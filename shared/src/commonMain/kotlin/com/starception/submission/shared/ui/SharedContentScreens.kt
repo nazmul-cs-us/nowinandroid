@@ -412,6 +412,7 @@ internal fun QuranDetailScreen(
     var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
     var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
     var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
+    var mushafMode by remember { mutableStateOf(store.quranMushafMode()) }
     LaunchedEffect(number, translationLanguage) {
         // Reload the ayahs when the translation language changes.
         loadAttempt += 1
@@ -456,8 +457,13 @@ internal fun QuranDetailScreen(
     ) { }
     val mushafPageAction = DetailAction(
         id = "mushaf_page",
-        label = "Mushaf page view",
-    ) { }
+        label = if (mushafMode) "Ayah list view" else "Mushaf page view",
+        selected = mushafMode,
+        trailingText = if (mushafMode) "ON" else "OFF",
+    ) {
+        mushafMode = !mushafMode
+        store.saveQuranMushafMode(mushafMode)
+    }
     val textAlignmentAction = DetailAction(
         id = "text_alignment",
         label = "Text alignment",
@@ -719,21 +725,29 @@ internal fun QuranDetailScreen(
                 val filteredVerses = remember(state.verses, query) {
                     filterQuranVerses(state.verses, query)
                 }
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text("Search ayah, Arabic, or translation") },
-                    leadingIcon = { Icon(NiaIcons.Search, contentDescription = null) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (!mushafMode) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        label = { Text("Search ayah, Arabic, or translation") },
+                        leadingIcon = { Icon(NiaIcons.Search, contentDescription = null) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        if (query.isBlank()) "${state.verses.size} ayahs" else "${filteredVerses.size} matches",
+                        if (mushafMode) {
+                            "${versesMushafPages(state.verses)} mushaf pages"
+                        } else if (query.isBlank()) {
+                            "${state.verses.size} ayahs"
+                        } else {
+                            "${filteredVerses.size} matches"
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -774,7 +788,17 @@ internal fun QuranDetailScreen(
                         )
                     }
                 }
-                if (filteredVerses.isEmpty()) {
+                if (mushafMode) {
+                    MushafPagerView(
+                        surah = surah,
+                        verses = state.verses,
+                        arabicFont = selectedArabicFont,
+                        arabicFontSize = arabicFontSize,
+                        showTranslation = showTranslation,
+                        textAlignment = textAlignment,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                } else if (filteredVerses.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         contentAlignment = Alignment.Center,
@@ -897,6 +921,9 @@ private fun QuranAyahReadingBlock(
 private fun Int.toArabicIndicDigits(): String = toString().map { digit ->
     if (digit in '0'..'9') ('٠'.code + (digit - '0')).toChar() else digit
 }.joinToString("")
+
+private fun versesMushafPages(verses: List<QuranVerse>): Int =
+    verses.map { it.page }.distinct().size
 
 @Composable
 internal fun SharedDuaLibraryScreen(
