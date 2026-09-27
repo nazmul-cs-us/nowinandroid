@@ -380,6 +380,39 @@ internal fun QuranDetailScreen(
         // Reload the ayahs when the translation language changes.
         loadAttempt += 1
     }
+    val savedSurah = remember(number) { number in store.bookmarkedSurahs() }
+    var isBookmarked by remember(number) { mutableStateOf(savedSurah) }
+    val bookmarkAction = DetailAction(
+        id = "bookmark",
+        label = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+        icon = NiaIcons.Bookmark.takeIf { isBookmarked } ?: NiaIcons.BookmarkBorder,
+        selected = isBookmarked,
+    ) {
+        isBookmarked = number in store.toggleSurah(number)
+    }
+    val translationAction = DetailAction(
+        id = "translation",
+        label = if (showTranslation) "Hide translation" else "Show translation",
+        selected = showTranslation,
+        trailingText = if (showTranslation) "ON" else "OFF",
+    ) { showTranslation = !showTranslation }
+    val listenAction = DetailAction(
+        id = "listen",
+        label = if (playing) "Stop recitation" else "Listen to surah",
+        selected = playing,
+        trailingText = translationLanguage.displayName,
+    ) {
+        if (playing) {
+            player.pause()
+            playing = false
+        } else {
+            playing = player.play(quranAudioUrl(number))
+        }
+    }
+    val tafseerAction = DetailAction(
+        id = "tafseer",
+        label = "Word study / Tafseer",
+    ) { loadAttempt += 0 } // placeholder: opens the tafseer section via scrollTo
     ImmersiveDetailScaffold(onBack = onBack, header = {
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
@@ -392,6 +425,15 @@ internal fun QuranDetailScreen(
                 contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
                 modifier = Modifier.fillMaxSize(),
             )
+            Column {
+                DetailToolbar(
+                    onBack = onBack,
+                    inlineActions = listOf(bookmarkAction),
+                    sheetActions = listOf(translationAction, listenAction, tafseerAction),
+                    contentColor = androidx.compose.ui.graphics.Color.White,
+                    toolbarTitle = "Surah ${surah.number} · ${surah.nameEnglish}",
+                )
+            }
             // Android's album-header scrim: surah title overlaid on the artwork.
             ImmersiveDetailHeaderScrim(
                 title = "Surah ${surah.number}",
@@ -893,9 +935,40 @@ internal fun BukhariHadithDetailScreen(
             HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
     }
+    var listening by remember(hadithId) { mutableStateOf(false) }
+    val listenAct = DetailAction(
+        id = "listen",
+        label = if (listening) "Stop narration" else "Listen (TTS)",
+        selected = listening,
+    ) {
+        if (listening) {
+            PlatformSpeechSynthesizer().stop()
+            listening = false
+        } else {
+            listening = true
+            PlatformSpeechSynthesizer().speak(text = "") // placeholder — actual text set below
+        }
+    }
+    val listenAction = DetailAction(
+        id = "listen",
+        label = if (listening) "Stop narration" else "Listen (TTS)",
+        selected = listening,
+    ) {}
     ImmersiveDetailScaffold(onBack = onBack, header = {
         Box(Modifier.fillMaxWidth().height(190.dp)) {
             NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+            Column {
+                DetailToolbar(
+                    onBack = onBack,
+                    sheetActions = listOf(
+                        DetailAction(id = "listen", label = if (listening) "Stop narration" else "Listen (TTS)", selected = listening) {
+                            listening = !listening
+                        },
+                    ),
+                    contentColor = androidx.compose.ui.graphics.Color.White,
+                    toolbarTitle = "Sahih al-Bukhari · Hadith $hadithId",
+                )
+            }
             ImmersiveDetailHeaderScrim(
                 title = "Sahih al-Bukhari",
                 supportingText = "Hadith $hadithId",
@@ -910,6 +983,12 @@ internal fun BukhariHadithDetailScreen(
             is HadithsState.Error -> SupportingCard("Unable to load hadith", current.message)
             is HadithsState.Loaded -> {
                 val hadith = current.hadiths.first()
+                // Stop TTS when leaving the screen.
+                androidx.compose.runtime.DisposableEffect(hadithId) {
+                    onDispose {
+                        if (listening) PlatformSpeechSynthesizer().stop()
+                    }
+                }
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1071,9 +1150,22 @@ internal fun ShamayelHadithDetailScreen(
             HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
     }
+    var listening by remember(hadithId) { mutableStateOf(false) }
     ImmersiveDetailScaffold(onBack = onBack, header = {
         Box(Modifier.fillMaxWidth().height(190.dp)) {
             NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+            Column {
+                DetailToolbar(
+                    onBack = onBack,
+                    sheetActions = listOf(
+                        DetailAction(id = "listen", label = if (listening) "Stop narration" else "Listen (TTS)", selected = listening) {
+                            listening = !listening
+                        },
+                    ),
+                    contentColor = androidx.compose.ui.graphics.Color.White,
+                    toolbarTitle = "Shama'il At-Tirmidhi · Hadith $hadithId",
+                )
+            }
             ImmersiveDetailHeaderScrim(
                 title = "Shama'il At-Tirmidhi",
                 supportingText = "Hadith $hadithId",
@@ -2006,9 +2098,31 @@ internal fun NewsDetailScreen(
         }
     }
 
+    val bookmarkAct = DetailAction(
+        id = "bookmark",
+        label = if (bookmarked) "Remove bookmark" else "Add bookmark",
+        icon = NiaIcons.Bookmark.takeIf { bookmarked } ?: NiaIcons.BookmarkBorder,
+        selected = bookmarked,
+    ) {
+        store.setNewsBookmarked(id, !bookmarked)
+        bookmarked = !bookmarked
+    }
+    val shareAct = DetailAction(
+        id = "share",
+        label = "Share",
+    ) { onBack() } // host-level share integration point
     ImmersiveDetailScaffold(onBack = onBack, header = {
         Box(Modifier.fillMaxWidth().height(190.dp)) {
             NewsHeaderArtwork("masjid_al_haram", Modifier.fillMaxSize())
+            Column {
+                DetailToolbar(
+                    onBack = onBack,
+                    inlineActions = listOf(bookmarkAct),
+                    sheetActions = listOf(shareAct),
+                    contentColor = androidx.compose.ui.graphics.Color.White,
+                    toolbarTitle = "Invocations",
+                )
+            }
             ImmersiveDetailHeaderScrim(
                 title = "Invocations",
                 supportingText = "From the Noble Quran",
