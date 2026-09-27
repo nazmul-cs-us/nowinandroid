@@ -765,8 +765,9 @@ private suspend fun loadIosContentStorageState(): ContentStorageState =
                 ?: return@withContext ContentStorageState(
                     error = "The Cloudflare asset manifest is unavailable",
                 )
+            // Every manifest category shows — the iOS storage manager mirrors
+            // the Android one, which lists all downloadable content.
             val categories = manifest.categories
-                .filterKeys { it in IOS_CONTENT_STORAGE_CATEGORIES }
                 .map { (category, info) ->
                     val status = iosCloudAssets.getCategoryStatus(category, manifest)
                     ContentStorageCategoryState(
@@ -800,14 +801,6 @@ private suspend fun loadIosContentStorageState(): ContentStorageState =
 
 private const val NARRATION_SAMPLE =
     "Assalamu alaikum, this is your selected narration voice."
-private val IOS_CONTENT_STORAGE_CATEGORIES = setOf(
-    "hadith_sahih_bukhari",
-    "news",
-    "model_asr",
-    "model_kws",
-    "model_tts_kokoro",
-    "model_tts_vits",
-)
 private const val TRAVEL_DUA_ARABIC =
     "سبحان الذي سخر لنا هذا وما كنا له مقرنين وإنا إلى ربنا لمنقلبون"
 
