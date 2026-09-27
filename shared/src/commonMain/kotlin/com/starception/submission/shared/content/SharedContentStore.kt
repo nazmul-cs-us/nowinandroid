@@ -79,6 +79,20 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         store.putString(QURAN_TEXT_ALIGNMENT, alignment)
     }
 
+    fun hadithTranslationLanguage(): String =
+        store.getString(HADITH_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank) ?: "en"
+
+    fun saveHadithTranslationLanguage(code: String) {
+        store.putString(HADITH_TRANSLATION_LANGUAGE, code)
+    }
+
+    fun hadithTranslationProvider(): String =
+        store.getString(HADITH_TRANSLATION_PROVIDER)?.takeUnless(String::isNullOrBlank) ?: "auto"
+
+    fun saveHadithTranslationProvider(provider: String) {
+        store.putString(HADITH_TRANSLATION_PROVIDER, provider)
+    }
+
     fun quranAutoplayPending(): Boolean =
         store.getString(QURAN_AUTOPLAY_PENDING)?.toBoolean() ?: false
 
@@ -312,6 +326,8 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val QURAN_MUSHAF_MODE = "shared_quran_mushaf_mode"
         private const val QURAN_TAJWEED_ENABLED = "shared_quran_tajweed_enabled"
         private const val QURAN_AUTOPLAY_PENDING = "shared_quran_autoplay_pending"
+        private const val HADITH_TRANSLATION_LANGUAGE = "shared_hadith_translation_language"
+        private const val HADITH_TRANSLATION_PROVIDER = "shared_hadith_translation_provider"
         private const val TOPIC_ORDER = "shared_topic_order"
         private const val BOOKMARK_MIGRATION_COMPLETE = "shared_news_bookmark_migration_complete"
         private const val SURAH_NEWS_ID_OFFSET = 2000

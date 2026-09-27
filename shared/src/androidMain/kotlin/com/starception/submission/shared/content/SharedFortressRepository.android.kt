@@ -26,4 +26,8 @@ private object AndroidSharedFortressRepository : SharedFortressRepository {
     override suspend fun getChapterInvocations(chapterId: Int): List<FortressInvocation> {
         error("The shared Fortress database is packaged by the iOS host only")
     }
+
+    override suspend fun getChapterReferences(chapterId: Int): Map<Int, String> {
+        error("The shared Fortress database is packaged by the iOS host only")
+    }
 }

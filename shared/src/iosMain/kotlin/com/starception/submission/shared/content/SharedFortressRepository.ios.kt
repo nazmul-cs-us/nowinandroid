@@ -59,6 +59,19 @@ private class IosSharedFortressRepository : SharedFortressRepository {
         }
     }
 
+    override suspend fun getChapterReferences(chapterId: Int): Map<Int, String> =
+        withContext(Dispatchers.Default) {
+            readRows(
+                sql = """
+                SELECT invocation_id, reference_str FROM hadith_references
+                WHERE invocation_id IN (SELECT id FROM invocations WHERE chapter_id = ?)
+                """.trimIndent(),
+                bind = { statement -> sqlite3_bind_int(statement, 1, chapterId) },
+            ) { statement ->
+                sqlite3_column_int(statement, 0) to columnText(statement, 1)
+            }.toMap()
+        }
+
     override suspend fun getChapterInvocations(chapterId: Int): List<FortressInvocation> =
         withContext(Dispatchers.Default) {
             readRows(

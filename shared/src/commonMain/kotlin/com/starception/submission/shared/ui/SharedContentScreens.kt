@@ -133,6 +133,7 @@ import com.starception.submission.shared.quran.createSharedTajweedRepository
 import com.starception.submission.shared.quran.filterQuranVerses
 import com.starception.submission.shared.quran.metadataLabel
 import com.starception.submission.shared.quran.tajweedAnnotatedString
+import com.starception.submission.shared.translation.SharedTranslationService
 import com.starception.submission.shared.voice.PlatformSpeechSynthesizer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -1212,6 +1213,7 @@ internal fun FortressChapterScreen(
     val repository = remember { createSharedFortressRepository() }
     var loadAttempt by remember { mutableStateOf(0) }
     var invocations by remember { mutableStateOf<List<FortressInvocation>>(emptyList()) }
+    var references by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
     var chapter by remember { mutableStateOf<FortressChapter?>(null) }
     var state by remember { mutableStateOf<DuaDetailState>(DuaDetailState.Loading) }
     LaunchedEffect(chapterId, loadAttempt) {
@@ -1219,6 +1221,7 @@ internal fun FortressChapterScreen(
         try {
             chapter = repository.getChapters().firstOrNull { it.id == chapterId }
             invocations = repository.getChapterInvocations(chapterId)
+            references = repository.getChapterReferences(chapterId)
             state = if (invocations.isEmpty()) {
                 DuaDetailState.Error("No invocations were found for chapter $chapterId.")
             } else {
@@ -1291,6 +1294,7 @@ internal fun FortressChapterScreen(
                 items(invocations, key = { it.id }) { invocation ->
                     FortressInvocationCard(
                         invocation = invocation,
+                        reference = references[invocation.id].orEmpty(),
                         playing = playingId == invocation.id,
                         onTogglePlay = {
                             if (playingId == invocation.id) {
@@ -1314,6 +1318,7 @@ internal fun FortressChapterScreen(
 @Composable
 private fun FortressInvocationCard(
     invocation: FortressInvocation,
+    reference: String,
     playing: Boolean,
     onTogglePlay: () -> Unit,
 ) {
@@ -1392,6 +1397,17 @@ private fun FortressInvocationCard(
                     invocation.note,
                     style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (reference.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    reference,
+                    style = MaterialTheme.typography.labelSmall.copy(lineHeight = 16.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                 )
             }
         }
@@ -1817,6 +1833,8 @@ internal fun BukhariHadithDetailScreen(
     }
     var listening by remember { mutableStateOf(false) }
     var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    var translationLanguage by remember { mutableStateOf(store.hadithTranslationLanguage()) }
+    var translationProvider by remember { mutableStateOf(store.hadithTranslationProvider()) }
     val arabicFontAction = DetailAction(
         id = "arabic_font",
         label = "Arabic font",
@@ -1828,13 +1846,11 @@ internal fun BukhariHadithDetailScreen(
         selectedArabicFont = next
         store.saveQuranArabicFont(next)
     }
-    val listenAction = DetailAction(
-        id = "listen",
-        label = if (listening) "Stop narration" else "Listen (TTS)",
-        selected = listening,
-    ) {
-        listening = !listening
-    }
+    // Play-all queue: narrates from the current hadith to the end of the
+    // book, auto-advancing the pager as each narration finishes — the shared
+    // counterpart of the Android hadith playlist.
+    var queueIndex by remember { mutableStateOf<Int?>(null) }
+    val queueSynthesizer = remember { PlatformSpeechSynthesizer() }
     when (val current = state) {
         HadithsState.Loading -> SharedDetailScaffold(title = "Sahih al-Bukhari", onBack = onBack) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -1850,22 +1866,127 @@ internal fun BukhariHadithDetailScreen(
             val pagerState = androidx.compose.foundation.pager.rememberPagerState(
                 initialPage = initialIndex,
             ) { hadiths.size }
-            // Stop narration when the user swipes to another hadith.
+            val queueScope = androidx.compose.runtime.rememberCoroutineScope()
+            // Drives the queue: scrolls to the queued hadith, narrates it,
+            // then enqueues the next one. A null index or a stop cancels.
+            LaunchedEffect(queueIndex) {
+                val index = queueIndex ?: return@LaunchedEffect
+                if (index >= hadiths.size) {
+                    queueIndex = null
+                    return@LaunchedEffect
+                }
+                pagerState.animateScrollToPage(index)
+                listening = true
+                val utterance = hadiths[index].english
+                if (utterance.isBlank()) {
+                    queueIndex = index + 1
+                    return@LaunchedEffect
+                }
+                queueSynthesizer.speak(text = utterance) { error ->
+                    if (error == null && queueIndex == index) {
+                        queueIndex = index + 1
+                    } else if (error != null) {
+                        queueIndex = null
+                        listening = false
+                    }
+                }
+            }
+            // Stop narration when the user swipes to another hadith manually.
             LaunchedEffect(pagerState.currentPage) {
-                PlatformSpeechSynthesizer().stop()
-                listening = false
+                if (queueIndex == null) {
+                    PlatformSpeechSynthesizer().stop()
+                    listening = false
+                }
             }
             androidx.compose.runtime.DisposableEffect(Unit) {
-                onDispose { PlatformSpeechSynthesizer().stop() }
+                onDispose {
+                    queueSynthesizer.stop()
+                    PlatformSpeechSynthesizer().stop()
+                }
             }
             val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
+            var translatedText by remember { mutableStateOf<String?>(null) }
+            var isTranslating by remember { mutableStateOf(false) }
+            LaunchedEffect(currentHadith.id, translationLanguage, translationProvider) {
+                if (translationLanguage == "en") {
+                    translatedText = null
+                } else {
+                    isTranslating = true
+                    translatedText = SharedTranslationService.translateFromEnglish(
+                        text = currentHadith.english,
+                        targetLang = translationLanguage,
+                        provider = translationProvider,
+                    )
+                    isTranslating = false
+                }
+            }
+            val translationLanguageAction = DetailAction(
+                id = "translation_language",
+                label = "Translation language",
+                trailingText = SharedTranslationService.displayName(translationLanguage),
+            ) {
+                val codes = SharedTranslationService.languages.map { it.first }
+                translationLanguage = codes[(codes.indexOf(translationLanguage) + 1) % codes.size]
+                store.saveHadithTranslationLanguage(translationLanguage)
+            }
+            val translationProviderAction = DetailAction(
+                id = "translation_provider",
+                label = "Translation provider",
+                trailingText = translationProvider.replaceFirstChar { it.uppercase() },
+            ) {
+                val providers = listOf(
+                    SharedTranslationService.PROVIDER_AUTO,
+                    SharedTranslationService.PROVIDER_GOOGLE,
+                    SharedTranslationService.PROVIDER_REVERSO,
+                )
+                translationProvider = providers[(providers.indexOf(translationProvider) + 1) % providers.size]
+                store.saveHadithTranslationProvider(translationProvider)
+            }
+            val listenAction = DetailAction(
+                id = "listen",
+                label = if (listening && queueIndex == null) "Stop narration" else "Listen (TTS)",
+                selected = listening && queueIndex == null,
+            ) {
+                queueIndex = null
+                queueSynthesizer.stop()
+                listening = !listening
+                if (listening) {
+                    PlatformSpeechSynthesizer().speak(text = currentHadith.english)
+                } else {
+                    PlatformSpeechSynthesizer().stop()
+                }
+            }
+            val playAllAction = DetailAction(
+                id = "play_all",
+                label = if (queueIndex != null) "Stop queue" else "Play all from here",
+                selected = queueIndex != null,
+                trailingText = if (queueIndex != null) {
+                    "${(queueIndex ?: 0) + 1}/${hadiths.size}"
+                } else {
+                    "${hadiths.size - pagerState.currentPage} left"
+                },
+            ) {
+                if (queueIndex != null) {
+                    queueSynthesizer.stop()
+                    queueIndex = null
+                    listening = false
+                } else {
+                    queueIndex = pagerState.currentPage
+                }
+            }
             ImmersiveDetailScaffold(onBack = onBack, header = {
                 Box(Modifier.fillMaxWidth().height(190.dp)) {
                     NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
                     Column {
                         DetailToolbar(
                             onBack = onBack,
-                            sheetActions = listOf(listenAction, arabicFontAction),
+                            sheetActions = listOf(
+                                listenAction,
+                                playAllAction,
+                                translationLanguageAction,
+                                translationProviderAction,
+                                arabicFontAction,
+                            ),
                             contentColor = androidx.compose.ui.graphics.Color.White,
                             toolbarTitle = "Sahih al-Bukhari · Hadith ${currentHadith.id}",
                         )
@@ -1894,6 +2015,9 @@ internal fun BukhariHadithDetailScreen(
                                 PlatformSpeechSynthesizer().stop()
                             }
                         },
+                        translatedText = if (index == pagerState.currentPage) translatedText else null,
+                        translationLanguage = translationLanguage,
+                        isTranslating = isTranslating && index == pagerState.currentPage,
                     )
                 }
                 Row(
@@ -1921,6 +2045,9 @@ private fun HadithDetailPage(
     arabicFont: String,
     listening: Boolean,
     onListeningChange: (Boolean) -> Unit,
+    translatedText: String? = null,
+    translationLanguage: String = "en",
+    isTranslating: Boolean = false,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -1962,6 +2089,24 @@ private fun HadithDetailPage(
             item {
                 ReaderSection("English translation", MaterialTheme.colorScheme.secondary) {
                     Text(hadith.english, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                }
+            }
+        }
+        if (isTranslating) {
+            item {
+                Text(
+                    "Translating…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else if (!translatedText.isNullOrBlank() && translatedText != hadith.english) {
+            item {
+                ReaderSection(
+                    "Translation (${SharedTranslationService.displayName(translationLanguage)})",
+                    MaterialTheme.colorScheme.tertiary,
+                ) {
+                    Text(translatedText, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
                 }
             }
         }
@@ -2091,6 +2236,8 @@ internal fun ShamayelHadithDetailScreen(
     }
     var listening by remember { mutableStateOf(false) }
     var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    var translationLanguage by remember { mutableStateOf(store.hadithTranslationLanguage()) }
+    var translationProvider by remember { mutableStateOf(store.hadithTranslationProvider()) }
     when (val current = state) {
         HadithsState.Loading -> SharedDetailScaffold(title = "Shama'il At-Tirmidhi", onBack = onBack) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -2106,14 +2253,81 @@ internal fun ShamayelHadithDetailScreen(
             val pagerState = androidx.compose.foundation.pager.rememberPagerState(
                 initialPage = initialIndex,
             ) { hadiths.size }
+            // Play-all queue — same mechanism as the Bukhari detail screen.
+            var queueIndex by remember { mutableStateOf<Int?>(null) }
+            val queueSynthesizer = remember { PlatformSpeechSynthesizer() }
+            LaunchedEffect(queueIndex) {
+                val index = queueIndex ?: return@LaunchedEffect
+                if (index >= hadiths.size) {
+                    queueIndex = null
+                    return@LaunchedEffect
+                }
+                pagerState.animateScrollToPage(index)
+                listening = true
+                val utterance = hadiths[index].english
+                if (utterance.isBlank()) {
+                    queueIndex = index + 1
+                    return@LaunchedEffect
+                }
+                queueSynthesizer.speak(text = utterance) { error ->
+                    if (error == null && queueIndex == index) {
+                        queueIndex = index + 1
+                    } else if (error != null) {
+                        queueIndex = null
+                        listening = false
+                    }
+                }
+            }
             LaunchedEffect(pagerState.currentPage) {
-                PlatformSpeechSynthesizer().stop()
-                listening = false
+                if (queueIndex == null) {
+                    PlatformSpeechSynthesizer().stop()
+                    listening = false
+                }
             }
             androidx.compose.runtime.DisposableEffect(Unit) {
-                onDispose { PlatformSpeechSynthesizer().stop() }
+                onDispose {
+                    queueSynthesizer.stop()
+                    PlatformSpeechSynthesizer().stop()
+                }
             }
             val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
+            var translatedText by remember { mutableStateOf<String?>(null) }
+            var isTranslating by remember { mutableStateOf(false) }
+            LaunchedEffect(currentHadith.id, translationLanguage, translationProvider) {
+                if (translationLanguage == "en") {
+                    translatedText = null
+                } else {
+                    isTranslating = true
+                    translatedText = SharedTranslationService.translateFromEnglish(
+                        text = currentHadith.english,
+                        targetLang = translationLanguage,
+                        provider = translationProvider,
+                    )
+                    isTranslating = false
+                }
+            }
+            val translationLanguageAction = DetailAction(
+                id = "translation_language",
+                label = "Translation language",
+                trailingText = SharedTranslationService.displayName(translationLanguage),
+            ) {
+                val codes = SharedTranslationService.languages.map { it.first }
+                translationLanguage = codes[(codes.indexOf(translationLanguage) + 1) % codes.size]
+                store.saveHadithTranslationLanguage(translationLanguage)
+            }
+            val translationProviderAction = DetailAction(
+                id = "translation_provider",
+                label = "Translation provider",
+                trailingText = translationProvider.replaceFirstChar { it.uppercase() },
+            ) {
+                val providers = listOf(
+                    SharedTranslationService.PROVIDER_AUTO,
+                    SharedTranslationService.PROVIDER_GOOGLE,
+                    SharedTranslationService.PROVIDER_REVERSO,
+                )
+                translationProvider = providers[(providers.indexOf(translationProvider) + 1) % providers.size]
+                store.saveHadithTranslationProvider(translationProvider)
+            }
             val arabicFontAction = DetailAction(
                 id = "arabic_font",
                 label = "Arabic font",
@@ -2127,10 +2341,35 @@ internal fun ShamayelHadithDetailScreen(
             }
             val listenAction = DetailAction(
                 id = "listen",
-                label = if (listening) "Stop narration" else "Listen (TTS)",
-                selected = listening,
+                label = if (listening && queueIndex == null) "Stop narration" else "Listen (TTS)",
+                selected = listening && queueIndex == null,
             ) {
+                queueIndex = null
+                queueSynthesizer.stop()
                 listening = !listening
+                if (listening) {
+                    PlatformSpeechSynthesizer().speak(text = currentHadith.english)
+                } else {
+                    PlatformSpeechSynthesizer().stop()
+                }
+            }
+            val playAllAction = DetailAction(
+                id = "play_all",
+                label = if (queueIndex != null) "Stop queue" else "Play all from here",
+                selected = queueIndex != null,
+                trailingText = if (queueIndex != null) {
+                    "${(queueIndex ?: 0) + 1}/${hadiths.size}"
+                } else {
+                    "${hadiths.size - pagerState.currentPage} left"
+                },
+            ) {
+                if (queueIndex != null) {
+                    queueSynthesizer.stop()
+                    queueIndex = null
+                    listening = false
+                } else {
+                    queueIndex = pagerState.currentPage
+                }
             }
             ImmersiveDetailScaffold(onBack = onBack, header = {
                 Box(Modifier.fillMaxWidth().height(190.dp)) {
@@ -2138,7 +2377,13 @@ internal fun ShamayelHadithDetailScreen(
                     Column {
                         DetailToolbar(
                             onBack = onBack,
-                            sheetActions = listOf(listenAction, arabicFontAction),
+                            sheetActions = listOf(
+                                listenAction,
+                                playAllAction,
+                                translationLanguageAction,
+                                translationProviderAction,
+                                arabicFontAction,
+                            ),
                             contentColor = androidx.compose.ui.graphics.Color.White,
                             toolbarTitle = "Shama'il At-Tirmidhi · Hadith ${currentHadith.id}",
                         )
@@ -2167,6 +2412,9 @@ internal fun ShamayelHadithDetailScreen(
                                 PlatformSpeechSynthesizer().stop()
                             }
                         },
+                        translatedText = if (index == pagerState.currentPage) translatedText else null,
+                        translationLanguage = translationLanguage,
+                        isTranslating = isTranslating && index == pagerState.currentPage,
                     )
                 }
                 Row(

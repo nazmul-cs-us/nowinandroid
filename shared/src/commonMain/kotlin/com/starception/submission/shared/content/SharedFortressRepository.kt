@@ -46,6 +46,9 @@ data class FortressInvocation(
 interface SharedFortressRepository {
     suspend fun getChapters(): List<FortressChapter>
     suspend fun getChapterInvocations(chapterId: Int): List<FortressInvocation>
+
+    /** Scholarly citation per invocation, keyed by invocation id (may be sparse). */
+    suspend fun getChapterReferences(chapterId: Int): Map<Int, String>
 }
 
 expect fun createSharedFortressRepository(): SharedFortressRepository
