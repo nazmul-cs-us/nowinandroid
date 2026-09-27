@@ -124,7 +124,10 @@ import com.starception.submission.shared.hadith.createSharedHadithRepository
 import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.salah.SalahProgress
+import com.starception.submission.shared.settings.VoiceRecognitionMode
 import com.starception.submission.shared.settings.formatOffset
+import com.starception.submission.shared.voice.PlatformSpeechRecognizer
+import com.starception.submission.shared.voice.SpeechRecognitionEvent
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 
@@ -195,6 +198,34 @@ fun PrayerTimesScreen(
     // place instead of navigating to separate pages.
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    // Voice search — Android's mic on the search bar: spoken words stream
+    // into the search field as live transcription.
+    var voiceSearchActive by remember { mutableStateOf(false) }
+    val voiceRecognizer = remember { PlatformSpeechRecognizer() }
+    val startVoiceSearch: () -> Unit = {
+        searchActive = true
+        voiceSearchActive = true
+        voiceRecognizer.start(VoiceRecognitionMode.TRANSCRIPTION) { event ->
+            when (event) {
+                SpeechRecognitionEvent.Listening -> voiceSearchActive = true
+                is SpeechRecognitionEvent.Partial -> searchQuery = event.text
+                is SpeechRecognitionEvent.Result -> {
+                    searchQuery = event.text
+                    voiceSearchActive = false
+                }
+                is SpeechRecognitionEvent.Error -> voiceSearchActive = false
+            }
+        }
+    }
+    LaunchedEffect(searchActive) {
+        if (!searchActive) {
+            voiceRecognizer.stop()
+            voiceSearchActive = false
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { voiceRecognizer.stop() }
+    }
     var showProfileSheet by remember { mutableStateOf(false) }
     val contentStore = remember { SharedContentStore() }
     val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
@@ -314,7 +345,10 @@ fun PrayerTimesScreen(
                             onOpenProfile = onOpenProfile,
                             onOpenSearch = { searchActive = true },
                             searchTerm = day.nextPrayer ?: day.currentPrayer,
-                            onVoiceTap = onVoiceTap,
+                            onVoiceTap = {
+                                searchActive = true
+                                startVoiceSearch()
+                            },
                             searchActive = searchActive,
                             searchQuery = searchQuery,
                             onSearchQueryChange = { searchQuery = it },
@@ -614,6 +648,37 @@ fun PrayerTimesScreen(
                                                     iconSize = 20.dp,
                                                     showBackground = false,
                                                     onClick = { searchQuery = "" },
+                                                )
+                                            }
+                                            IconTapTarget(
+                                                icon = Icons.Filled.Mic,
+                                                contentDescription = if (voiceSearchActive) {
+                                                    "Stop voice search"
+                                                } else {
+                                                    "Voice search"
+                                                },
+                                                tint = if (voiceSearchActive) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                                visualSize = 30.dp,
+                                                iconSize = 20.dp,
+                                                showBackground = false,
+                                                onClick = {
+                                                    if (voiceSearchActive) {
+                                                        voiceRecognizer.stop()
+                                                        voiceSearchActive = false
+                                                    } else {
+                                                        startVoiceSearch()
+                                                    }
+                                                },
+                                            )
+                                            if (voiceSearchActive) {
+                                                Text(
+                                                    "Listening…",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
                                                 )
                                             }
                                         }
