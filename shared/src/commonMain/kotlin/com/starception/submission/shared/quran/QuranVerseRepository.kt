@@ -34,6 +34,9 @@ interface QuranVerseRepository {
         surahNumber: Int,
         language: QuranTranslationLanguage,
     ): List<QuranVerse>
+
+    /** Full-text ayah search (Arabic), for the app-level search suggestions. */
+    suspend fun searchAyahs(query: String, limit: Int = 12): List<QuranVerse> = emptyList()
 }
 
 expect fun createQuranVerseRepository(): QuranVerseRepository

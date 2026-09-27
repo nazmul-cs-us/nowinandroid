@@ -34,6 +34,9 @@ interface SharedHadithRepository {
      */
     suspend fun getShamayelHadith(id: Int): SharedHadith? = getShamayelHadiths(id, id).firstOrNull()
     suspend fun getShamayelHadiths(firstId: Int, lastId: Int): List<SharedHadith>
+
+    /** Full-text Bukhari search over the English text, for search suggestions. */
+    suspend fun searchBukhari(query: String, limit: Int = 10): List<SharedHadith> = emptyList()
 }
 
 expect fun createSharedHadithRepository(): SharedHadithRepository

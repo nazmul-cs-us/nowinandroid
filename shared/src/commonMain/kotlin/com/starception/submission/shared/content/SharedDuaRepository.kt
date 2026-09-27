@@ -33,6 +33,9 @@ data class SharedQuranicDua(
 
 interface SharedDuaRepository {
     suspend fun getQuranicDuas(): List<SharedQuranicDua>
+
+    /** Full-text search over Quranic dua translations, for search suggestions. */
+    suspend fun searchQuranicDuas(query: String, limit: Int = 6): List<SharedQuranicDua> = emptyList()
 }
 
 expect fun createSharedDuaRepository(): SharedDuaRepository

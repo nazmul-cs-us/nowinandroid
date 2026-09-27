@@ -49,6 +49,9 @@ interface SharedFortressRepository {
 
     /** Scholarly citation per invocation, keyed by invocation id (may be sparse). */
     suspend fun getChapterReferences(chapterId: Int): Map<Int, String>
+
+    /** Full-text search over Fortress translations, for search suggestions. */
+    suspend fun searchFortressInvocations(query: String, limit: Int = 6): List<FortressInvocation> = emptyList()
 }
 
 expect fun createSharedFortressRepository(): SharedFortressRepository

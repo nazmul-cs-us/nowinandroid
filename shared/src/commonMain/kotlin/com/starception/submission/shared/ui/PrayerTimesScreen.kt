@@ -66,7 +66,6 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -579,16 +578,55 @@ private fun PrayerHomeHeader(
         // Inline expanding search — Android's SearchView expands in the bar
         // with live suggestions instead of navigating to a search page.
         if (searchActive) {
+            // Android's expanded SearchView input: a filled pill in
+            // surfaceContainerHigh — no outline, no indicator.
             val focusRequester = remember { FocusRequester() }
             LaunchedEffect(Unit) {
                 focusRequester.requestFocus()
             }
-            androidx.compose.material3.OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                placeholder = { androidx.compose.material3.Text("Search Quran, Hadith and more") },
-                leadingIcon = { Icon(NiaIcons.Search, contentDescription = null) },
-                trailingIcon = {
+            androidx.compose.material3.Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .focusRequester(focusRequester),
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 16.dp, end = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = NiaIcons.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                        decorationBox = { innerField ->
+                            Box(Modifier.weight(1f)) {
+                                if (searchQuery.isEmpty()) {
+                                    Text(
+                                        "Search Quran, Hadith and more",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                innerField()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
                     IconTapTarget(
                         icon = Icons.Filled.Close,
                         contentDescription = "Close search",
@@ -601,14 +639,8 @@ private fun PrayerHomeHeader(
                             onSearchActiveChange(false)
                         },
                     )
-                },
-                singleLine = true,
-                shape = CircleShape,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp)
-                    .focusRequester(focusRequester),
-            )
+                }
+            }
         } else {
             Surface(
                 onClick = onOpenSearch,
