@@ -833,7 +833,7 @@ private fun PrayerHomeHeader(
  *  renderSuggestions sections: catalog names, full-text ayah and hadith
  *  matches, Fortress/Quranic duas, recent chips, and popular shortcuts. */
 @Composable
-private fun SearchSuggestionsOverlayContent(
+internal fun SearchSuggestionsOverlayContent(
     query: String,
     onOpenSurah: (Int) -> Unit,
     onOpenBukhariBook: (Int) -> Unit,

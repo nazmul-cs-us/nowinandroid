@@ -16,6 +16,9 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -136,6 +139,16 @@ fun SharedNavHost(
 ) {
     val contentStore = remember { SharedContentStore() }
     val quranPlayer = remember { QuranAudioPlayer() }
+    // The app-level SearchPrefillBus equivalent: one search surface, shared
+    // by every bottom-tab page (Android's AppTopSearchBar pattern).
+    val searchController = rememberSharedSearchController(
+        onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+        onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+        onOpenBukhariHadith = { navController.navigate(BukhariHadithRoute(it)) },
+        onOpenQuranicDua = { navController.navigate(DuaDetailRoute(it)) },
+        onOpenFortressChapter = { navController.navigate(FortressChapterRoute(it)) },
+        onRecordRecent = { contentStore.addRecentSearch(it) },
+    )
     DisposableEffect(quranPlayer) {
         onDispose { quranPlayer.stop() }
     }
@@ -178,241 +191,258 @@ fun SharedNavHost(
             }
         }
     }
-    NavHost(
-        navController = navController,
-        startDestination = if (startInSettings) PrayerSettingsRoute else PrayerTimesRoute,
-        modifier = modifier,
-    ) {
-        composable<PrayerTimesRoute> {
-            CompositionLocalProvider(LocalQuranAudioPlayer provides quranPlayer) {
-                home(
-                    SharedHomeActions(
-                        onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
-                        onOpenProfile = { navController.navigate(ProfileRoute) },
-                        onOpenSearch = { navController.navigate(SearchRoute) },
-                        onOpenQuran = { navController.navigate(QuranDetailRoute(it)) },
-                        onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
-                        onOpenBukhariHadith = { navController.navigate(BukhariHadithRoute(it)) },
-                        onOpenQuranicDua = { navController.navigate(DuaDetailRoute(it)) },
-                        onOpenFortressChapter = { navController.navigate(FortressChapterRoute(it)) },
-                        onOpenQibla = { navController.navigate(QiblaRoute) },
-                        onOpenRecommendation = { navController.navigate(RecommendationRoute) },
-                        onOpenDrivingMode = { navController.navigate(DrivingModeRoute) },
-                        onSelectBottom = selectBottom,
-                    ),
+    Box(modifier) {
+        NavHost(
+            navController = navController,
+            startDestination = if (startInSettings) PrayerSettingsRoute else PrayerTimesRoute,
+            modifier = Modifier,
+        ) {
+            composable<PrayerTimesRoute> {
+                CompositionLocalProvider(LocalQuranAudioPlayer provides quranPlayer) {
+                    home(
+                        SharedHomeActions(
+                            onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
+                            onOpenProfile = { navController.navigate(ProfileRoute) },
+                            onOpenSearch = { navController.navigate(SearchRoute) },
+                            onOpenQuran = { navController.navigate(QuranDetailRoute(it)) },
+                            onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                            onOpenBukhariHadith = { navController.navigate(BukhariHadithRoute(it)) },
+                            onOpenQuranicDua = { navController.navigate(DuaDetailRoute(it)) },
+                            onOpenFortressChapter = { navController.navigate(FortressChapterRoute(it)) },
+                            onOpenQibla = { navController.navigate(QiblaRoute) },
+                            onOpenRecommendation = { navController.navigate(RecommendationRoute) },
+                            onOpenDrivingMode = { navController.navigate(DrivingModeRoute) },
+                            onSelectBottom = selectBottom,
+                        ),
+                    )
+                }
+            }
+            composable<PrayerSettingsRoute> {
+                // popBackStack rather than navigate(home): navigating would push a
+                // second copy of the home screen and leave settings on the stack,
+                // so the system back gesture would return to it.
+                settings(
+                    { navController.popBackStack() },
+                    { navController.navigate(SalahTrainingRoute) },
                 )
             }
-        }
-        composable<PrayerSettingsRoute> {
-            // popBackStack rather than navigate(home): navigating would push a
-            // second copy of the home screen and leave settings on the stack,
-            // so the system back gesture would return to it.
-            settings(
-                { navController.popBackStack() },
-                { navController.navigate(SalahTrainingRoute) },
-            )
-        }
-        composable<ForYouRoute> {
-            ForYouScreen(
-                date = today,
-                store = contentStore,
-                onOpenRecommendation = { navController.navigate(RecommendationRoute) },
-                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
-                onSelectBottom = selectBottom,
-                onOpenNews = openNews,
-                onOpenTopic = openTopic,
-            )
-        }
-        composable<SavedRoute> {
-            SavedScreen(
-                store = contentStore,
-                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
-                onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
-                onSelectBottom = selectBottom,
-                onOpenNews = openNews,
-                onOpenTopic = openTopic,
-            )
-        }
-        composable<CourseRoute> {
-            CourseScreen(contentStore, selectBottom)
-        }
-        composable<InterestsRoute> {
-            InterestsScreen(
-                store = contentStore,
-                onSelectBottom = selectBottom,
-                onOpenTopic = openTopic,
-            )
-        }
-        composable<SearchRoute> {
-            SearchScreen(
-                onBack = { navController.popBackStack() },
-                onOpenQuranLibrary = { navController.navigate(QuranLibraryRoute) },
-                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
-                onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
-            )
-        }
-        composable<ProfileRoute> {
-            ProfileScreen(contentStore) { navController.popBackStack() }
-        }
-        composable<DrivingModeRoute> {
-            DrivingModeScreen(
-                coordinator = drivingCoordinator,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<FortressLibraryRoute> {
-            FortressLibraryScreen(
-                onBack = { navController.popBackStack() },
-                onOpenChapter = { chapterId ->
-                    navController.navigate(FortressChapterRoute(chapterId))
-                },
-            )
-        }
-        composable<FortressChapterRoute> { entry ->
-            val route = entry.toRoute<FortressChapterRoute>()
-            FortressChapterScreen(
-                chapterId = route.id,
-                player = quranPlayer,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<DuaLibraryRoute> {
-            SharedDuaLibraryScreen(
-                onBack = { navController.popBackStack() },
-                onOpenDua = { duaNumber ->
-                    navController.navigate(DuaDetailRoute(duaNumber))
-                },
-            )
-        }
-        composable<DuaDetailRoute> { entry ->
-            val route = entry.toRoute<DuaDetailRoute>()
-            SharedDuaDetailScreen(
-                number = route.number,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<QuranLibraryRoute> {
-            QuranLibraryScreen(
-                store = contentStore,
-                onBack = { navController.popBackStack() },
-                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
-                onOpenDuas = { navController.navigate(DuaLibraryRoute) },
-                onOpenFortress = { navController.navigate(FortressLibraryRoute) },
-            )
-        }
-        composable<QuranDetailRoute> { entry ->
-            QuranDetailScreen(
-                number = entry.toRoute<QuranDetailRoute>().number,
-                store = contentStore,
-                player = quranPlayer,
-                onOpenSurah = { surahNumber ->
-                    // Prev/next surah replaces the current entry so swiping
-                    // through surahs doesn't pile up back-stack entries.
-                    navController.navigate(QuranDetailRoute(surahNumber)) {
-                        navController.currentDestination?.id?.let { id ->
-                            popUpTo(id) { inclusive = true }
-                        }
-                        launchSingleTop = true
-                    }
-                },
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<NewsDetailRoute> { entry ->
-            val id = entry.toRoute<NewsDetailRoute>().id
-            if (id in SURAH_NEWS_ID_RANGE) {
+            composable<ForYouRoute> {
+                Column(Modifier.fillMaxSize()) {
+                    SharedTabSearchHeader(searchController, title = "For You")
+                    ForYouScreen(
+                        date = today,
+                        store = contentStore,
+                        onOpenRecommendation = { navController.navigate(RecommendationRoute) },
+                        onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                        onSelectBottom = selectBottom,
+                        onOpenNews = openNews,
+                        onOpenTopic = openTopic,
+                    )
+                }
+            }
+            composable<SavedRoute> {
+                Column(Modifier.fillMaxSize()) {
+                    SharedTabSearchHeader(searchController, title = "Saved")
+                    SavedScreen(
+                        store = contentStore,
+                        onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                        onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                        onSelectBottom = selectBottom,
+                        onOpenNews = openNews,
+                        onOpenTopic = openTopic,
+                    )
+                }
+            }
+            composable<CourseRoute> {
+                Column(Modifier.fillMaxSize()) {
+                    SharedTabSearchHeader(searchController, title = "Course")
+                    CourseScreen(contentStore, selectBottom)
+                }
+            }
+            composable<InterestsRoute> {
+                Column(Modifier.fillMaxSize()) {
+                    SharedTabSearchHeader(searchController, title = "Interests")
+                    InterestsScreen(
+                        store = contentStore,
+                        onSelectBottom = selectBottom,
+                        onOpenTopic = openTopic,
+                    )
+                }
+            }
+            composable<SearchRoute> {
+                SearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenQuranLibrary = { navController.navigate(QuranLibraryRoute) },
+                    onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                    onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                )
+            }
+            composable<ProfileRoute> {
+                ProfileScreen(contentStore) { navController.popBackStack() }
+            }
+            composable<DrivingModeRoute> {
+                DrivingModeScreen(
+                    coordinator = drivingCoordinator,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<FortressLibraryRoute> {
+                FortressLibraryScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenChapter = { chapterId ->
+                        navController.navigate(FortressChapterRoute(chapterId))
+                    },
+                )
+            }
+            composable<FortressChapterRoute> { entry ->
+                val route = entry.toRoute<FortressChapterRoute>()
+                FortressChapterScreen(
+                    chapterId = route.id,
+                    player = quranPlayer,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<DuaLibraryRoute> {
+                SharedDuaLibraryScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenDua = { duaNumber ->
+                        navController.navigate(DuaDetailRoute(duaNumber))
+                    },
+                )
+            }
+            composable<DuaDetailRoute> { entry ->
+                val route = entry.toRoute<DuaDetailRoute>()
+                SharedDuaDetailScreen(
+                    number = route.number,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<QuranLibraryRoute> {
+                QuranLibraryScreen(
+                    store = contentStore,
+                    onBack = { navController.popBackStack() },
+                    onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                    onOpenDuas = { navController.navigate(DuaLibraryRoute) },
+                    onOpenFortress = { navController.navigate(FortressLibraryRoute) },
+                )
+            }
+            composable<QuranDetailRoute> { entry ->
                 QuranDetailScreen(
-                    number = id - SURAH_NEWS_ID_OFFSET,
+                    number = entry.toRoute<QuranDetailRoute>().number,
                     store = contentStore,
                     player = quranPlayer,
                     onOpenSurah = { surahNumber ->
+                        // Prev/next surah replaces the current entry so swiping
+                        // through surahs doesn't pile up back-stack entries.
                         navController.navigate(QuranDetailRoute(surahNumber)) {
-                            navController.currentDestination?.id?.let { destinationId ->
-                                popUpTo(destinationId) { inclusive = true }
+                            navController.currentDestination?.id?.let { id ->
+                                popUpTo(id) { inclusive = true }
                             }
                             launchSingleTop = true
                         }
                     },
                     onBack = { navController.popBackStack() },
                 )
-            } else {
-                NewsDetailScreen(
-                    id = id,
+            }
+            composable<NewsDetailRoute> { entry ->
+                val id = entry.toRoute<NewsDetailRoute>().id
+                if (id in SURAH_NEWS_ID_RANGE) {
+                    QuranDetailScreen(
+                        number = id - SURAH_NEWS_ID_OFFSET,
+                        store = contentStore,
+                        player = quranPlayer,
+                        onOpenSurah = { surahNumber ->
+                            navController.navigate(QuranDetailRoute(surahNumber)) {
+                                navController.currentDestination?.id?.let { destinationId ->
+                                    popUpTo(destinationId) { inclusive = true }
+                                }
+                                launchSingleTop = true
+                            }
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                } else {
+                    NewsDetailScreen(
+                        id = id,
+                        store = contentStore,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+            }
+            composable<BukhariBookRoute> { entry ->
+                BukhariBookDetailScreen(
+                    id = entry.toRoute<BukhariBookRoute>().id,
+                    store = contentStore,
+                    onBack = { navController.popBackStack() },
+                    onOpenHadith = { navController.navigate(BukhariHadithRoute(it)) },
+                )
+            }
+            composable<BukhariHadithRoute> { entry ->
+                BukhariHadithDetailScreen(
+                    hadithId = entry.toRoute<BukhariHadithRoute>().id,
                     store = contentStore,
                     onBack = { navController.popBackStack() },
                 )
             }
+            composable<ShamayelBookRoute> { entry ->
+                ShamayelBookDetailScreen(
+                    id = entry.toRoute<ShamayelBookRoute>().id,
+                    store = contentStore,
+                    onBack = { navController.popBackStack() },
+                    onOpenHadith = { navController.navigate(ShamayelHadithRoute(it)) },
+                )
+            }
+            composable<ShamayelHadithRoute> { entry ->
+                ShamayelHadithDetailScreen(
+                    hadithId = entry.toRoute<ShamayelHadithRoute>().id,
+                    store = contentStore,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<TopicRoute> { entry ->
+                TopicNewsScreen(
+                    topicId = entry.toRoute<TopicRoute>().id,
+                    store = contentStore,
+                    onBack = { navController.popBackStack() },
+                    onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                    onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                    onOpenShamayelBook = { navController.navigate(ShamayelBookRoute(it)) },
+                    onOpenArticle = { topicId, articleId ->
+                        navController.navigate(TopicArticleRoute(topicId, articleId))
+                    },
+                    onOpenNews = openNews,
+                    onOpenTopic = openTopic,
+                )
+            }
+            composable<TopicArticleRoute> { entry ->
+                val route = entry.toRoute<TopicArticleRoute>()
+                TopicArticleDetailScreen(
+                    topicId = route.topicId,
+                    articleId = route.articleId,
+                    store = contentStore,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<SalahTrainingRoute> {
+                SalahTrainingLabScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<QiblaRoute> {
+                QiblaScreen(latitude, longitude) { navController.popBackStack() }
+            }
+            composable<RecommendationRoute> {
+                RecommendationScreen(
+                    date = today,
+                    onBack = { navController.popBackStack() },
+                    onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                    onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                )
+            }
         }
-        composable<BukhariBookRoute> { entry ->
-            BukhariBookDetailScreen(
-                id = entry.toRoute<BukhariBookRoute>().id,
-                store = contentStore,
-                onBack = { navController.popBackStack() },
-                onOpenHadith = { navController.navigate(BukhariHadithRoute(it)) },
-            )
-        }
-        composable<BukhariHadithRoute> { entry ->
-            BukhariHadithDetailScreen(
-                hadithId = entry.toRoute<BukhariHadithRoute>().id,
-                store = contentStore,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<ShamayelBookRoute> { entry ->
-            ShamayelBookDetailScreen(
-                id = entry.toRoute<ShamayelBookRoute>().id,
-                store = contentStore,
-                onBack = { navController.popBackStack() },
-                onOpenHadith = { navController.navigate(ShamayelHadithRoute(it)) },
-            )
-        }
-        composable<ShamayelHadithRoute> { entry ->
-            ShamayelHadithDetailScreen(
-                hadithId = entry.toRoute<ShamayelHadithRoute>().id,
-                store = contentStore,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<TopicRoute> { entry ->
-            TopicNewsScreen(
-                topicId = entry.toRoute<TopicRoute>().id,
-                store = contentStore,
-                onBack = { navController.popBackStack() },
-                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
-                onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
-                onOpenShamayelBook = { navController.navigate(ShamayelBookRoute(it)) },
-                onOpenArticle = { topicId, articleId ->
-                    navController.navigate(TopicArticleRoute(topicId, articleId))
-                },
-                onOpenNews = openNews,
-                onOpenTopic = openTopic,
-            )
-        }
-        composable<TopicArticleRoute> { entry ->
-            val route = entry.toRoute<TopicArticleRoute>()
-            TopicArticleDetailScreen(
-                topicId = route.topicId,
-                articleId = route.articleId,
-                store = contentStore,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<SalahTrainingRoute> {
-            SalahTrainingLabScreen(
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<QiblaRoute> {
-            QiblaScreen(latitude, longitude) { navController.popBackStack() }
-        }
-        composable<RecommendationRoute> {
-            RecommendationScreen(
-                date = today,
-                onBack = { navController.popBackStack() },
-                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
-                onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
-            )
-        }
+
+        // The shared search surface floats above every destination.
+        SharedSearchOverlay(searchController)
     }
 }
 
