@@ -250,11 +250,16 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
             return
         }
 
+        // The stale date must stay in the FUTURE or ActivityKit rejects the
+        // whole request (ActivityInput error 0). Filtered-next guarantees
+        // next.date > now, so anchoring staleness at the prayer time is safe;
+        // the prayer window stays in the content state for the widget.
         let state = PrayerActivityAttributes.ContentState(
             prayerName: next.entry.name,
             prayerDate: next.date,
             activeUntil: next.date.addingTimeInterval(TimeInterval(60 * next.entry.activeMinutes))
         )
+        guard next.date > Date() else { return }
         Task { [weak self] in
             if let activity = Activity<PrayerActivityAttributes>.activities.first {
                 await Self.update(activity, state: state)
@@ -277,21 +282,23 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         attributes: PrayerActivityAttributes,
         state: PrayerActivityAttributes.ContentState
     ) throws -> Activity<PrayerActivityAttributes> {
+        // No pushType: the schedule republishes every minute, so local
+        // updates drive the activity. Requesting .token requires APNs
+        // registration and fails on debug builds without the push
+        // entitlement.
         if #available(iOS 16.2, *) {
             return try Activity.request(
                 attributes: attributes,
                 content: ActivityContent(
                     state: state,
-                    staleDate: state.activeUntil,
+                    staleDate: max(state.activeUntil, state.prayerDate),
                     relevanceScore: 1
-                ),
-                pushType: .token
+                )
             )
         }
         return try Activity.request(
             attributes: attributes,
-            contentState: state,
-            pushType: .token
+            contentState: state
         )
     }
 
@@ -304,7 +311,7 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
             await activity.update(
                 ActivityContent(
                     state: state,
-                    staleDate: state.activeUntil,
+                    staleDate: max(state.activeUntil, state.prayerDate),
                     relevanceScore: 1
                 )
             )
