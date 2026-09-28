@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -72,9 +73,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -114,6 +117,7 @@ import com.starception.submission.shared.content.DailyRecommendation
 import com.starception.submission.shared.content.FortressChapter
 import com.starception.submission.shared.content.FortressInvocation
 import com.starception.submission.shared.content.SharedContentStore
+import com.starception.submission.shared.content.SharedCourses
 import com.starception.submission.shared.content.SharedNewsResource
 import com.starception.submission.shared.content.SharedQuranicDua
 import com.starception.submission.shared.content.SharedTopic
@@ -2881,8 +2885,18 @@ internal fun CourseScreen(
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
+    onOpenSurah: (Int) -> Unit = {},
+    onOpenBukhariBook: (Int) -> Unit = {},
 ) {
-    var completed by remember { mutableStateOf(store.completedLessons()) }
+    var enrolled by remember { mutableStateOf(store.enrolledCourses()) }
+    var progress by remember { mutableStateOf(mapOf<String, Int>()) }
+    LaunchedEffect(Unit) {
+        progress = com.starception.submission.shared.content.SharedCourses.associate {
+            it.id to store.courseProgress(it.id)
+        }
+    }
+    var selectedFilter by remember { mutableStateOf("MY_COURSES") }
+
     TopLevelScaffold(
         title = "Course",
         selectedIndex = 3,
@@ -2895,16 +2909,252 @@ internal fun CourseScreen(
     ) { _ ->
         item {
             Text(
-                "Foundations · ${completed.size}/${SharedCourseLessons.size} complete",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                "Small lessons. Meaningful progress.",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // Filter chips: My Courses / Explore / categories
+        item {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+            ) {
+                val filters = listOf(
+                    "MY_COURSES" to "My Courses",
+                    "ALL" to "All",
+                    "QURAN" to "Quran",
+                    "HADITH" to "Hadith",
+                    "MEMORIZATION" to "Memorization",
+                )
+                items(filters, key = { it.first }) { (key, label) ->
+                    FilterChip(
+                        selected = selectedFilter == key,
+                        onClick = { selectedFilter = key },
+                        label = { Text(label) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // Your Progress section
+        item {
+            val enrolledCourses = com.starception.submission.shared.content.SharedCourses
+                .filter { it.id in enrolled }
+            val totalLessons = enrolledCourses.sumOf { it.totalLessons }
+            val completedLessons = progress.values.sum()
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    listOf(
+                        "Courses" to "${enrolledCourses.size}",
+                        "Lessons" to "$completedLessons",
+                        "Complete" to if (totalLessons > 0) "${completedLessons * 100 / totalLessons}%" else "0%",
+                    ).forEach { (label, value) ->
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                value,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // Course cards
+        val visible = when (selectedFilter) {
+            "MY_COURSES" -> com.starception.submission.shared.content.SharedCourses.filter { it.id in enrolled }
+            "ALL" -> com.starception.submission.shared.content.SharedCourses
+            "QURAN" -> com.starception.submission.shared.content.SharedCourses.filter { it.category == "Quran" }
+            "HADITH" -> com.starception.submission.shared.content.SharedCourses.filter { it.category == "Hadith" }
+            "MEMORIZATION" -> com.starception.submission.shared.content.SharedCourses.filter { it.category == "Memorization" }
+            else -> emptyList()
+        }
+
+        if (visible.isEmpty() && selectedFilter == "MY_COURSES") {
+            item {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            "Start learning",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Enroll in a course to begin your journey",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Button(onClick = { selectedFilter = "ALL" }) {
+                            Text("Browse all courses")
+                        }
+                    }
+                }
+            }
+        } else {
+            gridItems(visible, key = { it.id }) { course ->
+                val isEnrolled = course.id in enrolled
+                val courseProgress = progress[course.id] ?: 0
+                val percent = if (course.totalLessons > 0) courseProgress * 100 / course.totalLessons else 0
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                course.category.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                course.difficulty,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            course.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            course.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            course.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "${course.totalLessons} lessons · $percent%",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (isEnrolled) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = {
+                                        // Open the next lesson content
+                                        when (course.id) {
+                                            "memorize_3_ayahs", "juz_amma", "quran_reading" -> {
+                                                val nextSurah = (courseProgress % 114) + 1
+                                                onOpenSurah(nextSurah)
+                                            }
+                                            "daily_bukhari" -> {
+                                                onOpenBukhariBook(1)
+                                            }
+                                        }
+                                    }) {
+                                        Text("Continue")
+                                    }
+                                    OutlinedButton(onClick = {
+                                        store.incrementCourseProgress(course.id)
+                                        progress = progress + (course.id to store.courseProgress(course.id))
+                                    }) {
+                                        Text("Done")
+                                    }
+                                }
+                            } else {
+                                Button(onClick = {
+                                    enrolled = store.toggleEnrolledCourse(course.id)
+                                }) {
+                                    Text("Enroll")
+                                }
+                            }
+                        }
+                        if (isEnrolled && courseProgress > 0) {
+                            Spacer(Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { percent / 100f },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Foundational lessons (the original 5-lesson course, kept as a quick-start section)
+        item {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Foundations",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Text(
+                "${store.completedLessons().size}/${SharedCourseLessons.size} complete",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Spacer(Modifier.height(8.dp))
         }
         gridItems(SharedCourseLessons, key = { it.number }) { lesson ->
+            val completed = lesson.number in store.completedLessons()
             SupportingCard(
                 title = "${lesson.number}. ${lesson.title}",
                 body = lesson.summary,
-                action = if (lesson.number in completed) "Completed" else "Mark complete",
-                onAction = { completed = store.toggleLesson(lesson.number) },
+                action = if (completed) "Completed" else "Mark complete",
+                onAction = { store.toggleLesson(lesson.number) },
             )
         }
     }

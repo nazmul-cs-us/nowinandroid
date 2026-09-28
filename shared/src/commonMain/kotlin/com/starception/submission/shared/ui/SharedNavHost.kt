@@ -273,6 +273,9 @@ fun SharedNavHost(
                     searchController = searchController,
                     onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
                     onOpenProfile = { navController.navigate(ProfileRoute) },
+                    prayerAlert = tabPrayerAlert,
+                    onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                    onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
                 )
             }
             composable<InterestsRoute> {

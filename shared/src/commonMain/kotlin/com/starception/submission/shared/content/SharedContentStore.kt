@@ -288,6 +288,26 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
 
     fun saveTopicOrder(topicIds: List<Int>): List<Int> = setTopicOrder(topicIds)
 
+    /** Enrolled course ids. */
+    fun enrolledCourses(): Set<String> = stringSet(ENROLLED_COURSES)
+
+    fun toggleEnrolledCourse(courseId: String): Set<String> {
+        val updated = enrolledCourses().toMutableSet()
+        if (!updated.add(courseId)) updated.remove(courseId)
+        store.putString(ENROLLED_COURSES, updated.joinToString(SEPARATOR))
+        return updated
+    }
+
+    /** Completed lesson count for a course (per-course progress). */
+    fun courseProgress(courseId: String): Int =
+        store.getString("course_progress_$courseId")?.toIntOrNull() ?: 0
+
+    fun incrementCourseProgress(courseId: String): Int {
+        val updated = courseProgress(courseId) + 1
+        store.putString("course_progress_$courseId", updated.toString())
+        return updated
+    }
+
     fun completedLessons(): Set<Int> = intSet(COMPLETED_LESSONS, 1..COURSE_LESSON_COUNT)
 
     fun toggleLesson(number: Int): Set<Int> =
@@ -370,6 +390,7 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val QURAN_TAJWEED_ENABLED = "shared_quran_tajweed_enabled"
         private const val QURAN_AUTOPLAY_PENDING = "shared_quran_autoplay_pending"
         private const val CONTENT_SETUP_COMPLETE = "shared_content_setup_complete"
+        private const val ENROLLED_COURSES = "shared_enrolled_courses"
         private const val HADITH_TRANSLATION_LANGUAGE = "shared_hadith_translation_language"
         private const val RECENT_SEARCHES = "shared_recent_searches"
         private const val SALAH_SAMPLE_COUNTS = "shared_salah_sample_counts"
