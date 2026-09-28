@@ -77,7 +77,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -2888,14 +2887,26 @@ internal fun CourseScreen(
     onOpenSurah: (Int) -> Unit = {},
     onOpenBukhariBook: (Int) -> Unit = {},
 ) {
+    val allCourses = remember { com.starception.submission.shared.content.SharedCourses }
     var enrolled by remember { mutableStateOf(store.enrolledCourses()) }
-    var progress by remember { mutableStateOf(mapOf<String, Int>()) }
-    LaunchedEffect(Unit) {
-        progress = com.starception.submission.shared.content.SharedCourses.associate {
-            it.id to store.courseProgress(it.id)
-        }
+    var progress by remember {
+        mutableStateOf(allCourses.associate { it.id to store.courseProgress(it.id) })
     }
     var selectedFilter by remember { mutableStateOf("MY_COURSES") }
+
+    val myCourses = allCourses.filter { it.id in enrolled }
+    val featuredCourses = when (selectedFilter) {
+        "QURAN" -> allCourses.filter { it.category == "Quran" }
+        "HADITH" -> allCourses.filter { it.category == "Hadith" }
+        "MEMORIZATION" -> allCourses.filter { it.category == "Memorization" }
+        else -> allCourses
+    }
+    val filteredMyCourses = when (selectedFilter) {
+        "QURAN" -> myCourses.filter { it.category == "Quran" }
+        "HADITH" -> myCourses.filter { it.category == "Hadith" }
+        "MEMORIZATION" -> myCourses.filter { it.category == "Memorization" }
+        else -> myCourses
+    }
 
     TopLevelScaffold(
         title = "Course",
@@ -2907,223 +2918,184 @@ internal fun CourseScreen(
         onRefresh = { },
         prayerAlert = prayerAlert,
     ) { _ ->
+        // Editorial header — Android's CourseEditorialHeader
         item {
             Text(
                 "Small lessons. Meaningful progress.",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-            Spacer(Modifier.height(12.dp))
-        }
-
-        // Filter chips: My Courses / Explore / categories
-        item {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-            ) {
-                val filters = listOf(
-                    "MY_COURSES" to "My Courses",
-                    "ALL" to "All",
-                    "QURAN" to "Quran",
-                    "HADITH" to "Hadith",
-                    "MEMORIZATION" to "Memorization",
-                )
-                items(filters, key = { it.first }) { (key, label) ->
-                    FilterChip(
-                        selected = selectedFilter == key,
-                        onClick = { selectedFilter = key },
-                        label = { Text(label) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        // Your Progress section
-        item {
-            val enrolledCourses = com.starception.submission.shared.content.SharedCourses
-                .filter { it.id in enrolled }
-            val totalLessons = enrolledCourses.sumOf { it.totalLessons }
-            val completedLessons = progress.values.sum()
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 10.dp),
+            )
+        }
+
+        // Filter chips — Android's CourseHeader
+        item {
+            val primaryAccent = MaterialTheme.colorScheme.primary
+            data class Filter(val key: String, val label: String, val accent: androidx.compose.ui.graphics.Color)
+            val filters = listOf(
+                Filter("MY_COURSES", "Recent", primaryAccent),
+                Filter("QURAN", "Quran", androidx.compose.ui.graphics.Color(0xFF4F779D)),
+                Filter("HADITH", "Hadith", androidx.compose.ui.graphics.Color(0xFF99593C)),
+                Filter("MEMORIZATION", "Memorize", androidx.compose.ui.graphics.Color(0xFFCEC3A1)),
+            )
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 14.dp, bottom = 6.dp),
+                contentPadding = PaddingValues(horizontal = 22.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    listOf(
-                        "Courses" to "${enrolledCourses.size}",
-                        "Lessons" to "$completedLessons",
-                        "Complete" to if (totalLessons > 0) "${completedLessons * 100 / totalLessons}%" else "0%",
-                    ).forEach { (label, value) ->
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                value,
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                            )
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-        }
-
-        // Course cards
-        val visible = when (selectedFilter) {
-            "MY_COURSES" -> com.starception.submission.shared.content.SharedCourses.filter { it.id in enrolled }
-            "ALL" -> com.starception.submission.shared.content.SharedCourses
-            "QURAN" -> com.starception.submission.shared.content.SharedCourses.filter { it.category == "Quran" }
-            "HADITH" -> com.starception.submission.shared.content.SharedCourses.filter { it.category == "Hadith" }
-            "MEMORIZATION" -> com.starception.submission.shared.content.SharedCourses.filter { it.category == "Memorization" }
-            else -> emptyList()
-        }
-
-        if (visible.isEmpty() && selectedFilter == "MY_COURSES") {
-            item {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                items(filters, key = { it.key }) { filter ->
+                    val key = filter.key
+                    val label = filter.label
+                    val accent = filter.accent
+                    val selected = selectedFilter == key
+                    Surface(
+                        onClick = { selectedFilter = key },
+                        shape = RoundedCornerShape(999.dp),
+                        color = if (selected) accent else MaterialTheme.colorScheme.surfaceContainerLow,
+                        contentColor = if (selected) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                     ) {
                         Text(
-                            "Start learning",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                         )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Enroll in a course to begin your journey",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Button(onClick = { selectedFilter = "ALL" }) {
-                            Text("Browse all courses")
-                        }
                     }
                 }
             }
-        } else {
-            gridItems(visible, key = { it.id }) { course ->
-                val isEnrolled = course.id in enrolled
-                val courseProgress = progress[course.id] ?: 0
-                val percent = if (course.totalLessons > 0) courseProgress * 100 / course.totalLessons else 0
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+        }
+
+        // Learning overview — Android's CourseLearningOverview
+        item {
+            val completedLessons = myCourses.sumOf { progress[it.id] ?: 0 }
+            val totalLessons = myCourses.sumOf { it.totalLessons }
+            val overallProgress = if (totalLessons > 0) completedLessons.toFloat() / totalLessons else 0f
+            val barHeights = listOf(14, 19, 25, 20, 31, 37, 29, 43, 34, 49, 39, 54)
+            val accent = MaterialTheme.colorScheme.primary
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp, vertical = 12.dp),
+                shape = RoundedCornerShape(32.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
-                    Column(Modifier.padding(16.dp)) {
+                    // Header row: icon + title/lessons + chevron
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(11.dp),
                         ) {
-                            Text(
-                                course.category.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                course.difficulty,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    NiaIcons.Upcoming,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Text(
+                                    if (myCourses.isEmpty()) "Start learning" else "Learning progress",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    if (myCourses.isEmpty()) {
+                                        "${allCourses.size} courses ready to explore"
+                                    } else {
+                                        "$completedLessons of $totalLessons lessons"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            course.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            course.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            course.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
                         ) {
+                            Box(
+                                modifier = Modifier.size(42.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "Browse all courses",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    // Percentage + active badge
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                "${course.totalLessons} lessons · $percent%",
+                                "${(overallProgress * 100).toInt()}%",
+                                style = MaterialTheme.typography.displaySmall.copy(fontSize = 40.sp, lineHeight = 42.sp),
+                            )
+                            Text(
+                                if (myCourses.isEmpty()) "Ready when you are" else "Overall completion",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            if (isEnrolled) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = {
-                                        // Open the next lesson content
-                                        when (course.id) {
-                                            "memorize_3_ayahs", "juz_amma", "quran_reading" -> {
-                                                val nextSurah = (courseProgress % 114) + 1
-                                                onOpenSurah(nextSurah)
-                                            }
-                                            "daily_bukhari" -> {
-                                                onOpenBukhariBook(1)
-                                            }
-                                        }
-                                    }) {
-                                        Text("Continue")
-                                    }
-                                    OutlinedButton(onClick = {
-                                        store.incrementCourseProgress(course.id)
-                                        progress = progress + (course.id to store.courseProgress(course.id))
-                                    }) {
-                                        Text("Done")
-                                    }
-                                }
-                            } else {
-                                Button(onClick = {
-                                    enrolled = store.toggleEnrolledCourse(course.id)
-                                }) {
-                                    Text("Enroll")
-                                }
-                            }
                         }
-                        if (isEnrolled && courseProgress > 0) {
-                            Spacer(Modifier.height(8.dp))
-                            LinearProgressIndicator(
-                                progress = { percent / 100f },
-                                modifier = Modifier.fillMaxWidth(),
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Text(
+                                if (myCourses.isEmpty()) "${allCourses.size} available" else "${myCourses.size} active",
+                                modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        }
+                    }
+
+                    // Mini histogram — Android's 12-bar progress bars
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        barHeights.forEachIndexed { index, barHeight ->
+                            val reached = overallProgress > 0f &&
+                                (index + 1).toFloat() / barHeights.size <= overallProgress
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(barHeight.dp)
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(
+                                        if (reached) accent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
+                                    ),
                             )
                         }
                     }
@@ -3131,31 +3103,234 @@ internal fun CourseScreen(
             }
         }
 
-        // Foundational lessons (the original 5-lesson course, kept as a quick-start section)
+        // Featured courses — Android's CourseSwipeableTiles (horizontal carousel)
         item {
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Foundations",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-            Text(
-                "${store.completedLessons().size}/${SharedCourseLessons.size} complete",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Featured courses", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "See all",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
         }
-        gridItems(SharedCourseLessons, key = { it.number }) { lesson ->
-            val completed = lesson.number in store.completedLessons()
-            SupportingCard(
-                title = "${lesson.number}. ${lesson.title}",
-                body = lesson.summary,
-                action = if (completed) "Completed" else "Mark complete",
-                onAction = { store.toggleLesson(lesson.number) },
-            )
+        item {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 22.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(featuredCourses, key = { it.id }) { course ->
+                    val isEnrolled = course.id in enrolled
+                    val courseProgress = progress[course.id] ?: 0
+                    val percent = if (course.totalLessons > 0) courseProgress * 100 / course.totalLessons else 0
+                    val accent = when (course.category) {
+                        "Quran" -> androidx.compose.ui.graphics.Color(0xFF4F779D)
+                        "Hadith" -> androidx.compose.ui.graphics.Color(0xFF99593C)
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+
+                    Surface(
+                        onClick = {
+                            if (isEnrolled) {
+                                when (course.id) {
+                                    "memorize_3_ayahs" -> onOpenSurah(courseProgress + 1)
+                                    "juz_amma" -> onOpenSurah((78 + courseProgress).coerceAtMost(114))
+                                    "quran_reading" -> onOpenSurah(((courseProgress / 5) + 1).coerceIn(1, 114))
+                                    "daily_bukhari" -> onOpenBukhariBook(1)
+                                }
+                            } else {
+                                enrolled = store.toggleEnrolledCourse(course.id)
+                            }
+                        },
+                        shape = RoundedCornerShape(32.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.width(300.dp).height(224.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(9.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(accent, CircleShape),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            course.category.take(1),
+                                            color = androidx.compose.ui.graphics.Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 23.sp,
+                                        )
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            course.title,
+                                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, lineHeight = 20.sp),
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            course.subtitle,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                Text(
+                                    "${course.totalLessons} lessons · ${course.difficulty}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (isEnrolled) {
+                                    LinearProgressIndicator(
+                                        progress = { percent / 100f },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(5.dp)
+                                            .clip(RoundedCornerShape(999.dp)),
+                                        color = accent,
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        when {
+                                            percent >= 100 -> "Course complete"
+                                            isEnrolled -> "$percent% complete"
+                                            else -> course.category
+                                        },
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Surface(
+                                        onClick = {
+                                            if (isEnrolled && percent < 100) {
+                                                store.incrementCourseProgress(course.id)
+                                                progress = progress + (course.id to store.courseProgress(course.id))
+                                            } else if (!isEnrolled) {
+                                                enrolled = store.toggleEnrolledCourse(course.id)
+                                            }
+                                        },
+                                        shape = CircleShape,
+                                        color = accent,
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.size(42.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                if (isEnrolled && percent < 100) "▶" else "→",
+                                                color = androidx.compose.ui.graphics.Color.White,
+                                                fontSize = 18.sp,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // Continue learning — Android's OngoingCourseList
+        if (filteredMyCourses.isNotEmpty()) {
+            item {
+                Text(
+                    "Continue learning",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 22.dp),
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+            gridItems(filteredMyCourses, key = { it.id }) { course ->
+                val courseProgress = progress[course.id] ?: 0
+                val percent = if (course.totalLessons > 0) courseProgress * 100 / course.totalLessons else 0
+                val accent = when (course.category) {
+                    "Quran" -> androidx.compose.ui.graphics.Color(0xFF4F779D)
+                    "Hadith" -> androidx.compose.ui.graphics.Color(0xFF99593C)
+                    else -> MaterialTheme.colorScheme.primary
+                }
+                Surface(
+                    onClick = {
+                        when (course.id) {
+                            "memorize_3_ayahs" -> onOpenSurah(courseProgress + 1)
+                            "juz_amma" -> onOpenSurah((78 + courseProgress).coerceAtMost(114))
+                            "quran_reading" -> onOpenSurah(((courseProgress / 5) + 1).coerceIn(1, 114))
+                            "daily_bukhari" -> onOpenBukhariBook(1)
+                        }
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 22.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(accent, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(course.category.take(1), color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(course.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "$percent% · ${course.totalLessons} lessons",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Surface(
+                            onClick = {
+                                store.incrementCourseProgress(course.id)
+                                progress = progress + (course.id to store.courseProgress(course.id))
+                            },
+                            shape = CircleShape,
+                            color = accent,
+                        ) {
+                            Box(modifier = Modifier.size(38.dp), contentAlignment = Alignment.Center) {
+                                Text("▶", color = androidx.compose.ui.graphics.Color.White, fontSize = 16.sp)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
         }
     }
 }
