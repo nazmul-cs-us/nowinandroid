@@ -17,15 +17,21 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.ComposeUIViewController
 import com.starception.submission.core.designsystem.theme.DarkAndroidColorScheme
 import com.starception.submission.core.designsystem.theme.DarkCoastalColorScheme
@@ -88,718 +94,844 @@ import kotlin.time.Clock
  * screen to Compose. Everything below this line is shared with Android.
  */
 @Suppress("FunctionName")
+/**
+ * First-run content setup — the gate Android applies in MainActivity:
+ * required manifest categories that aren't available (bundled or cached)
+ * download through the setup screen before the app shows.
+ */
+@androidx.compose.runtime.Composable
+private fun ContentSetupGate(
+    store: com.starception.submission.shared.content.SharedContentStore,
+    content: @androidx.compose.runtime.Composable () -> Unit,
+) {
+    var setupState by remember { mutableStateOf<SetupGateState>(SetupGateState.Checking) }
+    LaunchedEffect(Unit) {
+        if (store.contentSetupComplete()) {
+            setupState = SetupGateState.Ready
+            return@LaunchedEffect
+        }
+        setupState = loadRequiredContentState() ?: SetupGateState.Ready
+    }
+    when (val state = setupState) {
+        SetupGateState.Checking, is SetupGateState.LoadingManifest ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        is SetupGateState.Ready -> content()
+        is SetupGateState.NeedDownload -> {
+            val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+            val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state
+                .collectAsState()
+            androidx.compose.runtime.LaunchedEffect(downloadStatus) {
+                if (downloadStatus == null && state.isDownloading) {
+                    // Download chain finished: mark complete and enter the app.
+                    store.saveContentSetupComplete(true)
+                    setupState = SetupGateState.Ready
+                } else if (downloadStatus != null) {
+                    setupState = state.copy(
+                        overallProgress = downloadStatus?.progress ?: state.overallProgress,
+                        isDownloading = true,
+                    )
+                }
+            }
+            ContentSetupScreen(
+                categories = state.categories,
+                overallProgress = if (downloadStatus != null) {
+                    downloadStatus?.progress ?: state.overallProgress
+                } else {
+                    state.overallProgress
+                },
+                isDownloading = state.isDownloading || downloadStatus != null,
+                error = state.error,
+                onComplete = {
+                    store.saveContentSetupComplete(true)
+                    setupState = SetupGateState.Ready
+                },
+                onDownload = {
+                    coroutineScope.launch { downloadRequiredContent(state.keys) }
+                },
+                onRetry = {
+                    coroutineScope.launch { downloadRequiredContent(state.keys) }
+                },
+                onSkip = {
+                    store.saveContentSetupComplete(true)
+                    setupState = SetupGateState.Ready
+                },
+            )
+        }
+    }
+}
+
+private sealed interface SetupGateState {
+    data object Checking : SetupGateState
+    data object LoadingManifest : SetupGateState
+    data object Ready : SetupGateState
+    data class NeedDownload(
+        val keys: List<String>,
+        val categories: List<com.starception.submission.shared.ui.ContentSetupCategory>,
+        val overallProgress: Float,
+        val isDownloading: Boolean,
+        val error: String? = null,
+    ) : SetupGateState
+}
+
+private suspend fun loadRequiredContentState(): SetupGateState =
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        val manifest = iosCloudAssets.loadManifest()
+            ?: return@withContext SetupGateState.Ready
+        val requiredCategories = manifest.categories.filter { it.value.required }
+        val missing = requiredCategories.filter { (key, _) ->
+            val status = iosCloudAssets.getCategoryStatus(key, manifest)
+            !status.isAvailable
+        }
+        if (missing.isEmpty()) {
+            return@withContext SetupGateState.Ready
+        }
+        SetupGateState.NeedDownload(
+            keys = missing.keys.toList(),
+            categories = missing.map { (key, info) ->
+                com.starception.submission.shared.ui.ContentSetupCategory(
+                    key = key,
+                    label = storageCategoryDisplayName(key),
+                    description = storageCategoryDescription(key),
+                    sizeBytes = info.totalSize,
+                )
+            },
+            overallProgress = 0f,
+            isDownloading = false,
+        )
+    }
+
+private suspend fun downloadRequiredContent(keys: List<String>) {
+    val manifest = iosCloudAssets.loadManifest() ?: return
+    keys.forEach { key ->
+        iosCloudAssets.downloadCategory(key, manifest) { progress ->
+            com.starception.submission.shared.assets.ContentDownloadBus.publish(
+                com.starception.submission.shared.assets.ContentDownloadStatus(
+                    label = storageCategoryDisplayName(key),
+                    progress = progress.fraction,
+                ),
+            )
+        }
+    }
+}
+
+@Suppress("FunctionName")
 fun PrayerTimesViewController(
     sherpaService: IosSherpaService? = null,
     salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService? = null,
 ): UIViewController = ComposeUIViewController {
-    val tracker = remember { SalahTracker() }
-    val settingsStore = remember { UserPrayerSettings() }
-    val appearanceStore = remember { UserAppearanceSettings() }
-    val audioStore = remember { UserAudioSettings() }
-    val locationStore = remember { LastLocationStore() }
-    val speechRecognizer = remember { PlatformSpeechRecognizer() }
-    val speechSynthesizer = remember { PlatformSpeechSynthesizer() }
-    val coroutineScope = rememberCoroutineScope()
-    val startInSettings = remember {
-        NSProcessInfo.processInfo.arguments.any { it == "--start-settings" }
-    }
-
-    var location by remember { mutableStateOf(locationStore.location()) }
-    var resolved by remember { mutableStateOf(false) }
-    var weatherCode by remember { mutableStateOf<Int?>(null) }
-    var temperature by remember { mutableStateOf<Double?>(null) }
-    var refreshRequest by remember { mutableStateOf(0) }
-    var isRefreshing by remember { mutableStateOf(false) }
-    var syncResultText by remember { mutableStateOf<String?>(null) }
-    var now by remember { mutableStateOf(Clock.System.now()) }
-    var themeSettings by remember { mutableStateOf(appearanceStore.settings()) }
-    var travelDuaSettings by remember { mutableStateOf(audioStore.travelDua()) }
-    var isTravelDuaPlaying by remember { mutableStateOf(false) }
-    var recognitionMode by remember { mutableStateOf(audioStore.recognitionMode()) }
-    var recognitionTestState by remember { mutableStateOf(VoiceTestState.IDLE) }
-    var recognitionTestText by remember { mutableStateOf<String?>(null) }
-    var recognitionSession by remember { mutableStateOf(0) }
-    val narrationVoices = remember(sherpaService) {
-        if (sherpaService == null) {
-            speechSynthesizer.voices()
-        } else {
-            listOf(
-                NarrationVoice(
-                    IosSherpaAssetResolver.KOKORO_VOICE_ID,
-                    "Kokoro",
-                    "High-quality English",
-                    totalSpeakers = 11,
-                ),
-                NarrationVoice(
-                    IosSherpaAssetResolver.VITS_VOICE_ID,
-                    "VCTK British",
-                    "British English",
-                    totalSpeakers = 109,
-                ),
-            )
+    val setupStore = remember { com.starception.submission.shared.content.SharedContentStore() }
+    ContentSetupGate(store = setupStore) {
+        val tracker = remember { SalahTracker() }
+        val settingsStore = remember { UserPrayerSettings() }
+        val appearanceStore = remember { UserAppearanceSettings() }
+        val audioStore = remember { UserAudioSettings() }
+        val locationStore = remember { LastLocationStore() }
+        val speechRecognizer = remember { PlatformSpeechRecognizer() }
+        val speechSynthesizer = remember { PlatformSpeechSynthesizer() }
+        val coroutineScope = rememberCoroutineScope()
+        val startInSettings = remember {
+            NSProcessInfo.processInfo.arguments.any { it == "--start-settings" }
         }
-    }
-    var selectedNarrationVoiceIdentifier by remember(narrationVoices) {
-        mutableStateOf(
-            audioStore.narrationVoiceIdentifier()
-                ?.takeIf { saved -> narrationVoices.any { it.identifier == saved } }
-                ?: narrationVoices.firstOrNull()?.identifier,
-        )
-    }
-    var isNarrationSpeaking by remember { mutableStateOf(false) }
-    var selectedNarrationSpeakerId by remember { mutableStateOf(audioStore.narrationSpeakerId()) }
-    var narrationStatus by remember { mutableStateOf<String?>(null) }
-    var narrationError by remember { mutableStateOf<String?>(null) }
-    var narrationSession by remember { mutableStateOf(0) }
-    var narrationJob by remember { mutableStateOf<Job?>(null) }
-    var recognitionJob by remember { mutableStateOf<Job?>(null) }
-    var automaticTravelDuaRequests by remember { mutableStateOf(0) }
-    var contentStorageState by remember { mutableStateOf(ContentStorageState()) }
-    var contentDownloadJob by remember { mutableStateOf<Job?>(null) }
-    var contentRefreshJob by remember { mutableStateOf<Job?>(null) }
-    val travelDuaMonitor = remember {
-        IosTravelDuaMonitor { automaticTravelDuaRequests += 1 }
-    }
 
-    fun stopAllSpeech() {
-        narrationSession += 1
-        narrationJob?.cancel()
-        narrationJob = null
-        sherpaService?.stopSpeaking()
-        speechSynthesizer.stop()
-        isTravelDuaPlaying = false
-        isNarrationSpeaking = false
-        narrationStatus = null
-    }
-
-    fun playTravelDua() {
-        recognitionSession += 1
-        recognitionJob?.cancel()
-        recognitionJob = null
-        sherpaService?.stopRecognition()
-        speechRecognizer.stop()
-        stopAllSpeech()
-        narrationError = null
-        isTravelDuaPlaying = true
-        val started = speechSynthesizer.speak(
-            text = TRAVEL_DUA_ARABIC,
-            language = "ar-SA",
-        ) { error ->
-            isTravelDuaPlaying = false
-            if (error != null) narrationError = error
-        }
-        if (!started) {
-            isTravelDuaPlaying = false
-            narrationError = "An Arabic system voice is not installed"
-        }
-    }
-
-    fun refreshContentStorage(message: String? = null, retryCategory: String? = null) {
-        contentRefreshJob?.cancel()
-        contentStorageState = contentStorageState.copy(
-            isLoading = true,
-            error = message,
-            retryCategoryKey = retryCategory,
-        )
-        contentRefreshJob = coroutineScope.launch {
-            val refreshed = loadIosContentStorageState()
-            contentStorageState = refreshed.copy(
-                error = message ?: refreshed.error,
-                retryCategoryKey = retryCategory,
-            )
-            contentRefreshJob = null
-        }
-    }
-
-    fun downloadContentCategory(category: String) {
-        if (contentDownloadJob?.isActive == true) return
-        contentStorageState = contentStorageState.copy(
-            error = null,
-            categories = contentStorageState.categories.map {
-                if (it.categoryKey == category) {
-                    it.copy(isDownloading = true, progress = 0f)
-                } else {
-                    it
-                }
-            },
-        )
-        lateinit var downloadJob: Job
-        downloadJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
-            var message: String? = null
-            try {
-                val manifest = iosCloudAssets.loadManifest()
-                    ?: error("The Cloudflare asset manifest is unavailable")
-                val result = iosCloudAssets.downloadCategory(category, manifest) { progress ->
-                    coroutineScope.launch(Dispatchers.Main) {
-                        if (contentDownloadJob === downloadJob && downloadJob.isActive) {
-                            contentStorageState = contentStorageState.copy(
-                                categories = contentStorageState.categories.map {
-                                    if (it.categoryKey == category) {
-                                        it.copy(isDownloading = true, progress = progress.fraction)
-                                    } else {
-                                        it
-                                    }
-                                },
-                            )
-                            // Feed the app-level pull-to-sync banner — the same
-                            // progress the Android strip shows on every screen.
-                            ContentDownloadBus.publish(
-                                ContentDownloadStatus(
-                                    label = storageCategoryDisplayName(category),
-                                    progress = progress.fraction,
-                                    completedFiles = progress.completedFiles,
-                                    totalFiles = progress.totalFiles,
-                                ),
-                            )
-                        }
-                    }
-                }
-                if (!result.isComplete) {
-                    message = "Could not download ${result.missingAssets.size} files. Try again."
-                }
-            } catch (_: CancellationException) {
-                // User-requested cancellation is reflected by the refreshed cache state.
-            } catch (error: Exception) {
-                message = error.message ?: "The content download failed"
-            } finally {
-                if (contentDownloadJob === downloadJob) {
-                    ContentDownloadBus.publish(null)
-                    contentStorageState = contentStorageState.copy(
-                        categories = contentStorageState.categories.map {
-                            if (it.categoryKey == category) it.copy(isDownloading = false) else it
-                        },
-                    )
-                    contentDownloadJob = null
-                    refreshContentStorage(message, retryCategory = category.takeIf { message != null })
-                }
+        var location by remember { mutableStateOf(locationStore.location()) }
+        var resolved by remember { mutableStateOf(false) }
+        var weatherCode by remember { mutableStateOf<Int?>(null) }
+        var temperature by remember { mutableStateOf<Double?>(null) }
+        var refreshRequest by remember { mutableStateOf(0) }
+        var isRefreshing by remember { mutableStateOf(false) }
+        var syncResultText by remember { mutableStateOf<String?>(null) }
+        var now by remember { mutableStateOf(Clock.System.now()) }
+        var themeSettings by remember { mutableStateOf(appearanceStore.settings()) }
+        var travelDuaSettings by remember { mutableStateOf(audioStore.travelDua()) }
+        var isTravelDuaPlaying by remember { mutableStateOf(false) }
+        var recognitionMode by remember { mutableStateOf(audioStore.recognitionMode()) }
+        var recognitionTestState by remember { mutableStateOf(VoiceTestState.IDLE) }
+        var recognitionTestText by remember { mutableStateOf<String?>(null) }
+        var recognitionSession by remember { mutableStateOf(0) }
+        val narrationVoices = remember(sherpaService) {
+            if (sherpaService == null) {
+                speechSynthesizer.voices()
+            } else {
+                listOf(
+                    NarrationVoice(
+                        IosSherpaAssetResolver.KOKORO_VOICE_ID,
+                        "Kokoro",
+                        "High-quality English",
+                        totalSpeakers = 11,
+                    ),
+                    NarrationVoice(
+                        IosSherpaAssetResolver.VITS_VOICE_ID,
+                        "VCTK British",
+                        "British English",
+                        totalSpeakers = 109,
+                    ),
+                )
             }
         }
-        contentDownloadJob = downloadJob
-        downloadJob.start()
-    }
+        var selectedNarrationVoiceIdentifier by remember(narrationVoices) {
+            mutableStateOf(
+                audioStore.narrationVoiceIdentifier()
+                    ?.takeIf { saved -> narrationVoices.any { it.identifier == saved } }
+                    ?: narrationVoices.firstOrNull()?.identifier,
+            )
+        }
+        var isNarrationSpeaking by remember { mutableStateOf(false) }
+        var selectedNarrationSpeakerId by remember { mutableStateOf(audioStore.narrationSpeakerId()) }
+        var narrationStatus by remember { mutableStateOf<String?>(null) }
+        var narrationError by remember { mutableStateOf<String?>(null) }
+        var narrationSession by remember { mutableStateOf(0) }
+        var narrationJob by remember { mutableStateOf<Job?>(null) }
+        var recognitionJob by remember { mutableStateOf<Job?>(null) }
+        var automaticTravelDuaRequests by remember { mutableStateOf(0) }
+        var contentStorageState by remember { mutableStateOf(ContentStorageState()) }
+        var contentDownloadJob by remember { mutableStateOf<Job?>(null) }
+        var contentRefreshJob by remember { mutableStateOf<Job?>(null) }
+        val travelDuaMonitor = remember {
+            IosTravelDuaMonitor { automaticTravelDuaRequests += 1 }
+        }
 
-    fun deleteContentCategory(category: String) {
-        if (contentDownloadJob?.isActive == true || contentRefreshJob?.isActive == true) return
-        if (category.startsWith("model_")) {
+        fun stopAllSpeech() {
+            narrationSession += 1
+            narrationJob?.cancel()
+            narrationJob = null
+            sherpaService?.stopSpeaking()
+            speechSynthesizer.stop()
+            isTravelDuaPlaying = false
+            isNarrationSpeaking = false
+            narrationStatus = null
+        }
+
+        fun playTravelDua() {
             recognitionSession += 1
             recognitionJob?.cancel()
             recognitionJob = null
             sherpaService?.stopRecognition()
             speechRecognizer.stop()
-            recognitionTestState = VoiceTestState.IDLE
-            recognitionTestText = "Say yes or no to verify recognition."
             stopAllSpeech()
-        }
-        contentStorageState = contentStorageState.copy(isLoading = true, error = null)
-        contentRefreshJob = coroutineScope.launch {
-            val message = try {
-                val manifest = iosCloudAssets.loadManifest()
-                    ?: error("The Cloudflare asset manifest is unavailable")
-                iosCloudAssets.deleteCategory(category, manifest)
-                null
-            } catch (error: Exception) {
-                error.message ?: "The downloaded content could not be deleted"
+            narrationError = null
+            isTravelDuaPlaying = true
+            val started = speechSynthesizer.speak(
+                text = TRAVEL_DUA_ARABIC,
+                language = "ar-SA",
+            ) { error ->
+                isTravelDuaPlaying = false
+                if (error != null) narrationError = error
             }
-            val refreshed = loadIosContentStorageState()
-            contentStorageState = refreshed.copy(error = message ?: refreshed.error)
-            contentRefreshJob = null
+            if (!started) {
+                isTravelDuaPlaying = false
+                narrationError = "An Arabic system voice is not installed"
+            }
         }
-    }
 
-    LaunchedEffect(travelDuaSettings) {
-        travelDuaMonitor.update(travelDuaSettings)
-    }
-
-    LaunchedEffect(automaticTravelDuaRequests) {
-        if (automaticTravelDuaRequests > 0) playTravelDua()
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            travelDuaMonitor.stop()
-            speechRecognizer.stop()
-            speechSynthesizer.stop()
-            sherpaService?.shutdown()
-            recognitionJob?.cancel()
-            narrationJob?.cancel()
-            contentDownloadJob?.cancel()
+        fun refreshContentStorage(message: String? = null, retryCategory: String? = null) {
             contentRefreshJob?.cancel()
-        }
-    }
-
-    LaunchedEffect(refreshRequest) {
-        isRefreshing = refreshRequest > 0
-        val savedLocation = location
-        val refreshedLocation = LocationProvider().current()
-        if (refreshedLocation != null) {
-            location = refreshedLocation
-            locationStore.save(refreshedLocation)
-        }
-        resolved = true
-
-        val target = refreshedLocation ?: savedLocation ?: FALLBACK_LOCATION
-        val conditions = CurrentConditionsClient.fetch(target.latitude, target.longitude)
-        weatherCode = conditions?.weatherCode
-        temperature = conditions?.temperatureCelsius
-        if (refreshRequest > 0) {
-            isRefreshing = false
-            syncResultText = if (refreshedLocation != null) {
-                "Location and prayer times updated"
-            } else if (savedLocation != null) {
-                "Location unavailable; using last saved location"
-            } else {
-                "Location unavailable; using Dubai fallback"
-            }
-            delay(3_000)
-            syncResultText = null
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(15_000)
-            now = Clock.System.now()
-        }
-    }
-
-    val place = location ?: FALLBACK_LOCATION
-    val country = prayerDefaultsFor(place.countryCode)
-    var prayerSettings by remember(place.countryCode, country) {
-        mutableStateOf(settingsStore.settings(place.countryCode, country))
-    }
-    var notificationPrefs by remember { mutableStateOf(settingsStore.notifications()) }
-    // Prayer times belong to the resolved location, not necessarily the device's
-    // current timezone (for example, when viewing a cached location while travelling).
-    val localNow = now.toLocalDateTime(timeZoneForOffset(place.timeZoneOffset))
-    val today = localNow.date
-
-    var completed by remember(today) { mutableStateOf(tracker.completed(today)) }
-
-    // Keyed, not recomputed on every recomposition. The calculator is not cheap
-    // and logs several thousand lines per run, all synchronously on the main
-    // thread — recomputing it for a "+1 minute" tap stalls the UI visibly.
-    val day = remember(
-        today,
-        place.latitude,
-        place.longitude,
-        place.timeZoneOffset,
-        place.countryCode,
-        country,
-        prayerSettings,
-        weatherCode,
-        temperature,
-        localNow.hour,
-        localNow.minute,
-    ) {
-        PrayerSchedule.forDate(
-            year = today.year,
-            month = today.monthNumber,
-            day = today.dayOfMonth,
-            latitude = place.latitude,
-            longitude = place.longitude,
-            timeZoneOffset = place.timeZoneOffset,
-            // The country's own method keeps its authority's published offsets.
-            defaults = country,
-            settings = prayerSettings,
-            // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
-            weatherCode = weatherCode,
-            temperatureCelsius = temperature,
-            countryCode = place.countryCode,
-            isFriday = today.dayOfWeek == DayOfWeek.FRIDAY,
-            nowHour = localNow.hour,
-            nowMinute = localNow.minute,
-        )
-    }
-
-    LaunchedEffect(
-        today,
-        place,
-        country,
-        prayerSettings,
-        notificationPrefs,
-        localNow.hour,
-        localNow.minute,
-    ) {
-        IosPrayerSchedulePublisher.publish(
-            locationName = place.placeName,
-            startDate = today,
-            latitude = place.latitude,
-            longitude = place.longitude,
-            timeZoneOffset = place.timeZoneOffset,
-            countryCode = place.countryCode,
-            defaults = country,
-            settings = prayerSettings,
-            preferences = notificationPrefs,
-        )
-    }
-
-    val useDarkTheme = when (themeSettings.darkThemeConfig) {
-        DarkThemeConfig.FOLLOW_SYSTEM -> isSystemInDarkTheme()
-        DarkThemeConfig.LIGHT -> false
-        DarkThemeConfig.DARK -> true
-    }
-    val appVersion = remember {
-        NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String
-            ?: "Unknown"
-    }
-
-    MaterialTheme(
-        colorScheme = iosColorScheme(themeSettings.brand, useDarkTheme),
-        typography = sharedTypography(),
-    ) {
-        SharedNavHost(
-            startInSettings = startInSettings,
-            latitude = place.latitude,
-            longitude = place.longitude,
-            today = today,
-            home = { actions ->
-                PrayerTimesScreen(
-                    placeName = place.placeName.ifEmpty { "Locating…" },
-                    day = day,
-                    salah = SalahProgress.from(completed),
-                    onTogglePrayer = { completed = tracker.toggle(today, it) },
-                    offsets = prayerSettings.timeOffsets,
-                    onAdjustPrayer = { prayer, delta ->
-                        prayerSettings = settingsStore.adjust(
-                            place.countryCode,
-                            country,
-                            prayer,
-                            delta,
-                        )
-                    },
-                    onOpenSettings = actions.onOpenSettings,
-                    today = today,
-                    isLocating = !resolved,
-                    isRefreshing = isRefreshing,
-                    syncResultText = syncResultText,
-                    onRefresh = { refreshRequest += 1 },
-                    latitude = place.latitude,
-                    longitude = place.longitude,
-                    notifications = notificationPrefs,
-                    onTogglePrayerNotification = { prayer ->
-                        notificationPrefs = notificationPrefs.togglePrayer(prayer)
-                        settingsStore.saveNotifications(notificationPrefs)
-                    },
-                    onTogglePrayerAdhan = { prayer ->
-                        notificationPrefs = notificationPrefs.toggleAdhan(prayer)
-                        settingsStore.saveNotifications(notificationPrefs)
-                    },
-                    onOpenProfile = actions.onOpenProfile,
-                    onOpenSearch = actions.onOpenSearch,
-                    searchController = actions.searchController,
-                    onOpenQuran = actions.onOpenQuran,
-                    onOpenBukhariBook = actions.onOpenBukhariBook,
-                    onOpenBukhariHadith = actions.onOpenBukhariHadith,
-                    onOpenQuranicDua = actions.onOpenQuranicDua,
-                    onOpenFortressChapter = actions.onOpenFortressChapter,
-                    onOpenQibla = actions.onOpenQibla,
-                    onOpenRecommendation = actions.onOpenRecommendation,
-                    onSelectBottom = actions.onSelectBottom,
+            contentStorageState = contentStorageState.copy(
+                isLoading = true,
+                error = message,
+                retryCategoryKey = retryCategory,
+            )
+            contentRefreshJob = coroutineScope.launch {
+                val refreshed = loadIosContentStorageState()
+                contentStorageState = refreshed.copy(
+                    error = message ?: refreshed.error,
+                    retryCategoryKey = retryCategory,
                 )
-            },
-            prayerDay = day,
-            notifications = notificationPrefs,
-            globalRefreshing = isRefreshing,
-            globalSyncResultText = syncResultText,
-            createQualityAnalyzer = salahTfliteService?.let { service ->
-                {
-                    readBundledSalahNormParams()?.let { paramsJson ->
-                        runCatching {
-                            com.starception.submission.shared.ml.SalahQualityAnalyzer(
-                                service = service,
-                                normParams = com.starception.submission.shared.ml.SalahNormParams.parse(paramsJson),
-                            )
-                        }.getOrNull()
+                contentRefreshJob = null
+            }
+        }
+
+        fun downloadContentCategory(category: String) {
+            if (contentDownloadJob?.isActive == true) return
+            contentStorageState = contentStorageState.copy(
+                error = null,
+                categories = contentStorageState.categories.map {
+                    if (it.categoryKey == category) {
+                        it.copy(isDownloading = true, progress = 0f)
+                    } else {
+                        it
+                    }
+                },
+            )
+            lateinit var downloadJob: Job
+            downloadJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
+                var message: String? = null
+                try {
+                    val manifest = iosCloudAssets.loadManifest()
+                        ?: error("The Cloudflare asset manifest is unavailable")
+                    val result = iosCloudAssets.downloadCategory(category, manifest) { progress ->
+                        coroutineScope.launch(Dispatchers.Main) {
+                            if (contentDownloadJob === downloadJob && downloadJob.isActive) {
+                                contentStorageState = contentStorageState.copy(
+                                    categories = contentStorageState.categories.map {
+                                        if (it.categoryKey == category) {
+                                            it.copy(isDownloading = true, progress = progress.fraction)
+                                        } else {
+                                            it
+                                        }
+                                    },
+                                )
+                                // Feed the app-level pull-to-sync banner — the same
+                                // progress the Android strip shows on every screen.
+                                ContentDownloadBus.publish(
+                                    ContentDownloadStatus(
+                                        label = storageCategoryDisplayName(category),
+                                        progress = progress.fraction,
+                                        completedFiles = progress.completedFiles,
+                                        totalFiles = progress.totalFiles,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    if (!result.isComplete) {
+                        message = "Could not download ${result.missingAssets.size} files. Try again."
+                    }
+                } catch (_: CancellationException) {
+                    // User-requested cancellation is reflected by the refreshed cache state.
+                } catch (error: Exception) {
+                    message = error.message ?: "The content download failed"
+                } finally {
+                    if (contentDownloadJob === downloadJob) {
+                        ContentDownloadBus.publish(null)
+                        contentStorageState = contentStorageState.copy(
+                            categories = contentStorageState.categories.map {
+                                if (it.categoryKey == category) it.copy(isDownloading = false) else it
+                            },
+                        )
+                        contentDownloadJob = null
+                        refreshContentStorage(message, retryCategory = category.takeIf { message != null })
                     }
                 }
-            },
-            settings = { onBack, onOpenSalahTraining ->
-                PrayerSettingsScreen(
-                    settings = prayerSettings,
-                    countryName = country?.countryName,
-                    showRestoreOption = settingsStore.isChanged(place.countryCode, country),
-                    onSettingsChange = { updated ->
-                        prayerSettings = updated
-                        settingsStore.save(place.countryCode, updated)
-                    },
-                    onRestore = {
-                        settingsStore.restoreDefaults(place.countryCode)
-                        prayerSettings = settingsStore.settings(place.countryCode, country)
-                    },
-                    onBack = onBack,
-                    onOpenSalahTraining = onOpenSalahTraining,
-                    databaseStats = com.starception.submission.shared.content.SharedDatabaseStats(),
-                    notifications = notificationPrefs,
-                    onNotificationsChange = { updated ->
-                        notificationPrefs = updated
-                        settingsStore.saveNotifications(updated)
-                    },
-                    themeSettings = themeSettings,
-                    onThemeBrandChange = { brand ->
-                        appearanceStore.saveBrand(brand)
-                        themeSettings = themeSettings.copy(brand = brand)
-                    },
-                    onDarkThemeConfigChange = { config ->
-                        appearanceStore.saveDarkTheme(config)
-                        themeSettings = themeSettings.copy(darkThemeConfig = config)
-                    },
-                    appVersion = appVersion,
-                    audioState = AudioSettingsState(
-                        travelDua = travelDuaSettings,
-                        isTravelDuaPlaying = isTravelDuaPlaying,
-                        recognitionMode = recognitionMode,
-                        recognitionTestState = recognitionTestState,
-                        recognitionTestText = recognitionTestText,
-                        narrationVoices = narrationVoices,
-                        selectedNarrationVoiceIdentifier = selectedNarrationVoiceIdentifier,
-                        selectedNarrationSpeakerId = selectedNarrationSpeakerId,
-                        isNarrationSpeaking = isNarrationSpeaking,
-                        narrationStatus = narrationStatus,
-                        narrationError = narrationError,
-                    ),
-                    audioActions = AudioSettingsActions(
-                        onTravelDuaChange = { updated ->
-                            travelDuaSettings = updated
-                            audioStore.saveTravelDua(updated)
+            }
+            contentDownloadJob = downloadJob
+            downloadJob.start()
+        }
+
+        fun deleteContentCategory(category: String) {
+            if (contentDownloadJob?.isActive == true || contentRefreshJob?.isActive == true) return
+            if (category.startsWith("model_")) {
+                recognitionSession += 1
+                recognitionJob?.cancel()
+                recognitionJob = null
+                sherpaService?.stopRecognition()
+                speechRecognizer.stop()
+                recognitionTestState = VoiceTestState.IDLE
+                recognitionTestText = "Say yes or no to verify recognition."
+                stopAllSpeech()
+            }
+            contentStorageState = contentStorageState.copy(isLoading = true, error = null)
+            contentRefreshJob = coroutineScope.launch {
+                val message = try {
+                    val manifest = iosCloudAssets.loadManifest()
+                        ?: error("The Cloudflare asset manifest is unavailable")
+                    iosCloudAssets.deleteCategory(category, manifest)
+                    null
+                } catch (error: Exception) {
+                    error.message ?: "The downloaded content could not be deleted"
+                }
+                val refreshed = loadIosContentStorageState()
+                contentStorageState = refreshed.copy(error = message ?: refreshed.error)
+                contentRefreshJob = null
+            }
+        }
+
+        LaunchedEffect(travelDuaSettings) {
+            travelDuaMonitor.update(travelDuaSettings)
+        }
+
+        LaunchedEffect(automaticTravelDuaRequests) {
+            if (automaticTravelDuaRequests > 0) playTravelDua()
+        }
+
+        DisposableEffect(Unit) {
+            onDispose {
+                travelDuaMonitor.stop()
+                speechRecognizer.stop()
+                speechSynthesizer.stop()
+                sherpaService?.shutdown()
+                recognitionJob?.cancel()
+                narrationJob?.cancel()
+                contentDownloadJob?.cancel()
+                contentRefreshJob?.cancel()
+            }
+        }
+
+        LaunchedEffect(refreshRequest) {
+            isRefreshing = refreshRequest > 0
+            val savedLocation = location
+            val refreshedLocation = LocationProvider().current()
+            if (refreshedLocation != null) {
+                location = refreshedLocation
+                locationStore.save(refreshedLocation)
+            }
+            resolved = true
+
+            val target = refreshedLocation ?: savedLocation ?: FALLBACK_LOCATION
+            val conditions = CurrentConditionsClient.fetch(target.latitude, target.longitude)
+            weatherCode = conditions?.weatherCode
+            temperature = conditions?.temperatureCelsius
+            if (refreshRequest > 0) {
+                isRefreshing = false
+                syncResultText = if (refreshedLocation != null) {
+                    "Location and prayer times updated"
+                } else if (savedLocation != null) {
+                    "Location unavailable; using last saved location"
+                } else {
+                    "Location unavailable; using Dubai fallback"
+                }
+                delay(3_000)
+                syncResultText = null
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(15_000)
+                now = Clock.System.now()
+            }
+        }
+
+        val place = location ?: FALLBACK_LOCATION
+        val country = prayerDefaultsFor(place.countryCode)
+        var prayerSettings by remember(place.countryCode, country) {
+            mutableStateOf(settingsStore.settings(place.countryCode, country))
+        }
+        var notificationPrefs by remember { mutableStateOf(settingsStore.notifications()) }
+        // Prayer times belong to the resolved location, not necessarily the device's
+        // current timezone (for example, when viewing a cached location while travelling).
+        val localNow = now.toLocalDateTime(timeZoneForOffset(place.timeZoneOffset))
+        val today = localNow.date
+
+        var completed by remember(today) { mutableStateOf(tracker.completed(today)) }
+
+        // Keyed, not recomputed on every recomposition. The calculator is not cheap
+        // and logs several thousand lines per run, all synchronously on the main
+        // thread — recomputing it for a "+1 minute" tap stalls the UI visibly.
+        val day = remember(
+            today,
+            place.latitude,
+            place.longitude,
+            place.timeZoneOffset,
+            place.countryCode,
+            country,
+            prayerSettings,
+            weatherCode,
+            temperature,
+            localNow.hour,
+            localNow.minute,
+        ) {
+            PrayerSchedule.forDate(
+                year = today.year,
+                month = today.monthNumber,
+                day = today.dayOfMonth,
+                latitude = place.latitude,
+                longitude = place.longitude,
+                timeZoneOffset = place.timeZoneOffset,
+                // The country's own method keeps its authority's published offsets.
+                defaults = country,
+                settings = prayerSettings,
+                // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
+                weatherCode = weatherCode,
+                temperatureCelsius = temperature,
+                countryCode = place.countryCode,
+                isFriday = today.dayOfWeek == DayOfWeek.FRIDAY,
+                nowHour = localNow.hour,
+                nowMinute = localNow.minute,
+            )
+        }
+
+        LaunchedEffect(
+            today,
+            place,
+            country,
+            prayerSettings,
+            notificationPrefs,
+            localNow.hour,
+            localNow.minute,
+        ) {
+            IosPrayerSchedulePublisher.publish(
+                locationName = place.placeName,
+                startDate = today,
+                latitude = place.latitude,
+                longitude = place.longitude,
+                timeZoneOffset = place.timeZoneOffset,
+                countryCode = place.countryCode,
+                defaults = country,
+                settings = prayerSettings,
+                preferences = notificationPrefs,
+            )
+        }
+
+        val useDarkTheme = when (themeSettings.darkThemeConfig) {
+            DarkThemeConfig.FOLLOW_SYSTEM -> isSystemInDarkTheme()
+            DarkThemeConfig.LIGHT -> false
+            DarkThemeConfig.DARK -> true
+        }
+        val appVersion = remember {
+            NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String
+                ?: "Unknown"
+        }
+
+        MaterialTheme(
+            colorScheme = iosColorScheme(themeSettings.brand, useDarkTheme),
+            typography = sharedTypography(),
+        ) {
+            SharedNavHost(
+                startInSettings = startInSettings,
+                latitude = place.latitude,
+                longitude = place.longitude,
+                today = today,
+                home = { actions ->
+                    PrayerTimesScreen(
+                        placeName = place.placeName.ifEmpty { "Locating…" },
+                        day = day,
+                        salah = SalahProgress.from(completed),
+                        onTogglePrayer = { completed = tracker.toggle(today, it) },
+                        offsets = prayerSettings.timeOffsets,
+                        onAdjustPrayer = { prayer, delta ->
+                            prayerSettings = settingsStore.adjust(
+                                place.countryCode,
+                                country,
+                                prayer,
+                                delta,
+                            )
                         },
-                        onTestTravelDua = { playTravelDua() },
-                        onStopTravelDua = { stopAllSpeech() },
-                        onRecognitionModeSelected = { mode ->
-                            recognitionSession += 1
-                            recognitionJob?.cancel()
-                            recognitionJob = null
-                            sherpaService?.stopRecognition()
-                            speechRecognizer.stop()
-                            recognitionTestState = VoiceTestState.IDLE
-                            recognitionTestText = null
-                            recognitionMode = mode
-                            audioStore.saveRecognitionMode(mode)
+                        onOpenSettings = actions.onOpenSettings,
+                        today = today,
+                        isLocating = !resolved,
+                        isRefreshing = isRefreshing,
+                        syncResultText = syncResultText,
+                        onRefresh = { refreshRequest += 1 },
+                        latitude = place.latitude,
+                        longitude = place.longitude,
+                        notifications = notificationPrefs,
+                        onTogglePrayerNotification = { prayer ->
+                            notificationPrefs = notificationPrefs.togglePrayer(prayer)
+                            settingsStore.saveNotifications(notificationPrefs)
                         },
-                        onStartRecognitionTest = {
-                            stopAllSpeech()
-                            recognitionJob?.cancel()
-                            val session = ++recognitionSession
-                            recognitionTestState = VoiceTestState.LISTENING
-                            recognitionTestText = if (sherpaService == null) {
-                                "Waiting for speech"
-                            } else {
-                                "Preparing offline model..."
-                            }
-                            recognitionJob = coroutineScope.launch {
-                                if (sherpaService == null) {
-                                    speechRecognizer.start(recognitionMode) { event ->
-                                        if (session == recognitionSession) {
-                                            when (event) {
-                                                SpeechRecognitionEvent.Listening -> {
-                                                    recognitionTestState = VoiceTestState.LISTENING
-                                                    recognitionTestText = "Say yes or no"
-                                                        .takeIf { recognitionMode == VoiceRecognitionMode.KEYWORDS }
-                                                }
-                                                is SpeechRecognitionEvent.Partial -> {
-                                                    recognitionTestState = VoiceTestState.LISTENING
-                                                    recognitionTestText = event.text
-                                                }
-                                                is SpeechRecognitionEvent.Result -> {
-                                                    recognitionTestState = VoiceTestState.SUCCESS
-                                                    recognitionTestText = event.text
-                                                }
-                                                is SpeechRecognitionEvent.Error -> {
-                                                    recognitionTestState = VoiceTestState.ERROR
-                                                    recognitionTestText = event.message
-                                                }
-                                            }
-                                        }
-                                    }
+                        onTogglePrayerAdhan = { prayer ->
+                            notificationPrefs = notificationPrefs.toggleAdhan(prayer)
+                            settingsStore.saveNotifications(notificationPrefs)
+                        },
+                        onOpenProfile = actions.onOpenProfile,
+                        onOpenSearch = actions.onOpenSearch,
+                        searchController = actions.searchController,
+                        onOpenQuran = actions.onOpenQuran,
+                        onOpenBukhariBook = actions.onOpenBukhariBook,
+                        onOpenBukhariHadith = actions.onOpenBukhariHadith,
+                        onOpenQuranicDua = actions.onOpenQuranicDua,
+                        onOpenFortressChapter = actions.onOpenFortressChapter,
+                        onOpenQibla = actions.onOpenQibla,
+                        onOpenRecommendation = actions.onOpenRecommendation,
+                        onSelectBottom = actions.onSelectBottom,
+                    )
+                },
+                prayerDay = day,
+                notifications = notificationPrefs,
+                globalRefreshing = isRefreshing,
+                globalSyncResultText = syncResultText,
+                createQualityAnalyzer = salahTfliteService?.let { service ->
+                    {
+                        readBundledSalahNormParams()?.let { paramsJson ->
+                            runCatching {
+                                com.starception.submission.shared.ml.SalahQualityAnalyzer(
+                                    service = service,
+                                    normParams = com.starception.submission.shared.ml.SalahNormParams.parse(paramsJson),
+                                )
+                            }.getOrNull()
+                        }
+                    }
+                },
+                settings = { onBack, onOpenSalahTraining ->
+                    PrayerSettingsScreen(
+                        settings = prayerSettings,
+                        countryName = country?.countryName,
+                        showRestoreOption = settingsStore.isChanged(place.countryCode, country),
+                        onSettingsChange = { updated ->
+                            prayerSettings = updated
+                            settingsStore.save(place.countryCode, updated)
+                        },
+                        onRestore = {
+                            settingsStore.restoreDefaults(place.countryCode)
+                            prayerSettings = settingsStore.settings(place.countryCode, country)
+                        },
+                        onBack = onBack,
+                        onOpenSalahTraining = onOpenSalahTraining,
+                        databaseStats = com.starception.submission.shared.content.SharedDatabaseStats(),
+                        notifications = notificationPrefs,
+                        onNotificationsChange = { updated ->
+                            notificationPrefs = updated
+                            settingsStore.saveNotifications(updated)
+                        },
+                        themeSettings = themeSettings,
+                        onThemeBrandChange = { brand ->
+                            appearanceStore.saveBrand(brand)
+                            themeSettings = themeSettings.copy(brand = brand)
+                        },
+                        onDarkThemeConfigChange = { config ->
+                            appearanceStore.saveDarkTheme(config)
+                            themeSettings = themeSettings.copy(darkThemeConfig = config)
+                        },
+                        appVersion = appVersion,
+                        audioState = AudioSettingsState(
+                            travelDua = travelDuaSettings,
+                            isTravelDuaPlaying = isTravelDuaPlaying,
+                            recognitionMode = recognitionMode,
+                            recognitionTestState = recognitionTestState,
+                            recognitionTestText = recognitionTestText,
+                            narrationVoices = narrationVoices,
+                            selectedNarrationVoiceIdentifier = selectedNarrationVoiceIdentifier,
+                            selectedNarrationSpeakerId = selectedNarrationSpeakerId,
+                            isNarrationSpeaking = isNarrationSpeaking,
+                            narrationStatus = narrationStatus,
+                            narrationError = narrationError,
+                        ),
+                        audioActions = AudioSettingsActions(
+                            onTravelDuaChange = { updated ->
+                                travelDuaSettings = updated
+                                audioStore.saveTravelDua(updated)
+                            },
+                            onTestTravelDua = { playTravelDua() },
+                            onStopTravelDua = { stopAllSpeech() },
+                            onRecognitionModeSelected = { mode ->
+                                recognitionSession += 1
+                                recognitionJob?.cancel()
+                                recognitionJob = null
+                                sherpaService?.stopRecognition()
+                                speechRecognizer.stop()
+                                recognitionTestState = VoiceTestState.IDLE
+                                recognitionTestText = null
+                                recognitionMode = mode
+                                audioStore.saveRecognitionMode(mode)
+                            },
+                            onStartRecognitionTest = {
+                                stopAllSpeech()
+                                recognitionJob?.cancel()
+                                val session = ++recognitionSession
+                                recognitionTestState = VoiceTestState.LISTENING
+                                recognitionTestText = if (sherpaService == null) {
+                                    "Waiting for speech"
                                 } else {
-                                    val paths = IosSherpaAssetResolver.recognition(recognitionMode)
-                                    if (session != recognitionSession) return@launch
-                                    if (paths == null) {
-                                        recognitionTestState = VoiceTestState.ERROR
-                                        recognitionTestText = "The offline recognition model is unavailable"
-                                        return@launch
-                                    }
-                                    val sink = object : IosSherpaEventSink {
-                                        override fun onRecognitionStarted() {
+                                    "Preparing offline model..."
+                                }
+                                recognitionJob = coroutineScope.launch {
+                                    if (sherpaService == null) {
+                                        speechRecognizer.start(recognitionMode) { event ->
                                             if (session == recognitionSession) {
-                                                recognitionTestState = VoiceTestState.LISTENING
-                                                recognitionTestText = if (recognitionMode == VoiceRecognitionMode.KEYWORDS) {
-                                                    "Say yes or no"
-                                                } else {
-                                                    "Listening..."
+                                                when (event) {
+                                                    SpeechRecognitionEvent.Listening -> {
+                                                        recognitionTestState = VoiceTestState.LISTENING
+                                                        recognitionTestText = "Say yes or no"
+                                                            .takeIf { recognitionMode == VoiceRecognitionMode.KEYWORDS }
+                                                    }
+                                                    is SpeechRecognitionEvent.Partial -> {
+                                                        recognitionTestState = VoiceTestState.LISTENING
+                                                        recognitionTestText = event.text
+                                                    }
+                                                    is SpeechRecognitionEvent.Result -> {
+                                                        recognitionTestState = VoiceTestState.SUCCESS
+                                                        recognitionTestText = event.text
+                                                    }
+                                                    is SpeechRecognitionEvent.Error -> {
+                                                        recognitionTestState = VoiceTestState.ERROR
+                                                        recognitionTestText = event.message
+                                                    }
                                                 }
                                             }
                                         }
+                                    } else {
+                                        val paths = IosSherpaAssetResolver.recognition(recognitionMode)
+                                        if (session != recognitionSession) return@launch
+                                        if (paths == null) {
+                                            recognitionTestState = VoiceTestState.ERROR
+                                            recognitionTestText = "The offline recognition model is unavailable"
+                                            return@launch
+                                        }
+                                        val sink = object : IosSherpaEventSink {
+                                            override fun onRecognitionStarted() {
+                                                if (session == recognitionSession) {
+                                                    recognitionTestState = VoiceTestState.LISTENING
+                                                    recognitionTestText = if (recognitionMode == VoiceRecognitionMode.KEYWORDS) {
+                                                        "Say yes or no"
+                                                    } else {
+                                                        "Listening..."
+                                                    }
+                                                }
+                                            }
 
-                                        override fun onKeyword(keyword: String) {
-                                            if (session == recognitionSession) {
-                                                recognitionTestState = VoiceTestState.SUCCESS
-                                                recognitionTestText = keyword
-                                                sherpaService.stopRecognition()
+                                            override fun onKeyword(keyword: String) {
+                                                if (session == recognitionSession) {
+                                                    recognitionTestState = VoiceTestState.SUCCESS
+                                                    recognitionTestText = keyword
+                                                    sherpaService.stopRecognition()
+                                                }
+                                            }
+
+                                            override fun onPartialResult(text: String) {
+                                                if (session == recognitionSession) recognitionTestText = text
+                                            }
+
+                                            override fun onFinalResult(text: String) {
+                                                if (session == recognitionSession) {
+                                                    recognitionTestState = VoiceTestState.SUCCESS
+                                                    recognitionTestText = text
+                                                }
+                                            }
+
+                                            override fun onTtsStarted(sampleRate: Int) = Unit
+                                            override fun onTtsFinished() = Unit
+
+                                            override fun onError(message: String) {
+                                                if (session == recognitionSession) {
+                                                    recognitionTestState = VoiceTestState.ERROR
+                                                    recognitionTestText = message
+                                                }
                                             }
                                         }
-
-                                        override fun onPartialResult(text: String) {
-                                            if (session == recognitionSession) recognitionTestText = text
+                                        val started = if (recognitionMode == VoiceRecognitionMode.KEYWORDS) {
+                                            sherpaService.startKeywordSpotting(paths, sink)
+                                        } else {
+                                            sherpaService.startOnlineRecognition(paths, sink)
                                         }
-
-                                        override fun onFinalResult(text: String) {
-                                            if (session == recognitionSession) {
-                                                recognitionTestState = VoiceTestState.SUCCESS
-                                                recognitionTestText = text
-                                            }
-                                        }
-
-                                        override fun onTtsStarted(sampleRate: Int) = Unit
-                                        override fun onTtsFinished() = Unit
-
-                                        override fun onError(message: String) {
-                                            if (session == recognitionSession) {
-                                                recognitionTestState = VoiceTestState.ERROR
-                                                recognitionTestText = message
-                                            }
+                                        if (!started) {
+                                            recognitionTestState = VoiceTestState.ERROR
+                                            recognitionTestText = "Unable to start offline recognition"
+                                            return@launch
                                         }
                                     }
-                                    val started = if (recognitionMode == VoiceRecognitionMode.KEYWORDS) {
-                                        sherpaService.startKeywordSpotting(paths, sink)
-                                    } else {
-                                        sherpaService.startOnlineRecognition(paths, sink)
+                                    delay(7_000)
+                                    if (session == recognitionSession &&
+                                        recognitionTestState == VoiceTestState.LISTENING
+                                    ) {
+                                        sherpaService?.stopRecognition()
+                                        speechRecognizer.stop()
+                                        recognitionTestState = VoiceTestState.ERROR
+                                        recognitionTestText = "No speech detected"
+                                    }
+                                }
+                            },
+                            onStopRecognitionTest = {
+                                recognitionSession += 1
+                                recognitionJob?.cancel()
+                                recognitionJob = null
+                                sherpaService?.stopRecognition()
+                                speechRecognizer.stop()
+                                recognitionTestState = VoiceTestState.IDLE
+                                recognitionTestText = null
+                            },
+                            onNarrationVoiceSelected = { voice ->
+                                stopAllSpeech()
+                                selectedNarrationVoiceIdentifier = voice.identifier
+                                selectedNarrationSpeakerId = 0
+                                audioStore.saveNarrationVoiceIdentifier(voice.identifier)
+                                audioStore.saveNarrationSpeakerId(0)
+                                narrationStatus = null
+                                narrationError = null
+                            },
+                            onNarrationSpeakerSelected = { speakerId ->
+                                val maxSpeaker = narrationVoices
+                                    .firstOrNull { it.identifier == selectedNarrationVoiceIdentifier }
+                                    ?.totalSpeakers
+                                    ?.minus(1)
+                                    ?: 0
+                                selectedNarrationSpeakerId = speakerId.coerceIn(0, maxSpeaker)
+                                audioStore.saveNarrationSpeakerId(selectedNarrationSpeakerId)
+                            },
+                            onPreviewNarration = {
+                                recognitionSession += 1
+                                recognitionJob?.cancel()
+                                recognitionJob = null
+                                sherpaService?.stopRecognition()
+                                speechRecognizer.stop()
+                                stopAllSpeech()
+                                val session = narrationSession
+                                narrationStatus = null
+                                narrationError = null
+                                isNarrationSpeaking = true
+                                if (sherpaService == null) {
+                                    val started = speechSynthesizer.speak(
+                                        text = NARRATION_SAMPLE,
+                                        voiceIdentifier = selectedNarrationVoiceIdentifier,
+                                    ) { error ->
+                                        isNarrationSpeaking = false
+                                        narrationError = error
                                     }
                                     if (!started) {
-                                        recognitionTestState = VoiceTestState.ERROR
-                                        recognitionTestText = "Unable to start offline recognition"
-                                        return@launch
-                                    }
-                                }
-                                delay(7_000)
-                                if (session == recognitionSession &&
-                                    recognitionTestState == VoiceTestState.LISTENING
-                                ) {
-                                    sherpaService?.stopRecognition()
-                                    speechRecognizer.stop()
-                                    recognitionTestState = VoiceTestState.ERROR
-                                    recognitionTestText = "No speech detected"
-                                }
-                            }
-                        },
-                        onStopRecognitionTest = {
-                            recognitionSession += 1
-                            recognitionJob?.cancel()
-                            recognitionJob = null
-                            sherpaService?.stopRecognition()
-                            speechRecognizer.stop()
-                            recognitionTestState = VoiceTestState.IDLE
-                            recognitionTestText = null
-                        },
-                        onNarrationVoiceSelected = { voice ->
-                            stopAllSpeech()
-                            selectedNarrationVoiceIdentifier = voice.identifier
-                            selectedNarrationSpeakerId = 0
-                            audioStore.saveNarrationVoiceIdentifier(voice.identifier)
-                            audioStore.saveNarrationSpeakerId(0)
-                            narrationStatus = null
-                            narrationError = null
-                        },
-                        onNarrationSpeakerSelected = { speakerId ->
-                            val maxSpeaker = narrationVoices
-                                .firstOrNull { it.identifier == selectedNarrationVoiceIdentifier }
-                                ?.totalSpeakers
-                                ?.minus(1)
-                                ?: 0
-                            selectedNarrationSpeakerId = speakerId.coerceIn(0, maxSpeaker)
-                            audioStore.saveNarrationSpeakerId(selectedNarrationSpeakerId)
-                        },
-                        onPreviewNarration = {
-                            recognitionSession += 1
-                            recognitionJob?.cancel()
-                            recognitionJob = null
-                            sherpaService?.stopRecognition()
-                            speechRecognizer.stop()
-                            stopAllSpeech()
-                            val session = narrationSession
-                            narrationStatus = null
-                            narrationError = null
-                            isNarrationSpeaking = true
-                            if (sherpaService == null) {
-                                val started = speechSynthesizer.speak(
-                                    text = NARRATION_SAMPLE,
-                                    voiceIdentifier = selectedNarrationVoiceIdentifier,
-                                ) { error ->
-                                    isNarrationSpeaking = false
-                                    narrationError = error
-                                }
-                                if (!started) {
-                                    isNarrationSpeaking = false
-                                    narrationError = "The selected system voice is unavailable"
-                                }
-                            } else {
-                                narrationJob = coroutineScope.launch {
-                                    narrationStatus = "Preparing offline voice..."
-                                    val voiceId = selectedNarrationVoiceIdentifier
-                                        ?: IosSherpaAssetResolver.KOKORO_VOICE_ID
-                                    val paths = IosSherpaAssetResolver.tts(voiceId)
-                                    if (session != narrationSession) return@launch
-                                    if (paths == null) {
                                         isNarrationSpeaking = false
-                                        narrationStatus = null
-                                        narrationError = "The offline voice model is unavailable"
-                                        return@launch
+                                        narrationError = "The selected system voice is unavailable"
                                     }
-                                    // The status STAYS through generation (~seconds
-                                    // for the offline model) — it clears the moment
-                                    // playback starts, so the button shows its
-                                    // generating state instead of a silent wait.
-                                    narrationStatus = "Generating voice with the offline model…"
-                                    val sink = object : IosSherpaEventSink {
-                                        override fun onRecognitionStarted() = Unit
-                                        override fun onKeyword(keyword: String) = Unit
-                                        override fun onPartialResult(text: String) = Unit
-                                        override fun onFinalResult(text: String) = Unit
-                                        override fun onTtsStarted(sampleRate: Int) {
-                                            if (session == narrationSession) {
-                                                isNarrationSpeaking = true
-                                                narrationStatus = null
+                                } else {
+                                    narrationJob = coroutineScope.launch {
+                                        narrationStatus = "Preparing offline voice..."
+                                        val voiceId = selectedNarrationVoiceIdentifier
+                                            ?: IosSherpaAssetResolver.KOKORO_VOICE_ID
+                                        val paths = IosSherpaAssetResolver.tts(voiceId)
+                                        if (session != narrationSession) return@launch
+                                        if (paths == null) {
+                                            isNarrationSpeaking = false
+                                            narrationStatus = null
+                                            narrationError = "The offline voice model is unavailable"
+                                            return@launch
+                                        }
+                                        // The status STAYS through generation (~seconds
+                                        // for the offline model) — it clears the moment
+                                        // playback starts, so the button shows its
+                                        // generating state instead of a silent wait.
+                                        narrationStatus = "Generating voice with the offline model…"
+                                        val sink = object : IosSherpaEventSink {
+                                            override fun onRecognitionStarted() = Unit
+                                            override fun onKeyword(keyword: String) = Unit
+                                            override fun onPartialResult(text: String) = Unit
+                                            override fun onFinalResult(text: String) = Unit
+                                            override fun onTtsStarted(sampleRate: Int) {
+                                                if (session == narrationSession) {
+                                                    isNarrationSpeaking = true
+                                                    narrationStatus = null
+                                                }
+                                            }
+
+                                            override fun onTtsFinished() {
+                                                if (session == narrationSession) isNarrationSpeaking = false
+                                            }
+
+                                            override fun onError(message: String) {
+                                                if (session == narrationSession) {
+                                                    isNarrationSpeaking = false
+                                                    narrationStatus = null
+                                                    narrationError = message
+                                                }
                                             }
                                         }
-
-                                        override fun onTtsFinished() {
-                                            if (session == narrationSession) isNarrationSpeaking = false
+                                        if (!sherpaService.speak(
+                                                NARRATION_SAMPLE,
+                                                paths,
+                                                selectedNarrationSpeakerId,
+                                                1f,
+                                                sink,
+                                            )
+                                        ) {
+                                            isNarrationSpeaking = false
+                                            narrationStatus = null
+                                            narrationError = "Unable to start the offline voice"
                                         }
-
-                                        override fun onError(message: String) {
-                                            if (session == narrationSession) {
-                                                isNarrationSpeaking = false
-                                                narrationStatus = null
-                                                narrationError = message
-                                            }
-                                        }
-                                    }
-                                    if (!sherpaService.speak(
-                                            NARRATION_SAMPLE,
-                                            paths,
-                                            selectedNarrationSpeakerId,
-                                            1f,
-                                            sink,
-                                        )
-                                    ) {
-                                        isNarrationSpeaking = false
-                                        narrationStatus = null
-                                        narrationError = "Unable to start the offline voice"
                                     }
                                 }
-                            }
-                        },
-                        onStopNarration = { stopAllSpeech() },
-                    ),
-                    contentStorageState = contentStorageState,
-                    contentStorageActions = ContentStorageActions(
-                        onRefresh = { refreshContentStorage() },
-                        onDownloadCategory = ::downloadContentCategory,
-                        onCancelDownload = { contentDownloadJob?.cancel() },
-                        onDeleteCategory = ::deleteContentCategory,
-                    ),
-                )
-            },
-        )
+                            },
+                            onStopNarration = { stopAllSpeech() },
+                        ),
+                        contentStorageState = contentStorageState,
+                        contentStorageActions = ContentStorageActions(
+                            onRefresh = { refreshContentStorage() },
+                            onDownloadCategory = ::downloadContentCategory,
+                            onCancelDownload = { contentDownloadJob?.cancel() },
+                            onDeleteCategory = ::deleteContentCategory,
+                        ),
+                    )
+                },
+            )
+        }
     }
 }
 

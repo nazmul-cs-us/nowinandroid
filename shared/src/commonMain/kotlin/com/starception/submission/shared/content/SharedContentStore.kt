@@ -129,6 +129,13 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         store.putString(HADITH_TRANSLATION_PROVIDER, provider)
     }
 
+    fun contentSetupComplete(): Boolean =
+        store.getString(CONTENT_SETUP_COMPLETE)?.toBoolean() ?: false
+
+    fun saveContentSetupComplete(complete: Boolean) {
+        store.putString(CONTENT_SETUP_COMPLETE, complete.toString())
+    }
+
     fun quranAutoplayPending(): Boolean =
         store.getString(QURAN_AUTOPLAY_PENDING)?.toBoolean() ?: false
 
@@ -362,6 +369,7 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val QURAN_MUSHAF_MODE = "shared_quran_mushaf_mode"
         private const val QURAN_TAJWEED_ENABLED = "shared_quran_tajweed_enabled"
         private const val QURAN_AUTOPLAY_PENDING = "shared_quran_autoplay_pending"
+        private const val CONTENT_SETUP_COMPLETE = "shared_content_setup_complete"
         private const val HADITH_TRANSLATION_LANGUAGE = "shared_hadith_translation_language"
         private const val RECENT_SEARCHES = "shared_recent_searches"
         private const val SALAH_SAMPLE_COUNTS = "shared_salah_sample_counts"
