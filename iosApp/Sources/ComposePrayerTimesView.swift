@@ -14,7 +14,8 @@ import UIKit
 struct ComposePrayerTimesView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         IosComposeRootKt.PrayerTimesViewController(
-            sherpaService: SherpaSpeechService.shared
+            sherpaService: SherpaSpeechService.shared,
+            salahTfliteService: SalahTfliteServiceImpl()
         )
     }
 

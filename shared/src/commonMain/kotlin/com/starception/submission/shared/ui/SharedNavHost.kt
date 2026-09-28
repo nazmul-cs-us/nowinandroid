@@ -137,6 +137,7 @@ fun SharedNavHost(
     today: LocalDate,
     home: @Composable (SharedHomeActions) -> Unit,
     settings: @Composable (onBack: () -> Unit, onOpenSalahTraining: () -> Unit) -> Unit,
+    createQualityAnalyzer: (() -> com.starception.submission.shared.ml.SalahQualityAnalyzer?)? = null,
 ) {
     val contentStore = remember { SharedContentStore() }
     val quranPlayer = remember { QuranAudioPlayer() }
@@ -439,6 +440,7 @@ fun SharedNavHost(
             composable<SalahReviewRoute> { entry ->
                 SalahSessionReviewScreen(
                     fileName = entry.toRoute<SalahReviewRoute>().fileName,
+                    qualityAnalyzer = createQualityAnalyzer?.invoke(),
                     onBack = { navController.popBackStack() },
                 )
             }

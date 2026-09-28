@@ -20,6 +20,7 @@ packages:
     url: https://github.com/k2-fsa/sherpa-onnx
     exactVersion: 1.13.7
 
+
 targets:
   iosApp:
     type: application
@@ -38,6 +39,7 @@ targets:
       - path: Sources/travel_dua.caf
         buildPhase: resources
         type: file
+      - path: ORTObjectiveC
       - path: Shared
       - path: ../app/src/main/assets/manifest.json
         buildPhase: resources
@@ -59,6 +61,12 @@ targets:
         buildPhase: resources
         type: file
       - path: ../app/src/main/assets/databases/fortress_of_the_muslim_v2.db
+        buildPhase: resources
+        type: file
+      - path: Sources/salah_detector.onnx
+        buildPhase: resources
+        type: file
+      - path: ../app/src/main/assets/salah_norm_params.json
         buildPhase: resources
         type: file
       # Reuse Android's exact Interests/news artwork in place. Keeping these as
@@ -184,6 +192,12 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission
+        # Swift finds the ORTObjectiveC module through its module map in the
+        # vendored wrapper sources.
+        SWIFT_INCLUDE_PATHS: $(SRCROOT)/ORTObjectiveC/include
+        OTHER_CFLAGS: $(inherited) -DSPM_BUILD
+        GCC_PREPROCESSOR_DEFINITIONS: $(inherited) SPM_BUILD=1
+        CLANG_CXX_LANGUAGE_STANDARD: c++17
         # iPhone and iPad. Required for "Designed for iPad", which is how this
         # ships to Apple Silicon Macs — there is no separate Mac target.
         TARGETED_DEVICE_FAMILY: "1,2"

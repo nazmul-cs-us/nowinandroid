@@ -74,6 +74,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import platform.Foundation.NSBundle
 import platform.Foundation.NSProcessInfo
+import platform.Foundation.create
+import platform.Foundation.dataWithContentsOfFile
 import platform.UIKit.UIViewController
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -88,6 +90,7 @@ import kotlin.time.Clock
 @Suppress("FunctionName")
 fun PrayerTimesViewController(
     sherpaService: IosSherpaService? = null,
+    salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService? = null,
 ): UIViewController = ComposeUIViewController {
     val tracker = remember { SalahTracker() }
     val settingsStore = remember { UserPrayerSettings() }
@@ -494,6 +497,18 @@ fun PrayerTimesViewController(
                     onSelectBottom = actions.onSelectBottom,
                 )
             },
+            createQualityAnalyzer = salahTfliteService?.let { service ->
+                {
+                    readBundledSalahNormParams()?.let { paramsJson ->
+                        runCatching {
+                            com.starception.submission.shared.ml.SalahQualityAnalyzer(
+                                service = service,
+                                normParams = com.starception.submission.shared.ml.SalahNormParams.parse(paramsJson),
+                            )
+                        }.getOrNull()
+                    }
+                }
+            },
             settings = { onBack, onOpenSalahTraining ->
                 PrayerSettingsScreen(
                     settings = prayerSettings,
@@ -881,4 +896,13 @@ private fun com.starception.submission.prayer.model.PrayerNotificationPreference
     "maghrib" -> copy(maghribAdhanEnabled = !maghribAdhanEnabled)
     "isha" -> copy(ishaAdhanEnabled = !ishaAdhanEnabled)
     else -> this
+}
+
+@Suppress("unused")
+private fun readBundledSalahNormParams(): String? {
+    val bundled = platform.Foundation.NSBundle.mainBundle
+        .pathForResource("salah_norm_params", ofType = "json") ?: return null
+    val data = platform.Foundation.NSData.dataWithContentsOfFile(bundled) ?: return null
+    val text = platform.Foundation.NSString.create(data = data, encoding = platform.Foundation.NSUTF8StringEncoding)
+    return text as? String
 }

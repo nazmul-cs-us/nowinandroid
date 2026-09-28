@@ -39,7 +39,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -81,6 +80,7 @@ private enum class ReviewScene(val label: String) {
 @Composable
 internal fun SalahSessionReviewScreen(
     fileName: String,
+    qualityAnalyzer: com.starception.submission.shared.ml.SalahQualityAnalyzer? = null,
     onBack: () -> Unit,
 ) {
     val store = remember { SalahRecordingStore() }
@@ -100,13 +100,19 @@ internal fun SalahSessionReviewScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            else -> ReviewBody(fileName, loaded)
+            else -> ReviewBody(fileName, loaded, qualityAnalyzer)
         }
     }
 }
 
 @Composable
-private fun ReviewBody(fileName: String, samples: List<SalahDataSample>) {
+private fun ReviewBody(
+    fileName: String,
+    samples: List<SalahDataSample>,
+    qualityAnalyzer: com.starception.submission.shared.ml.SalahQualityAnalyzer?,
+) {
+    var report by remember { mutableStateOf<com.starception.submission.shared.ml.SalahQualityReport?>(null) }
+    var analyzing by remember { mutableStateOf(false) }
     var scene by remember { mutableStateOf(ReviewScene.HUMANOID) }
     var frame by remember { mutableIntStateOf(0) }
     var playing by remember { mutableStateOf(true) }
@@ -118,6 +124,17 @@ private fun ReviewBody(fileName: String, samples: List<SalahDataSample>) {
         while (playing) {
             kotlinx.coroutines.delay(100)
             frame = (frame + 1) % samples.size
+        }
+    }
+    // The model-vs-label quality pass — Android's "Analyze data quality".
+    LaunchedEffect(analyzing) {
+        if (analyzing) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                qualityAnalyzer?.analyze(samples)
+            }?.let { result ->
+                report = result
+                analyzing = false
+            }
         }
     }
 
@@ -204,12 +221,16 @@ private fun ReviewBody(fileName: String, samples: List<SalahDataSample>) {
             }
         }
         Spacer(Modifier.height(4.dp))
-        OutlinedButton(onClick = { }, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                "Drag to orbit · pinch-free 3-D, rendered on-device",
-                style = MaterialTheme.typography.labelSmall,
-            )
+        if (qualityAnalyzer != null && report == null) {
+            Button(
+                onClick = { analyzing = true },
+                enabled = !analyzing,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (analyzing) "Analyzing…" else "Analyze data quality")
+            }
         }
+        report?.let { QualityReportCard(it) }
     }
 }
 
@@ -360,3 +381,41 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGravity(
 }
 
 private data class Offset3(val x: Float, val y: Float, val z: Float)
+
+/** The quality report — overall agreement plus per-posture accuracy chips. */
+@Composable
+private fun QualityReportCard(report: com.starception.submission.shared.ml.SalahQualityReport) {
+    val low = report.agreementPercent < 70
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = if (low) {
+            MaterialTheme.colorScheme.errorContainer
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "Model agreement: ${report.agreementPercent}%",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "${report.analyzedWindows} of ${report.totalWindows} windows analyzed",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(report.perPosture.entries.toList(), key = { it.key }) { entry ->
+                    FilterChip(
+                        selected = entry.value >= 70,
+                        onClick = { },
+                        label = { Text("${entry.key}: ${entry.value}%", maxLines = 1) },
+                    )
+                }
+            }
+        }
+    }
+}
