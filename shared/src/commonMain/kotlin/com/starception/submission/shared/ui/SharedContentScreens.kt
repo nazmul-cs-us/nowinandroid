@@ -104,6 +104,7 @@ import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.model.data.BukhariBook
 import com.starception.submission.core.model.data.BukhariBooks
+import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.Surah
 import com.starception.submission.feature.quran.subtitle
@@ -2535,6 +2536,8 @@ internal fun ForYouScreen(
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
 ) {
+    // Pull-to-refresh reloads the topic + news databases.
+    var refreshAttempt by remember { mutableStateOf(0) }
     val topicRepository = remember { createSharedTopicRepository() }
     val newsRepository = remember { createSharedNewsRepository() }
     var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
@@ -2546,7 +2549,7 @@ internal fun ForYouScreen(
     var onboardingHidden by remember { mutableStateOf(store.isOnboardingHidden()) }
     var newsState by remember { mutableStateOf<SharedNewsState>(SharedNewsState.Loading) }
 
-    LaunchedEffect(topicRepository) {
+    LaunchedEffect(topicRepository, refreshAttempt) {
         topicsLoading = true
         try {
             topics = topicRepository.topics()
@@ -2580,6 +2583,8 @@ internal fun ForYouScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
+        isRefreshing = topicsLoading,
+        onRefresh = { refreshAttempt += 1 },
         adaptiveGrid = true,
     ) { expanded ->
         if (!onboardingHidden) {
@@ -2770,6 +2775,7 @@ internal fun SavedScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
+        onRefresh = { },
         adaptiveGrid = true,
     ) { expanded ->
         removedForUndo?.let { removed ->
@@ -2865,6 +2871,7 @@ internal fun CourseScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
+        onRefresh = { },
     ) { _ ->
         item {
             Text(
@@ -2892,13 +2899,14 @@ internal fun InterestsScreen(
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
 ) {
+    var refreshAttempt by remember { mutableStateOf(0) }
     val repository = remember { createSharedTopicRepository() }
     var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
     var followedTopicIds by remember { mutableStateOf(store.followedTopicIds()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectedTopicId by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(repository) {
+    LaunchedEffect(repository, refreshAttempt) {
         loading = true
         try {
             val loadedTopics = repository.topics()
@@ -2924,6 +2932,8 @@ internal fun InterestsScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
+        isRefreshing = loading,
+        onRefresh = { refreshAttempt += 1 },
         itemSpacing = 0.dp,
         expandedPane = { modifier ->
             val selectedTopic = topics.firstOrNull { it.id == selectedTopicId }
@@ -3413,7 +3423,7 @@ private fun TopicPageScaffold(
     onFollowChanged: () -> Unit,
     content: LazyGridScope.(expanded: Boolean) -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    val page: @Composable () -> Unit = {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= EXPANDED_WIDTH
             Column(
@@ -3883,80 +3893,96 @@ private fun TopLevelScaffold(
     searchController: SharedSearchController? = null,
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    isRefreshing: Boolean = false,
+    onRefresh: (() -> Unit)? = null,
     itemSpacing: Dp = 10.dp,
     adaptiveGrid: Boolean = false,
     expandedPane: (@Composable (Modifier) -> Unit)? = null,
     content: LazyGridScope.(expanded: Boolean) -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val expanded = maxWidth >= EXPANDED_WIDTH
-            // Match Android and the home screen: the side rail appears only in
-            // landscape tablet windows; portrait keeps the bottom pill.
-            val useSideRail = maxWidth >= 600.dp && maxHeight >= 600.dp && maxWidth > maxHeight
-            Column(
-                modifier = Modifier
-                    .widthIn(max = if (expandedPane != null) 1200.dp else 1100.dp)
-                    .fillMaxSize()
-                    .align(Alignment.TopCenter)
-                    .safeDrawingPadding()
-                    .padding(
-                        start = if (useSideRail) 80.dp else 16.dp,
-                        end = 16.dp,
-                    ),
-            ) {
-                // The SAME top bar as the home screen on every page — Android's
-                // AppTopSearchBar: avatar + search pill with voice + settings.
-                if (searchController != null) {
-                    SharedUnifiedHeaderRow(
-                        searchController = searchController,
-                        onOpenSettings = onOpenSettings,
-                        onOpenProfile = onOpenProfile,
+        val page: @Composable () -> Unit = {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val expanded = maxWidth >= EXPANDED_WIDTH
+                // Match Android and the home screen: the side rail appears only in
+                // landscape tablet windows; portrait keeps the bottom pill.
+                val useSideRail = maxWidth >= 600.dp && maxHeight >= 600.dp && maxWidth > maxHeight
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = if (expandedPane != null) 1200.dp else 1100.dp)
+                        .fillMaxSize()
+                        .align(Alignment.TopCenter)
+                        .safeDrawingPadding()
+                        .padding(
+                            start = if (useSideRail) 80.dp else 16.dp,
+                            end = 16.dp,
+                        ),
+                ) {
+                    // The SAME top bar as the home screen on every page — Android's
+                    // AppTopSearchBar: avatar + search pill with voice + settings.
+                    if (searchController != null) {
+                        SharedUnifiedHeaderRow(
+                            searchController = searchController,
+                            onOpenSettings = onOpenSettings,
+                            onOpenProfile = onOpenProfile,
+                        )
+                    } else {
+                        ScreenHeader(title)
+                    }
+                    val grid: @Composable (Modifier) -> Unit = { modifier ->
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(if (adaptiveGrid && expanded) 2 else 1),
+                            modifier = modifier,
+                            verticalArrangement = Arrangement.spacedBy(itemSpacing),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(
+                                top = 12.dp,
+                                bottom = if (useSideRail) 24.dp else 88.dp,
+                            ),
+                        ) {
+                            content(expanded)
+                        }
+                    }
+                    if (expanded && expandedPane != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        ) {
+                            grid(Modifier.weight(0.55f).fillMaxHeight())
+                            expandedPane(Modifier.weight(0.45f).fillMaxHeight())
+                        }
+                    } else {
+                        grid(Modifier.fillMaxWidth().weight(1f))
+                    }
+                }
+                if (useSideRail) {
+                    FloatingSideBar(
+                        items = SharedBottomBarItems,
+                        selectedIndex = selectedIndex,
+                        onSelect = onSelectBottom,
+                        modifier = Modifier.align(Alignment.CenterStart),
                     )
                 } else {
-                    ScreenHeader(title)
-                }
-                val grid: @Composable (Modifier) -> Unit = { modifier ->
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(if (adaptiveGrid && expanded) 2 else 1),
-                        modifier = modifier,
-                        verticalArrangement = Arrangement.spacedBy(itemSpacing),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(
-                            top = 12.dp,
-                            bottom = if (useSideRail) 24.dp else 88.dp,
-                        ),
-                    ) {
-                        content(expanded)
-                    }
-                }
-                if (expanded && expandedPane != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    ) {
-                        grid(Modifier.weight(0.55f).fillMaxHeight())
-                        expandedPane(Modifier.weight(0.45f).fillMaxHeight())
-                    }
-                } else {
-                    grid(Modifier.fillMaxWidth().weight(1f))
+                    FloatingBottomBar(
+                        items = SharedBottomBarItems,
+                        selectedIndex = selectedIndex,
+                        onSelect = onSelectBottom,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
                 }
             }
-            if (useSideRail) {
-                FloatingSideBar(
-                    items = SharedBottomBarItems,
-                    selectedIndex = selectedIndex,
-                    onSelect = onSelectBottom,
-                    modifier = Modifier.align(Alignment.CenterStart),
-                )
-            } else {
-                FloatingBottomBar(
-                    items = SharedBottomBarItems,
-                    selectedIndex = selectedIndex,
-                    onSelect = onSelectBottom,
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
-            }
+        }
+        // Pull-to-refresh on every tab page — the app-level container Android
+        // gives all top-level destinations; pages without async data pass a
+        // refresh that completes immediately so the gesture springs back.
+        if (onRefresh != null) {
+            PullToSyncContainer(
+                isRefreshing = isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize(),
+            ) { _ -> page() }
+        } else {
+            page()
         }
     }
 }
