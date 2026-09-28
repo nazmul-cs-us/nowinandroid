@@ -269,6 +269,12 @@ targets:
       - path: PrayerWidget
     info:
       path: PrayerWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Prayer Widget
+        CFBundleShortVersionString: "0.1.2"
+        CFBundleVersion: "1"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
       path: PrayerWidget/PrayerWidgetExtension.entitlements
       properties:
