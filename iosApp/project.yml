@@ -223,6 +223,8 @@ targets:
         product: sherpa-onnx
       - target: PrayerLiveActivityExtension
         embed: true
+      - target: PrayerWidgetExtension
+        embed: true
     preBuildScripts:
       # Direct local integration: Gradle builds and embeds the framework as part
       # of the Xcode build, so the app can never link a stale copy. Copying a
@@ -253,6 +255,28 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission.PrayerLiveActivity
+        SWIFT_VERSION: "5.0"
+        SKIP_INSTALL: "YES"
+        APPLICATION_EXTENSION_API_ONLY: "YES"
+        CODE_SIGN_STYLE: Automatic
+        "CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]": "NO"
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": "NO"
+
+  PrayerWidgetExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: PrayerWidget
+    info:
+      path: PrayerWidget/Info.plist
+    entitlements:
+      path: PrayerWidget/PrayerWidgetExtension.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.starception.submission
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission.PrayerWidget
         SWIFT_VERSION: "5.0"
         SKIP_INSTALL: "YES"
         APPLICATION_EXTENSION_API_ONLY: "YES"

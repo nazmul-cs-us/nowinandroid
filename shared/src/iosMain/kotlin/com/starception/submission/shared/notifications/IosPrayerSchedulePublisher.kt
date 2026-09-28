@@ -30,6 +30,7 @@ import platform.Foundation.NSUserDefaults
 import kotlin.time.Clock
 
 private const val PAYLOAD_KEY = "ios_prayer_schedule_payload"
+private const val APP_GROUP = "group.com.starception.submission"
 private const val SCHEDULE_DAYS = 7
 
 /** Publishes one prayer schedule used by the native notification and ActivityKit layers. */
@@ -89,10 +90,13 @@ internal object IosPrayerSchedulePublisher {
             soundEnabled = preferences.notificationSound != "silent",
             days = days,
         )
-        NSUserDefaults.standardUserDefaults.setObject(
-            json.encodeToString(payload),
-            forKey = PAYLOAD_KEY,
-        )
+        val encoded = json.encodeToString(payload)
+        NSUserDefaults.standardUserDefaults.setObject(encoded, forKey = PAYLOAD_KEY)
+        // The home-screen widget reads the same payload through the app
+        // group container (extensions cannot see the app's own defaults).
+        NSUserDefaults(suiteName = APP_GROUP)?.let { groupDefaults ->
+            groupDefaults.setObject(encoded, forKey = PAYLOAD_KEY)
+        }
     }
 }
 
