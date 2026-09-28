@@ -140,7 +140,13 @@ fun SharedNavHost(
     home: @Composable (SharedHomeActions) -> Unit,
     settings: @Composable (onBack: () -> Unit, onOpenSalahTraining: () -> Unit) -> Unit,
     createQualityAnalyzer: (() -> com.starception.submission.shared.ml.SalahQualityAnalyzer?)? = null,
+    prayerDay: com.starception.submission.shared.SharedPrayerDay? = null,
+    notifications: com.starception.submission.prayer.model.PrayerNotificationPreferences? = null,
 ) {
+    // The prayer-time alert (go-to-mosue countdown when prayer approaches)
+    // shows in the sync strip of EVERY top page, like Android's app-level
+    // PullToSyncContainer.
+    val tabPrayerAlert = prayerDay?.prayerAlertState(notifications ?: com.starception.submission.prayer.model.PrayerNotificationPreferences())
     val contentStore = remember { SharedContentStore() }
     val quranPlayer = remember { QuranAudioPlayer() }
     // The app-level SearchPrefillBus equivalent: one search surface, shared
@@ -275,6 +281,7 @@ fun SharedNavHost(
                     searchController = searchController,
                     onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
                     onOpenProfile = { navController.navigate(ProfileRoute) },
+                    prayerAlert = tabPrayerAlert,
                 )
             }
             composable<SearchRoute> {

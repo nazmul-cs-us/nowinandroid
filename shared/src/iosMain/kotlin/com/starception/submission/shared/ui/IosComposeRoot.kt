@@ -497,6 +497,8 @@ fun PrayerTimesViewController(
                     onSelectBottom = actions.onSelectBottom,
                 )
             },
+            prayerDay = day,
+            notifications = notificationPrefs,
             createQualityAnalyzer = salahTfliteService?.let { service ->
                 {
                     readBundledSalahNormParams()?.let { paramsJson ->

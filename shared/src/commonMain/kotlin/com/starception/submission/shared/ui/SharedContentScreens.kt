@@ -2535,9 +2535,13 @@ internal fun ForYouScreen(
     searchController: SharedSearchController? = null,
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
 ) {
-    // Pull-to-refresh reloads the topic + news databases.
+    // Pull-to-refresh reloads the topic + news databases. The strip HOLDS
+    // until the reload lands (plus a small dwell) so it reads as a real sync
+    // instead of a flash — matching how the home's refresh behaves.
     var refreshAttempt by remember { mutableStateOf(0) }
+    var pullRefreshing by remember { mutableStateOf(false) }
     val topicRepository = remember { createSharedTopicRepository() }
     val newsRepository = remember { createSharedNewsRepository() }
     var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
@@ -2576,6 +2580,12 @@ internal fun ForYouScreen(
     }
     val topicsById = remember(topics) { topics.associateBy(SharedTopic::id) }
 
+    LaunchedEffect(topicsLoading, pullRefreshing) {
+        if (pullRefreshing && !topicsLoading) {
+            kotlinx.coroutines.delay(700)
+            pullRefreshing = false
+        }
+    }
     TopLevelScaffold(
         title = "For you",
         selectedIndex = 1,
@@ -2583,8 +2593,11 @@ internal fun ForYouScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
-        isRefreshing = topicsLoading,
-        onRefresh = { refreshAttempt += 1 },
+        isRefreshing = pullRefreshing,
+        onRefresh = {
+            pullRefreshing = true
+            refreshAttempt += 1
+        },
         adaptiveGrid = true,
     ) { expanded ->
         if (!onboardingHidden) {
@@ -2733,6 +2746,7 @@ internal fun SavedScreen(
     searchController: SharedSearchController? = null,
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
 ) {
     val newsRepository = remember { createSharedNewsRepository() }
     val topicRepository = remember { createSharedTopicRepository() }
@@ -2776,6 +2790,7 @@ internal fun SavedScreen(
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
         onRefresh = { },
+        prayerAlert = prayerAlert,
         adaptiveGrid = true,
     ) { expanded ->
         removedForUndo?.let { removed ->
@@ -2862,6 +2877,7 @@ internal fun CourseScreen(
     searchController: SharedSearchController? = null,
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
 ) {
     var completed by remember { mutableStateOf(store.completedLessons()) }
     TopLevelScaffold(
@@ -2872,6 +2888,7 @@ internal fun CourseScreen(
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
         onRefresh = { },
+        prayerAlert = prayerAlert,
     ) { _ ->
         item {
             Text(
@@ -2898,8 +2915,10 @@ internal fun InterestsScreen(
     searchController: SharedSearchController? = null,
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
 ) {
     var refreshAttempt by remember { mutableStateOf(0) }
+    var pullRefreshing by remember { mutableStateOf(false) }
     val repository = remember { createSharedTopicRepository() }
     var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
     var followedTopicIds by remember { mutableStateOf(store.followedTopicIds()) }
@@ -2925,6 +2944,12 @@ internal fun InterestsScreen(
         }
         loading = false
     }
+    LaunchedEffect(loading, pullRefreshing) {
+        if (pullRefreshing && !loading) {
+            kotlinx.coroutines.delay(700)
+            pullRefreshing = false
+        }
+    }
     TopLevelScaffold(
         title = "Interests",
         selectedIndex = 4,
@@ -2932,8 +2957,12 @@ internal fun InterestsScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
-        isRefreshing = loading,
-        onRefresh = { refreshAttempt += 1 },
+        isRefreshing = pullRefreshing,
+        onRefresh = {
+            pullRefreshing = true
+            refreshAttempt += 1
+        },
+        prayerAlert = prayerAlert,
         itemSpacing = 0.dp,
         expandedPane = { modifier ->
             val selectedTopic = topics.firstOrNull { it.id == selectedTopicId }
@@ -3895,6 +3924,7 @@ private fun TopLevelScaffold(
     onOpenProfile: () -> Unit = {},
     isRefreshing: Boolean = false,
     onRefresh: (() -> Unit)? = null,
+    prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
     itemSpacing: Dp = 10.dp,
     adaptiveGrid: Boolean = false,
     expandedPane: (@Composable (Modifier) -> Unit)? = null,

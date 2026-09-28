@@ -935,7 +935,7 @@ private fun HomeProfileSheet(
     }
 }
 
-private fun SharedPrayerDay.prayerAlertState(
+internal fun SharedPrayerDay.prayerAlertState(
     notifications: PrayerNotificationPreferences,
 ): PrayerAlertState {
     val prayers = slots.filterNot { it.name == "Sunrise" }
