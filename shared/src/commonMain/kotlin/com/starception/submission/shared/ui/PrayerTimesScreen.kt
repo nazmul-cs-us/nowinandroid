@@ -98,7 +98,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.images.resources.flaticon_sound_14925198
+import com.starception.submission.core.images.resources.flaticon_sound_14925297
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.feature.prayertimes.wobble.AlertPhase
@@ -123,7 +126,9 @@ import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.settings.formatOffset
 import kotlinx.datetime.LocalDate
+import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
+import com.starception.submission.core.images.resources.Res as ImageRes
 
 // Shared copies of the Android dashboard's reference palette. Keeping these
 // values identical makes light-mode prayer status read the same on both hosts.
@@ -172,6 +177,7 @@ fun PrayerTimesScreen(
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     onTogglePrayerNotification: (String) -> Unit = {},
     onTogglePrayerAdhan: (String) -> Unit = {},
+    onAdhanVolumeChange: (String, Int) -> Unit = { _, _ -> },
     onOpenProfile: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     searchController: SharedSearchController? = null,
@@ -386,6 +392,7 @@ fun PrayerTimesScreen(
                                             onToggleExpanded = { showAllPrayers = !showAllPrayers },
                                             onAdjustPrayer = onAdjustPrayer,
                                             onTogglePrayerAdhan = onTogglePrayerAdhan,
+                                            onAdhanVolumeChange = onAdhanVolumeChange,
                                             isTuning = isTuningSchedule,
                                             onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                             notifications = notifications,
@@ -434,6 +441,7 @@ fun PrayerTimesScreen(
                                     onToggleExpanded = { showAllPrayers = !showAllPrayers },
                                     onAdjustPrayer = onAdjustPrayer,
                                     onTogglePrayerAdhan = onTogglePrayerAdhan,
+                                    onAdhanVolumeChange = onAdhanVolumeChange,
                                     isTuning = isTuningSchedule,
                                     onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                     notifications = notifications,
@@ -487,6 +495,7 @@ fun PrayerTimesScreen(
                                         onToggleExpanded = { showAllPrayers = !showAllPrayers },
                                         onAdjustPrayer = onAdjustPrayer,
                                         onTogglePrayerAdhan = onTogglePrayerAdhan,
+                                        onAdhanVolumeChange = onAdhanVolumeChange,
                                         isTuning = isTuningSchedule,
                                         onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                         notifications = notifications,
@@ -991,6 +1000,7 @@ private fun PrayerScheduleSection(
     notifications: PrayerNotificationPreferences,
     onTogglePrayerNotification: (String) -> Unit,
     onTogglePrayerAdhan: (String) -> Unit,
+    onAdhanVolumeChange: (String, Int) -> Unit = { _, _ -> },
     showExpandControl: Boolean,
     compact: Boolean,
     columns: Int = 2,
@@ -1178,6 +1188,7 @@ private fun PrayerCardRow(
     notifications: PrayerNotificationPreferences,
     onTogglePrayerNotification: (String) -> Unit,
     onTogglePrayerAdhan: (String) -> Unit,
+    onAdhanVolumeChange: (String, Int) -> Unit = { _, _ -> },
     compact: Boolean,
     cardMinHeight: Dp? = null,
 ) {
@@ -1199,6 +1210,8 @@ private fun PrayerCardRow(
                 adhanEnabled = slot.name != "Sunrise" &&
                     notifications.isAdhanEnabledForPrayer(slot.name),
                 onToggleAdhan = { onTogglePrayerAdhan(slot.name) },
+                adhanVolume = notifications.getAdhanVolumeForPrayer(slot.name),
+                onAdhanVolumeChange = { volume -> onAdhanVolumeChange(slot.name, volume) },
                 compact = compact,
                 minHeight = cardMinHeight,
                 modifier = Modifier.weight(1f),
@@ -1220,6 +1233,8 @@ private fun PrayerCard(
     onToggleNotification: () -> Unit,
     adhanEnabled: Boolean,
     onToggleAdhan: () -> Unit,
+    adhanVolume: Int = 100,
+    onAdhanVolumeChange: (Int) -> Unit = {},
     compact: Boolean,
     minHeight: Dp? = null,
     modifier: Modifier = Modifier,
@@ -1290,6 +1305,9 @@ private fun PrayerCard(
         label = "${slot.name}SwipeOffset",
     )
     val cardShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
+    // Per-prayer adhan volume popup — hoisted so the overlay renders in the
+    // card's root Box scope (the AnimatedContent content is not a BoxScope).
+    var volumePopup by remember(slot.name) { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -1300,6 +1318,52 @@ private fun PrayerCard(
             .clip(cardShape),
         propagateMinConstraints = true,
     ) {
+        if (volumePopup) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 12.dp)
+                    .fillMaxWidth()
+                    .zIndex(4f),
+            ) {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Text(
+                        "${slot.name} adhan volume",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Slider(
+                            value = adhanVolume.toFloat(),
+                            onValueChange = { value ->
+                                onAdhanVolumeChange(value.toInt())
+                            },
+                            valueRange = 0f..100f,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (adhanVolume == 0) "Muted" else "$adhanVolume%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (adhanVolume == 0) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                accentColor
+                            },
+                        )
+                    }
+                    Text(
+                        "0% plays silent — matching Android's muted adhan",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
         Box(
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -1570,16 +1634,24 @@ private fun PrayerCard(
                         label = "tileAdhanBadgeMorph",
                     ) { showAdhanControl ->
                         if (showAdhanControl) {
+                            // iOS equivalent of Android's system volume bar: the
+                            // tile cannot surface the OS volume HUD, so tapping
+                            // the speaker opens an inline slider whose percent
+                            // picks the pre-scaled adhan at scheduling.
                             Box(
                                 modifier = Modifier
                                     .size(if (compact) 28.dp else 32.dp)
                                     .clip(CircleShape)
-                                    .background(accentColor.copy(alpha = if (adhanEnabled) 0.12f else 0.04f))
-                                    .clickable(onClick = onToggleAdhan),
+                                    .background(
+                                        accentColor.copy(
+                                            alpha = if (adhanVolume > 0) 0.12f else 0.04f,
+                                        ),
+                                    )
+                                    .clickable { volumePopup = !volumePopup },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 androidx.compose.animation.AnimatedContent(
-                                    targetState = adhanEnabled,
+                                    targetState = adhanVolume > 0,
                                     transitionSpec = {
                                         (
                                             fadeIn(tween(220)) +
@@ -1596,18 +1668,23 @@ private fun PrayerCard(
                                             )
                                     },
                                     label = "${slot.name}SpeakerToggleMorph",
-                                ) { speakerEnabled ->
-                                    FlaticonIcon(
-                                        glyph = FlaticonIcons.VOLUME,
-                                        contentDescription = if (speakerEnabled) {
-                                            "Disable ${slot.name} adhan"
-                                        } else {
-                                            "Enable ${slot.name} adhan"
-                                        },
-                                        tint = accentColor.copy(
-                                            alpha = if (speakerEnabled) 0.9f else 0.25f,
+                                ) { audible ->
+                                    // The settings' on/mute flaticons — one set everywhere.
+                                    androidx.compose.material3.Icon(
+                                        painter = painterResource(
+                                            if (audible) {
+                                                ImageRes.drawable.flaticon_sound_14925297
+                                            } else {
+                                                ImageRes.drawable.flaticon_sound_14925198
+                                            },
                                         ),
-                                        fontSize = if (compact) 13.sp else 16.sp,
+                                        contentDescription = if (audible) {
+                                            "Adjust ${slot.name} adhan volume"
+                                        } else {
+                                            "${slot.name} adhan is muted — tap to raise the volume"
+                                        },
+                                        tint = accentColor.copy(alpha = if (audible) 0.9f else 0.45f),
+                                        modifier = Modifier.size(if (compact) 15.dp else 18.dp),
                                     )
                                 }
                             }

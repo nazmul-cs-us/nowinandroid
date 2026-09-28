@@ -123,10 +123,19 @@ private fun ContentSetupGate(
             val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state
                 .collectAsState()
             androidx.compose.runtime.LaunchedEffect(downloadStatus) {
-                if (downloadStatus == null && state.isDownloading) {
-                    // Download chain finished: mark complete and enter the app.
-                    store.saveContentSetupComplete(true)
-                    setupState = SetupGateState.Ready
+                val chainFinished = downloadStatus == null && state.isDownloading
+                if (chainFinished) {
+                    // Verify every required category actually landed, then enter.
+                    val rechecked = loadRequiredContentState()
+                    if (rechecked is SetupGateState.Ready) {
+                        store.saveContentSetupComplete(true)
+                        setupState = SetupGateState.Ready
+                    } else if (rechecked is SetupGateState.NeedDownload) {
+                        // Still missing: show what remains with a retry.
+                        setupState = rechecked.copy(error = "Some content did not finish downloading.")
+                    } else {
+                        setupState = SetupGateState.Ready
+                    }
                 } else if (downloadStatus != null) {
                     setupState = state.copy(
                         overallProgress = downloadStatus?.progress ?: state.overallProgress,
@@ -148,9 +157,11 @@ private fun ContentSetupGate(
                     setupState = SetupGateState.Ready
                 },
                 onDownload = {
+                    setupState = state.copy(isDownloading = true, error = null)
                     coroutineScope.launch { downloadRequiredContent(state.keys) }
                 },
                 onRetry = {
+                    setupState = state.copy(isDownloading = true, error = null)
                     coroutineScope.launch { downloadRequiredContent(state.keys) }
                 },
                 onSkip = {
@@ -214,6 +225,10 @@ private suspend fun downloadRequiredContent(keys: List<String>) {
             )
         }
     }
+    // The whole chain finished: clear the bus so the gate advances to Ready
+    // (the settings' per-category downloads clear it themselves; this chain
+    // is ours, so it clears it here).
+    com.starception.submission.shared.assets.ContentDownloadBus.publish(null)
 }
 
 @Suppress("FunctionName")
@@ -613,6 +628,11 @@ fun PrayerTimesViewController(
                         },
                         onTogglePrayerAdhan = { prayer ->
                             notificationPrefs = notificationPrefs.toggleAdhan(prayer)
+                            settingsStore.saveNotifications(notificationPrefs)
+                        },
+                        onAdhanVolumeChange = { prayer, volume ->
+                            notificationPrefs = notificationPrefs
+                                .withAdhanVolumeForPrayer(prayer, volume)
                             settingsStore.saveNotifications(notificationPrefs)
                         },
                         onOpenProfile = actions.onOpenProfile,

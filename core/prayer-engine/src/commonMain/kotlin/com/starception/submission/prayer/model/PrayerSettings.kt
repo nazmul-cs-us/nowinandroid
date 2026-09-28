@@ -247,6 +247,19 @@ data class PrayerNotificationPreferences(
         return (override ?: adhanVolume).coerceIn(0, 100)
     }
 
+    /** Sets [prayerName]'s individual adhan volume override (0-100). */
+    fun withAdhanVolumeForPrayer(prayerName: String, volume: Int): PrayerNotificationPreferences {
+        val coerced = volume.coerceIn(0, 100)
+        return when (prayerName.lowercase()) {
+            "fajr" -> copy(fajrAdhanVolume = coerced)
+            "dhuhr" -> copy(dhuhrAdhanVolume = coerced)
+            "asr" -> copy(asrAdhanVolume = coerced)
+            "maghrib" -> copy(maghribAdhanVolume = coerced)
+            "isha" -> copy(ishaAdhanVolume = coerced)
+            else -> this
+        }
+    }
+
     /** Whether [prayerName] has an individual adhan volume override (not following master). */
     fun hasAdhanVolumeOverride(prayerName: String): Boolean {
         return when (prayerName.lowercase()) {
