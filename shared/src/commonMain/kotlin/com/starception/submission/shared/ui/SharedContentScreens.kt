@@ -3192,6 +3192,7 @@ internal fun TopicNewsScreen(
     val newsRepository = remember { createSharedNewsRepository() }
     var topic by remember(topicId) { mutableStateOf(sharedTopic(topicId)) }
     var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
+    var articles by remember(topicId) { mutableStateOf(emptyList<SharedTopicArticle>()) }
     var state by remember(topicId) { mutableStateOf<TopicNewsState>(TopicNewsState.Loading) }
     var followedTopics by remember { mutableStateOf(store.followedTopicIds()) }
     var bookmarkedNewsIds by remember { mutableStateOf(store.bookmarkedNewsIds()) }
@@ -3211,6 +3212,11 @@ internal fun TopicNewsScreen(
         } catch (_: Throwable) {
             topic = sharedTopic(topicId)
         }
+    }
+    // Articles fallback: Shama'il books, Quranic duas, Fortress duas —
+    // loaded for topics whose news list is empty.
+    LaunchedEffect(topicId, topicRepository) {
+        articles = runCatching { topicRepository.articles(topicId) }.getOrDefault(emptyList())
     }
     LaunchedEffect(topicId, newsRepository, requestedOffset, loadAttempt) {
         println("[TopicScreen] LaunchedEffect FIRED topicId=$topicId offset=$requestedOffset attempt=$loadAttempt")
@@ -3317,11 +3323,26 @@ internal fun TopicNewsScreen(
                             )
                         }
                     }
-                    is TopicNewsState.Loaded -> if (current.news.isEmpty()) {
+                    is TopicNewsState.Loaded -> if (current.news.isEmpty() && articles.isEmpty()) {
                         item {
                             Box(Modifier.padding(horizontal = 24.dp)) {
-                                SupportingCard("No content yet", "There are no items in this topic.")
+                                SupportingCard(
+                                    title = "Content not downloaded",
+                                    body = "This topic's content needs to be downloaded once. " +
+                                        "Go to Settings → Content & Storage to download it, " +
+                                        "or pull down to refresh.",
+                                )
                             }
+                        }
+                    } else if (current.news.isEmpty()) {
+                        items(articles, key = { "article:${it.id}" }) { article ->
+                            TopicArticleRow(
+                                article = article,
+                                topic = currentTopic,
+                                bookmarked = false,
+                                onToggleBookmark = { },
+                                onClick = { onOpenArticle(topicId, article.id) },
+                            )
                         }
                     } else {
                         val topicsById = topics.associateBy(SharedTopic::id)

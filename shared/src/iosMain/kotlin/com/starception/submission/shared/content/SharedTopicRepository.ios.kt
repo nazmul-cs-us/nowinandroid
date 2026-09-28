@@ -55,6 +55,7 @@ private class IosSharedTopicRepository : SharedTopicRepository {
     override suspend fun articles(topicId: Int): List<SharedTopicArticle> =
         withContext(Dispatchers.Default) {
             when (topicId) {
+                9 -> readShamayelBooks()
                 11 -> readQuranicDuas()
                 in fortressChaptersByTopic.keys -> readFortressArticles(topicId)
                 else -> emptyList()
@@ -80,6 +81,20 @@ private class IosSharedTopicRepository : SharedTopicRepository {
             imageUrl = statement.text(5).ifBlank { null },
         )
     }
+
+    /** Topic 9: the 56 Shama'il At-Tirmidhi books, mapped to topic articles. */
+    private fun readShamayelBooks(): List<SharedTopicArticle> =
+        com.starception.submission.core.model.data.ShamayelBooks.all.map { book ->
+            SharedTopicArticle(
+                id = book.id,
+                topicId = 9,
+                title = book.nameEnglish,
+                arabic = "",
+                translation = book.nameEnglish,
+                transliteration = "",
+                reference = "Books ${book.firstHadithId}–${book.lastHadithId} · ${book.hadithCount} hadiths",
+            )
+        }
 
     @OptIn(ExperimentalForeignApi::class)
     private suspend fun readQuranicDuas(): List<SharedTopicArticle> = query(
