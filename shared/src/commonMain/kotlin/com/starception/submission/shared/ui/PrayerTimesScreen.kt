@@ -1344,6 +1344,19 @@ private fun PrayerCard(
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
+                    // Apple's native system volume slider (MPVolumeView) — the
+                    // Control Center bar — sitting above the per-prayer control.
+                    SystemVolumeSlider(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                    )
+                    Text(
+                        "System volume",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         androidx.compose.material3.Slider(
                             value = adhanVolume.toFloat(),
@@ -1366,7 +1379,7 @@ private fun PrayerCard(
                         )
                     }
                     Text(
-                        "Hardware volume buttons show the system bar · 0% = silent",
+                        "Per-prayer percent picks the adhan's loudness · 0% = silent",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
