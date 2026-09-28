@@ -36,6 +36,9 @@ targets:
       - path: Sources/short_adhan.caf
         buildPhase: resources
         type: file
+      - path: Sources/adhan_volume_silence.caf
+        buildPhase: resources
+        type: file
       - path: Sources/short_adhan_75.caf
         buildPhase: resources
         type: file

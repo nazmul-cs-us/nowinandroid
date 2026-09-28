@@ -1319,6 +1319,15 @@ private fun PrayerCard(
         propagateMinConstraints = true,
     ) {
         if (volumePopup) {
+            // The system capture session: while the popup is open, the hardware
+            // VOLUME BUTTONS surface the iOS system volume HUD (Android's
+            // system volume bar equivalent) — an active playback session is
+            // what makes the OS show it.
+            val capture = remember { com.starception.submission.shared.voice.SystemVolumeCapture() }
+            androidx.compose.runtime.DisposableEffect(slot.name) {
+                capture.start { }
+                onDispose { capture.stop() }
+            }
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -1357,10 +1366,16 @@ private fun PrayerCard(
                         )
                     }
                     Text(
-                        "0% plays silent — matching Android's muted adhan",
+                        "Hardware volume buttons show the system bar · 0% = silent",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    TextButton(
+                        onClick = { volumePopup = false },
+                        modifier = Modifier.align(Alignment.End),
+                    ) {
+                        Text("Done", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
         }
