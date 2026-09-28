@@ -3460,50 +3460,52 @@ private fun TopicPageScaffold(
     content: LazyGridScope.(expanded: Boolean) -> Unit,
 ) {
     val page: @Composable () -> Unit = {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val expanded = maxWidth >= EXPANDED_WIDTH
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 900.dp)
-                    .fillMaxSize()
-                    .align(Alignment.TopCenter)
-                    .safeDrawingPadding(),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+        Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val expanded = maxWidth >= EXPANDED_WIDTH
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 900.dp)
+                        .fillMaxSize()
+                        .align(Alignment.TopCenter)
+                        .safeDrawingPadding(),
                 ) {
-                    IconTapTarget(
-                        icon = NiaIcons.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onBackground,
-                        onClick = onBack,
-                    )
-                    FilterChip(
-                        selected = followed,
-                        onClick = onFollowChanged,
-                        label = { Text(if (followed) "FOLLOWING" else "NOT FOLLOWING") },
-                        leadingIcon = if (followed) {
-                            { Icon(NiaIcons.Check, contentDescription = null, Modifier.size(18.dp)) }
-                        } else {
-                            { Icon(NiaIcons.Add, contentDescription = null, Modifier.size(18.dp)) }
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                        modifier = Modifier.padding(end = 24.dp),
-                    )
-                }
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(if (expanded) 2 else 1),
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(0.dp),
-                    contentPadding = PaddingValues(bottom = 28.dp),
-                ) {
-                    content(expanded)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        IconTapTarget(
+                            icon = NiaIcons.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            onClick = onBack,
+                        )
+                        FilterChip(
+                            selected = followed,
+                            onClick = onFollowChanged,
+                            label = { Text(if (followed) "FOLLOWING" else "NOT FOLLOWING") },
+                            leadingIcon = if (followed) {
+                                { Icon(NiaIcons.Check, contentDescription = null, Modifier.size(18.dp)) }
+                            } else {
+                                { Icon(NiaIcons.Add, contentDescription = null, Modifier.size(18.dp)) }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            modifier = Modifier.padding(end = 24.dp),
+                        )
+                    }
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(if (expanded) 2 else 1),
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
+                        contentPadding = PaddingValues(bottom = 28.dp),
+                    ) {
+                        content(expanded)
+                    }
                 }
             }
         }
