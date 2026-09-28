@@ -55,6 +55,8 @@ object PrayerSettingsRoute
 
 @Serializable object CourseRoute
 
+@Serializable data class CourseDetailRoute(val courseId: String)
+
 @Serializable object InterestsRoute
 
 @Serializable object SearchRoute
@@ -264,6 +266,16 @@ fun SharedNavHost(
                     searchController = searchController,
                     onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
                     onOpenProfile = { navController.navigate(ProfileRoute) },
+                )
+            }
+            composable<CourseDetailRoute> { entry ->
+                val route = entry.toRoute<CourseDetailRoute>()
+                CourseDetailScreen(
+                    courseId = route.courseId,
+                    store = contentStore,
+                    onBack = { navController.popBackStack() },
+                    onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                    onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
                 )
             }
             composable<CourseRoute> {

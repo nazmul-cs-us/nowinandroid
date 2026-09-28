@@ -2886,6 +2886,7 @@ internal fun CourseScreen(
     prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
     onOpenSurah: (Int) -> Unit = {},
     onOpenBukhariBook: (Int) -> Unit = {},
+    onOpenCourseDetail: (String) -> Unit = {},
 ) {
     val allCourses = remember { com.starception.submission.shared.content.SharedCourses }
     var enrolled by remember { mutableStateOf(store.enrolledCourses()) }
@@ -3137,18 +3138,7 @@ internal fun CourseScreen(
                     }
 
                     Surface(
-                        onClick = {
-                            if (isEnrolled) {
-                                when (course.id) {
-                                    "memorize_3_ayahs" -> onOpenSurah(courseProgress + 1)
-                                    "juz_amma" -> onOpenSurah((78 + courseProgress).coerceAtMost(114))
-                                    "quran_reading" -> onOpenSurah(((courseProgress / 5) + 1).coerceIn(1, 114))
-                                    "daily_bukhari" -> onOpenBukhariBook(1)
-                                }
-                            } else {
-                                enrolled = store.toggleEnrolledCourse(course.id)
-                            }
-                        },
+                        onClick = { onOpenCourseDetail(course.id) },
                         shape = RoundedCornerShape(32.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier.width(300.dp).height(224.dp),
@@ -3280,14 +3270,7 @@ internal fun CourseScreen(
                     else -> MaterialTheme.colorScheme.primary
                 }
                 Surface(
-                    onClick = {
-                        when (course.id) {
-                            "memorize_3_ayahs" -> onOpenSurah(courseProgress + 1)
-                            "juz_amma" -> onOpenSurah((78 + courseProgress).coerceAtMost(114))
-                            "quran_reading" -> onOpenSurah(((courseProgress / 5) + 1).coerceIn(1, 114))
-                            "daily_bukhari" -> onOpenBukhariBook(1)
-                        }
-                    },
+                    onClick = { onOpenCourseDetail(course.id) },
                     shape = RoundedCornerShape(20.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     modifier = Modifier

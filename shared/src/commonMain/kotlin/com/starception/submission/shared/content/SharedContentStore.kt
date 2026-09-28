@@ -308,6 +308,18 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         return updated
     }
 
+    /** Per-course completed lesson IDs (Android's completed_lessons_\${course.id}). */
+    fun courseCompletedLessons(courseId: String): Set<String> =
+        stringSet("course_completed_$courseId")
+
+    fun toggleCourseLesson(courseId: String, lessonId: String): Set<String> {
+        val updated = courseCompletedLessons(courseId).toMutableSet()
+        if (!updated.add(lessonId)) updated.remove(lessonId)
+        store.putString("course_completed_$courseId", updated.joinToString(SEPARATOR))
+        store.putString("course_progress_$courseId", updated.size.toString())
+        return updated
+    }
+
     fun completedLessons(): Set<Int> = intSet(COMPLETED_LESSONS, 1..COURSE_LESSON_COUNT)
 
     fun toggleLesson(number: Int): Set<Int> =
