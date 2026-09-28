@@ -75,7 +75,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -3201,8 +3200,10 @@ internal fun TopicNewsScreen(
     var loadAttempt by remember(topicId) { mutableStateOf(0) }
 
     LaunchedEffect(topicId, topicRepository) {
+        println("[TopicScreen] loading topics for topicId=$topicId")
         try {
             val loadedTopics = topicRepository.topics()
+            println("[TopicScreen] loaded ${loadedTopics.size} topics, finding id=$topicId")
             topics = loadedTopics
             topic = loadedTopics.firstOrNull { it.id == topicId } ?: sharedTopic(topicId)
         } catch (error: CancellationException) {
@@ -3212,6 +3213,7 @@ internal fun TopicNewsScreen(
         }
     }
     LaunchedEffect(topicId, newsRepository, requestedOffset, loadAttempt) {
+        println("[TopicScreen] LaunchedEffect FIRED topicId=$topicId offset=$requestedOffset attempt=$loadAttempt")
         val existing = state as? TopicNewsState.Loaded
         if (requestedOffset > 0 && existing == null) return@LaunchedEffect
         state = if (requestedOffset == 0) {
@@ -3220,6 +3222,7 @@ internal fun TopicNewsScreen(
             requireNotNull(existing).copy(loadingMore = true, loadMoreError = null)
         }
         try {
+            println("[TopicScreen] calling newsForTopic...")
             val page = newsRepository.newsForTopic(
                 topicId = topicId,
                 limit = TOPIC_NEWS_PAGE_SIZE,
@@ -3230,6 +3233,7 @@ internal fun TopicNewsScreen(
             } else {
                 requireNotNull(existing).news + page
             }
+            println("[TopicScreen] got ${page.size} news items")
             state = TopicNewsState.Loaded(
                 news = combined.distinctBy(SharedNewsResource::id),
                 nextOffset = requestedOffset + page.size,
@@ -3239,6 +3243,7 @@ internal fun TopicNewsScreen(
             throw error
         } catch (error: Throwable) {
             val message = error.message ?: "Unable to read topic news"
+            println("[TopicScreen] ERROR: $message")
             state = existing?.copy(loadingMore = false, loadMoreError = message)
                 ?: TopicNewsState.Error(message)
         }
@@ -3252,92 +3257,100 @@ internal fun TopicNewsScreen(
         return
     }
 
-    TopicPageScaffold(
-        followed = currentTopic.id in followedTopics,
-        onBack = onBack,
-        onFollowChanged = {
-            val followed = currentTopic.id !in followedTopics
-            store.setTopicFollowed(currentTopic.id, followed)
-            followedTopics = if (followed) followedTopics + currentTopic.id else followedTopics - currentTopic.id
-        },
-    ) { expanded ->
-        item(span = { GridItemSpan(maxLineSpan) }) { TopicPageHeader(currentTopic) }
-        when (val current = state) {
-            TopicNewsState.Loading -> item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(40.dp),
-                    contentAlignment = Alignment.Center,
-                ) { CircularProgressIndicator() }
+    // The topic page: a direct LazyColumn — the LazyVerticalGrid inside
+    // TopicPageScaffold silently composed nothing (pixel analysis: 98% white
+    // below the header on every topic page).
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding(),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                IconTapTarget(
+                    icon = NiaIcons.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    onClick = onBack,
+                )
+                FilterChip(
+                    selected = currentTopic.id in followedTopics,
+                    onClick = {
+                        val followed = currentTopic.id !in followedTopics
+                        store.setTopicFollowed(currentTopic.id, followed)
+                        followedTopics = if (followed) followedTopics + currentTopic.id else followedTopics - currentTopic.id
+                    },
+                    label = { Text(if (currentTopic.id in followedTopics) "FOLLOWING" else "NOT FOLLOWING") },
+                    leadingIcon = if (currentTopic.id in followedTopics) {
+                        { Icon(NiaIcons.Check, contentDescription = null, Modifier.size(18.dp)) }
+                    } else {
+                        { Icon(NiaIcons.Add, contentDescription = null, Modifier.size(18.dp)) }
+                    },
+                )
             }
-            is TopicNewsState.Error -> item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(Modifier.padding(horizontal = 24.dp)) {
-                    SupportingCard(
-                        title = "Unable to load news",
-                        body = current.message,
-                        action = "Try again",
-                        onAction = { loadAttempt++ },
-                    )
-                }
-            }
-            is TopicNewsState.Loaded -> if (current.news.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(Modifier.padding(horizontal = 24.dp)) {
-                        SupportingCard("No content yet", "There are no items in this topic.")
-                    }
-                }
-            } else {
-                val topicsById = topics.associateBy(SharedTopic::id)
-                gridItems(current.news, key = { it.id }) { news ->
-                    SharedNewsResourceCard(
-                        news = news,
-                        topicsById = topicsById,
-                        bookmarked = news.id in bookmarkedNewsIds,
-                        viewed = news.id in viewedNewsIds,
-                        onToggleBookmark = {
-                            val bookmarked = news.id !in bookmarkedNewsIds
-                            store.setNewsBookmarked(news.id, bookmarked)
-                            bookmarkedNewsIds = if (bookmarked) bookmarkedNewsIds + news.id else bookmarkedNewsIds - news.id
-                        },
-                        onClick = {
-                            if (news.id !in viewedNewsIds) {
-                                store.markNewsViewed(news.id)
-                                viewedNewsIds = viewedNewsIds + news.id
-                            }
-                            onOpenNews(news.id)
-                        },
-                        onTopicClick = { selectedTopicId ->
-                            if (selectedTopicId != topicId) onOpenTopic(selectedTopicId)
-                        },
-                        modifier = Modifier.padding(
-                            horizontal = if (expanded) 6.dp else 24.dp,
-                            vertical = if (expanded) 6.dp else 12.dp,
-                        ),
-                        currentTopicId = topicId,
-                        compact = expanded,
-                    )
-                }
-                if (current.hasMore || current.loadingMore || current.loadMoreError != null) {
-                    item(key = "load-more", span = { GridItemSpan(maxLineSpan) }) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 28.dp),
+            ) {
+                item { TopicPageHeader(currentTopic) }
+                when (val current = state) {
+                    TopicNewsState.Loading -> item {
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(40.dp),
                             contentAlignment = Alignment.Center,
-                        ) {
-                            when {
-                                current.loadingMore -> CircularProgressIndicator(
-                                    modifier = Modifier.semantics {
-                                        contentDescription = "Loading more topic news"
-                                    },
-                                )
-                                current.loadMoreError != null -> SupportingCard(
-                                    title = "Unable to load more news",
-                                    body = current.loadMoreError,
-                                    action = "Try again",
-                                    onAction = { loadAttempt++ },
-                                )
-                                else -> OutlinedButton(
-                                    onClick = { requestedOffset = current.nextOffset },
-                                ) { Text("Load more") }
+                        ) { CircularProgressIndicator() }
+                    }
+                    is TopicNewsState.Error -> item {
+                        Box(Modifier.padding(horizontal = 24.dp)) {
+                            SupportingCard(
+                                title = "Unable to load news",
+                                body = current.message,
+                                action = "Try again",
+                                onAction = { loadAttempt++ },
+                            )
+                        }
+                    }
+                    is TopicNewsState.Loaded -> if (current.news.isEmpty()) {
+                        item {
+                            Box(Modifier.padding(horizontal = 24.dp)) {
+                                SupportingCard("No content yet", "There are no items in this topic.")
                             }
+                        }
+                    } else {
+                        val topicsById = topics.associateBy(SharedTopic::id)
+                        items(current.news, key = { it.id }) { news ->
+                            SharedNewsResourceCard(
+                                news = news,
+                                topicsById = topicsById,
+                                bookmarked = news.id in bookmarkedNewsIds,
+                                viewed = news.id in viewedNewsIds,
+                                onToggleBookmark = {
+                                    if (news.id in bookmarkedNewsIds) {
+                                        store.setNewsBookmarked(news.id, false)
+                                        bookmarkedNewsIds = bookmarkedNewsIds - news.id
+                                    } else {
+                                        store.setNewsBookmarked(news.id, true)
+                                        bookmarkedNewsIds = bookmarkedNewsIds + news.id
+                                    }
+                                },
+                                onClick = {
+                                    if (news.id !in viewedNewsIds) {
+                                        store.markNewsViewed(news.id)
+                                        viewedNewsIds = viewedNewsIds + news.id
+                                    }
+                                    onOpenNews(news.id)
+                                },
+                                onTopicClick = onOpenTopic,
+                                currentTopicId = topicId,
+                                compact = false,
+                            )
                         }
                     }
                 }

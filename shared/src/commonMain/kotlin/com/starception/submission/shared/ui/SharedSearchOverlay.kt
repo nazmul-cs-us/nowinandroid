@@ -160,6 +160,7 @@ internal var SharedSearchController.destinations: SharedSearchDestinations? by m
  */
 @Composable
 fun SharedSearchOverlay(controller: SharedSearchController, onOpenProfile: () -> Unit = {}) {
+    println("[SearchOverlay] active=${controller.active}")
     if (!controller.active) return
     val destinations = controller.destinations ?: return
     Surface(
