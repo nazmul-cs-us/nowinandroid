@@ -156,6 +156,7 @@ private enum class GuidedState { IDLE, COUNTDOWN, RECORDING, COMPLETED }
 internal fun SalahTrainingLabScreen(
     onBack: () -> Unit,
     onOpenSession: (String) -> Unit = {},
+    onOpenPrayerSimulation: () -> Unit = {},
 ) {
     val recorder = remember { SalahSensorRecorder() }
     val store = remember { SalahRecordingStore() }
@@ -313,6 +314,13 @@ internal fun SalahTrainingLabScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                 }
+                OutlinedButton(
+                    onClick = onOpenPrayerSimulation,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                ) {
+                    Text("Prayer simulation in 3-D")
+                }
+                Spacer(Modifier.height(8.dp))
                 GuidedSetupPanel(
                     steps = steps,
                     selectedDuration = selectedDuration,
