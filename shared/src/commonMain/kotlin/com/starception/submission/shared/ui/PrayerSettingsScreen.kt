@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +80,7 @@ fun PrayerSettingsScreen(
     onRestore: () -> Unit,
     onBack: () -> Unit,
     onOpenSalahTraining: () -> Unit = {},
+    databaseStats: com.starception.submission.shared.content.SharedDatabaseStats? = null,
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     onNotificationsChange: (PrayerNotificationPreferences) -> Unit = {},
     themeSettings: ThemeSettingsState = ThemeSettingsState(),
@@ -201,7 +203,7 @@ fun PrayerSettingsScreen(
 
                     SettingsSection(
                         title = "Travel Dua",
-                        subtitle = "Auto-play while driving in the foreground",
+                        subtitle = "Auto-play dua when driving",
                         iconGlyph = FlaticonIcons.TRAVEL,
                         isExpanded = expanded == SECTION_TRAVEL,
                         onToggleExpanded = {
@@ -278,6 +280,20 @@ fun PrayerSettingsScreen(
                         )
                     }
 
+                    SettingsSection(
+                        title = "Salah Training",
+                        subtitle = "Improve the on-device prayer posture model",
+                        iconGlyph = FlaticonIcons.DEVELOPER,
+                        isExpanded = expanded == SECTION_SALAH_TRAINING,
+                        onToggleExpanded = {
+                            expanded = if (expanded == SECTION_SALAH_TRAINING) null else SECTION_SALAH_TRAINING
+                        },
+                    ) {
+                        SalahTrainingSection(
+                            onOpenTrainingLab = onOpenSalahTraining,
+                        )
+                    }
+
                     SettingsGroupLabel("App & support")
 
                     SettingsSection(
@@ -296,18 +312,44 @@ fun PrayerSettingsScreen(
                         )
                     }
 
-                    SettingsSection(
-                        title = "Salah Training",
-                        subtitle = "Improve the on-device prayer posture model",
-                        iconGlyph = FlaticonIcons.DEVELOPER,
-                        isExpanded = expanded == SECTION_SALAH_TRAINING,
-                        onToggleExpanded = {
-                            expanded = if (expanded == SECTION_SALAH_TRAINING) null else SECTION_SALAH_TRAINING
-                        },
-                    ) {
-                        SalahTrainingSection(
-                            onOpenTrainingLab = onOpenSalahTraining,
-                        )
+                    // Developer options — the DB refresh tools (Android's DeveloperOptions).
+                    if (databaseStats != null) {
+                        var developerLoading by remember { mutableStateOf(true) }
+                        var developerDbs by remember {
+                            mutableStateOf(emptyList<com.starception.submission.shared.content.SharedDatabaseInfo>())
+                        }
+                        var refreshingKey by remember { mutableStateOf<String?>(null) }
+                        LaunchedEffect(Unit) {
+                            developerDbs = databaseStats.snapshot()
+                            developerLoading = false
+                        }
+                        SettingsSection(
+                            title = "Developer Options",
+                            subtitle = "Debug & testing tools",
+                            iconGlyph = FlaticonIcons.DEVELOPER,
+                            isExpanded = expanded == SECTION_DEVELOPER,
+                            onToggleExpanded = {
+                                expanded = if (expanded == SECTION_DEVELOPER) null else SECTION_DEVELOPER
+                            },
+                        ) {
+                            DeveloperSettingsSection(
+                                databases = developerDbs,
+                                isLoading = developerLoading,
+                                refreshingKey = refreshingKey,
+                                onRefresh = { key ->
+                                    refreshingKey = key
+                                    databaseStats.refresh(key)
+                                    refreshingKey = null
+                                },
+                                onRefreshAll = {
+                                    refreshingKey = "all"
+                                    developerDbs.forEach { info ->
+                                        databaseStats.refresh(info.key)
+                                    }
+                                    refreshingKey = null
+                                },
+                            )
+                        }
                     }
 
                     SettingsSection(
@@ -353,4 +395,5 @@ private const val SECTION_TRAVEL = "travel"
 private const val SECTION_VOICE = "voice"
 private const val SECTION_NARRATION = "narration"
 private const val SECTION_SALAH_TRAINING = "salah_training"
+private const val SECTION_DEVELOPER = "developer"
 private const val SECTION_CONTENT = "content"

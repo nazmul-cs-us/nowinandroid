@@ -524,6 +524,7 @@ fun PrayerTimesViewController(
                     },
                     onBack = onBack,
                     onOpenSalahTraining = onOpenSalahTraining,
+                    databaseStats = com.starception.submission.shared.content.SharedDatabaseStats(),
                     notifications = notificationPrefs,
                     onNotificationsChange = { updated ->
                         notificationPrefs = updated
