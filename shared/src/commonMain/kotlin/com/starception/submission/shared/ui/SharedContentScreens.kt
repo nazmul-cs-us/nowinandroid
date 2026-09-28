@@ -2536,6 +2536,8 @@ internal fun ForYouScreen(
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
+    globalRefreshing: Boolean = false,
+    globalSyncResultText: String? = null,
 ) {
     // Pull-to-refresh reloads the topic + news databases. The strip HOLDS
     // until the reload lands (plus a small dwell) so it reads as a real sync
@@ -2747,6 +2749,8 @@ internal fun SavedScreen(
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
+    globalRefreshing: Boolean = false,
+    globalSyncResultText: String? = null,
 ) {
     val newsRepository = remember { createSharedNewsRepository() }
     val topicRepository = remember { createSharedTopicRepository() }
@@ -2916,6 +2920,8 @@ internal fun InterestsScreen(
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
+    globalRefreshing: Boolean = false,
+    globalSyncResultText: String? = null,
 ) {
     var refreshAttempt by remember { mutableStateOf(0) }
     var pullRefreshing by remember { mutableStateOf(false) }
@@ -2957,7 +2963,8 @@ internal fun InterestsScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
-        isRefreshing = pullRefreshing,
+        isRefreshing = pullRefreshing || globalRefreshing,
+        syncResultText = globalSyncResultText,
         onRefresh = {
             pullRefreshing = true
             refreshAttempt += 1
@@ -3923,6 +3930,7 @@ private fun TopLevelScaffold(
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     isRefreshing: Boolean = false,
+    syncResultText: String? = null,
     onRefresh: (() -> Unit)? = null,
     prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
     itemSpacing: Dp = 10.dp,
@@ -4009,6 +4017,9 @@ private fun TopLevelScaffold(
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,
+                syncResultText = syncResultText,
+                prayerAlertState = prayerAlert
+                    ?: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
                 modifier = Modifier.fillMaxSize(),
             ) { _ -> page() }
         } else {

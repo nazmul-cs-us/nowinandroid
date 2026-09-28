@@ -142,6 +142,8 @@ fun SharedNavHost(
     createQualityAnalyzer: (() -> com.starception.submission.shared.ml.SalahQualityAnalyzer?)? = null,
     prayerDay: com.starception.submission.shared.SharedPrayerDay? = null,
     notifications: com.starception.submission.prayer.model.PrayerNotificationPreferences? = null,
+    globalRefreshing: Boolean = false,
+    globalSyncResultText: String? = null,
 ) {
     // The prayer-time alert (go-to-mosue countdown when prayer approaches)
     // shows in the sync strip of EVERY top page, like Android's app-level
@@ -282,6 +284,8 @@ fun SharedNavHost(
                     onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
                     onOpenProfile = { navController.navigate(ProfileRoute) },
                     prayerAlert = tabPrayerAlert,
+                    globalRefreshing = globalRefreshing,
+                    globalSyncResultText = globalSyncResultText,
                 )
             }
             composable<SearchRoute> {

@@ -499,6 +499,8 @@ fun PrayerTimesViewController(
             },
             prayerDay = day,
             notifications = notificationPrefs,
+            globalRefreshing = isRefreshing,
+            globalSyncResultText = syncResultText,
             createQualityAnalyzer = salahTfliteService?.let { service ->
                 {
                     readBundledSalahNormParams()?.let { paramsJson ->

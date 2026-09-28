@@ -45,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.images.resources.flaticon_sound_14925198
+import com.starception.submission.core.images.resources.flaticon_sound_14925297
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.ui.FlaticonIcons
@@ -59,6 +61,8 @@ import com.starception.submission.settings.components.SalahTrainingSection
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
 import com.starception.submission.shared.settings.VoiceRecognitionMode
+import org.jetbrains.compose.resources.painterResource
+import com.starception.submission.core.images.resources.Res as ImageRes
 
 /**
  * The prayer settings screen.
@@ -198,6 +202,14 @@ fun PrayerSettingsScreen(
                             onPreferencesChanged = onNotificationsChange,
                             hasDndAccess = true,
                             showSilentDuringPrayer = false,
+                            // The tile's on/mute flaticons so the Adhan rows show
+                            // distinct speaker states like Android.
+                            speakerOnPainter = painterResource(
+                                ImageRes.drawable.flaticon_sound_14925297,
+                            ),
+                            speakerMutedPainter = painterResource(
+                                ImageRes.drawable.flaticon_sound_14925198,
+                            ),
                         )
                     }
 

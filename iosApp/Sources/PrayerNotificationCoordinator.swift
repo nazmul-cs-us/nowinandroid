@@ -37,6 +37,7 @@ private struct PrayerEntry: Decodable {
     let priorMinutes: Int
     let activeMinutes: Int
     let adhanEnabled: Bool?
+    let adhanVolume: Int?
 }
 
 private struct DatedPrayer {
@@ -148,14 +149,15 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         }
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
 
-        let events = prayers.flatMap { prayer -> [(String, Date, String, String, Bool)] in
+        let events = prayers.flatMap { prayer -> [(String, Date, String, String, Bool, Int?)] in
             let dayKey = Self.identifierDateFormatter.string(from: prayer.date)
             let start = (
                 "\(prayerNotificationPrefix)\(dayKey).\(prayer.entry.name).start",
                 prayer.date,
                 "Time for \(prayer.entry.name)",
                 "It is time to pray \(prayer.entry.name) in \(payload.locationName).",
-                prayer.entry.adhanEnabled ?? true
+                prayer.entry.adhanEnabled ?? true,
+                prayer.entry.adhanVolume
             )
             guard prayer.entry.priorMinutes > 0 else { return [start] }
             let reminderDate = prayer.date.addingTimeInterval(
@@ -168,7 +170,8 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
                     reminderDate,
                     "\(prayer.entry.name) is approaching",
                     "\(prayer.entry.name) begins in \(prayer.entry.priorMinutes) minutes.",
-                    false
+                    false,
+                    nil
                 ),
                 start,
             ]
@@ -189,7 +192,21 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
             // 30s notification-sound limit.
             let isPrayerStart = event.0.hasSuffix(".start")
             if isPrayerStart, event.4 {
-                content.sound = UNNotificationSound(named: UNNotificationSoundName("short_adhan.caf"))
+                // Per-prayer volume: the adhan ships pre-scaled at 25/50/75/100
+                // and the schedule selects the file for the stored percent —
+                // notification sounds cannot be scaled at playback time.
+                let volume = event.5 ?? 100
+                let fileName: String?
+                switch volume {
+                case 0: fileName = nil // muted: silent notification, like Android's 0%
+                case 1...37: fileName = "short_adhan_25.caf"
+                case 38...62: fileName = "short_adhan_50.caf"
+                case 63...87: fileName = "short_adhan_75.caf"
+                default: fileName = "short_adhan.caf"
+                }
+                if let fileName {
+                    content.sound = UNNotificationSound(named: UNNotificationSoundName(fileName))
+                }
             } else if payload.soundEnabled {
                 content.sound = .default
             }

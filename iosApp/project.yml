@@ -36,6 +36,15 @@ targets:
       - path: Sources/short_adhan.caf
         buildPhase: resources
         type: file
+      - path: Sources/short_adhan_75.caf
+        buildPhase: resources
+        type: file
+      - path: Sources/short_adhan_50.caf
+        buildPhase: resources
+        type: file
+      - path: Sources/short_adhan_25.caf
+        buildPhase: resources
+        type: file
       - path: Sources/travel_dua.caf
         buildPhase: resources
         type: file
