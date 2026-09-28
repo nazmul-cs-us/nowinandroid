@@ -91,6 +91,8 @@ object PrayerSettingsRoute
 
 @Serializable object SalahTrainingRoute
 
+@Serializable data class SalahReviewRoute(val fileName: String)
+
 @Serializable object QiblaRoute
 
 @Serializable object RecommendationRoute
@@ -428,6 +430,15 @@ fun SharedNavHost(
             }
             composable<SalahTrainingRoute> {
                 SalahTrainingLabScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenSession = { fileName ->
+                        navController.navigate(SalahReviewRoute(fileName))
+                    },
+                )
+            }
+            composable<SalahReviewRoute> { entry ->
+                SalahSessionReviewScreen(
+                    fileName = entry.toRoute<SalahReviewRoute>().fileName,
                     onBack = { navController.popBackStack() },
                 )
             }

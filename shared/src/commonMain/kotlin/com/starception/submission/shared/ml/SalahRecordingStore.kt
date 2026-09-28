@@ -47,6 +47,12 @@ expect class SalahRecordingStore() {
      */
     fun stopSession(trimLastMs: Long): String?
 
+    /** Parses one JSONL line back into a sample (same shape as toJson). */
+    fun parseSample(line: String): SalahDataSample?
+
+    /** All samples of one saved session, in capture order. */
+    fun sessionSamples(fileName: String): List<SalahDataSample>
+
     /** All saved sessions, newest first. */
     fun sessions(): List<SalahSessionInfo>
 

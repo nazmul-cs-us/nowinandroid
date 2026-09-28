@@ -29,6 +29,10 @@ actual class SalahRecordingStore actual constructor() {
         error("The shared recording store is packaged by the iOS host only")
     }
 
+    actual fun parseSample(line: String): SalahDataSample? = null
+
+    actual fun sessionSamples(fileName: String): List<SalahDataSample> = emptyList()
+
     actual fun sessions(): List<SalahSessionInfo> = emptyList()
 
     actual fun deleteSession(fileName: String) = Unit

@@ -155,6 +155,7 @@ private enum class GuidedState { IDLE, COUNTDOWN, RECORDING, COMPLETED }
 @Composable
 internal fun SalahTrainingLabScreen(
     onBack: () -> Unit,
+    onOpenSession: (String) -> Unit = {},
 ) {
     val recorder = remember { SalahSensorRecorder() }
     val store = remember { SalahRecordingStore() }
@@ -327,6 +328,7 @@ internal fun SalahTrainingLabScreen(
                 Spacer(Modifier.height(14.dp))
                 SessionBrowser(
                     sessions = sessions,
+                    onOpen = onOpenSession,
                     onDelete = { name ->
                         store.deleteSession(name)
                         refreshSessions()
@@ -525,6 +527,7 @@ private fun GuidedLivePanel(
 @Composable
 private fun SessionBrowser(
     sessions: List<SalahSessionInfo>,
+    onOpen: (String) -> Unit,
     onDelete: (String) -> Unit,
     onDeleteAll: () -> Unit,
 ) {
@@ -550,6 +553,7 @@ private fun SessionBrowser(
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
+                onClick = { onOpen(session.fileName) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(

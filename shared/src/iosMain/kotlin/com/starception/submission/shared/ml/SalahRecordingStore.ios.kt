@@ -110,6 +110,14 @@ actual class SalahRecordingStore actual constructor() {
         return finalName
     }
 
+    actual fun parseSample(line: String): SalahDataSample? = parseSalahSampleLine(line)
+
+    actual fun sessionSamples(fileName: String): List<SalahDataSample> {
+        val path = "${recordingsDirectory()}/$fileName"
+        val content = readText(path) ?: return emptyList()
+        return content.lineSequence().mapNotNull(::parseSalahSampleLine).toList()
+    }
+
     actual fun sessions(): List<SalahSessionInfo> {
         val directory = recordingsDirectory()
         val names = (fileManager.contentsOfDirectoryAtPath(directory, error = null) as? List<String>)
