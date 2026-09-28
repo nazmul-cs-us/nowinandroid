@@ -41690,6 +41690,12 @@
       "sha256": "9c2a6d7bfa54bad1b12eeb2cd75879a7303d2a6bbf04936839ddd77c261cb9f3",
       "category": "surah_artwork",
       "required": false
+    },
+    "news.db": {
+      "size": 6393856,
+      "sha256": "9f6e662cca5f4a91fa07cbaca33e3ec4c8ef9389967495e55bbbdeb2d7dd496b",
+      "category": "json_data",
+      "required": true
     }
   }
 }
