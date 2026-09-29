@@ -90,6 +90,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -202,27 +203,7 @@ fun PrayerTimesScreen(
     var showProfileSheet by remember { mutableStateOf(false) }
     val contentStore = remember { SharedContentStore() }
     val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
-    val colorScheme = MaterialTheme.colorScheme
-    val isDarkTheme = colorScheme.background.luminance() < 0.5f
-    val homeCanvas = if (isDarkTheme) {
-        Brush.verticalGradient(
-            listOf(
-                colorScheme.background,
-                colorScheme.surface,
-                colorScheme.primary.copy(alpha = 0.05f).compositeOver(colorScheme.surface),
-                colorScheme.background,
-            ),
-        )
-    } else {
-        Brush.verticalGradient(
-            listOf(
-                colorScheme.background,
-                colorScheme.surfaceContainerLow,
-                colorScheme.secondary.copy(alpha = 0.14f)
-                    .compositeOver(colorScheme.surfaceContainerLow),
-            ),
-        )
-    }
+    val homeCanvas = screenCanvasBrush()
     val nextPrayerState = remember(day, notifications) {
         day.prayerAlertState(notifications)
     }
@@ -547,6 +528,31 @@ fun PrayerTimesScreen(
 }
 
 @Composable
+internal fun screenCanvasBrush(): Brush {
+    val colorScheme = MaterialTheme.colorScheme
+    val isDarkTheme = colorScheme.background.luminance() < 0.5f
+    return if (isDarkTheme) {
+        Brush.verticalGradient(
+            listOf(
+                colorScheme.background,
+                colorScheme.surface,
+                colorScheme.primary.copy(alpha = 0.05f).compositeOver(colorScheme.surface),
+                colorScheme.background,
+            ),
+        )
+    } else {
+        Brush.verticalGradient(
+            listOf(
+                colorScheme.background,
+                colorScheme.surfaceContainerLow,
+                colorScheme.secondary.copy(alpha = 0.14f)
+                    .compositeOver(colorScheme.surfaceContainerLow),
+            ),
+        )
+    }
+}
+
+@Composable
 private fun PrayerHomeHeader(
     onOpenSettings: () -> Unit,
     onOpenProfile: () -> Unit,
@@ -556,7 +562,20 @@ private fun PrayerHomeHeader(
     onShowProfile: () -> Unit = {},
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .layout { measurable, constraints ->
+                val bleed = 8.dp.roundToPx()
+                val expanded = constraints.copy(
+                    minWidth = constraints.minWidth + (bleed * 2),
+                    maxWidth = constraints.maxWidth + (bleed * 2),
+                )
+                val placeable = measurable.measure(expanded)
+                layout(constraints.maxWidth, placeable.height) {
+                    placeable.placeRelative(-bleed, 0)
+                }
+            },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

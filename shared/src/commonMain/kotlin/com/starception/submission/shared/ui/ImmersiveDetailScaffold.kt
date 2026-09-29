@@ -21,12 +21,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -96,14 +100,14 @@ internal fun ImmersiveDetailScaffold(
                     .widthIn(max = maxContentWidth)
                     .fillMaxSize()
                     .align(Alignment.TopCenter)
-                    .safeDrawingPadding()
                     .then(
                         if (collapsibleHeader) Modifier.nestedScroll(headerNestedScrollConnection) else Modifier,
                     ),
             ) {
-                // Android's reader artwork is full-bleed. Keeping the header
-                // outside the page gutter also prevents its rounded/artwork
-                // silhouette from being clipped against an arbitrary inset.
+                // Android's reader artwork is full-bleed, extending under the
+                // status bar; the toolbar inside it clears the inset itself.
+                // Only the content below keeps the horizontal and bottom safe
+                // insets, so text stays clear of notches and the home indicator.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -127,6 +131,11 @@ internal fun ImmersiveDetailScaffold(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(
+                                WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+                            ),
+                        )
                         .padding(horizontal = 16.dp)
                         .padding(top = 12.dp),
                 ) {

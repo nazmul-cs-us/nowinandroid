@@ -48,7 +48,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -93,7 +95,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -146,6 +151,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
 internal data class CourseLesson(val number: Int, val title: String, val summary: String)
@@ -2609,7 +2616,11 @@ internal fun ForYouScreen(
     LaunchedEffect(topicRepository, refreshAttempt) {
         topicsLoading = true
         try {
-            topics = topicRepository.topics()
+            val loadedTopics = topicRepository.topics()
+            val order = store.topicOrder()
+            val topicsById = loadedTopics.associateBy(SharedTopic::id)
+            topics = order.mapNotNull(topicsById::get) +
+                loadedTopics.filterNot { it.id in order }
             topicsError = null
         } catch (error: CancellationException) {
             throw error
@@ -2639,6 +2650,17 @@ internal fun ForYouScreen(
             pullRefreshing = false
         }
     }
+    val gridState = rememberLazyGridState()
+    val haptics = LocalHapticFeedback.current
+    val reorderState = rememberReorderableLazyGridState(gridState) { from, to ->
+        val fromIndex = topics.indexOfFirst { "onboarding:${it.id}" == from.key }
+        val toIndex = topics.indexOfFirst { "onboarding:${it.id}" == to.key }
+        if (fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex) {
+            topics = topics.toMutableList().apply {
+                add(toIndex, removeAt(fromIndex))
+            }
+        }
+    }
     TopLevelScaffold(
         title = "For you",
         selectedIndex = 1,
@@ -2652,6 +2674,7 @@ internal fun ForYouScreen(
             refreshAttempt += 1
         },
         adaptiveGrid = true,
+        gridState = gridState,
     ) { expanded ->
         if (!onboardingHidden) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -2686,18 +2709,29 @@ internal fun ForYouScreen(
                     key = { "onboarding:${it.id}" },
                     span = { GridItemSpan(maxLineSpan) },
                 ) { topic ->
-                    OnboardingTopicRow(
-                        topic = topic,
-                        followed = topic.id in followedTopicIds,
-                        onFollowChanged = { followed ->
-                            store.setTopicFollowed(topic.id, followed)
-                            followedTopicIds = if (followed) {
-                                followedTopicIds + topic.id
-                            } else {
-                                followedTopicIds - topic.id
-                            }
-                        },
-                    )
+                    ReorderableItem(reorderState, key = "onboarding:${topic.id}") { isDragging ->
+                        OnboardingTopicRow(
+                            topic = topic,
+                            followed = topic.id in followedTopicIds,
+                            isDragging = isDragging,
+                            onFollowChanged = { followed ->
+                                store.setTopicFollowed(topic.id, followed)
+                                followedTopicIds = if (followed) {
+                                    followedTopicIds + topic.id
+                                } else {
+                                    followedTopicIds - topic.id
+                                }
+                            },
+                            dragHandleModifier = Modifier.longPressDraggableHandle(
+                                onDragStarted = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDragStopped = {
+                                    store.saveTopicOrder(topics.map(SharedTopic::id))
+                                },
+                            ),
+                        )
+                    }
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -2766,11 +2800,24 @@ private fun OnboardingTopicRow(
     topic: SharedTopic,
     followed: Boolean,
     onFollowChanged: (Boolean) -> Unit,
+    isDragging: Boolean = false,
+    dragHandleModifier: Modifier = Modifier,
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth(),
+        color = if (isDragging) {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(dragHandleModifier)
+            .graphicsLayer {
+                val scale = if (isDragging) 1.02f else 1f
+                scaleX = scale
+                scaleY = scale
+            },
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
@@ -3412,6 +3459,17 @@ internal fun InterestsScreen(
             pullRefreshing = false
         }
     }
+    val gridState = rememberLazyGridState()
+    val haptics = LocalHapticFeedback.current
+    val reorderState = rememberReorderableLazyGridState(gridState) { from, to ->
+        val fromIndex = topics.indexOfFirst { it.id == from.key }
+        val toIndex = topics.indexOfFirst { it.id == to.key }
+        if (fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex) {
+            topics = topics.toMutableList().apply {
+                add(toIndex, removeAt(fromIndex))
+            }
+        }
+    }
     TopLevelScaffold(
         title = "Interests",
         selectedIndex = 4,
@@ -3427,6 +3485,7 @@ internal fun InterestsScreen(
         },
         prayerAlert = prayerAlert,
         itemSpacing = 0.dp,
+        gridState = gridState,
         expandedPane = { modifier ->
             val selectedTopic = topics.firstOrNull { it.id == selectedTopicId }
             if (selectedTopic == null) {
@@ -3464,30 +3523,29 @@ internal fun InterestsScreen(
                 SupportingCard("No topics", "The topic database is empty.")
             }
             else -> gridItems(topics, key = { it.id }) { topic ->
-                val index = topics.indexOfFirst { it.id == topic.id }
-                TopicInterestRow(
-                    topic = topic,
-                    following = topic.id in followedTopicIds,
-                    selected = expanded && topic.id == selectedTopicId,
-                    canMoveEarlier = index > 0,
-                    canMoveLater = index in 0 until topics.lastIndex,
-                    onOpen = {
-                        if (expanded) selectedTopicId = topic.id else onOpenTopic(topic.id)
-                    },
-                    onToggle = { followed ->
-                        store.setTopicFollowed(topic.id, followed)
-                        followedTopicIds = if (followed) followedTopicIds + topic.id else followedTopicIds - topic.id
-                    },
-                    onMove = { offset ->
-                        val target = index + offset
-                        if (index >= 0 && target in topics.indices) {
-                            topics = topics.toMutableList().apply {
-                                add(target, removeAt(index))
-                            }
-                            store.saveTopicOrder(topics.map(SharedTopic::id))
-                        }
-                    },
-                )
+                ReorderableItem(reorderState, key = topic.id) { isDragging ->
+                    TopicInterestRow(
+                        topic = topic,
+                        following = topic.id in followedTopicIds,
+                        selected = expanded && topic.id == selectedTopicId,
+                        isDragging = isDragging,
+                        onOpen = {
+                            if (expanded) selectedTopicId = topic.id else onOpenTopic(topic.id)
+                        },
+                        onToggle = { followed ->
+                            store.setTopicFollowed(topic.id, followed)
+                            followedTopicIds = if (followed) followedTopicIds + topic.id else followedTopicIds - topic.id
+                        },
+                        dragHandleModifier = Modifier.longPressDraggableHandle(
+                            onDragStarted = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            onDragStopped = {
+                                store.saveTopicOrder(topics.map(SharedTopic::id))
+                            },
+                        ),
+                    )
+                }
             }
         }
     }
@@ -3498,11 +3556,10 @@ private fun TopicInterestRow(
     topic: SharedTopic,
     following: Boolean,
     selected: Boolean,
-    canMoveEarlier: Boolean,
-    canMoveLater: Boolean,
     onOpen: () -> Unit,
     onToggle: (Boolean) -> Unit,
-    onMove: (Int) -> Unit,
+    isDragging: Boolean = false,
+    dragHandleModifier: Modifier = Modifier,
 ) {
     ListItem(
         leadingContent = {
@@ -3515,55 +3572,41 @@ private fun TopicInterestRow(
             Text(topic.shortDescription, style = MaterialTheme.typography.bodyMedium)
         },
         trailingContent = {
-            Column(horizontalAlignment = Alignment.End) {
-                FilledIconToggleButton(
-                    checked = following,
-                    onCheckedChange = onToggle,
-                    colors = IconButtonDefaults.iconToggleButtonColors(
-                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
-                ) {
-                    Icon(
-                        imageVector = if (following) NiaIcons.Check else NiaIcons.Add,
-                        contentDescription = if (following) {
-                            "Unfollow ${topic.name}"
-                        } else {
-                            "Follow ${topic.name}"
-                        },
-                    )
-                }
-                Row {
-                    TextButton(
-                        onClick = { onMove(-1) },
-                        enabled = canMoveEarlier,
-                        contentPadding = PaddingValues(horizontal = 6.dp),
-                        modifier = Modifier.semantics {
-                            contentDescription = "Move ${topic.name} earlier"
-                        },
-                    ) { Text("Up", style = MaterialTheme.typography.labelSmall) }
-                    TextButton(
-                        onClick = { onMove(1) },
-                        enabled = canMoveLater,
-                        contentPadding = PaddingValues(horizontal = 6.dp),
-                        modifier = Modifier.semantics {
-                            contentDescription = "Move ${topic.name} later"
-                        },
-                    ) { Text("Down", style = MaterialTheme.typography.labelSmall) }
-                }
+            FilledIconToggleButton(
+                checked = following,
+                onCheckedChange = onToggle,
+                colors = IconButtonDefaults.iconToggleButtonColors(
+                    checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+            ) {
+                Icon(
+                    imageVector = if (following) NiaIcons.Check else NiaIcons.Add,
+                    contentDescription = if (following) {
+                        "Unfollow ${topic.name}"
+                    } else {
+                        "Follow ${topic.name}"
+                    },
+                )
             }
         },
         colors = ListItemDefaults.colors(
-            containerColor = if (selected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-            } else {
-                Color.Transparent
+            containerColor = when {
+                isDragging -> MaterialTheme.colorScheme.surfaceContainerLow
+                selected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                else -> Color.Transparent
             },
         ),
         modifier = Modifier
             // TopLevelScaffold already supplies 16 dp; Android's list supplies 24 dp.
             .padding(horizontal = 8.dp)
             .fillMaxWidth()
+            .then(dragHandleModifier)
+            .graphicsLayer {
+                val scale = if (isDragging) 1.02f else 1f
+                scaleX = scale
+                scaleY = scale
+            }
             .semantics {
                 contentDescription = "${topic.name} topic${if (following) ", followed" else ""}"
             }
@@ -4413,16 +4456,21 @@ private fun TopLevelScaffold(
     prayerAlert: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState? = null,
     itemSpacing: Dp = 10.dp,
     adaptiveGrid: Boolean = false,
+    gridState: LazyGridState? = null,
     expandedPane: (@Composable (Modifier) -> Unit)? = null,
     content: LazyGridScope.(expanded: Boolean) -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    Surface(
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxSize().background(screenCanvasBrush()),
+    ) {
         val page: @Composable () -> Unit = {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val expanded = maxWidth >= EXPANDED_WIDTH
                 // Match Android and the home screen: the side rail appears only in
                 // landscape tablet windows; portrait keeps the bottom pill.
                 val useSideRail = maxWidth >= 600.dp && maxHeight >= 600.dp && maxWidth > maxHeight
+                val effectiveGridState = gridState ?: rememberLazyGridState()
                 Column(
                     modifier = Modifier
                         .widthIn(max = if (expandedPane != null) 1200.dp else 1100.dp)
@@ -4432,7 +4480,11 @@ private fun TopLevelScaffold(
                         .padding(
                             start = if (useSideRail) 80.dp else 16.dp,
                             end = 16.dp,
-                        ),
+                        )
+                        // Match the home column's breathing room above the header so
+                        // the pulled sync strip holds the search bar at the same
+                        // clearance on every tab page.
+                        .padding(top = 8.dp),
                 ) {
                     // The SAME top bar as the home screen on every page — Android's
                     // AppTopSearchBar: avatar + search pill with voice + settings.
@@ -4448,6 +4500,7 @@ private fun TopLevelScaffold(
                     val grid: @Composable (Modifier) -> Unit = { modifier ->
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(if (adaptiveGrid && expanded) 2 else 1),
+                            state = effectiveGridState,
                             modifier = modifier,
                             verticalArrangement = Arrangement.spacedBy(itemSpacing),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),

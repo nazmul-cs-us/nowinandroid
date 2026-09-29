@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -158,7 +159,9 @@ internal fun DetailToolbar(
     Surface(
         color = androidx.compose.ui.graphics.Color.Transparent,
         tonalElevation = 0.dp,
-        modifier = Modifier.fillMaxWidth().height(64.dp),
+        // The immersive headers are full-bleed under the status bar; the
+        // toolbar itself clears the network/notification icons.
+        modifier = Modifier.fillMaxWidth().statusBarsPadding().height(64.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
