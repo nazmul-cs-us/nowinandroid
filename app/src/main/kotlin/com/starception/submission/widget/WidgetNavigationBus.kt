@@ -36,7 +36,11 @@ sealed interface WidgetNavigationTarget {
         val duaNumber: Int,
     ) : WidgetNavigationTarget
 
-    data class Surah(val surahNumber: Int) : WidgetNavigationTarget
+    data class Surah(
+        val surahNumber: Int,
+        /** Zero keeps the existing behaviour of opening the surah at its normal start. */
+        val ayahNumber: Int = 0,
+    ) : WidgetNavigationTarget
 }
 
 /**
@@ -100,6 +104,7 @@ object WidgetNavigationBus {
             KIND_SURAH -> WidgetNavigationTarget.Surah(
                 surahNumber = intent.getIntExtra(EXTRA_SURAH_NUMBER, -1).takeIf { it > 0 }
                     ?: return null,
+                ayahNumber = intent.getIntExtra(EXTRA_AYAH_NUMBER, 0).coerceAtLeast(0),
             )
 
             KIND_DUA -> WidgetNavigationTarget.Dua(
@@ -125,6 +130,7 @@ object WidgetNavigationBus {
             intent
                 .putExtra(EXTRA_KIND, KIND_SURAH)
                 .putExtra(EXTRA_SURAH_NUMBER, target.surahNumber)
+                .putExtra(EXTRA_AYAH_NUMBER, target.ayahNumber)
 
         is WidgetNavigationTarget.Dua ->
             intent
@@ -145,4 +151,5 @@ object WidgetNavigationBus {
     private const val KIND_DUA = "dua"
     private const val KIND_SURAH = "surah"
     private const val EXTRA_SURAH_NUMBER = "widget_surah_number"
+    private const val EXTRA_AYAH_NUMBER = "widget_ayah_number"
 }

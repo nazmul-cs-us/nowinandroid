@@ -143,7 +143,10 @@ internal fun DetailToolbar(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { action.onClick() },
+                            .clickable {
+                                action.onClick()
+                                showOptionsSheet = false
+                            },
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp,
                     )
@@ -194,11 +197,11 @@ internal fun DetailToolbar(
                             Icon(
                                 imageVector = icon,
                                 contentDescription = action.label,
-                                tint = if (action.selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    contentColor
-                                },
+                                // Filled vs outlined artwork already communicates
+                                // selection. Keep overlay actions at the requested
+                                // contrast color so a selected bookmark never turns
+                                // dark and disappears over photography.
+                                tint = contentColor,
                                 modifier = Modifier.size(24.dp),
                             )
                         } else if (action.trailingText != null) {

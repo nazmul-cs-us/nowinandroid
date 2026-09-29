@@ -348,6 +348,7 @@ fun SharedNavHost(
                 val route = entry.toRoute<DuaDetailRoute>()
                 SharedDuaDetailScreen(
                     number = route.number,
+                    store = contentStore,
                     onBack = { navController.popBackStack() },
                 )
             }

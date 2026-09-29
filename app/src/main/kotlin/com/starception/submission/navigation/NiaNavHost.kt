@@ -108,7 +108,10 @@ fun NiaNavHost(
             }
 
             is com.starception.submission.widget.WidgetNavigationTarget.Surah -> {
-                navController.navigateToSurah(target.surahNumber)
+                navController.navigateToSurah(
+                    surahNumber = target.surahNumber,
+                    scrollToAyah = target.ayahNumber,
+                )
                 com.starception.submission.widget.WidgetNavigationBus.consumed(target)
             }
 

@@ -419,7 +419,6 @@ internal fun QuranDetailScreen(
         SharedDetailScaffold(title = "Quran", onBack = onBack) { Text("Surah not found") }
         return
     }
-    var saved by remember(number) { mutableStateOf(number in store.bookmarkedSurahs()) }
     var playing by remember(number) { mutableStateOf(false) }
     LaunchedEffect(number) {
         if (store.quranAutoplayPending()) {
@@ -439,9 +438,6 @@ internal fun QuranDetailScreen(
     }
     var tafseerLoading by remember { mutableStateOf(false) }
     var tafseerSelectedBook by remember { mutableStateOf(0) }
-    LaunchedEffect(tafseerRequest) {
-        tafseerLoading = tafseerRequest != null
-    }
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
     val repository = remember { createQuranVerseRepository() }
     DisposableEffect(player) { onDispose { player.stop() } }
@@ -546,9 +542,14 @@ internal fun QuranDetailScreen(
     val textAlignmentAction = DetailAction(
         id = "text_alignment",
         label = "Text alignment",
-        trailingText = if (textAlignment == "center") "Center" else "Justify",
+        trailingText = textAlignment.replaceFirstChar { it.uppercase() },
     ) {
-        textAlignment = if (textAlignment == "center") "justify" else "center"
+        textAlignment = when (textAlignment) {
+            "start" -> "center"
+            "center" -> "end"
+            "end" -> "justify"
+            else -> "start"
+        }
         store.saveQuranTextAlignment(textAlignment)
     }
     val arabicFontAction = DetailAction(
@@ -571,10 +572,6 @@ internal fun QuranDetailScreen(
         translationLanguage = entries[(entries.indexOf(translationLanguage) + 1) % entries.size]
         store.saveQuranTranslationLanguage(translationLanguage.code)
     }
-    val tafseerAction = DetailAction(
-        id = "tafseer",
-        label = "Word study / Tafseer",
-    ) { }
     val bookmarkSheetAction = DetailAction(
         id = "bookmark_sheet",
         label = if (isBookmarked) "Remove bookmark" else "Bookmark surah",
@@ -583,17 +580,31 @@ internal fun QuranDetailScreen(
     ) {
         isBookmarked = number in store.toggleSurah(number)
     }
-    ImmersiveDetailScaffold(onBack = onBack, header = {
+    ImmersiveDetailScaffold(onBack = onBack, collapsibleHeader = true, header = {
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(3f / 2f)
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)),
+                .aspectRatio(3f / 2f),
         ) {
             com.starception.submission.shared.quran.SurahArtworkHeader(
                 surahNumber = number,
                 contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
                 modifier = Modifier.fillMaxSize(),
+            )
+            // Android keeps the chapter identity in the information panel
+            // below the artwork. The artwork only needs a top contrast scrim
+            // for toolbar controls; repeating the title here caused a second,
+            // overlapping title on iOS.
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.42f),
+                            0.35f to Color.Black.copy(alpha = 0.08f),
+                            1f to Color.Transparent,
+                        ),
+                    ),
             )
             Column {
                 DetailToolbar(
@@ -607,20 +618,12 @@ internal fun QuranDetailScreen(
                         textAlignmentAction,
                         arabicFontAction,
                         translationLanguageAction,
-                        tafseerAction,
                         bookmarkSheetAction,
                     ),
                     contentColor = androidx.compose.ui.graphics.Color.White,
                     toolbarTitle = "Surah ${surah.number} · ${surah.nameEnglish}",
                 )
             }
-            // Android's album-header scrim: surah title overlaid on the artwork.
-            ImmersiveDetailHeaderScrim(
-                title = "Surah ${surah.number}",
-                supportingText = surah.nameEnglish,
-                arabicTitle = surah.nameArabic,
-                modifier = Modifier.matchParentSize(),
-            )
         }
     }) {
         // Surah-to-surah swipe, matching Android's SurahSwipeContainer. In
@@ -742,10 +745,10 @@ internal fun QuranDetailScreen(
                             Icon(Icons.Filled.SkipNext, contentDescription = "Next surah")
                         }
                         Spacer(Modifier.weight(1f))
-                        IconButton(onClick = { saved = number in store.toggleSurah(number) }) {
+                        IconButton(onClick = { isBookmarked = number in store.toggleSurah(number) }) {
                             Icon(
-                                if (saved) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
-                                contentDescription = if (saved) "Remove bookmark" else "Bookmark surah",
+                                if (isBookmarked) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
+                                contentDescription = if (isBookmarked) "Remove bookmark" else "Bookmark surah",
                             )
                         }
                     }
@@ -1062,7 +1065,12 @@ private fun QuranAyahReadingBlock(
                 fontFamily = arabicFontFamily,
                 fontSize = arabicFontSize.sp,
                 lineHeight = (arabicFontSize * 1.7f).sp,
-                textAlign = if (textAlignment == "center") TextAlign.Center else TextAlign.Justify,
+                textAlign = when (textAlignment) {
+                    "start" -> TextAlign.Start
+                    "center" -> TextAlign.Center
+                    "end" -> TextAlign.End
+                    else -> TextAlign.Justify
+                },
                 color = MaterialTheme.colorScheme.onSurface,
             )
             AyahNumberChip(
@@ -1260,6 +1268,11 @@ internal fun FortressChapterScreen(
     ImmersiveDetailScaffold(onBack = onBack, header = {
         Box(Modifier.fillMaxWidth().height(190.dp)) {
             NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+            ImmersiveDetailHeaderScrim(
+                title = "Fortress of the Muslim",
+                supportingText = chapter?.title ?: "Chapter $chapterId",
+                arabicTitle = "حصن المسلم",
+            )
             Column {
                 DetailToolbar(
                     onBack = onBack,
@@ -1277,11 +1290,6 @@ internal fun FortressChapterScreen(
                     toolbarTitle = "Chapter $chapterId",
                 )
             }
-            ImmersiveDetailHeaderScrim(
-                title = "Fortress of the Muslim",
-                supportingText = chapter?.title ?: "Chapter $chapterId",
-                arabicTitle = "حصن المسلم",
-            )
         }
     }) {
         when (val current = state) {
@@ -1498,6 +1506,7 @@ internal fun SharedDuaLibraryScreen(
 @Composable
 internal fun SharedDuaDetailScreen(
     number: Int,
+    store: SharedContentStore,
     onBack: () -> Unit,
 ) {
     val repository = remember { createSharedDuaRepository() }
@@ -1516,28 +1525,65 @@ internal fun SharedDuaDetailScreen(
         }
     }
     var listening by remember(number) { mutableStateOf(false) }
+    val speechSynthesizer = remember { PlatformSpeechSynthesizer() }
+    var bookmarked by remember(number) {
+        mutableStateOf(QURANIC_DUA_NEWS_ID_OFFSET + number in store.bookmarkedNewsIds())
+    }
+    DisposableEffect(speechSynthesizer) {
+        onDispose { speechSynthesizer.stop() }
+    }
+    val bookmarkAction = DetailAction(
+        id = "bookmark",
+        label = if (bookmarked) "Remove bookmark" else "Bookmark dua",
+        icon = NiaIcons.Bookmark.takeIf { bookmarked } ?: NiaIcons.BookmarkBorder,
+        selected = bookmarked,
+    ) {
+        val newsId = QURANIC_DUA_NEWS_ID_OFFSET + number
+        store.setNewsBookmarked(newsId, !bookmarked)
+        bookmarked = !bookmarked
+    }
     ImmersiveDetailScaffold(onBack = onBack, header = {
-        Box(Modifier.fillMaxWidth().height(190.dp)) {
+        Box(Modifier.fillMaxWidth().height(220.dp)) {
             NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.42f),
+                            0.4f to Color.Black.copy(alpha = 0.08f),
+                            1f to Color.Transparent,
+                        ),
+                    ),
+            )
             Column {
                 DetailToolbar(
                     onBack = onBack,
+                    inlineActions = listOf(bookmarkAction),
                     sheetActions = listOf(
                         DetailAction(
                             id = "listen",
                             label = if (listening) "Stop narration" else "Listen (TTS)",
                             selected = listening,
-                        ) { listening = !listening },
+                        ) {
+                            listening = !listening
+                            val dua = (state as? DuaDetailState.Loaded)?.dua
+                            if (listening && dua != null) {
+                                val started = speechSynthesizer.speak(text = dua.translation) {
+                                    listening = false
+                                }
+                                if (!started) listening = false
+                            } else {
+                                speechSynthesizer.stop()
+                                listening = false
+                            }
+                        },
+                        bookmarkAction,
                     ),
                     contentColor = androidx.compose.ui.graphics.Color.White,
                     toolbarTitle = "Quranic Dua $number",
                 )
             }
-            ImmersiveDetailHeaderScrim(
-                title = "Quranic Dua",
-                supportingText = "Dua $number",
-                arabicTitle = "دعاء",
-            )
         }
     }) {
         when (val current = state) {
@@ -1645,6 +1691,9 @@ private sealed interface DuaDetailState {
     data class Loaded(val dua: SharedQuranicDua) : DuaDetailState
     data class Error(val message: String) : DuaDetailState
 }
+
+/** Matches Android's DatabaseSyncHelper mapping for Quranic duas in news. */
+private const val QURANIC_DUA_NEWS_ID_OFFSET = 100
 
 @Composable
 internal fun BukhariBookDetailScreen(
@@ -1984,6 +2033,11 @@ internal fun BukhariHadithDetailScreen(
             ImmersiveDetailScaffold(onBack = onBack, header = {
                 Box(Modifier.fillMaxWidth().height(190.dp)) {
                     NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+                    ImmersiveDetailHeaderScrim(
+                        title = "Sahih al-Bukhari",
+                        supportingText = "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        arabicTitle = "صحيح البخاري",
+                    )
                     Column {
                         DetailToolbar(
                             onBack = onBack,
@@ -1998,11 +2052,6 @@ internal fun BukhariHadithDetailScreen(
                             toolbarTitle = "Sahih al-Bukhari · Hadith ${currentHadith.id}",
                         )
                     }
-                    ImmersiveDetailHeaderScrim(
-                        title = "Sahih al-Bukhari",
-                        supportingText = "Hadith ${currentHadith.id} of ${hadiths.size}",
-                        arabicTitle = "صحيح البخاري",
-                    )
                 }
             }) {
                 androidx.compose.foundation.pager.HorizontalPager(
@@ -2381,6 +2430,11 @@ internal fun ShamayelHadithDetailScreen(
             ImmersiveDetailScaffold(onBack = onBack, header = {
                 Box(Modifier.fillMaxWidth().height(190.dp)) {
                     NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+                    ImmersiveDetailHeaderScrim(
+                        title = "Shama'il At-Tirmidhi",
+                        supportingText = "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        arabicTitle = "شمائل الترمذي",
+                    )
                     Column {
                         DetailToolbar(
                             onBack = onBack,
@@ -2395,11 +2449,6 @@ internal fun ShamayelHadithDetailScreen(
                             toolbarTitle = "Shama'il At-Tirmidhi · Hadith ${currentHadith.id}",
                         )
                     }
-                    ImmersiveDetailHeaderScrim(
-                        title = "Shama'il At-Tirmidhi",
-                        supportingText = "Hadith ${currentHadith.id} of ${hadiths.size}",
-                        arabicTitle = "شمائل الترمذي",
-                    )
                 }
             }) {
                 androidx.compose.foundation.pager.HorizontalPager(
@@ -3824,23 +3873,31 @@ internal fun NewsDetailScreen(
         id = "share",
         label = "Share",
     ) { onBack() } // host-level share integration point
+    val headerNews = (state as? SharedNewsState.Loaded)?.news?.firstOrNull()
+    val rawHeaderType = headerNews?.type?.takeIf(String::isNotBlank) ?: "Invocations"
+    val isHadith = rawHeaderType.contains("hadith", ignoreCase = true)
+    val headerType = if (isHadith) "Hadith" else rawHeaderType
     ImmersiveDetailScaffold(onBack = onBack, header = {
         Box(Modifier.fillMaxWidth().height(190.dp)) {
-            NewsHeaderArtwork("masjid_al_haram", Modifier.fillMaxSize())
+            NewsHeaderArtwork(
+                resourceName = headerNews?.let(::newsHeaderResource) ?: "masjid_al_haram",
+                modifier = Modifier.fillMaxSize(),
+            )
+            ImmersiveDetailHeaderScrim(
+                title = headerType,
+                supportingText = headerNews?.source?.takeIf(String::isNotBlank)
+                    ?: if (isHadith) "Prophetic narration" else "From the Noble Quran",
+                arabicTitle = if (isHadith) "حديث" else "دعاء",
+            )
             Column {
                 DetailToolbar(
                     onBack = onBack,
                     inlineActions = listOf(bookmarkAct),
                     sheetActions = listOf(shareAct),
                     contentColor = androidx.compose.ui.graphics.Color.White,
-                    toolbarTitle = "Invocations",
+                    toolbarTitle = headerType,
                 )
             }
-            ImmersiveDetailHeaderScrim(
-                title = "Invocations",
-                supportingText = "From the Noble Quran",
-                arabicTitle = "دعاء",
-            )
         }
     }) {
         when (val current = state) {
@@ -3864,29 +3921,6 @@ internal fun NewsDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(0.dp),
                     contentPadding = PaddingValues(bottom = 28.dp),
                 ) {
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                        ) {
-                            FilledIconToggleButton(
-                                checked = bookmarked,
-                                onCheckedChange = { checked ->
-                                    store.setNewsBookmarked(id, checked)
-                                    bookmarked = checked
-                                },
-                            ) {
-                                Icon(
-                                    if (bookmarked) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
-                                    if (bookmarked) {
-                                        "Remove bookmark for ${news.title}"
-                                    } else {
-                                        "Bookmark ${news.title}"
-                                    },
-                                )
-                            }
-                        }
-                    }
                     item { SharedNewsDetailContent(news) }
                 }
             }

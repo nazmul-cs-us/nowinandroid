@@ -1539,7 +1539,7 @@ fun PrayerTimesScreen(
         // Per-prayer adhan state for the dial's speaker + volume bar,
         // persisted through the singleton prayer settings repository.
         var adhanEnabled by remember(prayerName) { mutableStateOf(true) }
-        var adhanVolume by remember(prayerName) { mutableStateOf(100) }
+        var adhanVolume by remember(prayerName) { mutableStateOf(10) }
         LaunchedEffect(prayerName) {
             val entryPoint = EntryPointAccessors.fromApplication(
                 screenContext.applicationContext,

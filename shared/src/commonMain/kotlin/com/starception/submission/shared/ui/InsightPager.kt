@@ -140,7 +140,6 @@ fun InsightPager(
     }
     val nextPrayerText = day.nextPrayer?.let { "$it in ${day.countdown}" }.orEmpty()
     var isReadingAudio by remember { mutableStateOf(false) }
-    var prayerSceneIndex by remember(today) { mutableStateOf(today.toEpochDays().mod(3)) }
     val autoAdvanceProgress = remember { Animatable(0f) }
     val headingProvider = remember { HeadingProvider() }
     var heading by remember { mutableStateOf(HeadingReading()) }
@@ -288,11 +287,18 @@ fun InsightPager(
                             subtitle = day.heroSubtitle(placeName),
                             nextPrayer = nextPrayerText,
                             forecast = day.temperatureCelsius?.let { "${it.roundToInt()}°C" },
-                            sceneIndex = prayerSceneIndex,
                             timelineProgress = day.prayerWindowProgress(),
+                            nowMinute = day.nowMinute,
+                            sunriseMinute = day.slots
+                                .firstOrNull { it.name == "Sunrise" }
+                                ?.let { it.hour * 60 + it.minute }
+                                ?: 390,
+                            maghribMinute = day.slots
+                                .firstOrNull { it.name == "Maghrib" }
+                                ?.let { it.hour * 60 + it.minute }
+                                ?: 1_080,
                             tileHeight = tileHeight,
                             onClick = onOpenQibla,
-                            onLongClick = { prayerSceneIndex = (prayerSceneIndex + 1).mod(3) },
                         )
 
                         1 -> ArtworkTile(
@@ -607,16 +613,18 @@ private fun SharedPrayerDay.heroHeadline(
 
 /**
  * When a prayer is in progress, shows how long ago it started ("7h 42m since
- * Fajr"), matching the Android hero subtitle. Falls back to the place name when
- * no prayer is currently active — so it always reads naturally.
+ * Fajr"), matching the Android hero subtitle. Between Isha and Fajr, use the
+ * live countdown rather than spending the card's supporting line on a location
+ * that is already visible below the prayer schedule.
  */
 private fun SharedPrayerDay.heroSubtitle(placeName: String): String {
     val effectiveCurrent = currentPrayer
         ?: if (countdown == "Now") {
             nextPrayer
         } else {
-            null
-                ?: return placeName
+            return nextPrayer?.let { prayer ->
+                if (countdown.isNotBlank()) "$countdown until $prayer" else placeName
+            } ?: placeName
         }
     val slot = slots.firstOrNull { it.isCurrent }
         ?: slots.firstOrNull { it.name == effectiveCurrent }

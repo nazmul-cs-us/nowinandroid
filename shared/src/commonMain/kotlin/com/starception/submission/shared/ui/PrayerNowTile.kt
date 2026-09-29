@@ -18,15 +18,18 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,26 +41,26 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.images.PrayerSkyPhase
 import com.starception.submission.core.images.PrayerSkyWeather
-import com.starception.submission.core.images.prayerSkyResource
 import com.starception.submission.core.images.resources.Res
-import com.starception.submission.core.images.resources.insight_salah_foreground
-import com.starception.submission.core.images.resources.prayer_foreground_kaaba
-import com.starception.submission.core.images.resources.prayer_foreground_nabawi
-import com.starception.submission.core.images.resources.prayer_ground_kaaba
-import com.starception.submission.core.images.resources.prayer_ground_local
-import com.starception.submission.core.images.resources.prayer_ground_nabawi
+import com.starception.submission.core.images.resources.insight_prayer_poster_day
+import com.starception.submission.core.images.resources.insight_prayer_poster_moon
+import com.starception.submission.core.images.resources.insight_prayer_poster_night
+import com.starception.submission.core.images.resources.insight_prayer_poster_night_lights
+import com.starception.submission.core.images.resources.insight_prayer_poster_sun
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.PI
+import kotlin.math.sin
 
 /**
  * The "Prayer now" hero tile: sky artwork with the current prayer over it.
@@ -66,9 +69,9 @@ import org.jetbrains.compose.resources.painterResource
  * page, from :core:images, so both platforms show the same sky for the same
  * moment and forecast.
  *
- * The portable ground and foreground layers mirror the Android composition.
- * The scene rotates on long press, matching Android's local, Kaaba and Nabawi
- * variants without making the iOS host own any UI state.
+ * The poster, mosque-light layer and textured sun/moon are the same high-resolution
+ * assets used by Android's Prayer Now card. Text remains native Compose so it stays
+ * sharp and accessible on iOS at every card size.
  */
 @Composable
 fun PrayerNowTile(
@@ -78,61 +81,104 @@ fun PrayerNowTile(
     subtitle: String,
     nextPrayer: String,
     forecast: String?,
-    sceneIndex: Int = 0,
     timelineProgress: Float? = null,
+    nowMinute: Int = 0,
+    sunriseMinute: Int = 390,
+    maghribMinute: Int = 1_080,
     tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
-    onLongClick: () -> Unit = {},
 ) {
-    val scene = sceneIndex.mod(3)
-    val foreground = when (scene) {
-        0 -> Res.drawable.insight_salah_foreground
-        1 -> Res.drawable.prayer_foreground_kaaba
-        else -> Res.drawable.prayer_foreground_nabawi
+    val isNight = nowMinute < sunriseMinute || nowMinute >= maghribMinute ||
+        (nowMinute == 0 && (phase == PrayerSkyPhase.Fajr || phase == PrayerSkyPhase.Isha))
+    val weatherScrimBoost = when (weather) {
+        PrayerSkyWeather.Clear, PrayerSkyWeather.PartlyCloudy -> 0f
+        PrayerSkyWeather.Overcast, PrayerSkyWeather.Fog -> 0.04f
+        PrayerSkyWeather.Rain, PrayerSkyWeather.Snow -> 0.07f
+        PrayerSkyWeather.Thunderstorm -> 0.11f
     }
-    val ground = when (scene) {
-        0 -> Res.drawable.prayer_ground_local
-        1 -> Res.drawable.prayer_ground_kaaba
-        else -> Res.drawable.prayer_ground_nabawi
+    val cycleProgress = if (isNight) {
+        val nightEnd = sunriseMinute + 24 * 60
+        val current = if (nowMinute < sunriseMinute) nowMinute + 24 * 60 else nowMinute
+        ((current - maghribMinute).toFloat() / (nightEnd - maghribMinute).coerceAtLeast(1))
+            .coerceIn(0f, 1f)
+    } else {
+        ((nowMinute - sunriseMinute).toFloat() / (maghribMinute - sunriseMinute).coerceAtLeast(1))
+            .coerceIn(0f, 1f)
     }
-    Box(
+    val sceneAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = 0.40f)
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(tileHeight)
             .clip(RoundedCornerShape(26.dp))
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            .clickable(onClick = onClick),
     ) {
         Image(
-            painter = painterResource(prayerSkyResource(phase, weather)),
+            painter = painterResource(
+                if (isNight) Res.drawable.insight_prayer_poster_night
+                else Res.drawable.insight_prayer_poster_day,
+            ),
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            alignment = sceneAlignment,
             modifier = Modifier.fillMaxSize(),
         )
-        Image(
-            painter = painterResource(ground),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.BottomCenter,
+        if (isNight) {
+            Image(
+                painter = painterResource(Res.drawable.insight_prayer_poster_night_lights),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = sceneAlignment,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        // Match Android's full east-to-west cycle, but anchor the zenith to the
+        // mountain ridge so a taller iOS card cannot lift the body out of the scene.
+        val altitude = sin(cycleProgress * PI).toFloat().coerceAtLeast(0f)
+        val celestialX = maxWidth * (0.17f + 0.66f * cycleProgress)
+        val horizonY = maxHeight * 0.60f
+        val heightZenithY = maxHeight * if (isNight) 0.17f else 0.15f
+        val ridgeZenithY = horizonY - maxWidth * if (isNight) 0.26f else 0.28f
+        val zenithY = maxOf(heightZenithY, ridgeZenithY)
+        val celestialY = horizonY - (horizonY - zenithY) * altitude
+        val bodySize = minOf(maxWidth, maxHeight) * if (isNight) 0.119f else 0.104f
+        val glowSize = bodySize * if (isNight) 2.35f else 3f
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = if (scene == 1) {
-                        0.94f
-                    } else if (scene == 2) {
-                        0.92f
-                    } else {
-                        1f
-                    }
-                    scaleY = scaleX
-                },
+                .offset(x = celestialX - glowSize / 2, y = celestialY - glowSize / 2)
+                .size(glowSize)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = if (isNight) {
+                            listOf(
+                                Color(0x9ED8E7FF),
+                                Color(0x46D8E7FF),
+                                Color.Transparent,
+                            )
+                        } else {
+                            listOf(
+                                Color(0xC8FFB72E),
+                                Color(0x58FFB72E),
+                                Color.Transparent,
+                            )
+                        },
+                    ),
+                    shape = CircleShape,
+                ),
         )
         Image(
-            painter = painterResource(foreground),
+            painter = painterResource(
+                if (isNight) Res.drawable.insight_prayer_poster_moon
+                else Res.drawable.insight_prayer_poster_sun,
+            ),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            alignment = Alignment.BottomCenter,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .offset(x = celestialX - bodySize / 2, y = celestialY - bodySize / 2)
+                .size(bodySize)
+                .clip(CircleShape),
         )
 
         // The artwork is bright at the horizon, so the text needs its own
@@ -143,8 +189,12 @@ fun PrayerNowTile(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color.Black.copy(alpha = 0.10f),
-                            Color.Black.copy(alpha = 0.55f),
+                            Color.Black.copy(
+                                alpha = (if (isNight) 0.12f else 0.03f) + weatherScrimBoost,
+                            ),
+                            Color.Black.copy(
+                                alpha = (if (isNight) 0.68f else 0.60f) + weatherScrimBoost,
+                            ),
                         ),
                     ),
                 ),

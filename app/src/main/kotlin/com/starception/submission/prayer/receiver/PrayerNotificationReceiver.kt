@@ -104,7 +104,8 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                 val adhanWanted = notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME &&
                     (preferences?.isAdhanEnabledForPrayer(prayerName) ?: true)
                 if (adhanWanted) {
-                    val volumePercent = preferences?.getAdhanVolumeForPrayer(prayerName) ?: 100
+                    val volumePercent = preferences?.getAdhanVolumeForPrayer(prayerName)
+                        ?: AdhanPlaybackService.DEFAULT_VOLUME_PERCENT
                     FileLogger.log(
                         "INFO",
                         "PrayerNotificationReceiver",
@@ -113,7 +114,6 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     AdhanPlaybackService.startOrFallback(
                         context = context,
                         prayerName = prayerName,
-                        prayerTime = prayerTime,
                         volumePercent = volumePercent,
                     )
                 } else {

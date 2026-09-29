@@ -27,6 +27,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +70,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
@@ -98,6 +100,8 @@ import com.starception.submission.core.designsystem.component.scrollbar.Draggabl
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.icon.isMonochromeTopicIcon
+import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.UserNewsResource
@@ -480,6 +484,7 @@ private fun SingleTopicButton(
             modifier = Modifier.padding(start = 12.dp, end = 8.dp),
         ) {
             TopicIcon(
+                name = name,
                 imageUrl = imageUrl,
             )
             Text(
@@ -512,18 +517,35 @@ private fun SingleTopicButton(
 
 @Composable
 fun TopicIcon(
+    name: String,
     imageUrl: String,
     modifier: Modifier = Modifier,
 ) {
-    DynamicAsyncImage(
-        placeholder = painterResource(R.drawable.feature_foryou_ic_icon_placeholder),
-        imageUrl = imageUrl,
-        // decorative
-        contentDescription = null,
-        modifier = modifier
-            .padding(10.dp)
-            .size(32.dp),
-    )
+    val iconModifier = modifier
+        .padding(10.dp)
+        .size(32.dp)
+    val localIcon = topicIconResFor(name)
+
+    if (localIcon != null) {
+        Image(
+            painter = painterResource(localIcon),
+            contentDescription = null,
+            modifier = iconModifier,
+            colorFilter = if (isMonochromeTopicIcon(name)) {
+                ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
+            } else {
+                null
+            },
+        )
+    } else {
+        DynamicAsyncImage(
+            placeholder = painterResource(R.drawable.feature_foryou_ic_icon_placeholder),
+            imageUrl = imageUrl,
+            // decorative
+            contentDescription = null,
+            modifier = iconModifier,
+        )
+    }
 }
 
 @Composable

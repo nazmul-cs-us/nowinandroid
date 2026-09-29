@@ -152,7 +152,6 @@ class PrayerNotificationWorker @AssistedInject constructor(
                 AdhanPlaybackService.startOrFallback(
                     context = applicationContext,
                     prayerName = prayerName,
-                    prayerTime = prayerTime,
                     volumePercent = notificationPreferences.getAdhanVolumeForPrayer(prayerName),
                 )
             } else {

@@ -1233,7 +1233,7 @@ private fun PrayerCard(
     onToggleNotification: () -> Unit,
     adhanEnabled: Boolean,
     onToggleAdhan: () -> Unit,
-    adhanVolume: Int = 100,
+    adhanVolume: Int = 10,
     onAdhanVolumeChange: (Int) -> Unit = {},
     compact: Boolean,
     minHeight: Dp? = null,

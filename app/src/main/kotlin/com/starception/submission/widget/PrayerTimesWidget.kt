@@ -58,6 +58,7 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalGlanceId
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.AndroidRemoteViews
@@ -96,10 +97,12 @@ import androidx.glance.unit.ColorProvider
 import com.starception.submission.MainActivity
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.icon.topicIconResFor
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import androidx.glance.appwidget.action.actionStartActivity as actionStartIntent
 
@@ -218,11 +221,11 @@ private val REFERENCE_HEADER_DISC = 34.dp
 
 // Measured against the reference at equal width, the whole header band — plate top to
 // hero top — is about 48dp: roughly 8dp above the discs and 7.5dp below them. Scaffold
-// adds about 3dp of its own clearance above, so the row itself carries 9dp + 32dp + 7dp.
-// Keep the height budget synchronized so the hero begins immediately below it.
+// adds a little clearance of its own above. Keep this budget synchronized with the
+// scaled row below so home-screen hosts cannot squeeze it beneath lock-screen proportions.
 private val HEADER_TOUCH_TARGET_TOP_PADDING = 8.dp
 private val HEADER_TOUCH_TARGET_BOTTOM_PADDING = 6.dp
-private val TITLE_BAR_HEIGHT = 61.dp
+private val TITLE_BAR_HEIGHT = 69.dp
 
 /** The weather capsule stands a little taller than the discs it sits between. */
 private val REFERENCE_HEADER_CAPSULE_HEIGHT = 40.dp
@@ -366,19 +369,15 @@ enum class PrayerWidgetSection {
  * publish useful bounds, in which case the caller falls back to LocalSize.
  */
 /**
- * One UI Home draws a widget scaled by its `hsResizeRatio` (0.83 on a Galaxy S25 Ultra)
- * but leaves sp text at full size, so every label renders ~20% larger than the layout
- * it sits in — labels overflow columns the measurement said they fit, and the header
- * type looks heavier than the lock-screen instance of the same widget. Text sizes are
- * multiplied by this ratio so what the launcher shows is what the layout was sized for.
- * Hosts that do not send the key (the lock screen, other launchers) get 1.
+ * Keep RemoteViews typography at the same scale on the home and lock screens.
+ *
+ * One UI publishes `hsResizeRatio` for its home-screen grid, but current versions already
+ * apply that ratio to the widget's visual tree. Applying it again to TextView sizes made
+ * the home-screen location, weather and next-prayer copy about 17% smaller than the same
+ * widget on the lock screen. A neutral scale preserves the intended reference typography;
+ * width-fitting still prevents long labels from overflowing their columns.
  */
-private fun hostTextScale(context: Context, glanceId: GlanceId): Float {
-    val appWidgetId = (glanceId as? AppWidgetId)?.appWidgetId ?: return 1f
-    val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId)
-    val ratio = options.getFloat("hsResizeRatio", 1f)
-    return if (ratio in 0.5f..1f) ratio else 1f
-}
+private fun hostTextScale(): Float = 1f
 
 internal val LocalHostTextScale = staticCompositionLocalOf { 1f }
 
@@ -447,7 +446,7 @@ abstract class BasePrayerTimesWidget protected constructor(
                 source = themeSource,
             ) {
                 CompositionLocalProvider(
-                    LocalHostTextScale provides hostTextScale(context, id),
+                    LocalHostTextScale provides hostTextScale(),
                     LocalWidgetThemeSource provides themeSource,
                 ) {
                     when (state) {
@@ -483,26 +482,73 @@ abstract class BasePrayerTimesWidget protected constructor(
                             // The title bar owns the top inset. Titled content ends in an
                             // inset surface, so its smaller shell inset avoids double-padding
                             // below the final row.
-                            // The reference header is a fixed strip — 32dp discs, 12sp name —
-                            // whatever height the widget has; only the cards below it scale.
-                            // Scaling it with the grant was tried and made it read as heavier
-                            // than the design at every tall footprint.
-                            val headerScale = 1f
+                            // Preserve the lock-screen header proportions on the home host.
+                            // One UI otherwise compresses the location/weather furniture into
+                            // a noticeably shallower strip even when the body has ample height.
+                            val headerScale = 1.12f
                             val titledHeight =
                                 (size.height - TITLE_BAR_HEIGHT - TITLED_WIDGET_BOTTOM_PADDING)
                                     .coerceAtLeast(1.dp)
                             val bareHeight =
                                 (size.height - (WIDGET_PADDING * 2)).coerceAtLeast(1.dp)
                             if (standaloneSection != null) {
-                                BareSurface(
-                                    verticalAlignment = Alignment.Vertical.Top,
-                                    padding = WIDGET_PADDING,
-                                ) {
-                                    StandalonePrayerSection(
-                                        section = standaloneSection,
+                                val isTodayPrayerWidget =
+                                    standaloneSection == PrayerWidgetSection.TODAYS_PRAYERS
+                                val usePrayerPoster =
+                                    isTodayPrayerWidget &&
+                                        PrayerPosterArtwork.isSuitable(
+                                            widthDp = size.width.value,
+                                            heightDp = size.height.value,
+                                        )
+                                // A reduced Today's Prayers widget still belongs to the
+                                // same design family as the portrait poster. Previously it
+                                // fell through to BareSurface as soon as its aspect ratio
+                                // crossed the portrait threshold, losing the shared
+                                // location/weather/refresh header and revealing the legacy
+                                // standalone card. Keep the real header while there is room
+                                // for it plus a useful compact timeline body; only the body
+                                // changes layout at this breakpoint.
+                                val compactTimelineBodyHeight =
+                                    (size.height - TITLE_BAR_HEIGHT).coerceAtLeast(0.dp)
+                                val useCompactPrayerPoster =
+                                    isTodayPrayerWidget &&
+                                        size.width >= 250.dp &&
+                                        compactTimelineBodyHeight >= REFERENCE_FLIP_MIN_HEIGHT
+                                if (usePrayerPoster || useCompactPrayerPoster) {
+                                    // Reuse the hero widget's real header rather than painting
+                                    // a second approximation into the poster bitmap. Location,
+                                    // weather, refresh behaviour, typography and touch geometry
+                                    // now stay identical between the two widgets.
+                                    TitledSurface(
                                         state = state,
-                                        contentSize = DpSize(innerWidth, bareHeight),
-                                    )
+                                        detailedHeader = true,
+                                        headerScale = headerScale,
+                                        headerWidth = innerWidth,
+                                        bottomPadding = 0.dp,
+                                    ) {
+                                        ReferencePrayerTimeline(
+                                            state = state,
+                                            width = innerWidth,
+                                            height = (size.height - TITLE_BAR_HEIGHT).coerceAtLeast(1.dp),
+                                            // Portrait sizes retain the complete editorial
+                                            // poster. Reduced sizes use its purpose-built
+                                            // wide day/night crop and prayer arc beneath the
+                                            // exact same header instead of squashing the
+                                            // portrait composition vertically.
+                                            posterBodyOnly = usePrayerPoster,
+                                        )
+                                    }
+                                } else {
+                                    BareSurface(
+                                        verticalAlignment = Alignment.Vertical.Top,
+                                        padding = WIDGET_PADDING,
+                                    ) {
+                                        StandalonePrayerSection(
+                                            section = standaloneSection,
+                                            state = state,
+                                            contentSize = DpSize(innerWidth, bareHeight),
+                                        )
+                                    }
                                 }
                             } else {
                                 when {
@@ -880,6 +926,7 @@ private fun TitledSurface(
     detailedHeader: Boolean,
     headerScale: Float = 1f,
     headerWidth: Dp = REFERENCE_LAYOUT_MIN_WIDTH,
+    bottomPadding: Dp = TITLED_WIDGET_BOTTOM_PADDING,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val disc = REFERENCE_HEADER_DISC * headerScale
@@ -889,7 +936,7 @@ private fun TitledSurface(
         // Scaffold pads the sides only. The final content is already an inset surface,
         // so use the compensated bottom inset instead of stacking another full 16dp.
         modifier = GlanceModifier
-            .padding(bottom = TITLED_WIDGET_BOTTOM_PADDING)
+            .padding(bottom = bottomPadding)
             .clickable(actionStartActivity<MainActivity>()),
         titleBar = {
             val appearance = LocalWidgetAppearance.current
@@ -1369,6 +1416,28 @@ class RefreshPrayerWidgetAction : ActionCallback {
         parameters: ActionParameters,
     ) {
         PrayerWidgetUpdater.refresh(context)
+    }
+}
+
+private val DevotionalBookmarkIdKey = ActionParameters.Key<String>("devotional_bookmark_id")
+
+/** Toggles the devotional in the app-wide Saved store, then redraws every placed size. */
+class ToggleDevotionalBookmarkAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters,
+    ) {
+        val bookmarkId = parameters[DevotionalBookmarkIdKey] ?: return
+        val entryPoint = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            PrayerWidgetEntryPoint::class.java,
+        )
+        val repository = entryPoint.userDataRepository()
+        val isBookmarked = bookmarkId in repository.userData.first().bookmarkedNewsResources
+        repository.setNewsResourceBookmarked(bookmarkId, !isBookmarked)
+        invalidatePrayerWidgetStateCache()
+        PrayerWidgetUpdater.refreshNow(context)
     }
 }
 
@@ -2194,14 +2263,12 @@ private fun ReferencePrayerHero(
     // Right-aligned against the card edge, so only the widest line ("remembrance.")
     // reaches toward the arch and the shorter lines stay clear of it.
     val quoteZoneWidth = (width * 0.185f - 8.dp).coerceAtLeast(0.dp)
-    // The strip's width is set by the quote's longest line, so a tall hero uses its height
-    // instead: broken into short lines the limit becomes "establish", not "remembrance.",
-    // and the type can grow into the room below. Short heroes keep the reference's three.
-    val quoteLines = if (height >= 170.dp) {
-        listOf("And", "establish", "prayer", "for My", "remem-", "brance.")
-    } else {
-        listOf("And establish", "prayer for My", "remembrance.")
-    }
+    // The same daily ayah used by the poster is reflowed into the hero's narrow quote
+    // strip. Tall heroes can retain more of it; compact heroes receive a clean excerpt.
+    val quoteLines = state.ayah.text.toHeroQuoteLines(
+        maxLines = if (height >= 170.dp) 6 else 3,
+        maxCharacters = if (height >= 170.dp) 10 else 15,
+    )
     val quoteFitSize = quoteLines.minOf { line ->
         WidgetTypography.fittingSize(context, line, maxWidthDp = quoteZoneWidth.value - 6f)
     }
@@ -2210,7 +2277,11 @@ private fun ReferencePrayerHero(
     // The attribution is set two steps smaller, and must fit the strip in its own right.
     val quoteAttributionSize = (quoteFitSize - 2f)
         .coerceAtMost(
-            WidgetTypography.fittingSize(context, "— Taha 20:14", maxWidthDp = quoteZoneWidth.value - 6f),
+            WidgetTypography.fittingSize(
+                context,
+                "— ${state.ayah.citation}",
+                maxWidthDp = quoteZoneWidth.value - 6f,
+            ),
         )
         .coerceIn(7f, 10f * heightScale)
         .sp
@@ -2363,7 +2434,7 @@ private fun ReferencePrayerHero(
         // by however much the card departed from that — about 1.7x once the hero took a
         // whole flipper page. Give it its own aspect against the card's width instead and
         // let it sit on the bottom edge, which is where it grows from.
-        AnimatedFoliage(
+        StaticFoliage(
             phase = state.dayPhase,
             placement = WidgetFoliagePlacement.HERO_RIGHT,
             modifier = GlanceModifier
@@ -2500,7 +2571,7 @@ private fun ReferencePrayerHero(
                         )
                         Spacer(modifier = GlanceModifier.height(2.dp))
                         WidgetText(
-                            text = "— Taha 20:14",
+                            text = "— ${state.ayah.citation}",
                             size = quoteAttributionSize,
                             color = ReferenceQuote,
                             weight = WidgetFontWeight.Regular,
@@ -2547,7 +2618,7 @@ private fun ReferenceShallowPrayerHero(
             )
             .cornerRadius(24.dp),
     ) {
-        AnimatedFoliage(
+        StaticFoliage(
             phase = state.dayPhase,
             placement = WidgetFoliagePlacement.HERO_RIGHT,
             modifier = GlanceModifier.fillMaxSize(),
@@ -2621,33 +2692,113 @@ private fun ReferencePrayerTimeline(
     state: PrayerWidgetState.Available,
     width: Dp,
     height: Dp,
+    posterBodyOnly: Boolean = false,
 ) {
     val context = LocalContext.current
-    val sky = remember(state.sky, state.prayers, width, height) {
-        WidgetSkyArtwork.render(
-            context = context,
-            input = WidgetSkyArtwork.Input(
-                sky = state.sky,
-                prayers = state.prayers,
-                daylightLabel = state.daylightLabel,
-                nightLabel = state.nightLabel,
-                cornerRadiusDp = 22f,
-            ),
-            widthDp = width.value,
-            heightDp = height.value,
-        )
+    val usePrayerPoster = posterBodyOnly || PrayerPosterArtwork.isSuitable(width.value, height.value)
+    val useWidePosterTimeline = !usePrayerPoster && width >= 300.dp && height >= 120.dp
+    val sky = remember(
+        state,
+        width,
+        height,
+        usePrayerPoster,
+        posterBodyOnly,
+        useWidePosterTimeline,
+    ) {
+        if (usePrayerPoster) {
+            PrayerPosterArtwork.render(
+                context = context,
+                state = state,
+                widthDp = width.value,
+                heightDp = height.value,
+                includeHeader = !posterBodyOnly,
+            )
+        } else if (useWidePosterTimeline) {
+            PrayerPosterArtwork.renderTimelineCard(
+                context = context,
+                state = state,
+                widthDp = width.value,
+                heightDp = height.value,
+            )
+        } else {
+            WidgetSkyArtwork.render(
+                context = context,
+                input = WidgetSkyArtwork.Input(
+                    sky = state.sky,
+                    prayers = state.prayers,
+                    daylightLabel = state.daylightLabel,
+                    nightLabel = state.nightLabel,
+                    cornerRadiusDp = 22f,
+                ),
+                widthDp = width.value,
+                heightDp = height.value,
+            )
+        }
     }
+    val surfaceModifier = if (posterBodyOnly) {
+        // The launcher owns the exact height left after the shared title bar. A fixed
+        // estimate left one final host-colour strip on Samsung launchers, so the poster
+        // body must consume the complete content slot.
+        GlanceModifier.fillMaxSize()
+    } else {
+        GlanceModifier.fillMaxWidth().height(height)
+    }
+    // The button is painted into the bitmap at (90% width, height - 87 design units).
+    // Place a 48dp invisible target over that exact centre so it remains comfortably
+    // tappable without asking Glance to redraw any of the poster chrome.
+    val moreTargetSize = 48.dp
+    val moreEndPadding = (width.value * 0.10f - moreTargetSize.value / 2f)
+        .coerceAtLeast(0f)
+        .dp
+    val moreBottomPadding = (width.value * 87f / 460f - moreTargetSize.value / 2f)
+        .coerceAtLeast(0f)
+        .dp
     Box(
-        modifier = GlanceModifier
-            .fillMaxWidth()
-            .height(height)
+        modifier = surfaceModifier
             .background(
                 imageProvider = ImageProvider(sky),
                 contentScale = ContentScale.FillBounds,
             )
             .cornerRadius(22.dp)
             .semantics { contentDescription = "Today's prayers on the sun's path" },
-    ) {}
+    ) {
+        if (usePrayerPoster && !posterBodyOnly) {
+            // The refresh glyph is painted into the poster; this transparent target gives
+            // it its real behaviour without asking Glance to reproduce the visual chrome.
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .padding(top = 10.dp, end = 10.dp),
+                contentAlignment = Alignment.TopEnd,
+            ) {
+                Box(
+                    modifier = GlanceModifier
+                        .size(48.dp)
+                        .clickable(actionRunCallback<RefreshPrayerWidgetAction>())
+                        .semantics { contentDescription = "Refresh prayer widget" },
+                ) {}
+            }
+        }
+        if (usePrayerPoster) {
+            state.ayah.target?.let { target ->
+                Box(
+                    modifier = GlanceModifier
+                        .fillMaxSize()
+                        .padding(end = moreEndPadding, bottom = moreBottomPadding),
+                    contentAlignment = Alignment.BottomEnd,
+                ) {
+                    Box(
+                        modifier = GlanceModifier
+                            .size(moreTargetSize)
+                            .clickable(target.openAction(context))
+                            .semantics {
+                                contentDescription = "Open ${state.ayah.citation}"
+                            },
+                    ) {}
+                }
+            }
+        }
+    }
 }
 
 /** A source-backed dua or hadith panel, linked to its full in-app reading. */
@@ -2808,7 +2959,7 @@ private fun ReferenceDevotionalPanel(
         // As in the hero: the leaves are the one child that is not given the whole box.
         contentAlignment = Alignment.BottomStart,
     ) {
-        AnimatedFoliage(
+        StaticFoliage(
             phase = state.dayPhase,
             placement = WidgetFoliagePlacement.DEVOTIONAL_RIGHT,
             modifier = GlanceModifier
@@ -2976,12 +3127,34 @@ private fun ReferenceDevotionalPanel(
                 modifier = GlanceModifier
                     .size(32.dp)
                     .background(ReferenceHeaderPill)
-                    .cornerRadius(16.dp),
+                    .cornerRadius(16.dp)
+                    .then(
+                        state.reminderBookmarkId?.let { bookmarkId ->
+                            GlanceModifier.clickable(
+                                actionRunCallback<ToggleDevotionalBookmarkAction>(
+                                    actionParametersOf(DevotionalBookmarkIdKey to bookmarkId),
+                                ),
+                            )
+                        } ?: GlanceModifier,
+                    )
+                    .semantics {
+                        contentDescription = if (state.isReminderBookmarked) {
+                            "Remove devotional from saved"
+                        } else {
+                            "Save devotional"
+                        }
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 Image(
-                    provider = ImageProvider(R.drawable.widget_bookmark),
-                    contentDescription = "Save devotional",
+                    provider = ImageProvider(
+                        if (state.isReminderBookmarked) {
+                            R.drawable.widget_bookmark
+                        } else {
+                            R.drawable.widget_bookmark_outline
+                        },
+                    ),
+                    contentDescription = null,
                     colorFilter = ColorFilter.tint(ReferenceTopHeaderInk),
                     modifier = GlanceModifier.size(16.dp),
                 )
@@ -3000,6 +3173,15 @@ private fun DailyReminder.openAction(context: Context) = target?.let { target ->
         ),
     )
 } ?: actionStartActivity<MainActivity>()
+
+private fun WidgetNavigationTarget.openAction(context: Context) = actionStartIntent(
+    WidgetNavigationBus.put(
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        },
+        this,
+    ),
+)
 
 /** Short-height reference hierarchy: crop to the same illustrated prayer hero. */
 @Composable
@@ -3970,26 +4152,22 @@ private fun ExpressiveProgressBar(progress: Float, width: androidx.compose.ui.un
 // ---------------------------------------------------------------------------------
 
 /**
- * Transparent time-colored foliage advanced by the launcher itself.
- *
- * Its eight frames describe one very small sway cycle. A long crossfade in the XML keeps
- * the motion soft, and the palette is regenerated only when the widget's solar phase
- * changes, avoiding a continuous app process or battery cost.
+ * Static time-colored foliage. The solar phase still selects its palette, but the leaves
+ * stay on their calm centre frame instead of being advanced by a launcher ViewFlipper.
  */
 @Composable
-private fun AnimatedFoliage(
+private fun StaticFoliage(
     phase: WidgetDayPhase,
     modifier: GlanceModifier,
     placement: WidgetFoliagePlacement = WidgetFoliagePlacement.BOTH,
 ) {
-    val context = LocalContext.current
     val frames = WidgetFoliageArtwork.frames(phase, placement)
-    val remoteViews = RemoteViews(context.packageName, R.layout.widget_foliage_flipper).apply {
-        FOLIAGE_FRAME_VIEW_IDS.forEachIndexed { index, viewId ->
-            setImageViewBitmap(viewId, frames[index % frames.size])
-        }
-    }
-    AndroidRemoteViews(remoteViews = remoteViews, modifier = modifier)
+    Image(
+        provider = ImageProvider(frames[frames.size / 2]),
+        contentDescription = null,
+        contentScale = ContentScale.FillBounds,
+        modifier = modifier,
+    )
 }
 
 /**
@@ -4035,17 +4213,25 @@ private fun StaticMeteoconBitmap(
     }
 }
 
-private val FOLIAGE_FRAME_VIEW_IDS = intArrayOf(
-    R.id.foliage_frame_0,
-    R.id.foliage_frame_1,
-    R.id.foliage_frame_2,
-    R.id.foliage_frame_3,
-    R.id.foliage_frame_4,
-    R.id.foliage_frame_5,
-    R.id.foliage_frame_6,
-    R.id.foliage_frame_7,
-    R.id.foliage_frame_8,
-    R.id.foliage_frame_9,
-    R.id.foliage_frame_10,
-    R.id.foliage_frame_11,
-)
+private fun String.toHeroQuoteLines(maxLines: Int, maxCharacters: Int): List<String> {
+    val words = trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    if (words.isEmpty()) return listOf("")
+    val lines = mutableListOf<String>()
+    var current = ""
+    words.forEachIndexed { index, word ->
+        val candidate = if (current.isEmpty()) word else "$current $word"
+        if (candidate.length <= maxCharacters || current.isEmpty()) {
+            current = candidate
+        } else {
+            lines += current
+            current = word
+            if (lines.size == maxLines - 1) {
+                val remaining = (listOf(current) + words.drop(index + 1)).joinToString(" ")
+                lines += remaining.take(maxCharacters - 1).trimEnd() + "…"
+                return lines
+            }
+        }
+    }
+    if (current.isNotEmpty() && lines.size < maxLines) lines += current
+    return lines
+}

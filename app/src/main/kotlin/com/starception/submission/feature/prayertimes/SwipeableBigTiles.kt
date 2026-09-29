@@ -149,11 +149,13 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -204,23 +206,13 @@ import com.kyant.backdrop.effects.vibrancy
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.duadatabase.Dua
-import com.starception.submission.core.images.PrayerSkyPhase
-import com.starception.submission.core.images.prayerSkyPhase
-import com.starception.submission.core.images.prayerSkyResource
-import com.starception.submission.core.images.prayerSkyWeather
 import com.starception.submission.core.images.resources.insight_prayer_background
 import com.starception.submission.core.images.resources.insight_prayer_foreground
 import com.starception.submission.core.images.resources.insight_qibla_background
 import com.starception.submission.core.images.resources.insight_qibla_foreground_v2
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
-import com.starception.submission.core.images.resources.insight_salah_foreground
 import com.starception.submission.core.images.resources.insight_suggestion
-import com.starception.submission.core.images.resources.prayer_foreground_kaaba
-import com.starception.submission.core.images.resources.prayer_foreground_nabawi
-import com.starception.submission.core.images.resources.prayer_ground_kaaba
-import com.starception.submission.core.images.resources.prayer_ground_local
-import com.starception.submission.core.images.resources.prayer_ground_nabawi
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
 import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.core.ui.FlaticonIcon
@@ -247,12 +239,17 @@ import com.starception.submission.islamic.qibla.presentation.component.QiblaGlob
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.service.EnhancedLocationService
+import com.starception.submission.widget.PrayerPosterArtwork
+import com.starception.submission.widget.PrayerWidgetState
+import com.starception.submission.widget.loadPrayerWidgetStateCached
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.DrawableResource
 import java.time.LocalDate
 import java.time.LocalTime
@@ -1162,25 +1159,6 @@ private data class PrayerSkyKeyframe(
 )
 
 /**
- * Resolves the current visual phase around the calculated local prayer boundaries.
- *
- * The phase rules themselves live in :core:images alongside the artwork they
- * select, so iOS paints the same sky. This only converts java.time values into
- * the minute-of-day integers that function takes.
- */
-private fun prayerSkyPhase(
-    currentTime: LocalTime,
-    prayerTimes: DayPrayerTimes?,
-): PrayerSkyPhase = prayerSkyPhase(
-    nowMinute = currentTime.toSecondOfDay() / 60,
-    fajrMinute = prayerTimes?.fajr?.let { it.toSecondOfDay() / 60 } ?: 300,
-    sunriseMinute = prayerTimes?.sunrise?.let { it.toSecondOfDay() / 60 } ?: 390,
-    asrMinute = prayerTimes?.asr?.let { it.toSecondOfDay() / 60 } ?: 930,
-    maghribMinute = prayerTimes?.maghrib?.let { it.toSecondOfDay() / 60 } ?: 1_080,
-    ishaMinute = prayerTimes?.isha?.let { it.toSecondOfDay() / 60 } ?: 1_200,
-)
-
-/**
  * Resolves the insight artwork's sky treatment from the calculated prayer
  * boundaries. This keeps the carousel visually in step with the user's local
  * salah day instead of relying on fixed clock-hour assumptions.
@@ -1432,76 +1410,6 @@ fun SwipeableBigTiles(
     }
     val livePrayerSkyPalette = remember(currentTime, prayerTimes) {
         prayerSkyPalette(currentTime = currentTime, prayerTimes = prayerTimes)
-    }
-    // Use real local time in every build. The accelerated debug preview made the
-    // generated skies loop continuously instead of remaining at the current phase.
-    val prayerNowEffectTime = currentTime
-    val prayerNowSkyPalette = remember(prayerNowEffectTime, prayerTimes) {
-        prayerSkyPalette(currentTime = prayerNowEffectTime, prayerTimes = prayerTimes)
-    }
-    val currentPrayerWeather by produceState<CurrentWeather?>(
-        initialValue = null,
-        key1 = prayerTimes?.location?.latitude,
-        key2 = prayerTimes?.location?.longitude,
-    ) {
-        value = prayerTimes?.location?.let { location ->
-            CurrentWeatherRepository.get(
-                latitude = location.latitude,
-                longitude = location.longitude,
-            )
-        }
-    }
-    val prayerNowSkyPhase = remember(prayerNowEffectTime, prayerTimes) {
-        prayerSkyPhase(prayerNowEffectTime, prayerTimes)
-    }
-    val prayerNowSkyWeather = remember(currentPrayerWeather?.weatherCode) {
-        prayerSkyWeather(currentPrayerWeather?.weatherCode)
-    }
-    val prayerNowSkyResource = remember(prayerNowSkyPhase, prayerNowSkyWeather) {
-        prayerSkyResource(prayerNowSkyPhase, prayerNowSkyWeather)
-    }
-    // Start each day on the next architectural scene. A long press can then cycle
-    // through all three scenes immediately without changing the sky selection.
-    val prayerNowDay = LocalDate.now().toEpochDay()
-    var prayerNowManualSceneOffset by rememberSaveable(prayerNowDay) {
-        mutableIntStateOf(0)
-    }
-    val prayerNowSceneIndex = (
-        prayerNowDay.mod(3).toInt() + prayerNowManualSceneOffset
-        ).mod(3)
-    val prayerNowForegroundResource = remember(prayerNowSceneIndex) {
-        when (prayerNowSceneIndex) {
-            0 -> ImageRes.drawable.insight_salah_foreground
-            1 -> ImageRes.drawable.prayer_foreground_kaaba
-            else -> ImageRes.drawable.prayer_foreground_nabawi
-        }
-    }
-    val prayerNowGroundResource = remember(prayerNowSceneIndex) {
-        when (prayerNowSceneIndex) {
-            0 -> ImageRes.drawable.prayer_ground_local
-            1 -> ImageRes.drawable.prayer_ground_kaaba
-            else -> ImageRes.drawable.prayer_ground_nabawi
-        }
-    }
-    val prayerNowGroundFadeStart = if (prayerNowSceneIndex == 0) 0.68f else 0.84f
-    val prayerNowForegroundScale = when (prayerNowSceneIndex) {
-        1 -> 0.94f
-        2 -> 0.92f
-        else -> 1f
-    }
-    val prayerNowForegroundContentScale = if (prayerNowSceneIndex == 0) {
-        ContentScale.Crop
-    } else {
-        ContentScale.Fit
-    }
-    val prayerNowSceneDarkness = when (prayerNowSkyPhase) {
-        PrayerSkyPhase.Isha -> 0.18f
-        // Fajr begins well before the sun crosses the horizon. Keep the generated
-        // dawn artwork visibly pre-sunrise until the calculated Sunrise boundary;
-        // otherwise its bright horizon reads as full daylight immediately after Fajr.
-        PrayerSkyPhase.Fajr -> 0.34f
-        PrayerSkyPhase.Maghrib -> 0.04f
-        else -> 0f
     }
     val forecastTarget = remember(prayerTimes, timeOffsets, currentTime) {
         prayerTimes?.let {
@@ -1855,8 +1763,6 @@ fun SwipeableBigTiles(
                             {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                                prayerNowManualSceneOffset =
-                                    (prayerNowManualSceneOffset + 1).mod(3)
                                 if (!isLandscape) {
                                     expandedLogicalPage = if (isExpandedCard) null else logicalPage
                                 }
@@ -1872,7 +1778,8 @@ fun SwipeableBigTiles(
                         else -> null
                     }
                     when (logicalPage) {
-                        0 -> InsightPreviewCard(
+                        0 -> PrayerPosterInsightCard(
+                            currentTime = currentTime,
                             label = "Prayer now",
                             title = prayerPrediction?.title ?: prayerTitle,
                             supportingText = prayerPrediction?.content
@@ -1886,35 +1793,17 @@ fun SwipeableBigTiles(
                                             .joinToString(" · ")
                                             .takeIf { it.isNotBlank() }
                                 },
-                            // Keep every threshold condition. Taking only the text
-                            // after the last separator dropped humidity whenever a
-                            // later condition (usually heat) was also active.
                             statusMetaText = prayerWeatherInsight?.summary,
                             weatherThresholds = weatherThresholds,
-                            backgroundPainterRes = prayerNowSkyResource,
-                            groundPainterRes = prayerNowGroundResource,
-                            groundFadeStartFraction = prayerNowGroundFadeStart,
-                            foregroundPainterRes = prayerNowForegroundResource,
-                            foregroundBaseScale = prayerNowForegroundScale,
-                            foregroundContentScale = prayerNowForegroundContentScale,
-                            foregroundSceneDarkness = prayerNowSceneDarkness,
-                            skyTintTop = prayerNowSkyPalette.top,
-                            skyTintHorizon = prayerNowSkyPalette.horizon,
-                            // Every time × weather combination has its own graded
-                            // photograph, so retain its natural color instead of
-                            // tinting it a second time.
-                            skyTintStrength = 0f,
-                            sceneDarkness = prayerNowSceneDarkness,
                             compactProgress = compactProgress,
                             expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = isExpandedCard,
                             onLongPress = onCardLongPress,
                             longPressLabel = if (isExpandedCard) {
-                                "Change mosque and collapse Prayer Now"
+                                "Collapse Prayer Now"
                             } else {
-                                "Change mosque and enlarge Prayer Now"
+                                "Enlarge Prayer Now"
                             },
-                            fullDayEffect = true,
                             isFocused = isFocused,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
@@ -2489,11 +2378,133 @@ internal fun formatPrayerForecastMetric(
     }
 }
 
+/** Widget artwork only; this card keeps Prayer Now's original Compose text and actions. */
+private data class PrayerPosterSceneKey(
+    val day: Long,
+    val minute: Int,
+    val width: Int,
+    val height: Int,
+)
+
+/**
+ * Pager pages are deliberately disposed once they leave the small prefetch window. Prayer Now
+ * generates its scene asynchronously, so recreating the page with a null bitmap exposed one blank
+ * frame during a swipe. Keep the few most recent rendered scenes outside page composition: looped
+ * copies of the same logical page can reuse the bitmap immediately, while the bounded map avoids
+ * retaining old resize variants indefinitely.
+ */
+private object PrayerPosterSceneCache {
+    private const val MAX_ENTRIES = 4
+    private val scenes = object : LinkedHashMap<PrayerPosterSceneKey, android.graphics.Bitmap>(
+        MAX_ENTRIES,
+        0.75f,
+        true,
+    ) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<PrayerPosterSceneKey, android.graphics.Bitmap>?,
+        ): Boolean = size > MAX_ENTRIES
+    }
+
+    @Synchronized
+    fun get(key: PrayerPosterSceneKey): android.graphics.Bitmap? = scenes[key]
+
+    @Synchronized
+    fun put(key: PrayerPosterSceneKey, bitmap: android.graphics.Bitmap) {
+        scenes[key] = bitmap
+    }
+}
+
+@Composable
+private fun PrayerPosterInsightCard(
+    currentTime: LocalTime,
+    label: String,
+    title: String,
+    supportingText: String?,
+    statusText: String?,
+    statusMetaText: String?,
+    weatherThresholds: PrayerWeatherThresholds,
+    compactProgress: Float,
+    expansionProgress: Float,
+    isExpanded: Boolean,
+    onLongPress: (() -> Unit)?,
+    longPressLabel: String,
+    isFocused: Boolean,
+    backgroundPageOffset: () -> Float,
+    timelineProgress: Float?,
+    actionLabel: String,
+    actionDescription: String,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val widthDp = maxWidth.value.coerceAtLeast(1f)
+        val heightDp = maxHeight.value.coerceAtLeast(1f)
+        val minuteKey = currentTime.hour * 60 + currentTime.minute
+        val sceneKey = remember(minuteKey, widthDp, heightDp) {
+            PrayerPosterSceneKey(
+                day = LocalDate.now().toEpochDay(),
+                minute = minuteKey,
+                width = widthDp.roundToInt(),
+                height = heightDp.roundToInt(),
+            )
+        }
+        var retainedScene by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+        val scene by produceState<android.graphics.Bitmap?>(
+            initialValue = PrayerPosterSceneCache.get(sceneKey) ?: retainedScene,
+            key1 = sceneKey,
+        ) {
+            PrayerPosterSceneCache.get(sceneKey)?.let { cached ->
+                retainedScene = cached
+                value = cached
+                return@produceState
+            }
+            val rendered = withContext(Dispatchers.Default) {
+                val state = loadPrayerWidgetStateCached(context) as? PrayerWidgetState.Available
+                    ?: return@withContext null
+                val renderWidth = 350f
+                PrayerPosterArtwork.renderScene(
+                    context = context,
+                    state = state,
+                    widthDp = renderWidth,
+                    heightDp = renderWidth * (heightDp / widthDp),
+                )
+            }
+            if (rendered != null) {
+                PrayerPosterSceneCache.put(sceneKey, rendered)
+                retainedScene = rendered
+                value = rendered
+            }
+        }
+
+        InsightPreviewCard(
+            label = label,
+            title = title,
+            supportingText = supportingText,
+            statusText = statusText,
+            statusMetaText = statusMetaText,
+            weatherThresholds = weatherThresholds,
+            backgroundBitmap = scene?.asImageBitmap(),
+            compactProgress = compactProgress,
+            expansionProgress = expansionProgress,
+            isExpanded = isExpanded,
+            onLongPress = onLongPress,
+            longPressLabel = longPressLabel,
+            isFocused = isFocused,
+            backgroundPageOffset = backgroundPageOffset,
+            timelineProgress = timelineProgress,
+            actionLabel = actionLabel,
+            actionDescription = actionDescription,
+            onClick = onClick,
+        )
+    }
+}
+
 @Composable
 private fun InsightPreviewCard(
     label: String,
     title: String,
-    backgroundPainterRes: DrawableResource,
+    backgroundPainterRes: DrawableResource? = null,
+    backgroundBitmap: ImageBitmap? = null,
     groundPainterRes: DrawableResource? = null,
     groundFadeStartFraction: Float = 0.68f,
     foregroundPainterRes: DrawableResource? = null,
@@ -2707,42 +2718,47 @@ private fun InsightPreviewCard(
                 label = "heroBackgroundFocus",
             )
 
-            Crossfade(
-                targetState = backgroundPainterRes,
-                animationSpec = tween(durationMillis = 2_400, easing = FastOutSlowInEasing),
-                label = "prayerSkyCrossfade",
-                modifier = Modifier.fillMaxSize(),
-            ) { resolvedBackgroundRes ->
+            if (backgroundBitmap != null) {
                 Image(
-                    painter = composePainterResource(resolvedBackgroundRes),
+                    bitmap = backgroundBitmap,
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            // A single decoded still stays on the GPU. Moving it opposite
-                            // the pager creates depth without competing with the swipe for
-                            // animated-image decoding or causing a loop-boundary jump.
-                            val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                            val restingMotion = ambientMotion * focusedMotionStrength
-                            val imageScale = 1.065f + (restingMotion * 0.006f)
-                            val requestedTranslationX = -pageOffset * 18.dp.toPx()
-                            // The old parallax could move the next page farther than
-                            // this scaled layer's overscan, revealing the card's grey
-                            // Surface along its leading edge. Restrict the shift to
-                            // the pixels that are guaranteed to remain covered.
-                            val maxCoveredHorizontalShift = (
-                                (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
-                                ).coerceAtLeast(0f)
-                            scaleX = imageScale
-                            scaleY = imageScale
-                            translationX = requestedTranslationX.coerceIn(
-                                -maxCoveredHorizontalShift,
-                                maxCoveredHorizontalShift,
-                            )
-                            translationY = restingMotion * 4.dp.toPx()
-                        },
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier.fillMaxSize(),
                 )
+            } else if (backgroundPainterRes != null) {
+                Crossfade(
+                    targetState = backgroundPainterRes,
+                    animationSpec = tween(durationMillis = 2_400, easing = FastOutSlowInEasing),
+                    label = "prayerSkyCrossfade",
+                    modifier = Modifier.fillMaxSize(),
+                ) { resolvedBackgroundRes ->
+                    Image(
+                        painter = composePainterResource(resolvedBackgroundRes),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                // A single decoded still stays on the GPU. Moving it opposite
+                                // the pager creates depth without competing with the swipe for
+                                // animated-image decoding or causing a loop-boundary jump.
+                                val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                                val restingMotion = ambientMotion * focusedMotionStrength
+                                val imageScale = 1.065f + (restingMotion * 0.006f)
+                                val requestedTranslationX = -pageOffset * 18.dp.toPx()
+                                val maxCoveredHorizontalShift = (
+                                    (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
+                                    ).coerceAtLeast(0f)
+                                scaleX = imageScale
+                                scaleY = imageScale
+                                translationX = requestedTranslationX.coerceIn(
+                                    -maxCoveredHorizontalShift,
+                                    maxCoveredHorizontalShift,
+                                )
+                                translationY = restingMotion * 4.dp.toPx()
+                            },
+                    )
+                }
             }
 
             if (animatedSceneDarkness > 0f) {

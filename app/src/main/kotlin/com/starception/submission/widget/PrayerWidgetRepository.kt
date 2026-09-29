@@ -21,6 +21,8 @@ import android.graphics.Bitmap
 import android.text.format.DateFormat
 import android.util.Log
 import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.contentdatabase.NewsDatabase
+import com.starception.submission.download.AssetRepository
 import com.starception.submission.feature.prayertimes.SmartContentUtils
 import com.starception.submission.feature.prayertimes.prayerWindowProgress
 import com.starception.submission.feature.prayertimes.utils.applyOffsetToTime
@@ -37,6 +39,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
@@ -152,6 +155,8 @@ internal sealed interface PrayerWidgetState {
         val windowProgress: Float?,
         /** A source-backed devotional reading for the tall dashboard widget. */
         val reminder: DailyReminder,
+        /** A short daily Quran translation shared by the poster and prayer hero. */
+        val ayah: WidgetAyah,
         /** Solar/prayer-derived palette for the animated foliage decorating tall cards. */
         val dayPhase: WidgetDayPhase,
         val daylightLabel: String,
@@ -163,6 +168,10 @@ internal sealed interface PrayerWidgetState {
          * it instead of treating noon as the centre regardless of today's prayer times.
          */
         val prayerTimelineProgress: Float,
+        /** The shared news-resource key used by the app's Saved screen. */
+        val reminderBookmarkId: String? = null,
+        /** Current state of [reminderBookmarkId] in the user's shared bookmark store. */
+        val isReminderBookmarked: Boolean = false,
     ) : PrayerWidgetState
 }
 
@@ -170,6 +179,7 @@ internal sealed interface PrayerWidgetState {
 @InstallIn(SingletonComponent::class)
 internal interface PrayerWidgetEntryPoint {
     fun userDataRepository(): UserDataRepository
+    fun assetRepository(): AssetRepository
     fun prayerSettingsRepository(): PrayerSettingsRepository
     fun prayerTimeCalculatorService(): PrayerTimeCalculatorService
 }
@@ -211,6 +221,11 @@ internal suspend fun loadPrayerWidgetStateCached(context: Context): PrayerWidget
         loadPrayerWidgetState(context).also { cachedWidgetState = now to it }
     }
 
+/** Forces the next render to reread user data instead of reusing the 45-second snapshot. */
+internal suspend fun invalidatePrayerWidgetStateCache() {
+    cachedWidgetStateMutex.withLock { cachedWidgetState = null }
+}
+
 internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState {
     val entryPoint = EntryPointAccessors.fromApplication(
         context.applicationContext,
@@ -218,6 +233,7 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
     )
     val repository = entryPoint.prayerSettingsRepository()
     val calculator = entryPoint.prayerTimeCalculatorService()
+    val assetRepository = entryPoint.assetRepository()
 
     val basePrayerTimes = (
         repository.getCachedPrayerTimes()
@@ -242,7 +258,7 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
         null
     }
 
-    val (weatherPair, reminder) = coroutineScope {
+    val (weatherPair, reminder, ayah) = coroutineScope {
         val current = async { loadCurrentWeather(context, prayerTimes) }
         val forecasts = async { loadPrayerWeather(context, prayerTimes) }
         val devotional = async {
@@ -252,8 +268,14 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
                 prayerName = currentPrayerName,
             )
         }
-        (current.await() to forecasts.await()) to devotional.await()
+        val dailyAyah = async { DailyAyahRepository.load(context, assetRepository) }
+        Triple(current.await() to forecasts.await(), devotional.await(), dailyAyah.await())
     }
+
+    val reminderBookmarkId = reminder.bookmarkId(context)
+    val isReminderBookmarked = reminderBookmarkId?.let { id ->
+        id in entryPoint.userDataRepository().userData.first().bookmarkedNewsResources
+    } ?: false
 
     return prayerTimes.toWidgetState(
         context = context,
@@ -263,7 +285,38 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
         now = now,
         tomorrowSunrise = tomorrowSunrise,
         reminder = reminder,
+        ayah = ayah,
+        reminderBookmarkId = reminderBookmarkId,
+        isReminderBookmarked = isReminderBookmarked,
     )
+}
+
+/**
+ * Resolves the same identity used by the detail screen and the Saved feed.
+ *
+ * Fortress dua positions repeat in every chapter, so deriving an id from the position
+ * bookmarks the wrong resource. Their full generated title is unique. Hadith resources
+ * use the canonical hadith:// URL, with the detail screen's deterministic fallback when
+ * that item is not present in the feed database.
+ */
+private suspend fun DailyReminder.bookmarkId(context: Context): String? = when (val destination = target) {
+    is WidgetNavigationTarget.Dua -> runCatching {
+        NewsDatabase.getInstance(context).newsDao()
+            .getNewsIdByExactTitle(destination.title)
+            ?.toString()
+    }.getOrNull()
+
+    is WidgetNavigationTarget.Hadith -> {
+        val databaseName = destination.databaseFile.removeSuffix(".db")
+        val fallback = "hadith-$databaseName-${destination.hadithNumber}"
+        runCatching {
+            NewsDatabase.getInstance(context).newsDao()
+                .getNewsIdByExactUrl("hadith://$databaseName/${destination.hadithNumber}")
+                ?.toString()
+        }.getOrNull() ?: fallback
+    }
+
+    else -> null
 }
 
 /**
@@ -528,6 +581,9 @@ private fun DayPrayerTimes.toWidgetState(
     now: LocalTime,
     tomorrowSunrise: LocalTime?,
     reminder: DailyReminder,
+    ayah: WidgetAyah,
+    reminderBookmarkId: String?,
+    isReminderBookmarked: Boolean,
 ): PrayerWidgetState.Available {
     val formatter = timeFormatter(context)
 
@@ -591,6 +647,9 @@ private fun DayPrayerTimes.toWidgetState(
         insight = insight,
         windowProgress = prayerWindowProgress(this, now),
         reminder = reminder,
+        ayah = ayah,
+        reminderBookmarkId = reminderBookmarkId,
+        isReminderBookmarked = isReminderBookmarked,
         dayPhase = widgetDayPhase(now),
         daylightLabel = "Daylight ${durationLabel(daylightMinutes)}",
         nightLabel = "Night ${durationLabel(nightMinutes)}",

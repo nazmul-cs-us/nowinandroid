@@ -51,13 +51,10 @@ class DebugAdhanReceiver : BroadcastReceiver() {
                 "(master=${preferences?.adhanVolume}, " +
                 "toggle=${preferences?.isAdhanEnabledForPrayer(prayerName)})",
         )
-        // startOrFallback exercises the real alarm path: volume-controlled
-        // service when the start is permitted, channel-sound fallback when
-        // Android/OEM background-start restrictions reject it.
+        // Exercise the same volume-controlled service path as a real alarm.
         AdhanPlaybackService.startOrFallback(
             context = context.applicationContext,
             prayerName = prayerName,
-            prayerTime = "",
             volumePercent = volume,
         )
     }

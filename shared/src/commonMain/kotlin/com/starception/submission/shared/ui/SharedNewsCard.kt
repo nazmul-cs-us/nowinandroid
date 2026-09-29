@@ -79,11 +79,7 @@ internal fun SharedNewsResourceCard(
     ) {
         Column {
             NewsHeaderArtwork(
-                resourceName = news.headerImageUrl
-                    ?.takeIf { it.startsWith(DRAWABLE_PREFIX) }
-                    ?.substringAfter(DRAWABLE_PREFIX)
-                    ?.takeIf(String::isNotBlank)
-                    ?: DEFAULT_NEWS_HEADER,
+                resourceName = newsHeaderResource(news),
                 modifier = Modifier.fillMaxWidth().height(if (compact) 148.dp else 240.dp),
             )
             Column(
@@ -207,15 +203,6 @@ internal fun SharedNewsResourceCard(
 
 @Composable
 internal fun SharedNewsDetailContent(news: SharedNewsResource) {
-    NewsHeaderArtwork(
-        resourceName = news.headerImageUrl
-            ?.takeIf { it.startsWith(DRAWABLE_PREFIX) }
-            ?.substringAfter(DRAWABLE_PREFIX)
-            ?.takeIf(String::isNotBlank)
-            ?: DEFAULT_NEWS_HEADER,
-        modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(20.dp)),
-    )
-    Spacer(Modifier.height(16.dp))
     Text(news.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(8.dp))
     Text(
@@ -256,6 +243,12 @@ internal fun SharedNewsDetailContent(news: SharedNewsResource) {
         }
     }
 }
+
+internal fun newsHeaderResource(news: SharedNewsResource): String = news.headerImageUrl
+    .takeIf { it.startsWith(DRAWABLE_PREFIX) }
+    ?.substringAfter(DRAWABLE_PREFIX)
+    ?.takeIf(String::isNotBlank)
+    ?: DEFAULT_NEWS_HEADER
 
 private fun newsMetadata(news: SharedNewsResource): String = buildList {
     news.publishDate.toString().substringBefore('T').takeIf(String::isNotBlank)?.let(::add)

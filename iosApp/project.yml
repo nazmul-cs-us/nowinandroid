@@ -61,9 +61,6 @@ targets:
       - path: ../app/src/main/assets/databases/quran.db
         buildPhase: resources
         type: file
-      - path: ../app/src/main/assets/databases/news.db
-        buildPhase: resources
-        type: file
       # The Interests destination reads the same topic catalog and source
       # databases used by Android's NewsDbGenerator.
       - path: ../core/contentdatabase/src/main/assets/databases/topics.db

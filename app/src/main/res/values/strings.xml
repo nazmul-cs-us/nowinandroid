@@ -75,7 +75,7 @@
   <string name="prayer_widget_description_large">Cycles through the next prayer, today\'s sun path, and a dua.</string>
   <string name="prayer_widget_description_full">All at once: the next prayer, today\'s sun path, and a dua.</string>
   <string name="prayer_widget_description_next_standalone">The illustrated current and next-prayer card as a separate widget.</string>
-  <string name="prayer_widget_description_timeline_standalone">Today\'s five prayers displayed along the sun\'s path.</string>
+  <string name="prayer_widget_description_timeline_standalone">A day-and-night devotional view of today\'s prayers along the sun\'s path.</string>
   <string name="prayer_widget_description_devotional_standalone">A source-backed daily dua or hadith with its full reading one tap away.</string>
   <string name="prayer_widget_loading">Prayer times</string>
 

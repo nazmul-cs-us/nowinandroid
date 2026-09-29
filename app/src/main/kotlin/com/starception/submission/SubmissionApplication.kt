@@ -91,6 +91,17 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
 
         setStrictModePolicy()
 
+        // Feed cards live in core/ui, so bridge them to the app's CDN-backed
+        // resolver before any screen can compose. Detail pages already download
+        // artwork on demand; For You and Saved cards must do the same rather than
+        // only checking the cache once and permanently showing the placeholder.
+        val surahArtworkResolver =
+            com.starception.submission.feature.quran.SurahArtworkResolver.from(this)
+        com.starception.submission.core.ui.SurahArtworkBridge.artworkFileResolver =
+            surahArtworkResolver::resolveArtworkFile
+        com.starception.submission.core.ui.SurahArtworkBridge.artworkFileDownloader =
+            surahArtworkResolver::ensureArtworkDownloaded
+
         // Use background thread for heavy initialization to prevent ANR
         Thread {
             try {
@@ -120,16 +131,6 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                 com.starception.submission.core.ui.ChapterAudioController.localAudioResolver = { url ->
                     audioDownloadHelper.resolveFortressAudioUrlToLocalPath(url)
                 }
-
-                // Bridge core/ui's surah news cards to the CDN-downloaded chapter
-                // artwork (the art is no longer bundled — it alone was ~60 MB).
-                // A null return keeps the bundled placeholder.
-                com.starception.submission.core.ui.SurahArtworkBridge.artworkFileResolver =
-                    { surahNumber ->
-                        com.starception.submission.feature.quran.SurahArtworkResolver
-                            .from(this)
-                            .resolveArtworkFile(surahNumber)
-                    }
 
                 // Bridge ChapterAudioController <-> GlobalMediaViewModel so Fortress chapter
                 // playback surfaces the shared media mini-bar with a progress sweep (like Surah/

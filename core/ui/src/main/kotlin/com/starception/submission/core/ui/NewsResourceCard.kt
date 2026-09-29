@@ -48,6 +48,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -266,6 +267,9 @@ private fun ChapterPlayButton(audioUrl: String, title: String) {
 object SurahArtworkBridge {
     /** Returns the locally downloaded artwork file for a surah number, or null. */
     var artworkFileResolver: ((Int) -> java.io.File?)? = null
+
+    /** Downloads missing artwork and returns its local file, or null on failure. */
+    var artworkFileDownloader: (suspend (Int) -> java.io.File?)? = null
 }
 
 @Composable
@@ -298,14 +302,22 @@ fun NewsResourceHeaderImage(
     // Surah artwork moved to the CDN (its 60 MB was cut from the APK). Resolve
     // the downloaded file through the app-module bridge; fall back to the
     // bundled placeholder while a chapter's art has not been fetched.
-    val surahArtworkFile = remember(drawableResId, headerImageUrl) {
-        if (isDrawableResource && drawableResId == null) {
-            val name = headerImageUrl?.substringAfter("drawable://").orEmpty()
-            val surahNumber = Regex("surah_(\\d{3})").find(name)
-                ?.groupValues?.get(1)?.toIntOrNull()
-            surahNumber?.let { SurahArtworkBridge.artworkFileResolver?.invoke(it) }
-        } else {
-            null
+    val surahNumber = remember(isDrawableResource, drawableResId, headerImageUrl) {
+        if (!isDrawableResource || drawableResId != null) return@remember null
+        val name = headerImageUrl?.substringAfter("drawable://").orEmpty()
+        Regex("surah_(\\d{3})").find(name)
+            ?.groupValues?.get(1)?.toIntOrNull()
+    }
+    var surahArtworkFile by remember(surahNumber) {
+        mutableStateOf(
+            surahNumber?.let { SurahArtworkBridge.artworkFileResolver?.invoke(it) },
+        )
+    }
+    LaunchedEffect(surahNumber) {
+        if (surahNumber != null && surahArtworkFile == null) {
+            surahArtworkFile = runCatching {
+                SurahArtworkBridge.artworkFileDownloader?.invoke(surahNumber)
+            }.getOrNull()
         }
     }
 

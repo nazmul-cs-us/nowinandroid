@@ -31,10 +31,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -49,9 +59,33 @@ import androidx.compose.ui.unit.dp
 internal fun ImmersiveDetailScaffold(
     onBack: () -> Unit,
     maxContentWidth: Dp = 720.dp,
+    collapsibleHeader: Boolean = false,
     header: @Composable () -> Unit,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
+    var headerHeightPx by remember { mutableFloatStateOf(0f) }
+    var headerOffsetPx by remember { mutableFloatStateOf(0f) }
+    val headerNestedScrollConnection = remember(collapsibleHeader) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (!collapsibleHeader || available.y >= 0f || headerHeightPx <= 0f) return Offset.Zero
+                val previous = headerOffsetPx
+                headerOffsetPx = (headerOffsetPx + available.y).coerceIn(-headerHeightPx, 0f)
+                return Offset(x = 0f, y = headerOffsetPx - previous)
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                if (!collapsibleHeader || available.y <= 0f || headerHeightPx <= 0f) return Offset.Zero
+                val previous = headerOffsetPx
+                headerOffsetPx = (headerOffsetPx + available.y).coerceIn(-headerHeightPx, 0f)
+                return Offset(x = 0f, y = headerOffsetPx - previous)
+            }
+        }
+    }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxSize(),
@@ -62,23 +96,39 @@ internal fun ImmersiveDetailScaffold(
                     .widthIn(max = maxContentWidth)
                     .fillMaxSize()
                     .align(Alignment.TopCenter)
-                    .safeDrawingPadding(),
+                    .safeDrawingPadding()
+                    .then(
+                        if (collapsibleHeader) Modifier.nestedScroll(headerNestedScrollConnection) else Modifier,
+                    ),
             ) {
+                // Android's reader artwork is full-bleed. Keeping the header
+                // outside the page gutter also prevents its rounded/artwork
+                // silhouette from being clipped against an arbitrary inset.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                ) {
-                    // The header's DetailToolbar owns the back button — an
-                    // extra floating circle here stacked on the toolbar's and
-                    // overlapped the scrim title on every detail page.
-                    header()
-                }
-                Spacer(Modifier.height(12.dp))
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            headerHeightPx = placeable.height.toFloat()
+                            val offset = if (collapsibleHeader) {
+                                headerOffsetPx.coerceIn(-headerHeightPx, 0f).toInt()
+                            } else {
+                                0
+                            }
+                            layout(
+                                width = placeable.width,
+                                height = (placeable.height + offset).coerceAtLeast(0),
+                            ) {
+                                placeable.placeRelative(0, offset)
+                            }
+                        }
+                        .clipToBounds(),
+                ) { header() }
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 12.dp),
                 ) {
                     content()
                 }
@@ -95,7 +145,7 @@ internal fun ImmersiveDetailHeaderScrim(
     arabicTitle: String? = null,
     titleColor: Color = Color.White,
     scrimColor: Color = Color.Black,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.fillMaxSize(),
 ) {
     Box(
         modifier = modifier
@@ -129,7 +179,10 @@ internal fun ImmersiveDetailHeaderScrim(
                 text = arabicTitle,
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+                // The toolbar owns the top-right corner and the Latin title
+                // owns the bottom edge. The middle-right position keeps this
+                // label clear of both.
+                modifier = Modifier.align(Alignment.CenterEnd).padding(16.dp),
             )
         }
     }
