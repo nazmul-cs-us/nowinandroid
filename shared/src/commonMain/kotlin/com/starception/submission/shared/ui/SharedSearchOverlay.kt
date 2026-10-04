@@ -92,6 +92,7 @@ fun rememberSharedSearchController(
     onOpenBukhariHadith: (Int) -> Unit,
     onOpenQuranicDua: (Int) -> Unit,
     onOpenFortressChapter: (Int) -> Unit,
+    onOpenNews: (Int) -> Unit,
     onRecordRecent: (String) -> Unit,
 ): SharedSearchController {
     val controller = remember { SharedSearchController() }
@@ -131,6 +132,7 @@ fun rememberSharedSearchController(
         onOpenBukhariHadith = onOpenBukhariHadith,
         onOpenQuranicDua = onOpenQuranicDua,
         onOpenFortressChapter = onOpenFortressChapter,
+        onOpenNews = onOpenNews,
         onRecordRecent = onRecordRecent,
     )
     return controller
@@ -142,6 +144,7 @@ internal class SharedSearchDestinations(
     var onOpenBukhariHadith: (Int) -> Unit,
     var onOpenQuranicDua: (Int) -> Unit,
     var onOpenFortressChapter: (Int) -> Unit,
+    var onOpenNews: (Int) -> Unit,
     var onRecordRecent: (String) -> Unit,
 )
 
@@ -301,6 +304,11 @@ fun SharedSearchOverlay(controller: SharedSearchController, onOpenProfile: () ->
                         controller.close()
                         destinations.onOpenFortressChapter(it)
                     },
+                    onOpenNews = {
+                        controller.close()
+                        destinations.onOpenNews(it)
+                    },
+                    onQuerySelected = { controller.query = it },
                     onRecordRecent = destinations.onRecordRecent,
                 )
             }

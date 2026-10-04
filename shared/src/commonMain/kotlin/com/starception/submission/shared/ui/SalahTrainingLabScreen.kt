@@ -31,14 +31,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.starception.submission.shared.ml.SalahPosture
+import com.starception.submission.core.designsystem.component.NiaButton
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.shared.ml.SalahRecordingStore
 import com.starception.submission.shared.ml.SalahSensorRecorder
 import com.starception.submission.shared.ml.SalahSessionInfo
@@ -302,24 +302,22 @@ internal fun SalahTrainingLabScreen(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                             )
                             Spacer(Modifier.height(12.dp))
-                            OutlinedButton(
+                            NiaOutlinedButton(
                                 onClick = {
                                     guidedState = GuidedState.IDLE
                                     stepIndex = 0
                                 },
-                            ) {
-                                Text("Record another session")
-                            }
+                                text = { Text("Record another session") },
+                            )
                         }
                     }
                     Spacer(Modifier.height(12.dp))
                 }
-                OutlinedButton(
+                NiaOutlinedButton(
                     onClick = onOpenPrayerSimulation,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                ) {
-                    Text("Prayer simulation in 3-D")
-                }
+                    text = { Text("Prayer simulation in 3-D") },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                )
                 Spacer(Modifier.height(8.dp))
                 GuidedSetupPanel(
                     steps = steps,
@@ -442,14 +440,16 @@ private fun GuidedSetupPanel(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Button(
+            NiaButton(
                 onClick = onStart,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (focusedMode) "Start focused recording" else "Start guided pass")
-            }
+                text = {
+                    Text(if (focusedMode) "Start focused recording" else "Start guided pass")
+                },
+                leadingIcon = {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            )
         }
     }
 }
@@ -524,9 +524,11 @@ private fun GuidedLivePanel(
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(14.dp))
-            OutlinedButton(onClick = onCancel) {
-                Text("Stop and save what's recorded")
-            }
+            NiaOutlinedButton(
+                onClick = onCancel,
+                text = { Text("Stop and save what's recorded") },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -592,9 +594,11 @@ private fun SessionBrowser(
             }
         }
         item {
-            OutlinedButton(onClick = onDeleteAll, modifier = Modifier.fillMaxWidth()) {
-                Text("Delete all recordings")
-            }
+            NiaOutlinedButton(
+                onClick = onDeleteAll,
+                text = { Text("Delete all recordings") },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

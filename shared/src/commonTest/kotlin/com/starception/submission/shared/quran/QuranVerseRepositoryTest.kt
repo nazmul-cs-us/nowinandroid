@@ -42,4 +42,12 @@ class QuranVerseRepositoryTest {
         assertEquals(listOf(verses.last()), filterQuranVerses(verses, "2"))
         assertEquals(verses, filterQuranVerses(verses, "  "))
     }
+
+    @Test
+    fun separatesBismillahFromPrefixedFirstAyah() {
+        val prefixed = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ الٓمٓ"
+
+        assertEquals(true, hasLeadingBismillah(prefixed))
+        assertEquals("الٓمٓ", removeLeadingBismillah(prefixed))
+    }
 }

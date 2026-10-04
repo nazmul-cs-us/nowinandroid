@@ -33,13 +33,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Circle
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,12 +53,18 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.content.modulesForCourse
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveButton
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveIconButton
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSurface
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveTextButton
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
 
 /**
  * The course detail page — Android's CourseDetailScreen: hero with the
  * course highlight, quick stats, module-by-module lesson list with
  * completion tracking, and lesson content opening.
  */
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 internal fun CourseDetailScreen(
     courseId: String,
@@ -114,7 +116,7 @@ internal fun CourseDetailScreen(
         else -> MaterialTheme.colorScheme.primary
     }
 
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    AdaptiveSurface(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 28.dp),
@@ -127,7 +129,7 @@ internal fun CourseDetailScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onBack) {
+                    AdaptiveIconButton(onClick = onBack) {
                         Icon(NiaIcons.ArrowBack, contentDescription = "Back")
                     }
                     Text(
@@ -184,9 +186,8 @@ internal fun CourseDetailScreen(
                         Triple("${course.estimatedDays}", "Days", Modifier.weight(1f)),
                         Triple(course.difficulty, "Level", Modifier.weight(1f)),
                     ).forEach { (value, label, modifier) ->
-                        Surface(
+                        AdaptiveSurface(
                             shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
                             modifier = modifier,
                         ) {
                             Column(
@@ -216,7 +217,7 @@ internal fun CourseDetailScreen(
             // Enroll / Continue
             item {
                 if (!enrolled) {
-                    Button(
+                    AdaptiveButton(
                         onClick = {
                             enrolled = true
                             store.toggleEnrolledCourse(courseId)
@@ -319,7 +320,7 @@ internal fun CourseDetailScreen(
             // Unenroll
             if (enrolled) {
                 item {
-                    OutlinedButton(
+                    AdaptiveTextButton(
                         onClick = {
                             enrolled = false
                             store.toggleEnrolledCourse(courseId)
@@ -346,9 +347,8 @@ private fun LessonRow(
     onClick: () -> Unit,
     onToggleComplete: () -> Unit,
 ) {
-    Surface(
+    AdaptiveCard(
         onClick = onClick,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -359,7 +359,7 @@ private fun LessonRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Completion checkbox
-            IconButton(
+            AdaptiveIconButton(
                 onClick = onToggleComplete,
                 enabled = !isLocked,
                 modifier = Modifier.size(32.dp),

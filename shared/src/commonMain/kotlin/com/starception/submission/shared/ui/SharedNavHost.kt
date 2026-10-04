@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ import androidx.navigation.toRoute
 import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.content.SharedContentStore
 import kotlinx.datetime.LocalDate
+import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
 /**
@@ -111,6 +113,7 @@ data class SharedHomeActions(
     val onOpenBukhariHadith: (Int) -> Unit = {},
     val onOpenQuranicDua: (Int) -> Unit = {},
     val onOpenFortressChapter: (Int) -> Unit = {},
+    val onOpenShamayelBook: (Int) -> Unit = {},
     val onOpenQibla: () -> Unit,
     val onOpenRecommendation: () -> Unit,
     val onOpenDrivingMode: () -> Unit = {},
@@ -136,12 +139,18 @@ fun SharedNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startInSettings: Boolean = false,
+    startInSurah: Int? = null,
+    startBottomIndex: Int = 0,
+    onSelectTopLevel: ((Int) -> Unit)? = null,
+    externalVoiceSearchRequests: Flow<Int>? = null,
+    onExternalVoiceSearchHandled: (() -> Unit)? = null,
     latitude: Double,
     longitude: Double,
     today: LocalDate,
     home: @Composable (SharedHomeActions) -> Unit,
     settings: @Composable (onBack: () -> Unit, onOpenSalahTraining: () -> Unit) -> Unit,
     createQualityAnalyzer: (() -> com.starception.submission.shared.ml.SalahQualityAnalyzer?)? = null,
+    salah3DService: Salah3DSceneService? = null,
     prayerDay: com.starception.submission.shared.SharedPrayerDay? = null,
     notifications: com.starception.submission.prayer.model.PrayerNotificationPreferences? = null,
     globalRefreshing: Boolean = false,
@@ -153,6 +162,13 @@ fun SharedNavHost(
     val tabPrayerAlert = prayerDay?.prayerAlertState(notifications ?: com.starception.submission.prayer.model.PrayerNotificationPreferences())
     val contentStore = remember { SharedContentStore() }
     val quranPlayer = remember { QuranAudioPlayer() }
+    val openNews: (Int) -> Unit = { id ->
+        if (id in SURAH_NEWS_ID_RANGE) {
+            navController.navigate(QuranDetailRoute(id - SURAH_NEWS_ID_OFFSET))
+        } else {
+            navController.navigate(NewsDetailRoute(id))
+        }
+    }
     // The app-level SearchPrefillBus equivalent: one search surface, shared
     // by every bottom-tab page (Android's AppTopSearchBar pattern).
     val searchController = rememberSharedSearchController(
@@ -161,23 +177,27 @@ fun SharedNavHost(
         onOpenBukhariHadith = { navController.navigate(BukhariHadithRoute(it)) },
         onOpenQuranicDua = { navController.navigate(DuaDetailRoute(it)) },
         onOpenFortressChapter = { navController.navigate(FortressChapterRoute(it)) },
+        onOpenNews = openNews,
         onRecordRecent = { contentStore.addRecentSearch(it) },
     )
+    LaunchedEffect(externalVoiceSearchRequests, startBottomIndex) {
+        externalVoiceSearchRequests?.collect { requestedTab ->
+            if (requestedTab == startBottomIndex) {
+                searchController.openVoice()
+                onExternalVoiceSearchHandled?.invoke()
+            }
+        }
+    }
     DisposableEffect(quranPlayer) {
         onDispose { quranPlayer.stop() }
-    }
-    val openNews: (Int) -> Unit = { id ->
-        if (id in SURAH_NEWS_ID_RANGE) {
-            navController.navigate(QuranDetailRoute(id - SURAH_NEWS_ID_OFFSET))
-        } else {
-            navController.navigate(NewsDetailRoute(id))
-        }
     }
     val openTopic: (Int) -> Unit = { id ->
         navController.navigate(TopicRoute(id)) { launchSingleTop = true }
     }
     val selectBottom: (Int) -> Unit = { index ->
-        when (index) {
+        if (onSelectTopLevel != null) {
+            onSelectTopLevel(index)
+        } else when (index) {
             0 -> navController.navigate(PrayerTimesRoute) {
                 popUpTo(PrayerTimesRoute) { saveState = true }
                 launchSingleTop = true
@@ -208,7 +228,17 @@ fun SharedNavHost(
     Box(modifier) {
         NavHost(
             navController = navController,
-            startDestination = if (startInSettings) PrayerSettingsRoute else PrayerTimesRoute,
+            startDestination = startInSurah
+                ?.takeIf { it in 1..114 }
+                ?.let(::QuranDetailRoute)
+                ?: when {
+                    startInSettings -> PrayerSettingsRoute
+                    startBottomIndex == 1 -> ForYouRoute
+                    startBottomIndex == 2 -> SavedRoute
+                    startBottomIndex == 3 -> CourseRoute
+                    startBottomIndex == 4 -> InterestsRoute
+                    else -> PrayerTimesRoute
+                },
             modifier = Modifier,
         ) {
             composable<PrayerTimesRoute> {
@@ -224,6 +254,7 @@ fun SharedNavHost(
                             onOpenBukhariHadith = { navController.navigate(BukhariHadithRoute(it)) },
                             onOpenQuranicDua = { navController.navigate(DuaDetailRoute(it)) },
                             onOpenFortressChapter = { navController.navigate(FortressChapterRoute(it)) },
+                            onOpenShamayelBook = { navController.navigate(ShamayelBookRoute(it)) },
                             onOpenQibla = { navController.navigate(QiblaRoute) },
                             onOpenRecommendation = { navController.navigate(RecommendationRoute) },
                             onOpenDrivingMode = { navController.navigate(DrivingModeRoute) },
@@ -288,6 +319,7 @@ fun SharedNavHost(
                     prayerAlert = tabPrayerAlert,
                     onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
                     onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                    onOpenCourseDetail = { navController.navigate(CourseDetailRoute(it)) },
                 )
             }
             composable<InterestsRoute> {
@@ -376,7 +408,14 @@ fun SharedNavHost(
                             launchSingleTop = true
                         }
                     },
-                    onBack = { navController.popBackStack() },
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(PrayerTimesRoute) {
+                                popUpTo<QuranDetailRoute> { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    },
                 )
             }
             composable<NewsDetailRoute> { entry ->
@@ -470,17 +509,25 @@ fun SharedNavHost(
             composable<PrayerSimulationRoute> {
                 PrayerSimulationScreen(
                     onBack = { navController.popBackStack() },
+                    scene3DService = salah3DService,
                 )
             }
             composable<SalahReviewRoute> { entry ->
                 SalahSessionReviewScreen(
                     fileName = entry.toRoute<SalahReviewRoute>().fileName,
                     qualityAnalyzer = createQualityAnalyzer?.invoke(),
+                    scene3DService = salah3DService,
                     onBack = { navController.popBackStack() },
                 )
             }
             composable<QiblaRoute> {
-                QiblaScreen(latitude, longitude) { navController.popBackStack() }
+                QiblaScreen(latitude, longitude) {
+                    if (!navController.popBackStack()) {
+                        navController.navigate(PrayerTimesRoute) {
+                            launchSingleTop = true
+                        }
+                    }
+                }
             }
             composable<RecommendationRoute> {
                 RecommendationScreen(

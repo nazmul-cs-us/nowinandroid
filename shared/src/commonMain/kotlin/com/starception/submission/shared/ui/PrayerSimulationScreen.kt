@@ -58,6 +58,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.shared.ml.SalahPosture
+import com.starception.submission.shared.content.createSharedFortressRepository
 import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
@@ -68,6 +69,8 @@ internal data class PrayerSimStep(
     val posture: SalahPosture,
     val label: String,
     val durationMillis: Long,
+    /** Fortress of the Muslim chapter whose dua belongs to this phase. */
+    val fortressChapterId: Int? = null,
     val guidance: String? = null,
 )
 
@@ -89,7 +92,15 @@ internal fun buildPrayerSimulationSteps(rakahCount: Int): List<PrayerSimStep> = 
                     guidance = "Raise your hands and say Allahu Akbar to enter the prayer.",
                 ),
             )
-            add(PrayerSimStep(1, SalahPosture.QIYAM, "Opening supplication", 5_000))
+            add(
+                PrayerSimStep(
+                    1,
+                    SalahPosture.QIYAM,
+                    "Opening supplication",
+                    5_000,
+                    fortressChapterId = 16,
+                ),
+            )
         }
         add(
             PrayerSimStep(
@@ -104,8 +115,16 @@ internal fun buildPrayerSimulationSteps(rakahCount: Int): List<PrayerSimStep> = 
                 },
             ),
         )
-        add(PrayerSimStep(rakah, SalahPosture.RUKU, "Bowing", 4_000))
-        add(PrayerSimStep(rakah, SalahPosture.QIYAM_RISING, "Standing after ruku", 3_500))
+        add(PrayerSimStep(rakah, SalahPosture.RUKU, "Bowing", 4_000, fortressChapterId = 17))
+        add(
+                PrayerSimStep(
+                    rakah,
+                    SalahPosture.QIYAM_RISING,
+                    "Standing after ruku",
+                    3_500,
+                    fortressChapterId = 18,
+                ),
+            )
         add(
             PrayerSimStep(
                 rakah,
@@ -115,8 +134,16 @@ internal fun buildPrayerSimulationSteps(rakahCount: Int): List<PrayerSimStep> = 
                 guidance = "Say Allahu Akbar while lowering into prostration.",
             ),
         )
-        add(PrayerSimStep(rakah, SalahPosture.SUJUD, "First sujud", 4_000))
-        add(PrayerSimStep(rakah, SalahPosture.JALSA, "Sitting between sujud", 3_500))
+        add(PrayerSimStep(rakah, SalahPosture.SUJUD, "First sujud", 4_000, fortressChapterId = 19))
+        add(
+                PrayerSimStep(
+                    rakah,
+                    SalahPosture.JALSA,
+                    "Sitting between sujud",
+                    3_500,
+                    fortressChapterId = 20,
+                ),
+            )
         add(
             PrayerSimStep(
                 rakah,
@@ -126,11 +153,27 @@ internal fun buildPrayerSimulationSteps(rakahCount: Int): List<PrayerSimStep> = 
                 guidance = "Say Allahu Akbar while lowering into the second prostration.",
             ),
         )
-        add(PrayerSimStep(rakah, SalahPosture.SUJUD, "Second sujud", 4_000))
+        add(PrayerSimStep(rakah, SalahPosture.SUJUD, "Second sujud", 4_000, fortressChapterId = 19))
         if (rakah == rakahCount) {
-            add(PrayerSimStep(rakah, SalahPosture.TASHAHHUD, "Tashahhud", 5_000))
-            add(PrayerSimStep(rakah, SalahPosture.TASHAHHUD, "Blessings upon the Prophet", 5_000))
-            add(PrayerSimStep(rakah, SalahPosture.TASHAHHUD, "Supplication before salam", 5_000))
+            add(PrayerSimStep(rakah, SalahPosture.TASHAHHUD, "Tashahhud", 5_000, fortressChapterId = 22))
+            add(
+                PrayerSimStep(
+                    rakah,
+                    SalahPosture.TASHAHHUD,
+                    "Blessings upon the Prophet",
+                    5_000,
+                    fortressChapterId = 23,
+                ),
+            )
+            add(
+                PrayerSimStep(
+                    rakah,
+                    SalahPosture.TASHAHHUD,
+                    "Supplication before salam",
+                    5_000,
+                    fortressChapterId = 24,
+                ),
+            )
             add(
                 PrayerSimStep(
                     rakah,
@@ -140,11 +183,19 @@ internal fun buildPrayerSimulationSteps(rakahCount: Int): List<PrayerSimStep> = 
                     guidance = "Turn to the right and then the left to end the prayer with salam.",
                 ),
             )
-            add(PrayerSimStep(rakah, SalahPosture.TASHAHHUD, "Remembrance after salam", 5_000))
+            add(
+                PrayerSimStep(
+                    rakah,
+                    SalahPosture.TASHAHHUD,
+                    "Remembrance after salam",
+                    5_000,
+                    fortressChapterId = 25,
+                ),
+            )
         } else {
             // Three- and four-rak'ah prayers include the first tashahhud after rak'ah two.
             if (rakah == 2 && rakahCount > 2) {
-                add(PrayerSimStep(rakah, SalahPosture.TASHAHHUD, "First tashahhud", 5_000))
+                add(PrayerSimStep(rakah, SalahPosture.TASHAHHUD, "First tashahhud", 5_000, fortressChapterId = 22))
             }
             add(
                 PrayerSimStep(
@@ -189,6 +240,7 @@ private fun lerp(a: FigurePose, b: FigurePose, t: Float) = FigurePose(
 @Composable
 internal fun PrayerSimulationScreen(
     onBack: () -> Unit,
+    scene3DService: Salah3DSceneService? = null,
 ) {
     var rakat by remember { mutableIntStateOf(4) }
     var stepIndex by remember { mutableIntStateOf(0) }
@@ -199,6 +251,46 @@ internal fun PrayerSimulationScreen(
     val steps = remember(rakat) { buildPrayerSimulationSteps(rakat) }
 
     val stepProgress = remember { Animatable(1f) }
+
+    // ── The respective dua per step — Android's TwoRakahDuaPanel behavior ──
+    val duaPlayer = remember { com.starception.submission.shared.audio.QuranAudioPlayer() }
+    val fortressRepository = remember { createSharedFortressRepository() }
+    var duaInvocation by remember {
+        mutableStateOf<com.starception.submission.shared.content.FortressInvocation?>(null)
+    }
+    var duaPlaying by remember { mutableStateOf(false) }
+    var duaPausedByUser by remember { mutableStateOf(false) }
+
+    val currentStep = steps[stepIndex.coerceIn(0, steps.lastIndex)]
+
+    // Each step that owns a Fortress chapter plays its first invocation from
+    // the beginning — the step index is part of the key, so repeated phases
+    // (such as both sujud) replay their clip instead of resuming the last one.
+    LaunchedEffect(steps, stepIndex, playing) {
+        val chapterId = steps[stepIndex.coerceIn(0, steps.lastIndex)].fortressChapterId
+        if (playing && chapterId != null) {
+            val invocation = runCatching {
+                fortressRepository.getChapterInvocations(chapterId)
+            }.getOrNull()
+                ?.firstOrNull { it.audioUrl.isNotBlank() }
+            if (invocation != null) {
+                duaInvocation = invocation
+                duaPausedByUser = false
+                duaPlayer.stop()
+                duaPlaying = duaPlayer.play(invocation.audioUrl)
+            } else {
+                duaInvocation = null
+                duaPlaying = false
+            }
+        } else {
+            duaPlayer.stop()
+            duaPlaying = false
+        }
+    }
+    // Leaving the screen stops the recitation.
+    androidx.compose.runtime.DisposableEffect(duaPlayer) {
+        onDispose { duaPlayer.stop() }
+    }
 
     // The step engine: each step runs its duration, easing into the next pose.
     LaunchedEffect(playing, steps) {
@@ -211,6 +303,31 @@ internal fun PrayerSimulationScreen(
                 stepProgress.snapTo(0f)
             } else if (playing && stepIndex >= steps.lastIndex) {
                 playing = false
+            }
+        }
+    }
+
+    // The native 3-D scene shows the interpolated skeleton at the Metal frame
+    // rate; the pose target eases across the whole step duration, matching the
+    // Canvas figure's motion beat for beat.
+    if (scene3DService != null) {
+        LaunchedEffect(scene3DService) {
+            scene3DService.setSceneMode(0)
+        }
+        LaunchedEffect(scene3DService, steps, stepIndex) {
+            while (true) {
+                val current = steps[stepIndex.coerceIn(0, steps.lastIndex)]
+                val previous = steps[(stepIndex - 1).coerceAtLeast(0)]
+                val interpolated = lerpSkeletonPose(
+                    skeletonPoseFor(previous.posture),
+                    skeletonPoseFor(current.posture),
+                    stepProgress.value,
+                )
+                scene3DService.updatePose(
+                    joints = interpolated.flatten(),
+                    postureIndex = SalahPosture.classificationLabels.indexOf(current.posture),
+                )
+                kotlinx.coroutines.delay(33)
             }
         }
     }
@@ -246,18 +363,24 @@ internal fun PrayerSimulationScreen(
                     .fillMaxWidth()
                     .weight(1f),
             ) {
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-                        .pointerInput(Unit) {
-                            detectDragGestures { change, drag ->
-                                change.consume()
-                                yaw -= drag.x / 240f
-                                pitch = (pitch - drag.y / 240f).coerceIn(-1.35f, 1.35f)
-                            }
-                        },
-                ) {
+                if (scene3DService != null) {
+                    Salah3DSceneHost(
+                        service = scene3DService,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, drag ->
+                                    change.consume()
+                                    yaw -= drag.x / 240f
+                                    pitch = (pitch - drag.y / 240f).coerceIn(-1.35f, 1.35f)
+                                }
+                            },
+                    ) {
                     val cx = size.width / 2f
                     val cy = size.height / 2f
                     val scale = size.minDimension / 3.2f
@@ -299,6 +422,7 @@ internal fun PrayerSimulationScreen(
                     limb(shoulder, SimOffset3(shoulder.x + armX * 0.6f, armY, shoulder.z + 0.15f), tertiary, stroke * 0.8f)
                     limb(shoulder, SimOffset3(shoulder.x - armX * 0.4f, armY, shoulder.z - 0.15f), tertiary, stroke * 0.8f)
                 }
+                }
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -319,16 +443,71 @@ internal fun PrayerSimulationScreen(
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Rak'ah ${current.rakah} · ${current.label}",
+                        "Rak'ah ${currentStep.rakah} · ${currentStep.label}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
-                    current.guidance?.let { guidance ->
+                    currentStep.guidance?.let { guidance ->
                         Text(
                             guidance,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+            }
+            duaInvocation?.let { invocation ->
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        IconTapTarget(
+                            icon = if (duaPlaying) {
+                                androidx.compose.material.icons.Icons.Filled.Pause
+                            } else {
+                                androidx.compose.material.icons.Icons.Filled.PlayArrow
+                            },
+                            contentDescription = if (duaPlaying) {
+                                "Pause dua recitation"
+                            } else {
+                                "Play dua recitation"
+                            },
+                            tint = MaterialTheme.colorScheme.primary,
+                            visualSize = 34.dp,
+                            iconSize = 22.dp,
+                            showBackground = false,
+                            onClick = {
+                                if (duaPlaying) {
+                                    duaPlayer.pause()
+                                    duaPlaying = false
+                                    duaPausedByUser = true
+                                } else if (invocation.audioUrl.isNotBlank()) {
+                                    duaPlaying = duaPlayer.play(invocation.audioUrl)
+                                    duaPausedByUser = false
+                                }
+                            },
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Dua · ${currentStep.label}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                invocation.arabic,
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 2,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Right,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
             }

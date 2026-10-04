@@ -33,7 +33,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +47,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.starception.submission.R
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import kotlinx.coroutines.delay
 
 /**
@@ -217,7 +217,7 @@ fun WidgetDiscoveryPrompt() {
             }
         },
         confirmButton = {
-            TextButton(
+            NiaTextButton(
                 onClick = {
                     dismiss()
                     if (!WidgetPinning.requestPin(context, provider)) {
@@ -233,7 +233,7 @@ fun WidgetDiscoveryPrompt() {
             }
         },
         dismissButton = {
-            TextButton(onClick = ::dismiss) {
+            NiaTextButton(onClick = ::dismiss) {
                 Text(stringResource(R.string.widget_discovery_not_now))
             }
         },

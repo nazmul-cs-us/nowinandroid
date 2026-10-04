@@ -34,4 +34,27 @@ class CatalogSearchTest {
         assertEquals(80, result.book.id)
         assertEquals(97, com.starception.submission.core.model.data.BukhariBooks.all.size)
     }
+
+    @Test
+    fun mapsSalahSpellingsToIndexedPrayerTerm() {
+        assertEquals("prayer", canonicalSearchQuery("salah"))
+        assertEquals("prayer", canonicalSearchQuery("SALAT"))
+        assertEquals("prayer", canonicalSearchQuery("  Salah  "))
+        assertEquals("prayer times", canonicalSearchQuery("Salah-times"))
+    }
+
+    @Test
+    fun expandsCommonIslamicSearchTerms() {
+        assertTrue(expandedSearchQueries("wudhu").containsAll(listOf("wudhu", "wudu", "ablution")))
+        assertTrue(expandedSearchQueries("du'a").containsAll(listOf("dua", "supplication")))
+    }
+
+    @Test
+    fun toleratesSmallCatalogTypos() {
+        assertTrue(
+            searchCatalog("invocaton").any {
+                it is CatalogResult.Bukhari && it.book.id == 80
+            },
+        )
+    }
 }

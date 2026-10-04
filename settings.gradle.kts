@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+includeBuild("third_party/compose-cupertino") {
+    dependencySubstitution {
+        substitute(module("io.github.alexzhirkevich:cupertino-adaptive")).using(project(":cupertino-adaptive"))
+        substitute(module("io.github.alexzhirkevich:cupertino")).using(project(":cupertino"))
+        substitute(module("io.github.alexzhirkevich:cupertino-core")).using(project(":cupertino-core"))
+        substitute(module("io.github.alexzhirkevich:cupertino-native")).using(project(":cupertino-native"))
+    }
+}
+
 pluginManagement {
     includeBuild("build-logic")
     repositories {
@@ -46,7 +55,7 @@ dependencyResolutionManagement {
         }
     }
 }
-rootProject.name = "Submission"
+rootProject.name = "Deenly"
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 include(":app")

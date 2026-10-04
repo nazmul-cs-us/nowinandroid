@@ -40,6 +40,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
 import java.text.SimpleDateFormat
 import java.util.*
@@ -280,7 +281,7 @@ fun NoteDialog(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         if (editingNote != null) {
-                                            TextButton(
+                                            NiaTextButton(
                                                 onClick = {
                                                     editingNote = null
                                                     noteText = ""
@@ -475,7 +476,7 @@ fun NoteDialog(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirmation = null }) {
+                NiaTextButton(onClick = { showDeleteConfirmation = null }) {
                     Text("Cancel")
                 }
             },

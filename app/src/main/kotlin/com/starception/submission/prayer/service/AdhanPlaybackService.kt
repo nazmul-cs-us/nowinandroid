@@ -199,7 +199,7 @@ class AdhanPlaybackService : Service() {
             val player = MediaPlayer()
             val attrs = AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setUsage(AudioAttributes.USAGE_ALARM)
                 .build()
             player.setAudioAttributes(attrs)
 
@@ -208,8 +208,8 @@ class AdhanPlaybackService : Service() {
             assetFd.close()
 
             // Apply the effective per-prayer preference supplied by the alarm
-            // receiver/worker. The system notification stream remains the user's
-            // global ceiling; this player gain is the prayer-specific level.
+            // receiver/worker. The alarm stream remains the user's global
+            // ceiling; this player gain is the prayer-specific level.
             val playerGain = adhanPlayerGain(volumePercent)
             if (playerGain <= 0f) {
                 player.release()
@@ -297,7 +297,7 @@ class AdhanPlaybackService : Service() {
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setUsage(AudioAttributes.USAGE_ALARM)
                         .build(),
                 )
                 .build()
@@ -305,7 +305,7 @@ class AdhanPlaybackService : Service() {
             am.requestAudioFocus(request)
         } else {
             @Suppress("DEPRECATION")
-            am.requestAudioFocus(null, AudioManager.STREAM_NOTIFICATION, AudioManager.AUDIOFOCUS_GAIN)
+            am.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN)
         }
     }
 

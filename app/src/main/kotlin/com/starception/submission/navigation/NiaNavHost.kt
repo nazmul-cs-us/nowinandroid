@@ -479,6 +479,12 @@ fun NiaNavHost(
                 onFortressDuaClick = navController::navigateToFortressDua,
                 onBukhariBookPlayClick = navController::navigateToBukhariBookPlayback,
                 onShamayelBookPlayClick = navController::navigateToShamayelBookPlayback,
+                onBukhariFeelingBlessedClick = {
+                    navController.navigateToBukhariCollectionPlayback(shuffle = true)
+                },
+                onShamayelFeelingBlessedClick = {
+                    navController.navigateToShamayelCollectionPlayback(shuffle = true)
+                },
                 onMediaSourceClick = { source -> navController.navigateToMediaSourceDetail(source) },
                 downloadProgress = homeDownloadProgress,
                 downloadLabel = homeDownloadLabel,

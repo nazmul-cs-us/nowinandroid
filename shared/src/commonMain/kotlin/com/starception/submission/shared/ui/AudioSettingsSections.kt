@@ -365,11 +365,10 @@ fun NarrationSettingsSection(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Slider(
+            io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSlider(
                 value = selectedSpeakerId.coerceIn(0, selectedVoice.totalSpeakers - 1).toFloat(),
                 onValueChange = { onSpeakerSelected(it.toInt()) },
                 valueRange = 0f..(selectedVoice.totalSpeakers - 1).toFloat(),
-                steps = (selectedVoice.totalSpeakers - 2).coerceAtLeast(0),
                 modifier = Modifier.fillMaxWidth(),
             )
         }

@@ -32,7 +32,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -51,6 +50,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.animation.NiaTransitions
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import com.starception.submission.feature.prayertimes.isJumuahDay
 import kotlinx.coroutines.delay
@@ -391,7 +391,7 @@ private fun IOSPrayerCard(
             // Action buttons - iOS style
             if (isPrayed) {
                 // Text button for unmark action
-                TextButton(
+                NiaTextButton(
                     onClick = { onTogglePrayer(false) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {

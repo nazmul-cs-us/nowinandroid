@@ -18,6 +18,7 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,7 +28,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -51,6 +54,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import io.github.alexzhirkevich.cupertino.CupertinoActionSheetNative
+import io.github.alexzhirkevich.cupertino.cancel
+import io.github.alexzhirkevich.cupertino.default
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget
 
 /**
  * One action in a [DetailToolbar] / [DetailOptionsSheet]. The [icon] is
@@ -79,14 +86,58 @@ internal fun DetailToolbar(
     sheetActions: List<DetailAction> = emptyList(),
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     toolbarTitle: String? = null,
+    includeStatusBarInset: Boolean = true,
 ) {
     var showOptionsSheet by remember { mutableStateOf(false) }
     val allActions = inlineActions + sheetActions
 
+    AdaptiveWidget(
+        material = {
+            MaterialDetailToolbar(
+                onBack = onBack,
+                inlineActions = inlineActions,
+                allActions = allActions,
+                contentColor = contentColor,
+                toolbarTitle = toolbarTitle,
+                includeStatusBarInset = includeStatusBarInset,
+                showOptionsSheet = showOptionsSheet,
+                onShowOptionsSheet = { showOptionsSheet = true },
+                onDismissOptionsSheet = { showOptionsSheet = false },
+            )
+        },
+        cupertino = {
+            CupertinoDetailToolbar(
+                onBack = onBack,
+                inlineActions = inlineActions,
+                sheetActions = sheetActions,
+                contentColor = contentColor,
+                toolbarTitle = toolbarTitle,
+                includeStatusBarInset = includeStatusBarInset,
+                showOptionsSheet = showOptionsSheet,
+                onShowOptionsSheet = { showOptionsSheet = true },
+                onDismissOptionsSheet = { showOptionsSheet = false },
+            )
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MaterialDetailToolbar(
+    onBack: () -> Unit,
+    inlineActions: List<DetailAction>,
+    allActions: List<DetailAction>,
+    contentColor: Color,
+    toolbarTitle: String?,
+    includeStatusBarInset: Boolean,
+    showOptionsSheet: Boolean,
+    onShowOptionsSheet: () -> Unit,
+    onDismissOptionsSheet: () -> Unit,
+) {
     if (showOptionsSheet && allActions.isNotEmpty()) {
         val sheetState = rememberModalBottomSheetState()
         ModalBottomSheet(
-            onDismissRequest = { showOptionsSheet = false },
+            onDismissRequest = onDismissOptionsSheet,
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
@@ -146,7 +197,7 @@ internal fun DetailToolbar(
                             .fillMaxWidth()
                             .clickable {
                                 action.onClick()
-                                showOptionsSheet = false
+                                onDismissOptionsSheet()
                             },
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp,
@@ -161,7 +212,10 @@ internal fun DetailToolbar(
         tonalElevation = 0.dp,
         // The immersive headers are full-bleed under the status bar; the
         // toolbar itself clears the network/notification icons.
-        modifier = Modifier.fillMaxWidth().statusBarsPadding().height(64.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (includeStatusBarInset) Modifier.statusBarsPadding() else Modifier)
+            .height(68.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -218,7 +272,7 @@ internal fun DetailToolbar(
                     }
                 }
                 IconButton(
-                    onClick = { if (allActions.isNotEmpty()) showOptionsSheet = true },
+                    onClick = { if (allActions.isNotEmpty()) onShowOptionsSheet() },
                     modifier = Modifier.size(44.dp),
                     colors = IconButtonDefaults.iconButtonColors(
                         contentColor = contentColor,
@@ -230,6 +284,121 @@ internal fun DetailToolbar(
                         tint = contentColor,
                         modifier = Modifier.size(24.dp),
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CupertinoDetailToolbar(
+    onBack: () -> Unit,
+    inlineActions: List<DetailAction>,
+    sheetActions: List<DetailAction>,
+    contentColor: Color,
+    toolbarTitle: String?,
+    includeStatusBarInset: Boolean,
+    showOptionsSheet: Boolean,
+    onShowOptionsSheet: () -> Unit,
+    onDismissOptionsSheet: () -> Unit,
+) {
+    CupertinoActionSheetNative(
+        visible = showOptionsSheet && sheetActions.isNotEmpty(),
+        onDismissRequest = onDismissOptionsSheet,
+        title = toolbarTitle,
+        buttons = {
+            sheetActions.forEach { action ->
+                default(
+                    onClick = {
+                        action.onClick()
+                        onDismissOptionsSheet()
+                    },
+                    title = buildString {
+                        append(action.label)
+                        action.trailingText?.let {
+                            append(" · ")
+                            append(it)
+                        }
+                    },
+                )
+            }
+            cancel(onClick = onDismissOptionsSheet, title = "Cancel")
+        },
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (includeStatusBarInset) Modifier.statusBarsPadding() else Modifier)
+            .height(64.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                onClick = onBack,
+                modifier = Modifier.size(52.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shadowElevation = 2.dp,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = NiaIcons.ArrowBack,
+                        contentDescription = "Back",
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            }
+
+            if (inlineActions.isNotEmpty() || sheetActions.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shadowElevation = 2.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        inlineActions.forEach { action ->
+                            IconButton(
+                                onClick = action.onClick,
+                                modifier = Modifier.size(52.dp),
+                            ) {
+                                action.icon?.let { icon ->
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = action.label,
+                                        modifier = Modifier.size(25.dp),
+                                    )
+                                } ?: action.trailingText?.let { text ->
+                                    Text(
+                                        text = text,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                        }
+                        if (sheetActions.isNotEmpty()) {
+                            IconButton(
+                                onClick = onShowOptionsSheet,
+                                modifier = Modifier.size(52.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreHoriz,
+                                    contentDescription = "More options",
+                                    modifier = Modifier.size(27.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

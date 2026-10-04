@@ -113,19 +113,27 @@ import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.SharedPrayerSlot
 import com.starception.submission.shared.audio.QuranAudioPlayer
-import com.starception.submission.shared.content.FortressInvocation
 import com.starception.submission.shared.content.SharedContentStore
-import com.starception.submission.shared.content.SharedQuranicDua
-import com.starception.submission.shared.content.createSharedDuaRepository
-import com.starception.submission.shared.content.createSharedFortressRepository
+import com.starception.submission.shared.content.SharedNewsResource
+import com.starception.submission.shared.content.canonicalSearchQuery
+import com.starception.submission.shared.content.createSharedNewsRepository
+import com.starception.submission.shared.content.expandedSearchQueries
 import com.starception.submission.shared.content.searchCatalog
 import com.starception.submission.shared.dashboardSlots
-import com.starception.submission.shared.hadith.SharedHadith
-import com.starception.submission.shared.hadith.createSharedHadithRepository
 import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.settings.formatOffset
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
+import io.github.alexzhirkevich.cupertino.CupertinoIconButton
+import io.github.alexzhirkevich.cupertino.CupertinoSliderNative
+import io.github.alexzhirkevich.cupertino.CupertinoSurface
+import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.ExperimentalCupertinoApi
+import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults.plainButtonColors
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
+import io.github.alexzhirkevich.cupertino.theme.CupertinoTheme
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
@@ -184,34 +192,100 @@ fun PrayerTimesScreen(
     searchController: SharedSearchController? = null,
     onOpenQuran: (Int) -> Unit = {},
     onOpenQibla: () -> Unit = {},
+    onOpenDrivingMode: () -> Unit = {},
     onOpenRecommendation: () -> Unit = {},
     onOpenBukhariBook: (Int) -> Unit = {},
     onOpenBukhariHadith: (Int) -> Unit = {},
     onOpenQuranicDua: (Int) -> Unit = {},
     onOpenFortressChapter: (Int) -> Unit = {},
+    onOpenShamayelBook: (Int) -> Unit = {},
     selectedBottomIndex: Int = 0,
     onSelectBottom: (Int) -> Unit = {},
     quranPlayer: QuranAudioPlayer = LocalQuranAudioPlayer.current,
+    hasVerifiedLocation: Boolean = true,
+    nudgeOverride: com.starception.submission.core.model.deenly.DeenlyNudge? = null,
+    onNudgeChanged: (com.starception.submission.core.model.deenly.DeenlyNudge?) -> Unit = {},
+    externalNudgeActionRequests: kotlinx.coroutines.flow.Flow<Unit>? = null,
 ) {
     var showAllPrayers by remember { mutableStateOf(false) }
     var isTuningSchedule by remember { mutableStateOf(false) }
+    var showIslamicQuiz by remember { mutableStateOf(false) }
     // Inline search + profile sheet — the Android pattern: both open in
     // place instead of navigating to separate pages.
     // ONE search surface app-wide: the shared controller hosted by the nav
     // renders the overlay above every page; the home's pill, mic, and FAB all
     // drive it instead of keeping a private copy.
     var showProfileSheet by remember { mutableStateOf(false) }
+    // The floating iOS volume HUD: active prayer + its adhan percent while
+    // the user adjusts; null hides the capsule.
+    var activeAdhanVolume by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val contentStore = remember { SharedContentStore() }
     val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
+    val isOnline by com.starception.submission.shared.connectivity.appConnectivity.isOnline.collectAsState()
     val homeCanvas = screenCanvasBrush()
     val nextPrayerState = remember(day, notifications) {
         day.prayerAlertState(notifications)
+    }
+    val nudgeDate = today.toString()
+    var dismissedNudgeIds by remember(nudgeDate) {
+        mutableStateOf(contentStore.dismissedNudgeIds(nudgeDate))
+    }
+    val rankedNudge = remember(day, salah.completed, dismissedNudgeIds, hasVerifiedLocation) {
+        val currentSlot = day.currentPrayer?.let { name -> day.slots.firstOrNull { it.name == name } }
+        val nextSlot = day.nextPrayer?.let { name -> day.slots.firstOrNull { it.name == name } }
+        com.starception.submission.core.model.deenly.selectDeenlyNudge(
+            com.starception.submission.core.model.deenly.DeenlyNudgeContext(
+                nowMinute = day.nowMinute,
+                currentPrayer = currentSlot?.name,
+                currentPrayerMinute = currentSlot?.let { (it.hour * 60) + it.minute },
+                nextPrayer = nextSlot?.name,
+                nextPrayerMinute = nextSlot?.let { (it.hour * 60) + it.minute },
+                completedPrayers = salah.completed,
+                hasVerifiedLocation = hasVerifiedLocation,
+                hasQuizAvailable = true,
+                dismissedIds = dismissedNudgeIds,
+            ),
+        )
+    }
+    val deenlyNudge = nudgeOverride
+        ?.takeUnless { it.id in dismissedNudgeIds }
+        ?: rankedNudge
+
+    fun dismissNudge(id: String) {
+        dismissedNudgeIds = contentStore.dismissNudge(nudgeDate, id)
+    }
+
+    fun performNudgeAction(nudge: com.starception.submission.core.model.deenly.DeenlyNudge) {
+        when (nudge.action) {
+            com.starception.submission.core.model.deenly.DeenlyNudgeAction.MARK_PRAYED ->
+                nudge.prayerName?.let(onTogglePrayer)
+            com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_QIBLA ->
+                onOpenQibla()
+            com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_TRAVEL_DUA ->
+                onOpenDrivingMode()
+            com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_QUIZ ->
+                showIslamicQuiz = true
+            com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION -> Unit
+        }
+        dismissNudge(nudge.id)
+    }
+
+    androidx.compose.runtime.DisposableEffect(deenlyNudge) {
+        onNudgeChanged(deenlyNudge)
+        onDispose { onNudgeChanged(null) }
+    }
+
+    LaunchedEffect(deenlyNudge?.id, externalNudgeActionRequests) {
+        externalNudgeActionRequests?.collect {
+            deenlyNudge?.let(::performNudgeAction)
+        }
     }
 
     PullToSyncContainer(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         syncResultText = syncResultText,
+        isOffline = !isOnline,
         prayerAlertState = nextPrayerState,
         downloadProgress = downloadStatus?.progress ?: 0f,
         downloadLabel = downloadStatus?.label?.let { label ->
@@ -219,14 +293,19 @@ fun PrayerTimesScreen(
             "$label $percent%"
         }.orEmpty(),
         modifier = modifier.fillMaxSize(),
-    ) {
+    ) { syncState ->
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Color.Transparent,
         ) {
             BoxWithConstraints(Modifier.fillMaxSize().background(homeCanvas)) {
+                // A persistent sync/status strip is implemented as top padding, which
+                // reduces this child's measured height. Add that inset back for all
+                // responsive sizing so cards do not shrink and reflow while the strip
+                // opens; the LazyColumn remains responsible for the smaller viewport.
+                val layoutHeight = maxHeight + syncState.heldContentInsetTop
                 // Requiring room in both axes keeps wide, short phones out of tablet sizing.
-                val isTablet = maxWidth >= 600.dp && maxHeight >= 600.dp
+                val isTablet = maxWidth >= 600.dp && layoutHeight >= 600.dp
                 val isTabletPortrait = isTablet && maxWidth <= maxHeight
                 // The phone and tablet share one design language: identical
                 // cards at identical aspect ratios. Portrait tablets therefore
@@ -241,13 +320,17 @@ fun PrayerTimesScreen(
                 val portraitInsightHeight = if (isTablet) {
                     // Carousel pages keep the phone card's 250:288 aspect; the
                     // height just scales up so pages stay proportionate.
-                    (maxHeight * 0.34f).coerceIn(320.dp, 400.dp)
+                    (layoutHeight * 0.34f).coerceIn(320.dp, 400.dp)
                 } else {
-                    (maxHeight - 652.dp).coerceIn(192.dp, 280.dp)
+                    // Use the idle space above navigation for a taller card, then
+                    // yield that space as the sync strip opens. Never go below the
+                    // height at which the header/footer can remain on one line.
+                    (layoutHeight - 627.dp - syncState.heldContentInsetTop)
+                        .coerceIn(220.dp, 280.dp)
                 }
                 // Measured two-pane sizing: both panes share the height below
                 // the search header (~150dp of status bar, header, paddings).
-                val paneContentHeight = maxHeight - 150.dp
+                val paneContentHeight = layoutHeight - 150.dp
                 // The hero pane is 5/11 of the row; keep the card's 288/250
                 // aspect instead of stretching it to an arbitrary height.
                 val heroPaneWidth = (maxWidth - 124.dp) * (5f / 11f)
@@ -259,7 +342,7 @@ fun PrayerTimesScreen(
                         heroPaneWidth * (288f / 250f),
                     ).coerceAtLeast(320.dp)
                 } else {
-                    (maxHeight - 182.dp).coerceIn(220.dp, 400.dp)
+                    (layoutHeight - 182.dp).coerceIn(220.dp, 400.dp)
                 }
                 // Landscape schedule: three rows of two cards split the pane
                 // minus the schedule header (44) and 8dp row gaps evenly.
@@ -274,7 +357,7 @@ fun PrayerTimesScreen(
                 // hero (400) + gaps + schedule header (52) + location (58) +
                 // bottom-bar clearance (112) ≈ 810dp; rows share the rest.
                 val portraitCardHeight = (
-                    (maxHeight - 810.dp) / 3
+                    (layoutHeight - 810.dp) / 3
                     ).coerceIn(96.dp, 132.dp)
                 Box(
                     modifier = Modifier
@@ -333,6 +416,9 @@ fun PrayerTimesScreen(
                                 ) {
                                     item {
                                         InsightPager(
+                                            onOpenFortressChapter = onOpenFortressChapter,
+                                            onOpenBukhariBook = onOpenBukhariBook,
+                                            onOpenShamayelBook = onOpenShamayelBook,
                                             day = day,
                                             placeName = placeName,
                                             salah = salah,
@@ -374,6 +460,7 @@ fun PrayerTimesScreen(
                                             onAdjustPrayer = onAdjustPrayer,
                                             onTogglePrayerAdhan = onTogglePrayerAdhan,
                                             onAdhanVolumeChange = onAdhanVolumeChange,
+ onOpenAdhanVolume = { name, volume -> activeAdhanVolume = name to volume },
                                             isTuning = isTuningSchedule,
                                             onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                             notifications = notifications,
@@ -397,6 +484,9 @@ fun PrayerTimesScreen(
                                         // an 8dp gap above the artwork.
                                         val heroTile = (maxHeight - 42.dp).coerceAtLeast(220.dp)
                                         InsightPager(
+                                            onOpenFortressChapter = onOpenFortressChapter,
+                                            onOpenBukhariBook = onOpenBukhariBook,
+                                            onOpenShamayelBook = onOpenShamayelBook,
                                             day = day,
                                             placeName = placeName,
                                             salah = salah,
@@ -423,6 +513,7 @@ fun PrayerTimesScreen(
                                     onAdjustPrayer = onAdjustPrayer,
                                     onTogglePrayerAdhan = onTogglePrayerAdhan,
                                     onAdhanVolumeChange = onAdhanVolumeChange,
+ onOpenAdhanVolume = { name, volume -> activeAdhanVolume = name to volume },
                                     isTuning = isTuningSchedule,
                                     onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                     notifications = notifications,
@@ -448,11 +539,14 @@ fun PrayerTimesScreen(
                             // The pager and schedule scroll together on a phone so the
                             // artwork never leaves only a couple of prayer rows visible.
                             LazyColumn(
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
                                 contentPadding = PaddingValues(bottom = 112.dp),
                             ) {
                                 item {
                                     InsightPager(
+                                        onOpenFortressChapter = onOpenFortressChapter,
+                                        onOpenBukhariBook = onOpenBukhariBook,
+                                        onOpenShamayelBook = onOpenShamayelBook,
                                         day = day,
                                         placeName = placeName,
                                         salah = salah,
@@ -477,23 +571,41 @@ fun PrayerTimesScreen(
                                         onAdjustPrayer = onAdjustPrayer,
                                         onTogglePrayerAdhan = onTogglePrayerAdhan,
                                         onAdhanVolumeChange = onAdhanVolumeChange,
+ onOpenAdhanVolume = { name, volume -> activeAdhanVolume = name to volume },
                                         isTuning = isTuningSchedule,
                                         onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                         notifications = notifications,
                                         onTogglePrayerNotification = onTogglePrayerNotification,
                                         showExpandControl = true,
-                                        compact = false,
+                                        compact = showAllPrayers,
+                                        cardMinHeight = if (showAllPrayers) 88.dp else null,
                                     )
                                 }
                                 item {
-                                    LocationWeatherRow(
-                                        placeName = placeName,
-                                        temperatureCelsius = day.temperatureCelsius,
-                                        conditionLabel = day.conditionLabel,
-                                        isLocating = isLocating,
-                                        compact = showAllPrayers,
-                                        onRefresh = onRefresh,
-                                    )
+                                    AnimatedVisibility(
+                                        visible = !showAllPrayers,
+                                        enter = expandVertically(
+                                            animationSpec = tween(
+                                                durationMillis = 840,
+                                                easing = FastOutSlowInEasing,
+                                            ),
+                                        ) + fadeIn(animationSpec = tween(durationMillis = 280)),
+                                        exit = shrinkVertically(
+                                            animationSpec = tween(
+                                                durationMillis = 680,
+                                                easing = FastOutSlowInEasing,
+                                            ),
+                                        ) + fadeOut(animationSpec = tween(durationMillis = 180)),
+                                    ) {
+                                        LocationWeatherRow(
+                                            placeName = placeName,
+                                            temperatureCelsius = day.temperatureCelsius,
+                                            conditionLabel = day.conditionLabel,
+                                            isLocating = isLocating,
+                                            compact = false,
+                                            onRefresh = onRefresh,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -503,26 +615,121 @@ fun PrayerTimesScreen(
                     // (SharedSearchOverlay above every destination), so the
                     // home no longer renders a private copy.
 
-                    if (useSideNavigation) {
-                        FloatingSideBar(
-                            items = SharedBottomBarItems,
-                            selectedIndex = selectedBottomIndex,
-                            onSelect = onSelectBottom,
-                            modifier = Modifier.align(Alignment.CenterStart),
-                        )
-                    } else {
-                        FloatingBottomBar(
-                            items = SharedBottomBarItems,
-                            selectedIndex = selectedBottomIndex,
-                            onSelect = onSelectBottom,
-                            // The floating voice button is voice SEARCH — the same
-                            // shared surface as the header mic, matching Android.
-                            onVoiceTap = { searchController?.openVoice() },
-                            modifier = Modifier.align(Alignment.BottomCenter),
-                        )
+                    // UIKit-backed per-prayer volume HUD. Hardware volume keys
+                    // update the selected prayer while this native slider is open.
+                    activeAdhanVolume?.let { active ->
+                        val (prayerName, volume) = active
+                        androidx.compose.runtime.key(prayerName) {
+                            val capture = remember {
+                                com.starception.submission.shared.voice.SystemVolumeCapture()
+                            }
+                            androidx.compose.runtime.DisposableEffect(prayerName) {
+                                capture.start { percent ->
+                                    onAdhanVolumeChange(prayerName, percent)
+                                    activeAdhanVolume = prayerName to percent
+                                }
+                                onDispose { capture.stop() }
+                            }
+                            LaunchedEffect(prayerName, volume) {
+                                kotlinx.coroutines.delay(2_400)
+                                activeAdhanVolume = null
+                            }
+                            NativePrayerVolumeController(
+                                prayerName = prayerName,
+                                volume = volume,
+                                onVolumeChange = { next ->
+                                    onAdhanVolumeChange(prayerName, next)
+                                    activeAdhanVolume = prayerName to next
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(horizontal = 20.dp, vertical = 116.dp)
+                                    .zIndex(6f),
+                            )
+                        }
+                    }
+
+                    if (LocalShowBottomNavigation.current) {
+                        if (useSideNavigation) {
+                            FloatingSideBar(
+                                items = SharedBottomBarItems,
+                                selectedIndex = selectedBottomIndex,
+                                onSelect = onSelectBottom,
+                                modifier = Modifier.align(Alignment.CenterStart),
+                            )
+                        } else {
+                            FloatingBottomBar(
+                                items = SharedBottomBarItems,
+                                selectedIndex = selectedBottomIndex,
+                                onSelect = onSelectBottom,
+                                // The floating voice button is voice SEARCH — the same
+                                // shared surface as the header mic, matching Android.
+                                onVoiceTap = { searchController?.openVoice() },
+                                nudge = deenlyNudge,
+                                onNudgeAction = {
+                                    deenlyNudge?.let(::performNudgeAction)
+                                },
+                                modifier = Modifier.align(Alignment.BottomCenter),
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+
+    if (showIslamicQuiz) {
+        IslamicQuizDialog(onDismiss = { showIslamicQuiz = false })
+    }
+}
+
+@Composable
+private fun NativePrayerVolumeController(
+    prayerName: String,
+    volume: Int,
+    onVolumeChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = CupertinoTheme.colorScheme
+    CupertinoSurface(
+        shape = RoundedCornerShape(20.dp),
+        color = colors.secondarySystemGroupedBackground,
+        contentColor = colors.label,
+        shadowElevation = 12.dp,
+        modifier = modifier.fillMaxWidth().widthIn(max = 420.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CupertinoText(
+                    text = "$prayerName adhan volume",
+                    style = CupertinoTheme.typography.subhead,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                CupertinoText(
+                    text = if (volume == 0) "Muted" else "$volume%",
+                    style = CupertinoTheme.typography.subhead,
+                    color = colors.secondaryLabel,
+                )
+            }
+            CupertinoSliderNative(
+                value = volume.toFloat(),
+                onValueChange = { onVolumeChange(it.roundToInt().coerceIn(0, 100)) },
+                valueRange = 0f..100f,
+                steps = 99,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            CupertinoText(
+                text = "Drag the slider or use the volume buttons",
+                style = CupertinoTheme.typography.footnote,
+                color = colors.secondaryLabel,
+            )
         }
     }
 }
@@ -589,47 +796,59 @@ private fun PrayerHomeHeader(
             showBackground = false,
             onClick = onShowProfile,
         )
-        Surface(
-            onClick = onOpenSearch,
-            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ) {
-            Row(
-                modifier = Modifier.padding(start = 16.dp, end = if (onVoiceTap != null) 6.dp else 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = NiaIcons.Search,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Text(
-                    text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (onVoiceTap != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .clickable(onClick = onVoiceTap),
-                        contentAlignment = Alignment.Center,
+        io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget(
+            material = {
+                Surface(
+                    onClick = onOpenSearch,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = if (onVoiceTap != null) 6.dp else 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Mic,
-                            contentDescription = "Voice search",
+                            imageVector = NiaIcons.Search,
+                            contentDescription = null,
                             modifier = Modifier.size(20.dp),
                         )
+                        Text(
+                            text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (onVoiceTap != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .clickable(onClick = onVoiceTap),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Mic,
+                                    contentDescription = "Voice search",
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
                     }
                 }
-            }
-        }
+            },
+            cupertino = {
+                io.github.alexzhirkevich.cupertino.CupertinoSearchBarNative(
+                    placeholder = searchTerm?.let { "Search '$it'" } ?: "Search",
+                    onSearchClick = onOpenSearch,
+                    onVoiceClick = onVoiceTap,
+                    modifier = Modifier.weight(1f),
+                )
+            },
+        )
         IconTapTarget(
             icon = Icons.Outlined.Settings,
             contentDescription = "Prayer settings",
@@ -653,11 +872,16 @@ internal fun SearchSuggestionsOverlayContent(
     onOpenBukhariHadith: (Int) -> Unit,
     onOpenQuranicDua: (Int) -> Unit,
     onOpenFortressChapter: (Int) -> Unit,
+    onOpenNews: (Int) -> Unit,
+    onQuerySelected: (String) -> Unit,
     onRecordRecent: (String) -> Unit,
 ) {
     val trimmed = query.trim()
+    val effectiveQuery = canonicalSearchQuery(trimmed)
+    val expandedQueries = expandedSearchQueries(trimmed)
     val contentStore = remember { SharedContentStore() }
     val recents = remember { contentStore.recentSearches() }
+    val newsRepository = remember { createSharedNewsRepository() }
 
     // Android's curated empty-state shortcuts, so the staples are one tap away.
     data class Popular(val label: String, val surah: Int, val ayah: Int? = null)
@@ -674,32 +898,30 @@ internal fun SearchSuggestionsOverlayContent(
 
     // Catalog matches are synchronous; content searches run against the DBs.
     val catalog = remember(trimmed) {
-        if (trimmed.isEmpty()) emptyList() else searchCatalog(trimmed).take(4)
+        if (trimmed.isEmpty()) emptyList() else searchCatalog(effectiveQuery).take(4)
     }
     var verses by remember { mutableStateOf<List<QuranVerse>>(emptyList()) }
-    var hadiths by remember { mutableStateOf<List<SharedHadith>>(emptyList()) }
-    var fortress by remember { mutableStateOf<List<FortressInvocation>>(emptyList()) }
-    var duas by remember { mutableStateOf<List<SharedQuranicDua>>(emptyList()) }
+    var news by remember { mutableStateOf<List<SharedNewsResource>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
     LaunchedEffect(trimmed) {
         if (trimmed.length < 2) {
             verses = emptyList()
-            hadiths = emptyList()
-            fortress = emptyList()
-            duas = emptyList()
+            news = emptyList()
+            isSearching = false
             return@LaunchedEffect
         }
+        isSearching = true
+        news = runCatching {
+            buildList {
+                addAll(newsRepository.searchNewsByType(expandedQueries, "Dua", 6))
+                addAll(newsRepository.searchNewsByType(expandedQueries, "Hadith", 8))
+                addAll(newsRepository.searchNewsByType(expandedQueries, "Surah", 4))
+            }.distinctBy(SharedNewsResource::id)
+        }.getOrDefault(emptyList())
         runCatching {
-            verses = createQuranVerseRepository().searchAyahs(trimmed, 4)
+            verses = createQuranVerseRepository().searchAyahs(effectiveQuery, 4)
         }
-        runCatching {
-            hadiths = createSharedHadithRepository().searchBukhari(trimmed, 3)
-        }
-        runCatching {
-            fortress = createSharedFortressRepository().searchFortressInvocations(trimmed, 3)
-        }
-        runCatching {
-            duas = createSharedDuaRepository().searchQuranicDuas(trimmed, 3)
-        }
+        isSearching = false
     }
 
     Column(
@@ -713,7 +935,7 @@ internal fun SearchSuggestionsOverlayContent(
                 SuggestionHeader("RECENT")
                 SuggestionChips(
                     items = recents,
-                    onClick = { /* Re-filling the field happens through query state */ },
+                    onClick = onQuerySelected,
                 )
             }
             SuggestionHeader("POPULAR")
@@ -752,6 +974,27 @@ internal fun SearchSuggestionsOverlayContent(
                     }
                 }
             }
+            if (news.isNotEmpty()) {
+                listOf("Dua" to "DUAS", "Hadith" to "HADITHS", "Surah" to "SURAHS").forEach {
+                        (type, heading) ->
+                    val results = news.filter { displayNewsType(it.type) == type }
+                    if (results.isNotEmpty()) {
+                        SuggestionHeader(heading)
+                        results.forEach { result ->
+                            SuggestionRow(
+                                badge = searchResultNumber(result),
+                                title = result.title,
+                                trailing = result.source.takeIf(String::isNotBlank),
+                                onClick = {
+                                    onRecordRecent(trimmed)
+                                    contentStore.markNewsViewed(result.id)
+                                    onOpenNews(result.id)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
             if (verses.isNotEmpty()) {
                 SuggestionHeader("QURAN VERSES")
                 verses.forEach { verse ->
@@ -766,49 +1009,14 @@ internal fun SearchSuggestionsOverlayContent(
                     )
                 }
             }
-            if (hadiths.isNotEmpty()) {
-                SuggestionHeader("SAHIH AL-BUKHARI")
-                hadiths.forEach { hadith ->
-                    SuggestionRow(
-                        badge = "${hadith.id}",
-                        title = hadith.english,
-                        onClick = {
-                            onRecordRecent(trimmed)
-                            onOpenBukhariHadith(hadith.id)
-                        },
-                    )
-                }
-            }
-            if (fortress.isNotEmpty()) {
-                SuggestionHeader("FORTRESS OF THE MUSLIM")
-                fortress.forEach { invocation ->
-                    SuggestionRow(
-                        badge = "${invocation.chapterId}:${invocation.position}",
-                        title = invocation.translation.ifBlank { invocation.description },
-                        onClick = {
-                            onRecordRecent(trimmed)
-                            onOpenFortressChapter(invocation.chapterId)
-                        },
-                    )
-                }
-            }
-            if (duas.isNotEmpty()) {
-                SuggestionHeader("QURANIC DUAS")
-                duas.forEach { dua ->
-                    SuggestionRow(
-                        badge = "${dua.duaNumber}",
-                        title = dua.title,
-                        trailing = dua.surahReference,
-                        onClick = {
-                            onRecordRecent(trimmed)
-                            onOpenQuranicDua(dua.duaNumber)
-                        },
-                    )
-                }
-            }
-            if (catalog.isEmpty() && verses.isEmpty() && hadiths.isEmpty() &&
-                fortress.isEmpty() && duas.isEmpty()
-            ) {
+            if (isSearching && catalog.isEmpty() && news.isEmpty() && verses.isEmpty()) {
+                Text(
+                    "Searching…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                )
+            } else if (catalog.isEmpty() && news.isEmpty() && verses.isEmpty()) {
                 Text(
                     "No matches for \"$trimmed\"",
                     style = MaterialTheme.typography.bodyMedium,
@@ -819,6 +1027,13 @@ internal fun SearchSuggestionsOverlayContent(
         }
     }
 }
+
+private fun searchResultNumber(news: SharedNewsResource): String =
+    Regex("(?:Dua|Hadith|Surah)\\s+(\\d+)", RegexOption.IGNORE_CASE)
+        .find(news.title)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?: news.id.toString()
 
 @Composable
 private fun SuggestionHeader(label: String) {
@@ -1020,6 +1235,7 @@ private fun PrayerScheduleSection(
     onTogglePrayerNotification: (String) -> Unit,
     onTogglePrayerAdhan: (String) -> Unit,
     onAdhanVolumeChange: (String, Int) -> Unit = { _, _ -> },
+    onOpenAdhanVolume: (String, Int) -> Unit = { _, _ -> },
     showExpandControl: Boolean,
     compact: Boolean,
     columns: Int = 2,
@@ -1140,6 +1356,7 @@ private fun PrayerScheduleSection(
                 notifications = notifications,
                 onTogglePrayerNotification = onTogglePrayerNotification,
                 onTogglePrayerAdhan = onTogglePrayerAdhan,
+                onOpenAdhanVolume = onOpenAdhanVolume,
                 compact = compact,
                 cardMinHeight = cardMinHeight,
             )
@@ -1165,6 +1382,7 @@ private fun PrayerScheduleSection(
                         onRevealChange = { revealedCard = it },
                         notifications = notifications,
                         onTogglePrayerNotification = onTogglePrayerNotification,
+                        onOpenAdhanVolume = onOpenAdhanVolume,
                         compact = compact,
                         cardMinHeight = cardMinHeight,
                     )
@@ -1172,13 +1390,12 @@ private fun PrayerScheduleSection(
             }
         }
         if (showExpandControl) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(32.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Box(
+                modifier = Modifier.fillMaxWidth().height(40.dp),
             ) {
                 TextButton(
                     onClick = onToggleExpanded,
-                    modifier = Modifier.weight(1f).height(32.dp),
+                    modifier = Modifier.align(Alignment.Center).height(32.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp),
                 ) {
                     Icon(
@@ -1190,6 +1407,29 @@ private fun PrayerScheduleSection(
                     )
                     Spacer(Modifier.size(4.dp))
                     Text(if (showAllPrayers) "Show Less" else "Show All Prayers")
+                }
+                androidx.compose.animation.AnimatedContent(
+                    targetState = showAllPrayers,
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+                    transitionSpec = {
+                        fadeIn(tween(280)) + scaleIn(
+                            initialScale = 0.72f,
+                            animationSpec = tween(840, easing = FastOutSlowInEasing),
+                        ) togetherWith fadeOut(tween(180)) + scaleOut(
+                            targetScale = 0.72f,
+                            animationSpec = tween(680, easing = FastOutSlowInEasing),
+                        )
+                    },
+                    label = "locationPinMorph",
+                ) { expanded ->
+                    if (expanded) {
+                        LocationPinButton(
+                            onClick = onToggleExpanded,
+                            modifier = Modifier.offset(y = (-10).dp),
+                        )
+                    } else {
+                        Spacer(Modifier.size(40.dp))
+                    }
                 }
             }
         }
@@ -1208,6 +1448,7 @@ private fun PrayerCardRow(
     onTogglePrayerNotification: (String) -> Unit,
     onTogglePrayerAdhan: (String) -> Unit,
     onAdhanVolumeChange: (String, Int) -> Unit = { _, _ -> },
+    onOpenAdhanVolume: (String, Int) -> Unit = { _, _ -> },
     compact: Boolean,
     cardMinHeight: Dp? = null,
 ) {
@@ -1231,6 +1472,7 @@ private fun PrayerCardRow(
                 onToggleAdhan = { onTogglePrayerAdhan(slot.name) },
                 adhanVolume = notifications.getAdhanVolumeForPrayer(slot.name),
                 onAdhanVolumeChange = { volume -> onAdhanVolumeChange(slot.name, volume) },
+                onOpenAdhanVolume = onOpenAdhanVolume,
                 compact = compact,
                 minHeight = cardMinHeight,
                 modifier = Modifier.weight(1f),
@@ -1252,8 +1494,9 @@ private fun PrayerCard(
     onToggleNotification: () -> Unit,
     adhanEnabled: Boolean,
     onToggleAdhan: () -> Unit,
-    adhanVolume: Int = 10,
+    adhanVolume: Int = 5,
     onAdhanVolumeChange: (Int) -> Unit = {},
+    onOpenAdhanVolume: (String, Int) -> Unit = { _, _ -> },
     compact: Boolean,
     minHeight: Dp? = null,
     modifier: Modifier = Modifier,
@@ -1324,9 +1567,6 @@ private fun PrayerCard(
         label = "${slot.name}SwipeOffset",
     )
     val cardShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
-    // Per-prayer adhan volume popup — hoisted so the overlay renders in the
-    // card's root Box scope (the AnimatedContent content is not a BoxScope).
-    var volumePopup by remember(slot.name) { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -1337,80 +1577,6 @@ private fun PrayerCard(
             .clip(cardShape),
         propagateMinConstraints = true,
     ) {
-        if (volumePopup) {
-            // The system capture session: while the popup is open, the hardware
-            // VOLUME BUTTONS surface the iOS system volume HUD (Android's
-            // system volume bar equivalent) — an active playback session is
-            // what makes the OS show it.
-            val capture = remember { com.starception.submission.shared.voice.SystemVolumeCapture() }
-            androidx.compose.runtime.DisposableEffect(slot.name) {
-                capture.start { }
-                onDispose { capture.stop() }
-            }
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shadowElevation = 6.dp,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 12.dp)
-                    .fillMaxWidth()
-                    .zIndex(4f),
-            ) {
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                    Text(
-                        "${slot.name} adhan volume",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    // Apple's native system volume slider (MPVolumeView) — the
-                    // Control Center bar — sitting above the per-prayer control.
-                    SystemVolumeSlider(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                    )
-                    Text(
-                        "System volume",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.material3.Slider(
-                            value = adhanVolume.toFloat(),
-                            onValueChange = { value ->
-                                onAdhanVolumeChange(value.toInt())
-                            },
-                            valueRange = 0f..100f,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            if (adhanVolume == 0) "Muted" else "$adhanVolume%",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (adhanVolume == 0) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                accentColor
-                            },
-                        )
-                    }
-                    Text(
-                        "Per-prayer percent picks the adhan's loudness · 0% = silent",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TextButton(
-                        onClick = { volumePopup = false },
-                        modifier = Modifier.align(Alignment.End),
-                    ) {
-                        Text("Done", style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-            }
-        }
         Box(
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -1694,7 +1860,7 @@ private fun PrayerCard(
                                             alpha = if (adhanVolume > 0) 0.12f else 0.04f,
                                         ),
                                     )
-                                    .clickable { volumePopup = !volumePopup },
+                                    .clickable { onOpenAdhanVolume(slot.name, adhanVolume) },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 androidx.compose.animation.AnimatedContent(
@@ -1765,6 +1931,7 @@ private fun PrayerCard(
  * ported: they reach the same stored value, one minute at a time.
  */
 @Composable
+@OptIn(ExperimentalAdaptiveApi::class, ExperimentalCupertinoApi::class)
 internal fun IconTapTarget(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
@@ -1775,27 +1942,45 @@ internal fun IconTapTarget(
     showBackground: Boolean = true,
     onClick: () -> Unit,
 ) {
-    Box(
-        modifier = modifier
-            .size(48.dp)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(visualSize)
-                .clip(CircleShape)
-                .background(if (showBackground) tint.copy(alpha = 0.08f) else Color.Transparent),
+    AdaptiveWidget(
+        material = {
+            Box(
+                modifier = modifier
+                    .size(48.dp)
+                    .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
-        ) {
-            androidx.compose.material3.Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = tint,
-                modifier = Modifier.size(iconSize),
-            )
-        }
-    }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(visualSize)
+                        .clip(CircleShape)
+                        .background(if (showBackground) tint.copy(alpha = 0.08f) else Color.Transparent),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = icon,
+                        contentDescription = contentDescription,
+                        tint = tint,
+                        modifier = Modifier.size(iconSize),
+                    )
+                }
+            }
+        },
+        cupertino = {
+            CupertinoIconButton(
+                onClick = onClick,
+                modifier = modifier.size(48.dp),
+                colors = plainButtonColors(),
+            ) {
+                CupertinoIcon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = tint,
+                    modifier = Modifier.size(iconSize),
+                )
+            }
+        },
+    )
 }
 
 /**
@@ -1819,67 +2004,167 @@ private fun LocationWeatherRow(
             modifier = modifier.fillMaxWidth().heightIn(min = 40.dp),
             contentAlignment = Alignment.CenterEnd,
         ) {
-            Surface(
-                onClick = onRefresh,
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.size(40.dp),
-            ) {
-                LocationMarkerArtwork(
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(9.dp),
-                )
-            }
+            LocationPinButton(onClick = onRefresh)
         }
         return
     }
     val placeParts = remember(placeName) { placeName.split(',', limit = 2).map(String::trim) }
     val placeTitle = placeParts.firstOrNull().orEmpty().ifEmpty { placeName }
     val placeDetail = placeParts.getOrNull(1).orEmpty()
-    Surface(
-        onClick = onRefresh,
-        modifier = modifier.fillMaxWidth().heightIn(min = 58.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)),
-        shadowElevation = 0.dp,
+    AdaptiveWidget(
+        material = {
+            Surface(
+                onClick = onRefresh,
+                modifier = modifier.fillMaxWidth().heightIn(min = 58.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)),
+                shadowElevation = 0.dp,
+            ) {
+                LocationWeatherContent(
+                    placeTitle = placeTitle,
+                    placeDetail = placeDetail,
+                    temperatureCelsius = temperatureCelsius,
+                    conditionLabel = conditionLabel,
+                    isLocating = isLocating,
+                    cupertino = false,
+                )
+            }
+        },
+        cupertino = {
+            val colors = CupertinoTheme.colorScheme
+            CupertinoSurface(
+                onClick = onRefresh,
+                modifier = modifier.fillMaxWidth().heightIn(min = 58.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = colors.secondarySystemGroupedBackground,
+                contentColor = colors.label,
+                border = BorderStroke(0.5.dp, colors.separator),
+            ) {
+                LocationWeatherContent(
+                    placeTitle = placeTitle,
+                    placeDetail = placeDetail,
+                    temperatureCelsius = temperatureCelsius,
+                    conditionLabel = conditionLabel,
+                    isLocating = isLocating,
+                    cupertino = true,
+                )
+            }
+        },
+    )
+}
+
+@Composable
+@OptIn(ExperimentalAdaptiveApi::class)
+private fun LocationPinButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AdaptiveWidget(
+        material = {
+            Surface(
+                onClick = onClick,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = modifier.size(40.dp),
+            ) {
+                LocationMarkerArtwork(
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(9.dp),
+                )
+            }
+        },
+        cupertino = {
+            val colors = CupertinoTheme.colorScheme
+            CupertinoSurface(
+                onClick = onClick,
+                shape = CircleShape,
+                color = colors.quaternarySystemFill,
+                contentColor = colors.accent,
+                modifier = modifier.size(40.dp),
+            ) {
+                LocationMarkerArtwork(
+                    tint = colors.accent,
+                    modifier = Modifier.padding(9.dp),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun LocationWeatherContent(
+    placeTitle: String,
+    placeDetail: String,
+    temperatureCelsius: Double?,
+    conditionLabel: String,
+    isLocating: Boolean,
+    cupertino: Boolean,
+) {
+    val accent = if (cupertino) CupertinoTheme.colorScheme.accent else MaterialTheme.colorScheme.primary
+    val primaryText = if (cupertino) CupertinoTheme.colorScheme.label else MaterialTheme.colorScheme.onSurface
+    val secondaryText = if (cupertino) {
+        CupertinoTheme.colorScheme.secondaryLabel
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
             Row(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 LocationMarkerArtwork(
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = accent,
                     modifier = Modifier.size(20.dp),
                 )
                 Column(modifier = Modifier.padding(start = 8.dp).weight(1f)) {
-                    Text(
-                        text = if (isLocating) "$placeTitle · Locating" else placeTitle,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 14.sp,
-                            lineHeight = 17.sp,
-                        ),
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (placeDetail.isNotEmpty()) {
-                        Text(
-                            text = placeDetail,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                lineHeight = 13.sp,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    if (cupertino) {
+                        CupertinoText(
+                            text = if (isLocating) "$placeTitle · Locating" else placeTitle,
+                            style = CupertinoTheme.typography.subhead,
+                            fontWeight = FontWeight.Medium,
+                            color = primaryText,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                    } else {
+                        Text(
+                            text = if (isLocating) "$placeTitle · Locating" else placeTitle,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = 14.sp,
+                                lineHeight = 17.sp,
+                            ),
+                            fontWeight = FontWeight.Medium,
+                            color = primaryText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (placeDetail.isNotEmpty()) {
+                        if (cupertino) {
+                            CupertinoText(
+                                text = placeDetail,
+                                style = CupertinoTheme.typography.footnote,
+                                color = secondaryText,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        } else {
+                            Text(
+                                text = placeDetail,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp,
+                                ),
+                                color = secondaryText,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }
@@ -1890,28 +2175,44 @@ private fun LocationWeatherRow(
                 Icon(
                     imageVector = Icons.Outlined.Thermostat,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = accent,
                     modifier = Modifier.size(20.dp),
                 )
                 Column(
                     modifier = Modifier.padding(start = 6.dp),
                     horizontalAlignment = Alignment.Start,
                 ) {
-                    Text(
-                        text = "${temperatureCelsius.toInt()}\u00B0C",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    if (conditionLabel.isNotEmpty()) {
-                        Text(
-                            text = conditionLabel,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    if (cupertino) {
+                        CupertinoText(
+                            text = "${temperatureCelsius.toInt()}\u00B0C",
+                            style = CupertinoTheme.typography.subhead,
+                            fontWeight = FontWeight.SemiBold,
+                            color = primaryText,
                         )
+                    } else {
+                        Text(
+                            text = "${temperatureCelsius.toInt()}\u00B0C",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = primaryText,
+                        )
+                    }
+                    if (conditionLabel.isNotEmpty()) {
+                        if (cupertino) {
+                            CupertinoText(
+                                text = conditionLabel,
+                                style = CupertinoTheme.typography.footnote,
+                                color = secondaryText,
+                            )
+                        } else {
+                            Text(
+                                text = conditionLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = secondaryText.copy(alpha = 0.8f),
+                            )
+                        }
                     }
                 }
             }
         }
-    }
 }

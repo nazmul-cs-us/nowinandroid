@@ -43,6 +43,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveButton
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSurface
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveTextButton
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
 
 /** One required category the setup screen offers. */
 data class ContentSetupCategory(
@@ -58,6 +62,7 @@ data class ContentSetupCategory(
  * features." Lists each required category with its size, downloads them
  * with an overall progress bar, and hands off to the app when complete.
  */
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 fun ContentSetupScreen(
     categories: List<ContentSetupCategory>,
@@ -69,14 +74,14 @@ fun ContentSetupScreen(
     onRetry: () -> Unit,
     onSkip: () -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    AdaptiveSurface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp, vertical = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Surface(
+            AdaptiveSurface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.size(72.dp),
@@ -106,7 +111,7 @@ fun ContentSetupScreen(
 
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(categories, key = { it.key }) { category ->
-                    Surface(
+                    AdaptiveSurface(
                         shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier.fillMaxWidth(),
@@ -157,19 +162,19 @@ fun ContentSetupScreen(
                     )
                 }
             } else if (error != null) {
-                Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Try again") }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) {
-                    Text("Continue without downloading")
-                }
-            } else {
-                Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-                    Text("Download required content")
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onComplete, modifier = Modifier.fillMaxWidth()) {
-                    Text("Skip for now")
-                }
+                 AdaptiveButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Try again") }
+                 Spacer(Modifier.height(8.dp))
+                 AdaptiveTextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) {
+                     Text("Continue without downloading")
+                 }
+             } else {
+                 AdaptiveButton(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                     Text("Download required content")
+                 }
+                 Spacer(Modifier.height(8.dp))
+                 AdaptiveTextButton(onClick = onComplete, modifier = Modifier.fillMaxWidth()) {
+                     Text("Skip for now")
+                 }
             }
         }
     }

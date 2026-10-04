@@ -70,7 +70,7 @@ class ContextualInsightRecommendationTest {
     }
 
     @Test
-    fun bukhariDayRecommendsPlayableCanonicalBook() {
+    fun bukhariDayRecommendsFeelingBlessedCollectionShuffle() {
         val result = buildContextualInsightRecommendation(
             date = LocalDate.of(2026, 8, 25),
             time = LocalTime.of(17, 30),
@@ -78,17 +78,13 @@ class ContextualInsightRecommendationTest {
             locale = Locale.ENGLISH,
         )
 
-        val target = result.target as ContextualRecommendationTarget.Bukhari
-        assertTrue(target.book.id in listOf(66, 80, 81))
-        assertEquals(
-            target.book.hadithCount,
-            target.book.lastHadithId - target.book.firstHadithId + 1,
-        )
-        assertTrue(result.footerText.startsWith("Sahih al-Bukhari · Book"))
+        assertTrue(result.target is ContextualRecommendationTarget.BukhariCollection)
+        assertTrue(result.title.startsWith("Feeling blessed?"))
+        assertTrue(result.footerText.startsWith("Sahih al-Bukhari"))
     }
 
     @Test
-    fun alternateHadithDayRecommendsPlayableShamayelBook() {
+    fun alternateHadithDayRecommendsShamayelFeelingBlessedCollectionShuffle() {
         val result = buildContextualInsightRecommendation(
             date = LocalDate.of(2026, 8, 4),
             time = LocalTime.of(17, 30),
@@ -96,13 +92,9 @@ class ContextualInsightRecommendationTest {
             locale = Locale.ENGLISH,
         )
 
-        val target = result.target as ContextualRecommendationTarget.Shamayel
-        assertTrue(target.book.id in listOf(35, 36, 48))
-        assertEquals(
-            target.book.hadithCount,
-            target.book.lastHadithId - target.book.firstHadithId + 1,
-        )
-        assertTrue(result.footerText.startsWith("Shama'il At-Tirmidhi · Book"))
+        assertTrue(result.target is ContextualRecommendationTarget.ShamayelCollection)
+        assertTrue(result.title.startsWith("Feeling blessed?"))
+        assertTrue(result.footerText.startsWith("Shama'il At-Tirmidhi"))
     }
 
     @Test

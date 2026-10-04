@@ -405,10 +405,20 @@ private val SURAH_SEARCH_ALIASES = mapOf(
 
 /** Common terms and alternate spellings that differ from the bundled Fortress titles. */
 private val FORTRESS_CHAPTER_SEARCH_ALIASES = mapOf(
+    12 to "salah salat prayer mosque masjid",
+    13 to "salah salat prayer mosque masjid",
+    14 to "salah salat prayer mosque masjid",
     15 to "adhan athan azan call to prayer",
-    17 to "ruku rukoo bowing",
-    19 to "sujud sujood sajda sajdah prostration",
-    22 to "tashahhud attahiyat at-tahiyyat",
+    16 to "salah salat prayer opening beginning",
+    17 to "salah salat prayer ruku rukoo bowing",
+    18 to "salah salat prayer ruku rukoo bowing",
+    19 to "salah salat prayer sujud sujood sajda sajdah prostration",
+    20 to "salah salat prayer sujud sujood sajda sajdah prostration",
+    21 to "salah salat prayer sujud sujood sajda sajdah prostration quran recitation",
+    22 to "salah salat prayer tashahhud attahiyat at-tahiyyat",
+    23 to "salah salat prayer tashahhud prophet blessings salawat",
+    24 to "salah salat prayer tashahhud ending",
+    25 to "salah salat prayer after completion adhkar azkar",
     26 to "istikhara istikhaara guidance decision",
     27 to "adhkar azkar morning evening remembrance",
     28 to "sleep bedtime night",

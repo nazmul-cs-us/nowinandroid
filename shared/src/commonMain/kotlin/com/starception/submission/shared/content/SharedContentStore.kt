@@ -274,6 +274,16 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         store.putString(ONBOARDING_HIDDEN, hidden.toString())
     }
 
+    fun dismissedNudgeIds(date: String): Set<String> =
+        if (store.getString(NUDGE_DISMISSED_DATE) == date) stringSet(NUDGE_DISMISSED_IDS) else emptySet()
+
+    fun dismissNudge(date: String, id: String): Set<String> {
+        val updated = dismissedNudgeIds(date) + id
+        store.putString(NUDGE_DISMISSED_DATE, date)
+        store.putString(NUDGE_DISMISSED_IDS, updated.sorted().joinToString(SEPARATOR))
+        return updated
+    }
+
     fun topicOrder(): List<Int> = store.getString(TOPIC_ORDER).orEmpty()
         .split(SEPARATOR)
         .mapNotNull(String::toIntOrNull)
@@ -393,6 +403,8 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val BOOKMARKED_NEWS_IDS = "shared_bookmarked_news_ids"
         private const val VIEWED_NEWS_IDS = "shared_viewed_news_ids"
         private const val ONBOARDING_HIDDEN = "shared_onboarding_hidden"
+        private const val NUDGE_DISMISSED_DATE = "shared_nudge_dismissed_date"
+        private const val NUDGE_DISMISSED_IDS = "shared_nudge_dismissed_ids"
         private const val QURAN_TRANSLATION_LANGUAGE = "shared_quran_translation_language"
         private const val QURAN_ARABIC_FONT = "shared_quran_arabic_font"
         private const val QURAN_ARABIC_FONT_SIZE = "shared_quran_arabic_font_size"

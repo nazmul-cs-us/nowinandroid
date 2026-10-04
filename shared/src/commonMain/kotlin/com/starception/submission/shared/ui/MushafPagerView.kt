@@ -19,33 +19,30 @@ package com.starception.submission.shared.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.starception.submission.feature.quran.Surah
 import com.starception.submission.shared.quran.AyahNumberChip
 import com.starception.submission.shared.quran.QuranArabicFonts
 import com.starception.submission.shared.quran.QuranVerse
+import com.starception.submission.shared.quran.QURAN_BISMILLAH
 import com.starception.submission.shared.quran.SharedTajweedAnnotation
 import com.starception.submission.shared.quran.SharedTajweedRules
 
@@ -54,18 +51,20 @@ import com.starception.submission.shared.quran.SharedTajweedRules
  *
  * Ayahs group by their Madinah-mushaf page number and render as one
  * HorizontalPager page per mushaf page: a continuous Arabic flow with inline
- * rosette-style ayah markers between verses, the surah header band on the
- * page where the surah starts, and a page/juz footer like the printed mushaf.
+ * rosette-style ayah markers between verses.
  */
 @Composable
 internal fun MushafPagerView(
-    surah: Surah,
     verses: List<QuranVerse>,
     arabicFont: String,
     arabicFontSize: Float,
     showTranslation: Boolean,
     textAlignment: String,
+    showBismillah: Boolean = false,
     tajweedAnnotations: Map<Int, List<SharedTajweedAnnotation>>? = null,
+    openingContent: (@Composable () -> Unit)? = null,
+    requestedPage: Int = 1,
+    onPageChanged: (current: Int, total: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val pages = remember(verses) {
@@ -77,82 +76,64 @@ internal fun MushafPagerView(
     if (pages.isEmpty()) return
     val pagerState = rememberPagerState(pageCount = { pages.size })
 
+    LaunchedEffect(requestedPage, pages.size) {
+        val target = (requestedPage - 1).coerceIn(0, pages.lastIndex)
+        if (target != pagerState.currentPage) pagerState.animateScrollToPage(target)
+    }
+    LaunchedEffect(pagerState.currentPage, pages.size) {
+        onPageChanged(pagerState.currentPage + 1, pages.size)
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.weight(1f),
         ) { index ->
             MushafPageView(
-                surah = surah,
                 page = pages[index],
                 arabicFont = arabicFont,
                 arabicFontSize = arabicFontSize,
                 showTranslation = showTranslation,
                 textAlignment = textAlignment,
+                showBismillah = showBismillah && index == 0,
                 tajweedAnnotations = tajweedAnnotations,
-            )
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val page = pages[pagerState.currentPage]
-            Text(
-                text = "Page ${page.page} · Juz ${page.verses.first().juz}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                openingContent = openingContent.takeIf { index == 0 },
             )
         }
     }
 }
 
-/** One mushaf page: header band on the opening page, flowing ayah text, footer. */
+/** One mushaf page with optional opening information and flowing ayah text. */
 @Composable
 private fun MushafPageView(
-    surah: Surah,
     page: MushafPage,
     arabicFont: String,
     arabicFontSize: Float,
     showTranslation: Boolean,
     textAlignment: String,
+    showBismillah: Boolean,
     tajweedAnnotations: Map<Int, List<SharedTajweedAnnotation>>?,
+    openingContent: (@Composable () -> Unit)?,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
     ) {
-        // The surah header band sits on the page where the surah begins.
-        if (page.verses.first().numberInSurah == 1) {
-            item(key = "header") {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+        if (openingContent != null) {
+            item(key = "album_info") { openingContent() }
+        }
+        if (showBismillah) {
+            item(key = "bismillah") {
+                Text(
+                    text = QURAN_BISMILLAH,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "SURAH ${surah.number}",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = surah.nameArabic,
-                            fontSize = 20.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                    fontSize = (arabicFontSize * 1.3f).sp,
+                    lineHeight = (arabicFontSize * 1.55f).sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
         }
         item(key = "flow") {
@@ -225,7 +206,7 @@ private fun MushafPageFlow(
                 modifier = Modifier.fillMaxWidth(),
                 fontFamily = fontFamily,
                 fontSize = arabicFontSize.sp,
-                lineHeight = (arabicFontSize * 1.7f).sp,
+                lineHeight = (arabicFontSize * 1.55f).sp,
                 textAlign = if (textAlignment == "center") TextAlign.Center else TextAlign.Justify,
                 inlineContent = page.verses.associate { verse ->
                     "$chipIdPrefix${verse.numberInSurah}" to

@@ -77,9 +77,9 @@
         android:hasFragileUserData="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/ic_launcher_horizon"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/ic_launcher_horizon"
         android:supportsRtl="true"
         android:theme="@style/Theme.Nia.Splash">
         <profileable android:shell="true" tools:targetApi="q" />
@@ -92,7 +92,7 @@
             android:theme="@style/Theme.Nia.VideoSplash" />
 
         <!-- Launcher aliases let users switch among the bundled app icons. Exactly one
-             alias is enabled at a time; Royal is the default for new installations. -->
+             alias is enabled at a time; Horizon is the default for new installations. -->
         <activity-alias
             android:name=".launcher.EmeraldLauncherAlias"
             android:enabled="false"
@@ -109,7 +109,7 @@
 
         <activity-alias
             android:name=".launcher.RoyalLauncherAlias"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name"
@@ -137,7 +137,7 @@
 
         <activity-alias
             android:name=".launcher.HorizonLauncherAlias"
-            android:enabled="false"
+            android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_horizon"
             android:label="@string/app_name"

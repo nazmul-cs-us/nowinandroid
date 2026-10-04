@@ -19,6 +19,7 @@ package com.starception.submission.feature.prayertimes
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.res.Configuration
 import android.os.Build
 import android.provider.Settings
@@ -132,6 +133,8 @@ import com.starception.submission.core.designsystem.component.NiaBottomSheetDrag
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaButton
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.QuranFonts
@@ -279,12 +282,12 @@ private fun PermissionPrimerDialog(
             }
         },
         confirmButton = {
-            androidx.compose.material3.Button(onClick = onContinue) {
+            NiaButton(onClick = onContinue) {
                 androidx.compose.material3.Text("Continue")
             }
         },
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
+            NiaTextButton(onClick = onDismiss) {
                 androidx.compose.material3.Text("Not now")
             }
         },
@@ -555,6 +558,8 @@ fun PrayerTimesScreen(
     onFortressDuaClick: (com.starception.submission.core.duadatabase.Dua) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
     onShamayelBookPlayClick: (Int) -> Unit = {},
+    onBukhariFeelingBlessedClick: () -> Unit = {},
+    onShamayelFeelingBlessedClick: () -> Unit = {},
     // Full media-source router for the mini-bar title tap (surah/hadith/dua);
     // when null, falls back to the legacy surah-only behavior.
     onMediaSourceClick: ((com.starception.submission.media.MediaSource) -> Unit)? = null,
@@ -761,6 +766,8 @@ fun PrayerTimesScreen(
         .prayedPrayersToday
         .collectAsStateWithLifecycle()
     val prayedCount = prayedPrayersToday.size
+    val detectedActivity by com.starception.submission.util.ActivityTracker.currentActivity
+        .collectAsStateWithLifecycle()
 
     // Track current time updates for prayer status calculations
     LaunchedEffect(currentTime) {
@@ -798,6 +805,9 @@ fun PrayerTimesScreen(
 
     // COMPASS POPUP STATE - Shows large compass with calibration guidance
     var showCompassPopup by remember { mutableStateOf(false) }
+
+    // ISLAMIC QUIZ STATE - A short citation-backed game from the voice nudge
+    var showIslamicQuiz by remember { mutableStateOf(false) }
 
     // INTERACTIVE PRAYER DIAL POPUP STATE
     var popupDialState by remember { mutableStateOf<String?>(null) } // null means closed, non-null means open with that prayer name
@@ -932,14 +942,14 @@ fun PrayerTimesScreen(
                 )
             },
             confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
+                NiaTextButton(onClick = {
                     repository.markDndPromptShown()
                     showDndDialog = false
                     com.starception.submission.prayer.silent.openDndAccessSettings(screenContext)
                 }) { Text("Allow") }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = {
+                NiaTextButton(onClick = {
                     repository.markDndPromptShown()
                     showDndDialog = false
                 }) { Text("Not now") }
@@ -1225,6 +1235,168 @@ fun PrayerTimesScreen(
         rememberPermissionState(
             permission = Manifest.permission.READ_EXTERNAL_STORAGE,
         )
+    }
+
+    val nudgeDay = LocalDate.now().toString()
+    val nudgePreferences = remember(screenContext) {
+        screenContext.getSharedPreferences("deenly_nudge", Context.MODE_PRIVATE)
+    }
+    var dismissedNudgeIds by remember(nudgeDay) {
+        val storedDay = nudgePreferences.getString("dismissed_day", null)
+        mutableStateOf(
+            if (storedDay == nudgeDay) {
+                nudgePreferences.getStringSet("dismissed_ids", emptySet()).orEmpty().toSet()
+            } else {
+                emptySet()
+            },
+        )
+    }
+    val contextualNudgeRecommendation = remember(
+        nudgeDay,
+        currentTime.hour,
+        contextualDuasByChapter,
+    ) {
+        buildContextualInsightRecommendation(
+            date = LocalDate.now(),
+            time = currentTime,
+            fortressDuasByChapter = contextualDuasByChapter,
+        )
+    }
+    var launchGreetingPending by rememberSaveable { mutableStateOf(true) }
+    val launchGreeting = remember(currentTime.hour) {
+        val timeGreeting = when (currentTime.hour) {
+            in 5..11 -> "Good morning"
+            in 12..17 -> "Good afternoon"
+            else -> "Good evening"
+        }
+        com.starception.submission.core.model.deenly.DeenlyNudge(
+            id = "launch-greeting",
+            action = com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
+            label = "Assalamu alaikum. $timeGreeting",
+        )
+    }
+    val deenlyNudge = remember(
+        prayerTimes,
+        currentTime,
+        prayedPrayersToday,
+        detectedActivity,
+        mediaState.playback.isPlaying,
+        dailyReadingPlayer.isPlaying,
+        locationPermissionState.status,
+        contextualNudgeRecommendation,
+        launchGreetingPending,
+        launchGreeting,
+        dismissedNudgeIds,
+    ) {
+        val times = prayerTimes
+        val currentPrayer = times?.getActualPrayers(currentTime)?.firstOrNull { it.isCurrently }
+        val nextPrayer = times?.getNextPrayer(currentTime)
+        com.starception.submission.core.model.deenly.selectDeenlyNudge(
+            com.starception.submission.core.model.deenly.DeenlyNudgeContext(
+                nowMinute = (currentTime.hour * 60) + currentTime.minute,
+                currentPrayer = currentPrayer?.name,
+                currentPrayerMinute = currentPrayer?.time?.let { (it.hour * 60) + it.minute },
+                nextPrayer = nextPrayer?.name,
+                nextPrayerMinute = nextPrayer?.time?.let { (it.hour * 60) + it.minute },
+                completedPrayers = prayedPrayersToday,
+                activity = when {
+                    detectedActivity.startsWith("Driving", ignoreCase = true) ->
+                        com.starception.submission.core.model.deenly.DeenlyActivity.DRIVING
+                    detectedActivity.startsWith("Praying", ignoreCase = true) ->
+                        com.starception.submission.core.model.deenly.DeenlyActivity.PRAYING
+                    detectedActivity.startsWith("Detect", ignoreCase = true) ||
+                        detectedActivity.startsWith("Initial", ignoreCase = true) ||
+                        detectedActivity.contains("error", ignoreCase = true) ->
+                        com.starception.submission.core.model.deenly.DeenlyActivity.UNKNOWN
+                    else -> com.starception.submission.core.model.deenly.DeenlyActivity.OTHER
+                },
+                isMediaPlaying = mediaState.playback.isPlaying || dailyReadingPlayer.isPlaying,
+                hasVerifiedLocation = locationPermissionState.status is
+                    com.google.accompanist.permissions.PermissionStatus.Granted,
+                hasQuizAvailable = true,
+                launchNudge = launchGreeting.takeIf { launchGreetingPending },
+                fallbackNudges = listOf(
+                    com.starception.submission.core.model.deenly.DeenlyNudge(
+                        id = "contextual-${contextualNudgeRecommendation.target.hashCode()}",
+                        action = com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
+                        label = contextualNudgeRecommendation.title,
+                    ),
+                ),
+                dismissedIds = dismissedNudgeIds,
+            ),
+        )
+    }
+    var completedNudgeId by rememberSaveable { mutableStateOf<String?>(null) }
+    var nudgesDismissedForSession by rememberSaveable { mutableStateOf(false) }
+    val activeNudge = deenlyNudge?.takeUnless {
+        it.id == completedNudgeId || nudgesDismissedForSession
+    }
+
+    fun dismissNudge(id: String) {
+        val updated = dismissedNudgeIds + id
+        dismissedNudgeIds = updated
+        nudgePreferences.edit()
+            .putString("dismissed_day", nudgeDay)
+            .putStringSet("dismissed_ids", updated)
+            .apply()
+    }
+
+    DisposableEffect(activeNudge) {
+        com.starception.submission.ui.search.VoiceAssistantNudgeBus.show(activeNudge)
+        onDispose {
+            com.starception.submission.ui.search.VoiceAssistantNudgeBus.clear(activeNudge?.id)
+        }
+    }
+
+    LaunchedEffect(activeNudge) {
+        val nudge = activeNudge ?: return@LaunchedEffect
+        com.starception.submission.ui.search.VoiceAssistantNudgeBus.actionRequests.collect { requestedId ->
+            if (requestedId != nudge.id) return@collect
+
+            when (nudge.action) {
+                com.starception.submission.core.model.deenly.DeenlyNudgeAction.MARK_PRAYED ->
+                    nudge.prayerName?.let(com.starception.submission.util.PrayerTracker::markPrayerAsPrayed)
+                com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_QIBLA ->
+                    showCompassPopup = true
+            com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_TRAVEL_DUA ->
+                    com.starception.submission.util.ActivityTracker.triggerFullAudioChain()
+                com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_QUIZ ->
+                    com.starception.submission.ui.search.VoiceAssistantNudgeBus.requestQuiz()
+                com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION ->
+                    when (val target = contextualNudgeRecommendation.target) {
+                        is ContextualRecommendationTarget.Surah -> onSurahClick(target.number)
+                        is ContextualRecommendationTarget.FortressDua -> onFortressDuaClick(target.dua)
+                        is ContextualRecommendationTarget.Bukhari -> onBukhariBookPlayClick(target.book.id)
+                        is ContextualRecommendationTarget.Shamayel -> onShamayelBookPlayClick(target.book.id)
+                        ContextualRecommendationTarget.BukhariCollection -> onBukhariFeelingBlessedClick()
+                        ContextualRecommendationTarget.ShamayelCollection -> onShamayelFeelingBlessedClick()
+                    }
+            }
+
+            if (nudge.id == "launch-greeting") {
+                launchGreetingPending = false
+            } else {
+                dismissNudge(nudge.id)
+            }
+            completedNudgeId = nudge.id
+            com.starception.submission.ui.search.VoiceAssistantNudgeBus.clear(nudge.id)
+        }
+    }
+
+    LaunchedEffect(activeNudge) {
+        val nudge = activeNudge ?: return@LaunchedEffect
+        com.starception.submission.ui.search.VoiceAssistantNudgeBus.dismissRequests.collect { id ->
+            if (nudge.id == id) {
+                nudgesDismissedForSession = true
+                if (id == "launch-greeting") {
+                    launchGreetingPending = false
+                } else {
+                    dismissNudge(id)
+                }
+                completedNudgeId = id
+                com.starception.submission.ui.search.VoiceAssistantNudgeBus.clear(id)
+            }
+        }
     }
 
     // Monitor permission changes and re-initialize ActivityTracker
@@ -1539,7 +1711,7 @@ fun PrayerTimesScreen(
         // Per-prayer adhan state for the dial's speaker + volume bar,
         // persisted through the singleton prayer settings repository.
         var adhanEnabled by remember(prayerName) { mutableStateOf(true) }
-        var adhanVolume by remember(prayerName) { mutableStateOf(10) }
+        var adhanVolume by remember(prayerName) { mutableStateOf(5) }
         LaunchedEffect(prayerName) {
             val entryPoint = EntryPointAccessors.fromApplication(
                 screenContext.applicationContext,
@@ -2756,6 +2928,8 @@ fun PrayerTimesScreen(
                                                     onFortressDuaClick = onFortressDuaClick,
                                                     onBukhariBookPlayClick = onBukhariBookPlayClick,
                                                     onShamayelBookPlayClick = onShamayelBookPlayClick,
+                                                    onBukhariFeelingBlessedClick = onBukhariFeelingBlessedClick,
+                                                    onShamayelFeelingBlessedClick = onShamayelFeelingBlessedClick,
                                                     fortressDuasByChapter = contextualDuasByChapter,
                                                     goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                                                     isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
@@ -3029,6 +3203,8 @@ fun PrayerTimesScreen(
                                                 onFortressDuaClick = onFortressDuaClick,
                                                 onBukhariBookPlayClick = onBukhariBookPlayClick,
                                                 onShamayelBookPlayClick = onShamayelBookPlayClick,
+                                                onBukhariFeelingBlessedClick = onBukhariFeelingBlessedClick,
+                                                onShamayelFeelingBlessedClick = onShamayelFeelingBlessedClick,
                                                 fortressDuasByChapter = contextualDuasByChapter,
                                                 goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                                                 isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
@@ -3486,7 +3662,7 @@ fun PrayerTimesScreen(
                                                     .fillMaxWidth()
                                                     .height(locationControlHeight),
                                             ) {
-                                                TextButton(
+                                                NiaTextButton(
                                                     onClick = {
                                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                         // One state starts (or reverses) the prayer-row expansion,
@@ -4029,7 +4205,7 @@ fun PrayerTimesScreen(
                                     }
                                 },
                                 confirmButton = {
-                                    TextButton(
+                                    NiaTextButton(
                                         onClick = {
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                             showLocationServiceDialog = false
@@ -4050,7 +4226,7 @@ fun PrayerTimesScreen(
                                     }
                                 },
                                 dismissButton = {
-                                    TextButton(
+                                    NiaTextButton(
                                         onClick = {
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             showLocationServiceDialog = false
@@ -4225,6 +4401,7 @@ fun PrayerTimesScreen(
                 modifier = Modifier.fillMaxSize(),
             )
         } // Close if (popupDialState != null)
+
     } // Close outer Box
 }
 

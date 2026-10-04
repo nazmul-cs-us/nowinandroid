@@ -19,6 +19,9 @@ packages:
   SherpaOnnx:
     url: https://github.com/k2-fsa/sherpa-onnx
     exactVersion: 1.13.7
+  Swift3D:
+    url: https://github.com/andrewzimmer906/Swift3D
+    from: 1.0.0
 
 
 targets:
@@ -46,6 +49,9 @@ targets:
         buildPhase: resources
         type: file
       - path: Sources/short_adhan_25.caf
+        buildPhase: resources
+        type: file
+      - path: Sources/short_adhan_5.caf
         buildPhase: resources
         type: file
       - path: Sources/travel_dua.caf
@@ -153,7 +159,7 @@ targets:
     info:
       path: Sources/Info.plist
       properties:
-        CFBundleDisplayName: Starception
+        CFBundleDisplayName: Deenly
         CFBundleShortVersionString: "0.1.2"
         CFBundleVersion: "1"
         # Required by Compose Multiplatform, which refuses to start without it:
@@ -210,6 +216,7 @@ targets:
         # iPhone and iPad. Required for "Designed for iPad", which is how this
         # ships to Apple Silicon Macs — there is no separate Mac target.
         TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.0"
         # Device builds use automatic signing when DEVELOPMENT_TEAM is supplied
         # externally. Simulator builds remain unsigned and need no Apple account.
@@ -230,6 +237,8 @@ targets:
     dependencies:
       - package: SherpaOnnx
         product: sherpa-onnx
+      - package: Swift3D
+        product: Swift3D
       - target: PrayerLiveActivityExtension
         embed: true
       - target: PrayerWidgetExtension
@@ -285,10 +294,11 @@ targets:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
+      # NOTE: the group.com.starception.submission app group is stripped for
+      # personal-team dev signing; a paid account restores it by re-adding:
+      #   com.apple.security.application-groups: [group.com.starception.submission]
       path: PrayerWidget/PrayerWidgetExtension.entitlements
-      properties:
-        com.apple.security.application-groups:
-          - group.com.starception.submission
+      properties: {}
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission.PrayerWidget

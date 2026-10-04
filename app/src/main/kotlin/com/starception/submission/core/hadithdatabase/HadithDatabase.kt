@@ -280,7 +280,7 @@ abstract class HadithDatabase : RoomDatabase() {
         private fun hasBundledAsset(context: Context, databaseFile: String): Boolean {
             val assetPath = "$HADITH_DB_PATH$databaseFile"
             return try {
-                context.assets.open(assetPath).use { true }
+                context.assets.open(assetPath).use { it.available() > 0 }
             } catch (_: Exception) {
                 false
             }

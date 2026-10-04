@@ -77,6 +77,8 @@ data class SharedPrayerDay(
     val conditionLabel: String = "",
     /** Current local minute of the day, used to render the active-prayer timeline. */
     val nowMinute: Int = 0,
+    /** Enables Android's Friday-facing Dhuhr label (Jumu'ah). */
+    val isFriday: Boolean = false,
 )
 
 /**
@@ -275,6 +277,7 @@ object PrayerSchedule {
             temperatureCelsius = temperatureCelsius,
             conditionLabel = weatherConditionLabel(weatherCode),
             nowMinute = now.hour * 60 + now.minute,
+            isFriday = isFriday,
         )
     }
 }

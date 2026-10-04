@@ -137,6 +137,54 @@ private class IosSharedNewsRepository : SharedNewsRepository {
             )
         }
 
+    override suspend fun searchNewsByType(
+        query: String,
+        type: String,
+        limit: Int,
+    ): List<SharedNewsResource> = withContext(Dispatchers.Default) {
+        val term = query.trim()
+        if (term.isEmpty() || type.isBlank() || limit <= 0) return@withContext emptyList()
+        val pattern = "%${escapeLikeTerm(term)}%"
+        queryNews(
+            path = databasePath(),
+            sql = """
+                $NEWS_SELECT
+                FROM news_resources n
+                WHERE (n.title LIKE ? ESCAPE '\' OR n.content LIKE ? ESCAPE '\')
+                  AND n.type LIKE ?
+                ORDER BY n.id ASC
+                LIMIT ?
+            """.trimIndent(),
+            arguments = listOf(pattern, pattern, "%$type%", limit),
+        )
+    }
+
+    override suspend fun searchNewsByType(
+        queries: List<String>,
+        type: String,
+        limit: Int,
+    ): List<SharedNewsResource> = withContext(Dispatchers.Default) {
+        val terms = queries.map(String::trim).filter(String::isNotEmpty).distinct()
+        if (terms.isEmpty() || type.isBlank() || limit <= 0) return@withContext emptyList()
+        val patterns = terms.map { "%${escapeLikeTerm(it)}%" }
+        val matchSql = terms.joinToString(" OR ") {
+            "(n.title LIKE ? ESCAPE '\\' OR n.content LIKE ? ESCAPE '\\')"
+        }
+        queryNews(
+            path = databasePath(),
+            sql = """
+                $NEWS_SELECT
+                FROM news_resources n
+                WHERE ($matchSql)
+                  AND n.type LIKE ?
+                ORDER BY CASE WHEN n.title LIKE ? ESCAPE '\' THEN 0 ELSE 1 END, n.id ASC
+                LIMIT ?
+            """.trimIndent(),
+            arguments = patterns.flatMap { listOf(it, it) } +
+                listOf("%$type%", patterns.first(), limit),
+        )
+    }
+
     private suspend fun databasePath(): String {
         databasePathMutex.lock()
         return try {

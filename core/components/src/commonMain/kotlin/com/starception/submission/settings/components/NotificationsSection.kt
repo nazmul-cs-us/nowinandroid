@@ -73,10 +73,15 @@ import androidx.compose.ui.unit.sp
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSwitch
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSlider
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
 
 /**
  * Notifications section with collapsible sub-sections for prayer notification settings.
  */
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 fun NotificationsSection(
     preferences: PrayerNotificationPreferences,
@@ -145,7 +150,7 @@ fun NotificationsSection(
                 )
             },
             trailingContent = {
-                Switch(
+                AdaptiveSwitch(
                     checked = notificationsActive,
                     onCheckedChange = { enabled ->
                         if (enabled) {
@@ -449,7 +454,7 @@ private fun AdhanPlaybackSection(
  * the user drags it. Track and thumb colors morph with springs between the
  * live and disabled states.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalAdaptiveApi::class)
 @Composable
 private fun AdhanVolumeTrack(
     value: Int,
@@ -545,6 +550,7 @@ private fun AdhanVolumeTrack(
     )
 }
 
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 private fun SilentDuringPrayerSection(
     preferences: PrayerNotificationPreferences,
@@ -572,7 +578,7 @@ private fun SilentDuringPrayerSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Switch(
+            AdaptiveSwitch(
                 checked = preferences.silentDuringPrayerEnabled,
                 onCheckedChange = { enabled ->
                     // Persist the requested state before leaving for special-access
@@ -582,7 +588,6 @@ private fun SilentDuringPrayerSection(
                     onPreferencesChanged(preferences.copy(silentDuringPrayerEnabled = enabled))
                     if (enabled && !hasDndAccess) {
                         onOpenDndAccessSettings()
-                        return@Switch
                     }
                 },
             )
@@ -720,64 +725,71 @@ private fun SliderItem(
             maxLines = 1,
         )
 
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { newValue ->
-                val newIntValue = newValue.toInt()
-                // Trigger haptic feedback on each minute change
-                if (newIntValue != previousValue) {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    previousValue = newIntValue
-                }
-                onValueChange(newIntValue)
+        AdaptiveWidget(
+            material = {
+                Slider(
+                    value = value.toFloat(),
+                    onValueChange = { newValue ->
+                        val newIntValue = newValue.toInt()
+                        if (newIntValue != previousValue) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            previousValue = newIntValue
+                        }
+                        onValueChange(newIntValue)
+                    },
+                    valueRange = 0f..maxValue.toFloat(),
+                    modifier = Modifier.weight(1f),
+                    interactionSource = interactionSource,
+                    thumb = {
+                        Box(
+                            modifier = Modifier
+                                .height(28.dp)
+                                .shadow(elevation = 4.dp, shape = RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if (value > 0) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                )
+                                .padding(horizontal = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = if (value == 0) "Off" else "${value}m",
+                                style = MaterialTheme.typography.labelMedium.copy(lineHeight = 14.sp),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = if (value > 0) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    },
+                    colors = SliderDefaults.colors(
+                        activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    ),
+                )
             },
-            valueRange = 0f..maxValue.toFloat(),
-            modifier = Modifier.weight(1f),
-            interactionSource = interactionSource,
-            thumb = {
-                // Custom thumb with value label
-                Box(
-                    modifier = Modifier
-                        .height(28.dp)
-                        .shadow(
-                            elevation = 4.dp,
-                            shape = RoundedCornerShape(14.dp),
-                        )
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            if (value > 0) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerHighest
-                            },
-                        )
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = if (value == 0) "Off" else "${value}m",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            lineHeight = 14.sp,
-                        ),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = if (value > 0) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        textAlign = TextAlign.Center,
-                    )
-                }
+            cupertino = {
+                AdaptiveSlider(
+                    value = value.toFloat(),
+                    onValueChange = { newValue ->
+                        val newIntValue = newValue.toInt()
+                        if (newIntValue != previousValue) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            previousValue = newIntValue
+                        }
+                        onValueChange(newIntValue)
+                    },
+                    valueRange = 0f..maxValue.toFloat(),
+                    modifier = Modifier.weight(1f),
+                )
             },
-            colors = SliderDefaults.colors(
-                activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            ),
         )
     }
 }
 
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 private fun ToggleItem(
     prayerName: String,
@@ -812,7 +824,7 @@ private fun ToggleItem(
                 )
             }
         }
-        Switch(
+        AdaptiveSwitch(
             checked = enabled,
             onCheckedChange = onEnabledChange,
         )

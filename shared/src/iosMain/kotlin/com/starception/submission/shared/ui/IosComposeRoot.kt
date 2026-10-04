@@ -73,6 +73,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.DayOfWeek
@@ -231,10 +232,75 @@ private suspend fun downloadRequiredContent(keys: List<String>) {
     com.starception.submission.shared.assets.ContentDownloadBus.publish(null)
 }
 
+private val iosVoiceSearchRequests = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+private val iosNudgeActionRequests = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(
+    extraBufferCapacity = 1,
+)
+private var currentIosNudgeLabel: String? = null
+private var iosNudgeObserver: ((String?) -> Unit)? = null
+
+@Suppress("FunctionName", "unused")
+fun RequestVoiceSearch(tabIndex: Int) {
+    iosVoiceSearchRequests.value = tabIndex
+}
+
+@Suppress("FunctionName", "unused")
+fun ObserveDeenlyNudge(observer: (String?) -> Unit) {
+    iosNudgeObserver = observer
+    observer(currentIosNudgeLabel)
+}
+
+@Suppress("FunctionName", "unused")
+fun StopObservingDeenlyNudge() {
+    iosNudgeObserver = null
+}
+
+@Suppress("FunctionName", "unused")
+fun RequestDeenlyNudgeAction() {
+    iosNudgeActionRequests.tryEmit(Unit)
+}
+
+private fun publishDeenlyNudge(
+    nudge: com.starception.submission.core.model.deenly.DeenlyNudge?,
+) {
+    currentIosNudgeLabel = nudge?.label
+    iosNudgeObserver?.invoke(currentIosNudgeLabel)
+}
+
 @Suppress("FunctionName")
 fun PrayerTimesViewController(
     sherpaService: IosSherpaService? = null,
     salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService? = null,
+    salah3DService: Salah3DSceneService? = null,
+): UIViewController = createPrayerTimesViewController(
+    sherpaService = sherpaService,
+    salahTfliteService = salahTfliteService,
+    salah3DService = salah3DService,
+    startBottomIndex = 0,
+    onSelectBottom = null,
+)
+
+@Suppress("FunctionName", "unused")
+fun PrayerTimesTabViewController(
+    sherpaService: IosSherpaService? = null,
+    salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService? = null,
+    salah3DService: Salah3DSceneService? = null,
+    startBottomIndex: Int,
+    onSelectBottom: (Int) -> Unit,
+): UIViewController = createPrayerTimesViewController(
+    sherpaService = sherpaService,
+    salahTfliteService = salahTfliteService,
+    salah3DService = salah3DService,
+    startBottomIndex = startBottomIndex,
+    onSelectBottom = onSelectBottom,
+)
+
+private fun createPrayerTimesViewController(
+    sherpaService: IosSherpaService?,
+    salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService?,
+    salah3DService: Salah3DSceneService?,
+    startBottomIndex: Int,
+    onSelectBottom: ((Int) -> Unit)?,
 ): UIViewController = ComposeUIViewController {
     val setupStore = remember { com.starception.submission.shared.content.SharedContentStore() }
     ContentSetupGate(store = setupStore) {
@@ -248,6 +314,16 @@ fun PrayerTimesViewController(
         val coroutineScope = rememberCoroutineScope()
         val startInSettings = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--start-settings" }
+        }
+        val startInSurah = remember {
+            NSProcessInfo.processInfo.arguments
+                .mapNotNull { it as? String }
+                .firstOrNull { it.startsWith("--start-surah=") }
+                ?.substringAfter('=')
+                ?.toIntOrNull()
+        }
+        val nudgePreview = remember {
+            NSProcessInfo.processInfo.arguments.any { it == "--preview-deenly-nudge" }
         }
 
         var location by remember { mutableStateOf(locationStore.location()) }
@@ -589,12 +665,35 @@ fun PrayerTimesViewController(
                 ?: "Unknown"
         }
 
-        MaterialTheme(
-            colorScheme = iosColorScheme(themeSettings.brand, useDarkTheme),
-            typography = sharedTypography(),
+        io.github.alexzhirkevich.cupertino.adaptive.AdaptiveTheme(
+            target = io.github.alexzhirkevich.cupertino.adaptive.Theme.Cupertino,
+            material = {
+                MaterialTheme(
+                    colorScheme = iosColorScheme(themeSettings.brand, useDarkTheme),
+                    typography = sharedTypography(),
+                ) { it() }
+            },
         ) {
+            // Apple's controls show a soft dim under the finger — never
+            // Material's rectangular ripple. The ripple is disabled and every
+            // plain clickable gets the iOS-style circle press instead.
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalRippleConfiguration provides null,
+                androidx.compose.foundation.LocalIndication provides
+                    com.starception.submission.shared.ui.CirclePressIndication,
+                LocalShowBottomNavigation provides (onSelectBottom == null),
+            ) {
             SharedNavHost(
                 startInSettings = startInSettings,
+                startInSurah = startInSurah,
+                startBottomIndex = startBottomIndex,
+                onSelectTopLevel = onSelectBottom,
+                externalVoiceSearchRequests = iosVoiceSearchRequests
+                    .filterNotNull()
+                    .takeIf { onSelectBottom != null },
+                onExternalVoiceSearchHandled = {
+                    iosVoiceSearchRequests.value = null
+                }.takeIf { onSelectBottom != null },
                 latitude = place.latitude,
                 longitude = place.longitude,
                 today = today,
@@ -643,9 +742,25 @@ fun PrayerTimesViewController(
                         onOpenBukhariHadith = actions.onOpenBukhariHadith,
                         onOpenQuranicDua = actions.onOpenQuranicDua,
                         onOpenFortressChapter = actions.onOpenFortressChapter,
+                        onOpenShamayelBook = actions.onOpenShamayelBook,
                         onOpenQibla = actions.onOpenQibla,
+                        onOpenDrivingMode = actions.onOpenDrivingMode,
                         onOpenRecommendation = actions.onOpenRecommendation,
+                        selectedBottomIndex = startBottomIndex,
                         onSelectBottom = actions.onSelectBottom,
+                        hasVerifiedLocation = resolved,
+                        nudgeOverride = if (nudgePreview) {
+                            com.starception.submission.core.model.deenly.DeenlyNudge(
+                                id = "preview-mark-asr",
+                                action = com.starception.submission.core.model.deenly.DeenlyNudgeAction.MARK_PRAYED,
+                                label = "Mark Asr prayed",
+                                prayerName = "Asr",
+                            )
+                        } else {
+                            null
+                        },
+                        onNudgeChanged = ::publishDeenlyNudge,
+                        externalNudgeActionRequests = iosNudgeActionRequests,
                     )
                 },
                 prayerDay = day,
@@ -664,6 +779,7 @@ fun PrayerTimesViewController(
                         }
                     }
                 },
+                salah3DService = salah3DService,
                 settings = { onBack, onOpenSalahTraining ->
                     PrayerSettingsScreen(
                         settings = prayerSettings,
@@ -952,6 +1068,7 @@ fun PrayerTimesViewController(
                 },
             )
         }
+            }
     }
 }
 

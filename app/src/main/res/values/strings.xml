@@ -15,7 +15,7 @@
      limitations under the License.
 -->
 <resources>
-  <string name="app_name">Submission</string>
+  <string name="app_name">Deenly</string>
   <string name="prayer_times_title">Home</string>
   <string name="course_title">Course</string>
   <string name="not_connected">Not connected</string>

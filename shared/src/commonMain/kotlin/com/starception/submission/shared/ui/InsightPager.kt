@@ -18,8 +18,10 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,12 +30,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
@@ -42,16 +48,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,8 +64,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -69,8 +76,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_prayer_background
 import com.starception.submission.core.images.resources.insight_prayer_foreground
@@ -79,23 +88,28 @@ import com.starception.submission.core.images.resources.insight_qibla_foreground
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.images.resources.insight_suggestion
-import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.dailyReading
 import com.starception.submission.feature.quran.subtitle
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.audio.quranAudioUrl
-import com.starception.submission.shared.content.dailyRecommendation
+import com.starception.submission.shared.content.CONTEXTUAL_DUA_CHAPTER_IDS
+import com.starception.submission.shared.content.ContextualRecommendation
+import com.starception.submission.shared.content.createSharedFortressRepository
+import com.starception.submission.shared.content.contextualRecommendation
 import com.starception.submission.shared.qibla.HeadingProvider
 import com.starception.submission.shared.qibla.HeadingReading
-import com.starception.submission.shared.qibla.cardinalDirection
 import com.starception.submission.shared.qibla.qiblaBearing
-import com.starception.submission.shared.qibla.relativeQiblaTurn
 import com.starception.submission.shared.salah.FARD_PRAYERS
 import com.starception.submission.shared.salah.SalahProgress
+import io.github.alexzhirkevich.cupertino.CupertinoSliderNative
+import io.github.alexzhirkevich.cupertino.CupertinoSurface
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.PI
@@ -122,6 +136,9 @@ fun InsightPager(
     onOpenQuran: (Int) -> Unit = {},
     onOpenQibla: () -> Unit = {},
     onOpenRecommendation: () -> Unit = {},
+    onOpenFortressChapter: (Int) -> Unit = {},
+    onOpenBukhariBook: (Int) -> Unit = {},
+    onOpenShamayelBook: (Int) -> Unit = {},
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     tileHeight: Dp = 220.dp,
     fullWidthPage: Boolean = false,
@@ -138,8 +155,42 @@ fun InsightPager(
     val qiblaBearing = remember(latitude, longitude) {
         qiblaBearing(latitude, longitude).roundToInt()
     }
-    val nextPrayerText = day.nextPrayer?.let { "$it in ${day.countdown}" }.orEmpty()
+    val nextPrayerText = day.nextPrayer
+        ?.let { "${day.displayPrayerName(it)} in ${day.countdown}" }
+        .orEmpty()
     var isReadingAudio by remember { mutableStateOf(false) }
+    var fortressInvocations by remember {
+        mutableStateOf<Map<Int, List<com.starception.submission.shared.content.FortressInvocation>>>(emptyMap())
+    }
+    var fortressTitles by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    LaunchedEffect(today) {
+        val repository = createSharedFortressRepository()
+        val invocations = mutableMapOf<Int, List<com.starception.submission.shared.content.FortressInvocation>>()
+        val titles = mutableMapOf<Int, String>()
+        runCatching {
+            repository.getChapters().forEach { chapter ->
+                titles[chapter.id] = chapter.title
+            }
+            CONTEXTUAL_DUA_CHAPTER_IDS.forEach { chapterId ->
+                runCatching {
+                    invocations[chapterId] = repository.getChapterInvocations(chapterId)
+                }
+            }
+        }
+        fortressInvocations = invocations
+        fortressTitles = titles
+    }
+    val currentHour = remember(today) {
+        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).hour
+    }
+    val recommendation = remember(today, currentHour, fortressInvocations, fortressTitles) {
+        contextualRecommendation(
+            date = today,
+            hour = currentHour,
+            fortressInvocationsByChapter = fortressInvocations,
+            chapterTitles = fortressTitles,
+        )
+    }
     val autoAdvanceProgress = remember { Animatable(0f) }
     val headingProvider = remember { HeadingProvider() }
     var heading by remember { mutableStateOf(HeadingReading()) }
@@ -187,7 +238,11 @@ fun InsightPager(
         ) {
             Text(
                 text = "Insights",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = 20.sp,
+                    lineHeight = 24.sp,
+                    letterSpacing = (-0.25).sp,
+                ),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -261,7 +316,8 @@ fun InsightPager(
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(pageWidth),
-                pageSpacing = 12.dp,
+                pageSpacing = 14.dp,
+                contentPadding = PaddingValues(end = if (fullWidthPage) 0.dp else 18.dp),
                 beyondViewportPageCount = 1,
                 modifier = Modifier.fillMaxWidth().height(tileHeight),
             ) { page ->
@@ -307,8 +363,19 @@ fun InsightPager(
                             foregroundScale = 0.88f,
                             foregroundOffsetYFraction = 0.08f,
                             label = "Today's salah",
-                            title = salah.headline,
-                            subtitle = salah.detail,
+                            title = when (salah.completedCount) {
+                                FARD_PRAYERS.size -> "All prayers complete"
+                                1 -> "1 prayer complete"
+                                else -> "${salah.completedCount} prayers complete"
+                            },
+                            subtitle = when {
+                                salah.remainingCount == 0 -> "All five marked for today"
+                                salah.remainingCount == 1 && salah.nextUnprayed != null ->
+                                    "${salah.nextUnprayed} remains today"
+                                salah.nextUnprayed != null ->
+                                    "${salah.remainingCount} remain · ${salah.nextUnprayed} is next"
+                                else -> "${salah.remainingCount} prayers remain today"
+                            },
                             tileHeight = tileHeight,
                         ) {
                             SalahMarkers(
@@ -321,13 +388,10 @@ fun InsightPager(
                         }
 
                         2 -> {
-                            // Android's DailyStatsTile: a surah selector with
-                            // skip buttons, a play control, and a progress
+                            // Android's home reading tile: the day's fixed
+                            // suggestion with a play control and a progress
                             // slider with time labels.
-                            var surahOffset by remember(today) {
-                                mutableStateOf(dailyReading(today).number - 1)
-                            }
-                            val surah = QuranData.surahs[surahOffset.coerceIn(0, QuranData.surahs.size - 1)]
+                            val surah = dailyReading(today)
                             var position by remember { mutableStateOf(0f) }
                             var duration by remember { mutableStateOf(0f) }
                             LaunchedEffect(isReadingAudio) {
@@ -340,13 +404,45 @@ fun InsightPager(
                             ArtworkTile(
                                 artwork = Res.drawable.insight_quran_background,
                                 foreground = Res.drawable.insight_quran_foreground_v2,
-                                foregroundScale = 0.80f,
-                                foregroundOffsetYFraction = 0.10f,
+                                foregroundScale = 0.74f,
+                                foregroundOffsetYFraction = 0.09f,
                                 label = "Today's reading",
                                 title = surah.nameEnglish,
-                                subtitle = surah.subtitle(),
-                                arabicTitle = surah.nameArabic,
+                                subtitle = surah.nameArabic,
+                                footerText = surah.subtitle(),
                                 tileHeight = tileHeight,
+                                topEndContent = {
+                                    CupertinoSurface(
+                                        onClick = {
+                                            if (isReadingAudio) {
+                                                quranPlayer.pause()
+                                                isReadingAudio = false
+                                            } else {
+                                                isReadingAudio = quranPlayer.play(quranAudioUrl(surah.number))
+                                            }
+                                        },
+                                        shape = CircleShape,
+                                        color = Color.Black.copy(alpha = 0.35f),
+                                        contentColor = Color.White,
+                                        modifier = Modifier.size(40.dp),
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = if (isReadingAudio) {
+                                                    Icons.Filled.Pause
+                                                } else {
+                                                    Icons.Filled.PlayArrow
+                                                },
+                                                contentDescription = if (isReadingAudio) {
+                                                    "Pause recitation"
+                                                } else {
+                                                    "Play recitation"
+                                                },
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
+                                    }
+                                },
                                 onClick = {
                                     quranPlayer.stop()
                                     isReadingAudio = false
@@ -359,86 +455,6 @@ fun InsightPager(
                                             .padding(bottom = 10.dp, start = 12.dp, end = 12.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        ) {
-                                            Surface(
-                                                onClick = {
-                                                    quranPlayer.stop()
-                                                    isReadingAudio = false
-                                                    surahOffset = (surahOffset - 1)
-                                                        .mod(QuranData.surahs.size)
-                                                },
-                                                shape = CircleShape,
-                                                color = Color.Black.copy(alpha = 0.38f),
-                                                contentColor = Color.White,
-                                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.SkipPrevious,
-                                                    contentDescription = "Previous surah",
-                                                    modifier = Modifier.size(22.dp).padding(4.dp),
-                                                )
-                                            }
-                                            Surface(
-                                                onClick = {
-                                                    if (isReadingAudio) {
-                                                        quranPlayer.pause()
-                                                        isReadingAudio = false
-                                                    } else {
-                                                        isReadingAudio = quranPlayer.play(quranAudioUrl(surah.number))
-                                                    }
-                                                },
-                                                shape = CircleShape,
-                                                color = Color.Black.copy(alpha = 0.38f),
-                                                contentColor = Color.White,
-                                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                ) {
-                                                    Icon(
-                                                        imageVector = if (isReadingAudio) {
-                                                            Icons.Filled.Pause
-                                                        } else {
-                                                            Icons.Filled.PlayArrow
-                                                        },
-                                                        contentDescription = if (isReadingAudio) {
-                                                            "Pause recitation"
-                                                        } else {
-                                                            "Play recitation"
-                                                        },
-                                                        modifier = Modifier.size(16.dp),
-                                                    )
-                                                    Text(
-                                                        text = if (isReadingAudio) "Pause" else "Listen",
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                    )
-                                                }
-                                            }
-                                            Surface(
-                                                onClick = {
-                                                    quranPlayer.stop()
-                                                    isReadingAudio = false
-                                                    surahOffset = (surahOffset + 1)
-                                                        .mod(QuranData.surahs.size)
-                                                },
-                                                shape = CircleShape,
-                                                color = Color.Black.copy(alpha = 0.38f),
-                                                contentColor = Color.White,
-                                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.SkipNext,
-                                                    contentDescription = "Next surah",
-                                                    modifier = Modifier.size(22.dp).padding(4.dp),
-                                                )
-                                            }
-                                        }
                                         if (isReadingAudio && duration > 0f) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
@@ -449,17 +465,12 @@ fun InsightPager(
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = Color.White,
                                                 )
-                                                androidx.compose.material3.Slider(
+                                                CupertinoSliderNative(
                                                     value = (position / duration).coerceIn(0f, 1f),
                                                     onValueChange = { fraction ->
                                                         position = fraction * duration
                                                         quranPlayer.seekTo(position)
                                                     },
-                                                    colors = androidx.compose.material3.SliderDefaults.colors(
-                                                        thumbColor = Color.White,
-                                                        activeTrackColor = Color.White,
-                                                        inactiveTrackColor = Color.White.copy(alpha = 0.35f),
-                                                    ),
                                                     modifier = Modifier
                                                         .weight(1f)
                                                         .padding(horizontal = 8.dp),
@@ -476,42 +487,99 @@ fun InsightPager(
                             )
                         }
 
-                        3 -> ArtworkTile(
-                            artwork = Res.drawable.insight_qibla_background,
-                            foreground = Res.drawable.insight_qibla_foreground_v2,
-                            foregroundScale = 0.75f,
-                            foregroundOffsetYFraction = 0.10f,
-                            label = "Qibla",
-                            title = "$qiblaBearing° toward Makkah",
-                            subtitle = qiblaGuidance(
-                                qiblaBearing = qiblaBearing,
-                                headingDegrees = heading.headingDegrees,
-                            ),
-                            tileHeight = tileHeight,
-                            onClick = onOpenQibla,
-                            content = {
-                                // Android's compass tiles: a live dial that
-                                // rotates with the device heading while the
-                                // Qibla needle stays fixed at the bearing.
-                                QiblaCompassDial(
-                                    qiblaBearing = qiblaBearing,
-                                    headingDegrees = heading.headingDegrees,
-                                    modifier = Modifier.padding(bottom = 10.dp),
+                        3 -> {
+                            // Android's live directional arrow: the needle holds
+                            // the bearing while the device heading rotates the
+                            // arrow, spring-eased through the shortest angle.
+                            val rawRotation = normalizeBearing(
+                                qiblaBearing - (heading.headingDegrees?.toFloat() ?: 0f),
+                            )
+                            var continuousRotation by remember(qiblaBearing) {
+                                mutableFloatStateOf(rawRotation)
+                            }
+                            LaunchedEffect(rawRotation) {
+                                continuousRotation += shortestBearingDelta(
+                                    continuousRotation,
+                                    rawRotation,
                                 )
-                            },
-                        )
-
-                        else -> {
-                            val recommendation = dailyRecommendation(today)
+                            }
+                            val arrowRotation by animateFloatAsState(
+                                targetValue = continuousRotation,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                                label = "liveQiblaDirection",
+                            )
                             ArtworkTile(
-                                artwork = Res.drawable.insight_suggestion,
-                                label = "AI suggested · ${recommendation.category}",
-                                title = recommendation.title,
-                                subtitle = recommendation.summary,
+                                artwork = Res.drawable.insight_qibla_background,
+                                foreground = Res.drawable.insight_qibla_foreground_v2,
+                                foregroundScale = 0.75f,
+                                foregroundOffsetXFraction = 0.025f,
+                                foregroundOffsetYFraction = 0.11f,
+                                label = "Qibla",
+                                title = "$qiblaBearing° toward Makkah",
+                                subtitle = qiblaCardinalDirection(qiblaBearing),
+                                footerText = "Open the live compass and 3D globe",
                                 tileHeight = tileHeight,
-                                onClick = onOpenRecommendation,
+                                onClick = onOpenQibla,
+                                topEndContent = {
+                                    Box {
+                                         CupertinoSurface(
+                                             onClick = onOpenQibla,
+                                             shape = CircleShape,
+                                             color = Color.Black.copy(alpha = 0.35f),
+                                             contentColor = Color.White,
+                                             modifier = Modifier.size(40.dp),
+                                         ) {
+                                             Box(
+                                                 modifier = Modifier.fillMaxSize(),
+                                                 contentAlignment = Alignment.Center,
+                                             ) {
+                                                 // A navigation-style needle holding the
+                                                 // bearing against the rotating heading.
+                                                 androidx.compose.foundation.Canvas(
+                                                     modifier = Modifier
+                                                         .size(20.dp)
+                                                         .rotate(arrowRotation),
+                                                 ) {
+                                                     val w = size.width
+                                                     val h = size.height
+                                                     val arrow = Path().apply {
+                                                         moveTo(w / 2f, 0f)
+                                                         lineTo(w * 0.92f, h)
+                                                         lineTo(w / 2f, h * 0.78f)
+                                                         lineTo(w * 0.08f, h)
+                                                         close()
+                                                     }
+                                                     drawPath(arrow, Color.White)
+                                                 }
+                                             }
+                                         }
+                                    }
+                                },
                             )
                         }
+
+                        else -> ArtworkTile(
+                            artwork = Res.drawable.insight_suggestion,
+                            label = "AI suggested",
+                            title = recommendation.title,
+                            subtitle = recommendation.supportingText,
+                            footerText = recommendation.footerText,
+                            tileHeight = tileHeight,
+                            onClick = {
+                                when (val target = recommendation.target) {
+                                    is ContextualRecommendation.Target.Surah -> onOpenQuran(target.number)
+                                    is ContextualRecommendation.Target.FortressDua ->
+                                        onOpenFortressChapter(target.chapterId)
+                                    is ContextualRecommendation.Target.Bukhari ->
+                                        onOpenBukhariBook(target.bookId)
+                                    is ContextualRecommendation.Target.Shamayel ->
+                                        onOpenShamayelBook(target.bookId)
+                                }
+                            },
+                        )
                     }
                 }
             }
@@ -519,64 +587,34 @@ fun InsightPager(
     }
 }
 
-/** A rotating Qibla compass dial — the shared counterpart of Android's
- *  QiblaCompass: the dial rotates with the live heading, the Qibla needle
- *  holds the bearing, cardinal letters mark the ring. */
-@Composable
-private fun QiblaCompassDial(
-    qiblaBearing: Int,
-    headingDegrees: Double?,
-    modifier: Modifier = Modifier,
-) {
-    androidx.compose.foundation.layout.Box(
-        modifier = modifier.size(74.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-            val stroke = 1.6.dp.toPx()
-            val ringColor = Color.White.copy(alpha = 0.85f)
-            val needleColor = Color.White
-            drawCircle(ringColor, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
-            val ticks = 12
-            repeat(ticks) { index ->
-                val angle = (index * 360f / ticks - (headingDegrees?.toFloat() ?: 0f)) * PI / 180f
-                val start = Offset(
-                    x = center.x + (size.minDimension / 2 - 6.dp.toPx()) * kotlin.math.sin(angle).toFloat(),
-                    y = center.y - (size.minDimension / 2 - 6.dp.toPx()) * kotlin.math.cos(angle).toFloat(),
-                )
-                val end = Offset(
-                    x = center.x + (size.minDimension / 2 - 2.dp.toPx()) * kotlin.math.sin(angle).toFloat(),
-                    y = center.y - (size.minDimension / 2 - 2.dp.toPx()) * kotlin.math.cos(angle).toFloat(),
-                )
-                drawLine(ringColor.copy(alpha = 0.6f), start, end, strokeWidth = stroke)
-            }
-            // Qibla needle — fixed at the bearing against the rotating dial.
-            val needleAngle = (qiblaBearing - (headingDegrees?.toFloat() ?: 0f)) * PI / 180f
-            val tip = Offset(
-                x = center.x + (size.minDimension / 2 - 10.dp.toPx()) * kotlin.math.sin(needleAngle).toFloat(),
-                y = center.y - (size.minDimension / 2 - 10.dp.toPx()) * kotlin.math.cos(needleAngle).toFloat(),
-            )
-            drawLine(needleColor, center, tip, strokeWidth = 2.4.dp.toPx())
-            drawCircle(needleColor, radius = 2.4.dp.toPx(), center = tip)
-            drawCircle(needleColor, radius = 2.dp.toPx(), center = center)
-        }
-    }
+/** Normalizes an angle into [0, 360). */
+private fun normalizeBearing(value: Float): Float = ((value % 360f) + 360f) % 360f
+
+/** The shortest signed rotation from one bearing to another. */
+private fun shortestBearingDelta(from: Float, to: Float): Float =
+    normalizeBearing(to - from + 180f) - 180f
+
+/** Android's qiblaCardinalDirection: "Northwest from your location". */
+private fun qiblaCardinalDirection(bearing: Int): String {
+    val directions = listOf(
+        "North",
+        "Northeast",
+        "East",
+        "Southeast",
+        "South",
+        "Southwest",
+        "West",
+        "Northwest",
+    )
+    val normalized = ((bearing % 360) + 360) % 360
+    val index = ((normalized + 22.5) / 45.0).toInt() % directions.size
+    return "${directions[index]} from your location"
 }
 
 private fun formatTileSeconds(totalSeconds: Int): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "$minutes:" + if (seconds < 10) "0$seconds" else seconds.toString()
-}
-
-private fun qiblaGuidance(qiblaBearing: Int, headingDegrees: Double?): String {
-    if (headingDegrees == null) return cardinalDirection(qiblaBearing.toDouble())
-    val turn = relativeQiblaTurn(qiblaBearing.toDouble(), headingDegrees)
-    return when {
-        abs(turn) <= 5.0 -> "Aligned with Qibla"
-        turn > 0 -> "Turn right ${turn.roundToInt()}°"
-        else -> "Turn left ${abs(turn).roundToInt()}°"
-    }
 }
 
 /**
@@ -586,29 +624,21 @@ private fun qiblaGuidance(qiblaBearing: Int, headingDegrees: Double?): String {
  * When countdown == "Now" the next prayer has just started; even if [currentPrayer]
  * hasn't been updated yet, treat it as starting so the headline is actionable.
  */
-private fun SharedPrayerDay.heroHeadline(
+internal fun SharedPrayerDay.heroHeadline(
     notifications: PrayerNotificationPreferences,
 ): String {
-    // Treat countdown=="Now" as the prayer just starting, matching Android's behaviour.
-    val effectiveCurrent = currentPrayer
-        ?: if (countdown == "Now") nextPrayer else null
-    if (effectiveCurrent != null) {
-        val slot = slots.firstOrNull { it.isCurrent }
-            ?: slots.firstOrNull { it.name == effectiveCurrent }
-        val elapsed = if (slot != null) {
-            val startMin = slot.hour * 60 + slot.minute
-            (nowMinute - startMin + 1440) % 1440
-        } else {
-            0
-        }
+    val context = heroPrayerContext()
+    if (context != null) {
+        val (effectiveCurrent, elapsed) = context
+        val displayName = displayPrayerName(effectiveCurrent)
         return when {
             elapsed <= notifications.getGoToMosqueDurationForPrayer(effectiveCurrent) ->
-                "Go to Mosque for $effectiveCurrent"
-            elapsed <= 60 -> "Best Time to Pray $effectiveCurrent"
-            else -> "Make Time for $effectiveCurrent"
+                "Go to Mosque for $displayName"
+            elapsed <= 60 -> "Best Time to Pray $displayName"
+            else -> "Make Time for $displayName"
         }
     }
-    return nextPrayer?.let { "Your next prayer is $it" } ?: "Prayer Times"
+    return nextPrayer?.let { "Your next prayer is ${displayPrayerName(it)}" } ?: "Prayer Times"
 }
 
 /**
@@ -617,25 +647,39 @@ private fun SharedPrayerDay.heroHeadline(
  * live countdown rather than spending the card's supporting line on a location
  * that is already visible below the prayer schedule.
  */
-private fun SharedPrayerDay.heroSubtitle(placeName: String): String {
-    val effectiveCurrent = currentPrayer
-        ?: if (countdown == "Now") {
-            nextPrayer
-        } else {
-            return nextPrayer?.let { prayer ->
-                if (countdown.isNotBlank()) "$countdown until $prayer" else placeName
-            } ?: placeName
-        }
-    val slot = slots.firstOrNull { it.isCurrent }
-        ?: slots.firstOrNull { it.name == effectiveCurrent }
-        ?: return placeName
-    val startMin = slot.hour * 60 + slot.minute
-    val elapsed = (nowMinute - startMin + 1440) % 1440
-    if (elapsed <= 0) return placeName
-    val h = elapsed / 60
-    val m = elapsed % 60
-    return if (h > 0) "${h}h ${m}m since $effectiveCurrent" else "${m}m since $effectiveCurrent"
+internal fun SharedPrayerDay.heroSubtitle(placeName: String): String {
+    val context = heroPrayerContext() ?: return nextPrayer?.let { prayer ->
+        if (countdown.isNotBlank()) "$countdown until ${displayPrayerName(prayer)}" else placeName
+    } ?: placeName
+    val (prayer, elapsed) = context
+    val elapsedText = when {
+        elapsed == 0 -> "Just started"
+        elapsed == 1 -> "1 minute"
+        elapsed < 60 -> "$elapsed minutes"
+        elapsed % 60 == 0 -> "${elapsed / 60}h"
+        else -> "${elapsed / 60}h ${elapsed % 60}m"
+    }
+    return "$elapsedText since ${displayPrayerName(prayer)}"
 }
+
+private fun SharedPrayerDay.heroPrayerContext(): Pair<String, Int>? {
+    val effectiveCurrent = currentPrayer ?: if (countdown == "Now") nextPrayer else null
+    if (effectiveCurrent != null) {
+        val slot = slots.firstOrNull { it.isCurrent }
+            ?: slots.firstOrNull { it.name == effectiveCurrent }
+            ?: return effectiveCurrent to 0
+        return effectiveCurrent to ((nowMinute - (slot.hour * 60 + slot.minute) + 1440) % 1440)
+    }
+    val fajr = slots.firstOrNull { it.name == "Fajr" } ?: return null
+    val isha = slots.firstOrNull { it.name == "Isha" } ?: return null
+    val fajrMinute = fajr.hour * 60 + fajr.minute
+    if (nowMinute >= fajrMinute) return null
+    val elapsedSinceIsha = nowMinute + 1440 - (isha.hour * 60 + isha.minute)
+    return if (elapsedSinceIsha in 0..720) "Isha" to elapsedSinceIsha else null
+}
+
+private fun SharedPrayerDay.displayPrayerName(name: String): String =
+    if (isFriday && name == "Dhuhr") "Jumu'ah" else name
 
 private fun SharedPrayerDay.prayerWindowProgress(): Float? {
     val current = currentPrayer?.let { name -> slots.firstOrNull { it.name == name } }
@@ -651,29 +695,39 @@ private fun SharedPrayerDay.prayerWindowProgress(): Float? {
         .coerceIn(0f, 1f)
 }
 
-/** A tile that is artwork with a label chip and a caption over it. */
+/** Cupertino rendering of Android's artwork insight card. */
 @Composable
 private fun ArtworkTile(
     artwork: DrawableResource,
     foreground: DrawableResource? = null,
     foregroundScale: Float = 1f,
+    foregroundOffsetXFraction: Float = 0f,
     foregroundOffsetYFraction: Float = 0f,
     label: String,
     title: String,
     subtitle: String,
     tileHeight: Dp,
     modifier: Modifier = Modifier,
-    arabicTitle: String? = null,
+    footerText: String? = null,
+    topEndContent: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable (() -> Unit)? = null,
 ) {
-    Box(
+    val shape = RoundedCornerShape(26.dp)
+    CupertinoSurface(
         modifier = modifier
             .fillMaxWidth()
-            .height(tileHeight)
-            .clip(RoundedCornerShape(26.dp))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .height(tileHeight),
+        shape = shape,
+        color = Color(0xFF635A56),
+        shadowElevation = 6.dp,
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        ) {
         Image(
             painter = painterResource(artwork),
             contentDescription = null,
@@ -691,62 +745,108 @@ private fun ArtworkTile(
                     .graphicsLayer {
                         scaleX = foregroundScale
                         scaleY = foregroundScale
+                        translationX = size.width * foregroundOffsetXFraction
                         translationY = size.height * foregroundOffsetYFraction
                     },
             )
         }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = 0.25f),
-                            Color.Black.copy(alpha = 0.60f),
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to Color.Transparent,
+                                0.50f to Color.Transparent,
+                                0.72f to Color(0xFF241D19).copy(alpha = 0.12f),
+                                1f to Color(0xFF241D19).copy(alpha = 0.66f),
+                            ),
                         ),
                     ),
-                ),
-        )
-        Box(
-            modifier = Modifier
-                .padding(10.dp)
-                .clip(RoundedCornerShape(50))
-                .background(Color.Black.copy(alpha = 0.35f))
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
             )
+            CupertinoSurface(
+                onClick = onClick ?: {},
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.34f),
+                contentColor = Color.White,
+                modifier = Modifier
+                    .padding(11.dp)
+                    .defaultMinSize(minWidth = 58.dp, minHeight = 40.dp),
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
+            }
+        topEndContent?.let { trailing ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 11.dp, end = 11.dp),
+            ) {
+                trailing()
+            }
         }
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.Bottom,
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(start = 22.dp, end = 22.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             content?.invoke()
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = 17.sp,
+                    lineHeight = 22.sp,
+                    letterSpacing = (-0.2).sp,
+                ),
+                fontWeight = FontWeight.Medium,
                 color = Color.White,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
             )
-            if (arabicTitle != null) {
-                Text(
-                    text = arabicTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.9f),
-                )
-            }
             if (subtitle.isNotEmpty()) {
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 13.sp,
+                        lineHeight = 17.sp,
+                        letterSpacing = 0.sp,
+                    ),
+                    color = Color.White.copy(alpha = 0.88f),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (footerText != null) {
+                Text(
+                    text = footerText,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        letterSpacing = 0.sp,
+                    ),
+                    color = Color.White.copy(alpha = 0.78f),
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         }
     }
 }
@@ -758,56 +858,90 @@ private fun ArtworkTile(
  * it was made — there is no other affordance on the tile to correct one.
  */
 @Composable
-private fun SalahMarkers(
+internal fun SalahMarkers(
     completed: Set<String>,
     available: Set<String>,
     onToggle: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(bottom = 10.dp),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         FARD_PRAYERS.forEach { prayer ->
             val isDone = prayer in completed
             val isAvailable = prayer in available
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(
-                            when {
-                                isDone -> Color.White
-                                isAvailable -> Color.White.copy(alpha = 0.15f)
-                                else -> Color.White.copy(alpha = 0.07f)
-                            },
-                        )
-                        .border(
-                            width = 1.5.dp,
-                            color = Color.White.copy(
-                                alpha = when {
-                                    isDone -> 1f
-                                    isAvailable -> 0.6f
-                                    else -> 0.28f
-                                },
-                            ),
-                            shape = CircleShape,
-                        )
-                        .clickable(enabled = isAvailable) { onToggle(prayer) },
-                    contentAlignment = Alignment.Center,
+            Box(
+                modifier = Modifier
+                    .width(24.dp)
+                    .height(42.dp)
+                    .semantics {
+                        contentDescription = when {
+                            isDone -> "$prayer completed. Tap to unmark"
+                            isAvailable -> "$prayer not completed. Tap to mark"
+                            else -> "$prayer prayer time has not arrived"
+                        }
+                        selected = isDone
+                    }
+                    .clickable(enabled = isAvailable || isDone) { onToggle(prayer) },
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Column(
+                    modifier = Modifier.wrapContentWidth(unbounded = true),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(
+                                color = when {
+                                    isDone -> MaterialTheme.colorScheme.primary
+                                    isAvailable -> Color.Black.copy(alpha = 0.28f)
+                                    else -> Color.Black.copy(alpha = 0.14f)
+                                },
+                                shape = CircleShape,
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = when {
+                                    isDone -> MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                                    isAvailable -> Color.White.copy(alpha = 0.48f)
+                                    else -> Color.White.copy(alpha = 0.24f)
+                                },
+                                shape = CircleShape,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = if (isDone) "✓" else prayer.take(1),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                lineHeight = 11.sp,
+                            ),
+                            color = if (isDone) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                Color.White.copy(alpha = if (isAvailable) 0.78f else 0.38f)
+                            },
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    }
                     Text(
-                        text = prayer.take(1),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        // Dark on the filled state, light on the empty one, so
-                        // the letter stays legible either way.
-                        color = if (isDone) {
-                            Color(0xFF1B3A2A)
-                        } else {
-                            Color.White.copy(alpha = if (isAvailable) 1f else 0.42f)
-                        },
+                        text = prayer,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 8.5.sp,
+                            lineHeight = 9.5.sp,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = Color.White.copy(
+                            alpha = if (isAvailable || isDone) 0.72f else 0.40f,
+                        ),
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +57,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.model.deenly.DeenlyNudge
 
 /** A destination in the floating bar. */
 data class BottomBarItem(
@@ -79,6 +81,8 @@ val SharedBottomBarItems = listOf(
     BottomBarItem("Interests", NiaIcons.Grid3x3, NiaIcons.Grid3x3),
 )
 
+val LocalShowBottomNavigation = staticCompositionLocalOf { true }
+
 /**
  * The floating navigation pill.
  *
@@ -94,6 +98,41 @@ fun FloatingBottomBar(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     onVoiceTap: (() -> Unit)? = null,
+    nudge: DeenlyNudge? = null,
+    onNudgeAction: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    PlatformFloatingBottomBar(
+        items = items,
+        selectedIndex = selectedIndex,
+        onSelect = onSelect,
+        onVoiceTap = onVoiceTap,
+        nudge = nudge,
+        onNudgeAction = onNudgeAction,
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal expect fun PlatformFloatingBottomBar(
+    items: List<BottomBarItem>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    onVoiceTap: (() -> Unit)?,
+    nudge: DeenlyNudge?,
+    onNudgeAction: (() -> Unit)?,
+    modifier: Modifier,
+)
+
+/** Android's floating pill — unchanged. */
+@Composable
+internal fun MaterialFloatingBottomBar(
+    items: List<BottomBarItem>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    onVoiceTap: (() -> Unit)?,
+    nudge: DeenlyNudge?,
+    onNudgeAction: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     var barWidth by remember { mutableStateOf(0) }
@@ -190,35 +229,11 @@ fun FloatingBottomBar(
         }
 
         if (onVoiceTap != null) {
-            Surface(
-                onClick = onVoiceTap,
-                modifier = Modifier
-                    .size(52.dp)
-                    .semantics {
-                        contentDescription = "Voice assistant"
-                        role = Role.Button
-                    },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.onSurface,
-                contentColor = MaterialTheme.colorScheme.surface,
-                shadowElevation = 3.dp,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 13.dp),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    listOf(12.dp, 20.dp, 27.dp, 20.dp, 12.dp).forEach { barHeight ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(barHeight)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surface),
-                        )
-                    }
-                }
-            }
+            VoiceNudgeButton(
+                onVoiceTap = onVoiceTap,
+                nudge = nudge,
+                onNudgeAction = onNudgeAction,
+            )
         }
     }
 }

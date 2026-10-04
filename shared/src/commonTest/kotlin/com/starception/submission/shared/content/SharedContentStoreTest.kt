@@ -151,4 +151,31 @@ class SharedContentStoreTest {
         assertTrue(content.bookmarkedSurahs().isEmpty())
         assertEquals(setOf(80), content.savedBukhariBooks())
     }
+
+    @Test
+    fun readingTypographyRoundTripsForSharedReaders() {
+        val keyValues = InMemoryKeyValueStore()
+        val content = SharedContentStore(keyValues)
+
+        content.saveQuranArabicFont("uthmanic")
+        content.saveQuranArabicFontSize(36f)
+        content.saveQuranTextAlignment("center")
+
+        val restored = SharedContentStore(keyValues)
+        assertEquals("uthmanic", restored.quranArabicFont())
+        assertEquals(36f, restored.quranArabicFontSize())
+        assertEquals("center", restored.quranTextAlignment())
+    }
+
+    @Test
+    fun nudgeDismissalsPersistOnlyForTheirDay() {
+        val keyValues = InMemoryKeyValueStore()
+        val content = SharedContentStore(keyValues)
+
+        content.dismissNudge("2026-10-02", "mark-asr")
+
+        val restored = SharedContentStore(keyValues)
+        assertEquals(setOf("mark-asr"), restored.dismissedNudgeIds("2026-10-02"))
+        assertTrue(restored.dismissedNudgeIds("2026-10-03").isEmpty())
+    }
 }

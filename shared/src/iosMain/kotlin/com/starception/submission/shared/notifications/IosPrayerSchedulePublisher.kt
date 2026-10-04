@@ -129,5 +129,5 @@ private data class IosPrayerEntry(
     // Per-prayer adhan toggle: the prayer-time notification plays the bundled
     // adhan audio instead of the default sound.
     val adhanEnabled: Boolean = false,
-    val adhanVolume: Int = 10,
+    val adhanVolume: Int = 5,
 )

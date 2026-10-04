@@ -64,7 +64,12 @@ import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
+import io.github.alexzhirkevich.cupertino.CupertinoSurface
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
+import io.github.alexzhirkevich.cupertino.theme.CupertinoTheme
 
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 fun SettingsSection(
     title: String,
@@ -86,7 +91,7 @@ fun SettingsSection(
         label = "chevronRotation",
     )
 
-    Card(
+    AdaptiveSettingsCard(
         modifier = modifier
             .fillMaxWidth()
             .shadow(
@@ -95,36 +100,14 @@ fun SettingsSection(
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                 spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
             ),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isExpanded) {
-                MaterialTheme.colorScheme.surface
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerLow
-            },
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (isExpanded) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
-            },
-        ),
+        isExpanded = isExpanded,
     ) {
         Column {
             // Header - clickable to expand/collapse
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = ripple(
-                            bounded = true,
-                            color = MaterialTheme.colorScheme.primary,
-                        ),
-                        onClick = onToggleExpanded,
-                    )
+                    .clickable(onClick = onToggleExpanded)
                     .padding(horizontal = 14.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -255,4 +238,50 @@ fun SettingsSection(
             }
         }
     }
+}
+
+@OptIn(ExperimentalAdaptiveApi::class)
+@Composable
+private fun AdaptiveSettingsCard(
+    modifier: Modifier,
+    isExpanded: Boolean,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    AdaptiveWidget(
+        material = {
+            Card(
+                modifier = modifier,
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isExpanded) {
+                        MaterialTheme.colorScheme.surface
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerLow
+                    },
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    if (isExpanded) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
+                    },
+                ),
+                content = content,
+            )
+        },
+        cupertino = {
+            CupertinoSurface(
+                modifier = modifier,
+                shape = RoundedCornerShape(20.dp),
+                color = if (isExpanded) {
+                    CupertinoTheme.colorScheme.secondarySystemGroupedBackground
+                } else {
+                    CupertinoTheme.colorScheme.tertiarySystemGroupedBackground
+                },
+            ) {
+                Column(Modifier.fillMaxWidth(), content = content)
+            }
+        },
+    )
 }

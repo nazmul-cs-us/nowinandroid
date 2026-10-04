@@ -60,7 +60,7 @@ private class IosSharedDuaRepository : SharedDuaRepository {
     private suspend fun readDuas(): List<SharedQuranicDua> {
         val databasePath = resolveDatabaseAsset(
             bundledPath = NSBundle.mainBundle.pathForResource("quranic_duas", ofType = "db"),
-            remotePath = "databases/quran/quranic_duas.db",
+            remotePath = "databases/quranic_duas.db",
             cacheName = "quranic_duas.db",
         )
         return memScoped {
@@ -127,7 +127,7 @@ private class IosSharedDuaRepository : SharedDuaRepository {
     private suspend fun readSearch(term: String, limit: Int): List<SharedQuranicDua> {
         val databasePath = resolveDatabaseAsset(
             bundledPath = NSBundle.mainBundle.pathForResource("quranic_duas", ofType = "db"),
-            remotePath = "databases/quran/quranic_duas.db",
+            remotePath = "databases/quranic_duas.db",
             cacheName = "quranic_duas.db",
         )
         return memScoped {

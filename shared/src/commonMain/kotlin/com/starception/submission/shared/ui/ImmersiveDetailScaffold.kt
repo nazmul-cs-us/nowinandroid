@@ -49,9 +49,12 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSurface
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
 
 /**
  * Immersive detail scaffold matching the Android app's album-header pages
@@ -59,10 +62,12 @@ import androidx.compose.ui.unit.dp
  * artwork with a scrim gradient, floating circular back button, content
  * below — no plain text header.
  */
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 internal fun ImmersiveDetailScaffold(
     onBack: () -> Unit,
     maxContentWidth: Dp = 720.dp,
+    contentHorizontalPadding: Dp = 16.dp,
     collapsibleHeader: Boolean = false,
     header: @Composable () -> Unit,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
@@ -90,10 +95,7 @@ internal fun ImmersiveDetailScaffold(
             }
         }
     }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxSize(),
-    ) {
+    AdaptiveSurface(modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -136,7 +138,7 @@ internal fun ImmersiveDetailScaffold(
                                 WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
                             ),
                         )
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = contentHorizontalPadding)
                         .padding(top = 12.dp),
                 ) {
                     content()
@@ -187,6 +189,7 @@ internal fun ImmersiveDetailHeaderScrim(
             Text(
                 text = arabicTitle,
                 style = MaterialTheme.typography.headlineMedium,
+                fontFamily = FontFamily.Default,
                 color = MaterialTheme.colorScheme.primary,
                 // The toolbar owns the top-right corner and the Latin title
                 // owns the bottom edge. The middle-right position keeps this

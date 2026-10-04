@@ -154,7 +154,7 @@ data class PrayerNotificationPreferences(
     // ADHAN PLAYBACK VOLUME - 0 (silent) to 100 (full), applied to the adhan
     // player independently of the device's notification volume. This is the
     // master volume; per-prayer values below override it for that prayer.
-    val adhanVolume: Int = 10,
+    val adhanVolume: Int = 5,
 
     // PER-PRAYER ADHAN VOLUME - overrides [adhanVolume] for that prayer;
     // null means "follow the master volume".

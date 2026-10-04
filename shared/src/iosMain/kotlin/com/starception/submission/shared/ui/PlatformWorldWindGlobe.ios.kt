@@ -110,14 +110,19 @@ private fun worldWindHtml(
     html, body { margin:0; width:100%; height:100%; overflow:hidden; background:transparent; }
     #shell { position:relative; width:100%; height:100%; overflow:hidden; border-radius:50%;
       background:#07121d; }
-    #globe { display:block; width:100%; height:100%; touch-action:none; background:#07121d;
-      border-radius:50%; }
+    #globe { position:absolute; inset:0; z-index:1; display:block; width:100%; height:100%;
+      touch-action:none; background:#07121d; border-radius:50%; }
     #status { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
       padding:20px; color:#dce8f2; background:#07121d; font:600 14px -apple-system,sans-serif;
-      text-align:center; }
-    #overlay { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
-    #heading-cone { transform-origin:150px var(--user-y); transition:transform 90ms linear; }
+      text-align:center; z-index:4; }
+    #overlay { position:absolute; inset:0; z-index:3; display:block; width:100%; height:100%;
+      pointer-events:none; overflow:visible; }
+    #heading-cone { transform-box:view-box; transform-origin:150px var(--user-y);
+      transition:transform 90ms linear, opacity 180ms ease; }
+    #user-dot { transform-box:fill-box; transform-origin:center; animation:radar-pulse 1.1s ease-in-out infinite alternate; }
+    #kaaba-marker { filter:drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
     #accuracy-ring { transition:stroke 240ms ease, filter 240ms ease; }
+    @keyframes radar-pulse { from { transform:scale(.85); } to { transform:scale(1); } }
   </style>
   <script src="$WORLDWIND_SCRIPT"></script>
 </head>
@@ -126,14 +131,21 @@ private fun worldWindHtml(
     <canvas id="globe">WorldWind globe</canvas>
     <svg id="overlay" viewBox="0 0 300 300" aria-hidden="true">
       <defs>
-        <linearGradient id="cone-gradient" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" stop-color="#10b981" stop-opacity=".62"/>
-          <stop offset="1" stop-color="#10b981" stop-opacity="0"/>
+        <linearGradient id="cone-gradient" gradientUnits="userSpaceOnUse" x1="150" y1="260" x2="150" y2="80">
+          <stop offset="0" stop-color="#10b981" stop-opacity=".88"/>
+          <stop offset=".42" stop-color="#10b981" stop-opacity=".48"/>
+          <stop offset="1" stop-color="#10b981" stop-opacity=".06"/>
         </linearGradient>
       </defs>
       <path id="heading-cone" fill="url(#cone-gradient)"/>
       <circle id="user-ring" fill="white"/>
       <circle id="user-dot" fill="#10b981"/>
+      <g id="kaaba-marker">
+        <circle r="19" fill="white" fill-opacity=".96"/>
+        <rect x="-12" y="-12" width="24" height="24" rx="2" fill="#101010"/>
+        <rect x="-12" y="-4" width="24" height="4" fill="#d4af37"/>
+        <rect x="3" y="5" width="5" height="7" rx="1" fill="#b99028"/>
+      </g>
       <circle id="accuracy-ring" cx="150" cy="150" r="144" fill="none" stroke="white"
         stroke-width="8" opacity=".94"/>
     </svg>
@@ -167,26 +179,6 @@ private fun worldWindHtml(
       route.pathType = WorldWind.GREAT_CIRCLE;
       routeLayer.addRenderable(route);
 
-      function marker(lat, lon, color, label) {
-        const attributes = new WorldWind.PlacemarkAttributes(null);
-        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">' +
-          '<circle cx="24" cy="24" r="18" fill="' + color + '" stroke="white" stroke-width="4"/>' +
-          '<circle cx="24" cy="24" r="5" fill="white"/></svg>';
-        attributes.imageSource = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-        attributes.imageScale = 0.72;
-        attributes.labelAttributes.color = WorldWind.Color.WHITE;
-        attributes.labelAttributes.offset = new WorldWind.Offset(
-          WorldWind.OFFSET_FRACTION, 0.5, WorldWind.OFFSET_FRACTION, -0.45
-        );
-        const placemark = new WorldWind.Placemark(
-          new WorldWind.Position(lat, lon, 0), false, attributes
-        );
-        placemark.label = label;
-        placemark.altitudeMode = WorldWind.CLAMP_TO_GROUND;
-        routeLayer.addRenderable(placemark);
-      }
-
-      marker(makkahLat, makkahLon, '#e2b94f', 'Kaaba');
       wwd.addLayer(routeLayer);
 
       const toRadians = value => value * Math.PI / 180;
@@ -222,30 +214,53 @@ private fun worldWindHtml(
           Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
         )) + 360) % 360;
       }
-      const dLat = toRadians(makkahLat - userLat);
-      const dLon = toRadians(makkahLon - userLon);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(userLat)) *
-        Math.cos(toRadians(makkahLat)) * Math.sin(dLon / 2) ** 2;
-      const distanceMeters = 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const earthRadius = 6378137;
+      const distanceRadians = angularDistance(userLat, userLon, makkahLat, makkahLon);
+      const distanceMeters = distanceRadians * earthRadius;
       const routeMidpoint = midpoint(userLat, userLon, makkahLat, makkahLon);
       const cameraHeading = bearingBetween(
         routeMidpoint.latitude, routeMidpoint.longitude, makkahLat, makkahLon
       );
+      // Match Android QiblaGlobeView: frame both geographic markers around the
+      // great-circle midpoint and pull back in proportion to their distance.
+      // Web WorldWind's navigator range produces a wider view than the native
+      // engine for the same Earth-radius multiple, so convert the native range
+      // before applying it to keep the globe and markers on-screen.
+      const baseRange = distanceMeters * 1.8;
+      const minimumRange = earthRadius * 2.05;
+      const maximumRange = earthRadius * 5.0;
+      const nativeEquivalentRange = Math.min(
+        maximumRange,
+        Math.max(minimumRange, baseRange)
+      );
+      const cameraRange = Math.max(
+        earthRadius * 1.8,
+        nativeEquivalentRange * 0.55
+      );
       wwd.navigator.lookAtLocation.latitude = routeMidpoint.latitude;
       wwd.navigator.lookAtLocation.longitude = routeMidpoint.longitude;
-      wwd.navigator.range = 6378137 * 2.0;
+      wwd.navigator.range = cameraRange;
       wwd.navigator.heading = cameraHeading;
       wwd.navigator.tilt = 0;
 
-      const halfAngle = angularDistance(userLat, userLon, makkahLat, makkahLon) / 2;
+      const halfAngle = distanceRadians / 2;
       const focalLength = 1 / Math.tan(toRadians(22.5));
-      const normalizedOffset = Math.sin(halfAngle) * focalLength / (2.0 + Math.cos(halfAngle));
+      const rangeMultiplier = cameraRange / earthRadius;
+      // Keep the SVG compass markers over the rendered Earth. Web WorldWind's
+      // canvas projection leaves a wider dark margin than the native Android
+      // globe, so the raw perspective offset would place both markers outside
+      // the visible land/ocean sphere.
+      const normalizedOffset = Math.min(0.55,
+        Math.sin(halfAngle) * focalLength /
+          (rangeMultiplier + Math.cos(halfAngle)));
       const userY = 150 + normalizedOffset * 150;
+      const kaabaY = 150 - normalizedOffset * 150;
       const coneLength = 112;
       const coneHalfWidth = 58;
       const cone = document.getElementById('heading-cone');
       const userRing = document.getElementById('user-ring');
       const userDot = document.getElementById('user-dot');
+      const kaabaMarker = document.getElementById('kaaba-marker');
       const accuracyRing = document.getElementById('accuracy-ring');
       cone.setAttribute('d', 'M 150 ' + userY + ' L ' + (150 - coneHalfWidth) + ' ' +
         (userY - coneLength) + ' Q 150 ' + (userY - coneLength - 18) + ' ' +
@@ -257,12 +272,13 @@ private fun worldWindHtml(
       userDot.setAttribute('cx', '150');
       userDot.setAttribute('cy', String(userY));
       userDot.setAttribute('r', '7');
+      kaabaMarker.setAttribute('transform', 'translate(150 ' + kaabaY + ')');
 
       window.updateCompassHeading = function (heading, accuracy) {
         const hasHeading = heading !== null && Number.isFinite(heading);
-        const relative = hasHeading ? heading - qiblaBearing : 0;
+        const relative = hasHeading ? heading - cameraHeading : 0;
         cone.style.transform = 'rotate(' + relative + 'deg)';
-        cone.style.opacity = hasHeading ? '1' : '.38';
+        cone.style.opacity = hasHeading ? '1' : '.72';
         const color = accuracy === null ? '#ffffff' :
           accuracy <= 10 ? '#10b981' : accuracy <= 25 ? '#ffa500' : '#ff4444';
         accuracyRing.setAttribute('stroke', color);

@@ -26,6 +26,11 @@ data class QuranVerse(
     val translation: String = "",
 )
 
+data class QuranSurahMetadata(
+    val nameTranslation: String,
+    val totalVerses: Int,
+)
+
 interface QuranVerseRepository {
     suspend fun getVersesBySurah(surahNumber: Int): List<QuranVerse> =
         getVersesBySurah(surahNumber, QuranTranslationLanguage.English)
@@ -34,6 +39,8 @@ interface QuranVerseRepository {
         surahNumber: Int,
         language: QuranTranslationLanguage,
     ): List<QuranVerse>
+
+    suspend fun getSurahMetadata(surahNumber: Int): QuranSurahMetadata? = null
 
     /** Full-text ayah search (Arabic), for the app-level search suggestions. */
     suspend fun searchAyahs(query: String, limit: Int = 12): List<QuranVerse> = emptyList()
@@ -73,6 +80,18 @@ enum class QuranTranslationLanguage(
 private val ArabicMarks = Regex("[\\u0640\\u064B-\\u065F\\u0670\\u06D6-\\u06ED]")
 
 internal fun cleanQuranText(text: String): String = text.trim().removePrefix("\uFEFF")
+
+internal const val QURAN_BISMILLAH = "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ"
+
+private val BismillahPrefix = Regex(
+    "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*[اٱ]لل[َّ]*ه[ِ]*\\s*[اٱ]لر[َّ]*ح[ْۡ]*م[َٰـ]*ن[ِ]*\\s*[اٱ]لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
+)
+
+internal fun hasLeadingBismillah(text: String): Boolean =
+    BismillahPrefix.containsMatchIn(cleanQuranText(text))
+
+internal fun removeLeadingBismillah(text: String): String =
+    BismillahPrefix.replaceFirst(cleanQuranText(text), "").trim()
 
 internal fun filterQuranVerses(
     verses: List<QuranVerse>,

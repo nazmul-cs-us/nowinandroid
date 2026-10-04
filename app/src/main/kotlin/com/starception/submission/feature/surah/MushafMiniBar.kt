@@ -37,7 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +56,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.ui.MiniBarShell
 
 /**
@@ -122,7 +122,7 @@ fun MushafMiniBar(
                 )
             },
             confirmButton = {
-                TextButton(
+                NiaTextButton(
                     enabled = pageInputIsValid,
                     onClick = {
                         requestedPage?.let(onJumpToPage)
@@ -133,7 +133,7 @@ fun MushafMiniBar(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showPageJump = false }) {
+                NiaTextButton(onClick = { showPageJump = false }) {
                     Text("Cancel")
                 }
             },

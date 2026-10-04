@@ -58,7 +58,7 @@ object SharedTranslationService {
 
     suspend fun translateFromEnglish(text: String, targetLang: String, provider: String): String {
         if (targetLang == "en" || text.isBlank()) return text
-        val cacheKey = "$targetLang|${text.hashCode()}"
+        val cacheKey = "$provider|$targetLang|${text.hashCode()}"
         cache[cacheKey]?.let { return it }
         val translated = when (provider) {
             PROVIDER_GOOGLE -> translateWithGoogle(text, targetLang)

@@ -23,6 +23,15 @@ import org.junit.Test
 class AdhanPlaybackVolumeTest {
 
     @Test
+    fun allPrayersDefaultToFivePercentVolume() {
+        val preferences = PrayerNotificationPreferences()
+
+        listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha").forEach { prayer ->
+            assertEquals(5, preferences.getAdhanVolumeForPrayer(prayer))
+        }
+    }
+
+    @Test
     fun playerGainUsesQuietPerceptualCurveAndClampsInput() {
         assertEquals(0f, adhanPlayerGain(-20), 0.000001f)
         assertEquals(0f, adhanPlayerGain(0), 0.000001f)

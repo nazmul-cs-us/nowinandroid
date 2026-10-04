@@ -58,7 +58,9 @@ import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaButton
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
@@ -2008,7 +2010,7 @@ private fun SectionTitle(
             color = if (isDarkTheme) MaterialTheme.colorScheme.onBackground else CourseInk,
         )
         if (onActionClick != null) {
-            TextButton(
+            NiaTextButton(
                 onClick = onActionClick,
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             ) {
@@ -3387,7 +3389,7 @@ private fun CourseBigTile(
                 )
             },
             confirmButton = {
-                Button(
+                NiaButton(
                     onClick = {
                         showUnenrollConfirmation = false
                         onUnenroll()
@@ -3401,7 +3403,7 @@ private fun CourseBigTile(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showUnenrollConfirmation = false }) {
+                NiaTextButton(onClick = { showUnenrollConfirmation = false }) {
                     Text("Keep course")
                 }
             },

@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.ml.SalahPosture
 import java.io.File
@@ -647,7 +648,7 @@ private fun DataQualityCard(
                         }
                     }
 
-                    TextButton(onClick = onAnalyze) { Text("Re-analyze") }
+                    NiaTextButton(onClick = onAnalyze) { Text("Re-analyze") }
                 }
             }
         }

@@ -48,8 +48,14 @@ struct iOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ComposePrayerTimesView()
-                .ignoresSafeArea(.container)
+            Group {
+                if #available(iOS 26.0, *) {
+                    NativePrayerTabsView()
+                } else {
+                    ComposePrayerTimesView()
+                        .ignoresSafeArea(.container)
+                }
+            }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
                         PrayerNotificationCoordinator.shared.refresh()

@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -56,6 +57,7 @@ fun NiaButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
     content: @Composable RowScope.() -> Unit,
 ) {
     NiaOutlinedButton(
@@ -63,6 +65,7 @@ fun NiaButton(
         modifier = modifier,
         enabled = enabled,
         contentPadding = contentPadding,
+        colors = colors,
         content = content,
     )
 }
@@ -82,6 +85,7 @@ fun NiaButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
     text: @Composable () -> Unit,
     leadingIcon: @Composable (() -> Unit)? = null,
 ) {
@@ -89,6 +93,7 @@ fun NiaButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        colors = colors,
         contentPadding = if (leadingIcon != null) {
             ButtonDefaults.ButtonWithIconContentPadding
         } else {
@@ -119,6 +124,7 @@ fun NiaOutlinedButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
     content: @Composable RowScope.() -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -140,7 +146,7 @@ fun NiaOutlinedButton(
         enabled = enabled,
         shape = RoundedCornerShape(cornerRadius),
         interactionSource = interactionSource,
-        colors = ButtonDefaults.outlinedButtonColors(),
+        colors = colors,
         border = BorderStroke(
             width = NiaButtonDefaults.OutlinedButtonBorderWidth,
             color = if (enabled) {
@@ -171,6 +177,7 @@ fun NiaOutlinedButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
     text: @Composable () -> Unit,
     leadingIcon: @Composable (() -> Unit)? = null,
 ) {
@@ -178,6 +185,7 @@ fun NiaOutlinedButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        colors = colors,
         contentPadding = if (leadingIcon != null) {
             ButtonDefaults.ButtonWithIconContentPadding
         } else {
@@ -205,15 +213,18 @@ fun NiaTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    contentPadding: PaddingValues = ButtonDefaults.TextButtonContentPadding,
+    colors: ButtonColors = ButtonDefaults.textButtonColors(
+        contentColor = MaterialTheme.colorScheme.onBackground,
+    ),
     content: @Composable RowScope.() -> Unit,
 ) {
     TextButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
-        colors = ButtonDefaults.textButtonColors(
-            contentColor = MaterialTheme.colorScheme.onBackground,
-        ),
+        contentPadding = contentPadding,
+        colors = colors,
         content = content,
     )
 }
@@ -233,6 +244,10 @@ fun NiaTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    contentPadding: PaddingValues = ButtonDefaults.TextButtonContentPadding,
+    colors: ButtonColors = ButtonDefaults.textButtonColors(
+        contentColor = MaterialTheme.colorScheme.onBackground,
+    ),
     text: @Composable () -> Unit,
     leadingIcon: @Composable (() -> Unit)? = null,
 ) {
@@ -240,6 +255,8 @@ fun NiaTextButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        contentPadding = contentPadding,
+        colors = colors,
     ) {
         NiaButtonContent(
             text = text,

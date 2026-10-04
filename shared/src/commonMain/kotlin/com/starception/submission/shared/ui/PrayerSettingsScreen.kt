@@ -61,6 +61,8 @@ import com.starception.submission.settings.components.SalahTrainingSection
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
 import com.starception.submission.shared.settings.VoiceRecognitionMode
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSurface
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
 import org.jetbrains.compose.resources.painterResource
 import com.starception.submission.core.images.resources.Res as ImageRes
 
@@ -75,6 +77,7 @@ import com.starception.submission.core.images.resources.Res as ImageRes
  * than none — it looks authoritative while disagreeing about what the app does.
  *
  */
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 fun PrayerSettingsScreen(
     settings: PrayerSettings,
@@ -99,9 +102,8 @@ fun PrayerSettingsScreen(
     // One section open at a time, as on Android: the sections are long enough
     // that several open at once buries the one being read.
     var expanded by remember { mutableStateOf<String?>(SECTION_APPEARANCE) }
-    Surface(
+    AdaptiveSurface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
     ) {
         Box(
             modifier = Modifier.fillMaxSize().safeDrawingPadding(),

@@ -47,7 +47,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
@@ -79,6 +78,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.component.NiaButton
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -515,29 +515,17 @@ private fun LazyListScope.hadithBookBrowser(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Button(
+                    NiaButton(
                         onClick = { onCollectionPlayClick(false) },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(
-                            topStart = 20.dp,
-                            topEnd = 20.dp,
-                            bottomEnd = 8.dp,
-                            bottomStart = 20.dp,
-                        ),
                     ) {
                         FlaticonPlayIcon(contentDescription = null, iconSize = 20.dp)
                         Spacer(Modifier.width(8.dp))
                         Text("Play all")
                     }
-                    Button(
+                    NiaButton(
                         onClick = { onCollectionPlayClick(true) },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(
-                            topStart = 20.dp,
-                            topEnd = 20.dp,
-                            bottomEnd = 8.dp,
-                            bottomStart = 20.dp,
-                        ),
                     ) {
                         Text("Feeling blessed")
                     }

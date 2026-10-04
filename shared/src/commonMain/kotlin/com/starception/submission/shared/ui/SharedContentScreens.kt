@@ -22,7 +22,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,9 +40,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -57,7 +62,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -80,20 +89,27 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -101,8 +117,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -141,8 +159,10 @@ import com.starception.submission.shared.quran.QuranTranslationLanguage
 import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.SharedTajweedAnnotation
 import com.starception.submission.shared.quran.createQuranVerseRepository
+import com.starception.submission.shared.quran.hasLeadingBismillah
+import com.starception.submission.shared.quran.QURAN_BISMILLAH
+import com.starception.submission.shared.quran.removeLeadingBismillah
 import com.starception.submission.shared.quran.createSharedTajweedRepository
-import com.starception.submission.shared.quran.filterQuranVerses
 import com.starception.submission.shared.quran.metadataLabel
 import com.starception.submission.shared.quran.tajweedAnnotatedString
 import com.starception.submission.shared.translation.SharedTranslationService
@@ -154,6 +174,13 @@ import kotlin.math.roundToInt
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import io.github.alexzhirkevich.cupertino.CupertinoNavigateBackButton
+import io.github.alexzhirkevich.cupertino.CupertinoSurface
+import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSurface
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
+import io.github.alexzhirkevich.cupertino.theme.CupertinoTheme
 
 internal data class CourseLesson(val number: Int, val title: String, val summary: String)
 
@@ -167,7 +194,10 @@ internal val SharedCourseLessons = listOf(
 
 private sealed interface QuranAyahState {
     data object Loading : QuranAyahState
-    data class Loaded(val verses: List<QuranVerse>) : QuranAyahState
+    data class Loaded(
+        val verses: List<QuranVerse>,
+        val nameTranslation: String,
+    ) : QuranAyahState
     data class Error(val message: String) : QuranAyahState
 }
 
@@ -427,13 +457,14 @@ internal fun QuranDetailScreen(
         return
     }
     var playing by remember(number) { mutableStateOf(false) }
+    var showAudioPlayer by remember(number) { mutableStateOf(false) }
     LaunchedEffect(number) {
         if (store.quranAutoplayPending()) {
             store.saveQuranAutoplayPending(false)
             playing = player.play(quranAudioUrl(number))
+            showAudioPlayer = playing
         }
     }
-    var query by remember(number) { mutableStateOf("") }
     var loadAttempt by remember(number) { mutableStateOf(0) }
     var translationLanguage by remember {
         mutableStateOf(QuranTranslationLanguage.fromCode(store.quranTranslationLanguage()))
@@ -455,7 +486,10 @@ internal fun QuranDetailScreen(
             if (verses.isEmpty()) {
                 QuranAyahState.Error("No ayahs were found for this surah.")
             } else {
-                QuranAyahState.Loaded(verses)
+                QuranAyahState.Loaded(
+                    verses = verses,
+                    nameTranslation = repository.getSurahMetadata(number)?.nameTranslation.orEmpty(),
+                )
             }
         } catch (error: CancellationException) {
             throw error
@@ -469,6 +503,9 @@ internal fun QuranDetailScreen(
     var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
     var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
     var mushafMode by remember { mutableStateOf(store.quranMushafMode()) }
+    var mushafCurrentPage by remember(number) { mutableIntStateOf(1) }
+    var mushafTotalPages by remember(number) { mutableIntStateOf(1) }
+    var requestedMushafPage by remember(number) { mutableIntStateOf(1) }
     var tajweedEnabled by remember { mutableStateOf(store.quranTajweedEnabled()) }
     var tajweedAnnotations by remember { mutableStateOf<Map<Int, List<SharedTajweedAnnotation>>?>(null) }
     var tajweedUnavailable by remember { mutableStateOf(false) }
@@ -501,6 +538,16 @@ internal fun QuranDetailScreen(
     ) {
         isBookmarked = number in store.toggleSurah(number)
     }
+    var showReadingSettings by remember { mutableStateOf(false) }
+    // Android's toolbar translation chip — the two-letter code (EN/BN/…) that
+    // opens the reading settings' translation picker.
+    val translationChipAction = DetailAction(
+        id = "translation_chip",
+        label = "Translation",
+        trailingText = translationLanguage.code.uppercase(),
+    ) {
+        showReadingSettings = true
+    }
     // The ⋮ sheet mirrors the Android Reading Settings options (SurahDetailViewModel):
     // Tajweed, Show Translation, Mushaf Page, Text Alignment, Arabic Font, Translation Language.
     val playAudioAction = DetailAction(
@@ -513,126 +560,88 @@ internal fun QuranDetailScreen(
             playing = false
         } else {
             playing = player.play(quranAudioUrl(number))
+            if (playing) showAudioPlayer = true
         }
     }
-    val showTranslationAction = DetailAction(
-        id = "show_translation",
-        label = if (showTranslation) "Hide translation" else "Show translation",
-        selected = showTranslation,
-        trailingText = if (showTranslation) "ON" else "OFF",
-    ) {
-        showTranslation = !showTranslation
-        store.saveQuranShowTranslation(showTranslation)
-    }
-    val tajweedAction = DetailAction(
-        id = "tajweed",
-        label = "Tajweed colors",
-        selected = tajweedEnabled,
-        trailingText = when {
-            tajweedEnabled -> "ON"
-            tajweedUnavailable -> "N/A"
-            else -> "OFF"
-        },
-    ) {
-        tajweedEnabled = !tajweedEnabled
-        store.saveQuranTajweedEnabled(tajweedEnabled)
-    }
-    val mushafPageAction = DetailAction(
-        id = "mushaf_page",
-        label = if (mushafMode) "Ayah list view" else "Mushaf page view",
-        selected = mushafMode,
-        trailingText = if (mushafMode) "ON" else "OFF",
-    ) {
-        mushafMode = !mushafMode
-        store.saveQuranMushafMode(mushafMode)
-    }
-    val textAlignmentAction = DetailAction(
-        id = "text_alignment",
-        label = "Text alignment",
-        trailingText = textAlignment.replaceFirstChar { it.uppercase() },
-    ) {
-        textAlignment = when (textAlignment) {
-            "start" -> "center"
-            "center" -> "end"
-            "end" -> "justify"
-            else -> "start"
-        }
-        store.saveQuranTextAlignment(textAlignment)
-    }
-    val arabicFontAction = DetailAction(
-        id = "arabic_font",
-        label = "Arabic font",
+    val readingSettingsAction = DetailAction(
+        id = "reading_settings",
+        label = "Reading settings",
         trailingText = QuranArabicFonts.displayName(selectedArabicFont),
     ) {
-        val order = QuranArabicFonts.selectionOrder
-        val currentIndex = order.indexOf(selectedArabicFont).coerceAtLeast(0)
-        val next = order[(currentIndex + 1) % order.size]
-        selectedArabicFont = next
-        store.saveQuranArabicFont(next)
+        showReadingSettings = true
     }
-    val translationLanguageAction = DetailAction(
-        id = "translation_language",
-        label = "Translation language",
-        trailingText = translationLanguage.displayName,
-    ) {
-        val entries = QuranTranslationLanguage.entries
-        translationLanguage = entries[(entries.indexOf(translationLanguage) + 1) % entries.size]
-        store.saveQuranTranslationLanguage(translationLanguage.code)
-    }
-    val bookmarkSheetAction = DetailAction(
-        id = "bookmark_sheet",
-        label = if (isBookmarked) "Remove bookmark" else "Bookmark surah",
-        icon = NiaIcons.Bookmark.takeIf { isBookmarked } ?: NiaIcons.BookmarkBorder,
-        selected = isBookmarked,
-    ) {
-        isBookmarked = number in store.toggleSurah(number)
-    }
-    ImmersiveDetailScaffold(onBack = onBack, collapsibleHeader = true, header = {
-        androidx.compose.foundation.layout.Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(3f / 2f),
-        ) {
-            com.starception.submission.shared.quran.SurahArtworkHeader(
-                surahNumber = number,
-                contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
-                modifier = Modifier.fillMaxSize(),
-            )
-            // Android keeps the chapter identity in the information panel
-            // below the artwork. The artwork only needs a top contrast scrim
-            // for toolbar controls; repeating the title here caused a second,
-            // overlapping title on iOS.
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        androidx.compose.ui.graphics.Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.42f),
-                            0.35f to Color.Black.copy(alpha = 0.08f),
-                            1f to Color.Transparent,
-                        ),
-                    ),
-            )
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+    ImmersiveDetailScaffold(
+        onBack = onBack,
+        collapsibleHeader = true,
+        contentHorizontalPadding = 0.dp,
+        header = {
             Column {
-                DetailToolbar(
-                    onBack = onBack,
-                    inlineActions = listOf(bookmarkAction),
-                    sheetActions = listOf(
-                        playAudioAction,
-                        showTranslationAction,
-                        tajweedAction,
-                        mushafPageAction,
-                        textAlignmentAction,
-                        arabicFontAction,
-                        translationLanguageAction,
-                        bookmarkSheetAction,
-                    ),
-                    contentColor = androidx.compose.ui.graphics.Color.White,
-                    toolbarTitle = "Surah ${surah.number} · ${surah.nameEnglish}",
-                )
+                if (mushafMode) {
+                    SurahMushafMiniBar(
+                        surah = surah,
+                        currentPage = mushafCurrentPage,
+                        totalPages = mushafTotalPages,
+                        onPrevious = {
+                            if (mushafCurrentPage > 1) {
+                                requestedMushafPage = mushafCurrentPage - 1
+                            } else if (number > 1) {
+                                onOpenSurah(number - 1)
+                            }
+                        },
+                        onNext = {
+                            if (mushafCurrentPage < mushafTotalPages) {
+                                requestedMushafPage = mushafCurrentPage + 1
+                            } else if (number < 114) {
+                                onOpenSurah(number + 1)
+                            }
+                        },
+                    )
+                }
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(3f / 2f)
+                        .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
+                ) {
+                    com.starception.submission.shared.quran.SurahArtworkHeader(
+                        surahNumber = number,
+                        contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    0f to Color.Black.copy(alpha = 0.30f),
+                                    0.4f to Color.Transparent,
+                                    1f to Color.Black.copy(alpha = 0.08f),
+                                ),
+                            ),
+                    )
+                    Column {
+                        DetailToolbar(
+                            onBack = onBack,
+                            inlineActions = listOf(
+                                translationChipAction,
+                                bookmarkAction,
+                            ),
+                            sheetActions = listOf(
+                                playAudioAction,
+                                readingSettingsAction,
+                            ),
+                            contentColor = androidx.compose.ui.graphics.Color.White,
+                            toolbarTitle = "Surah ${surah.number} · ${surah.nameEnglish}",
+                            includeStatusBarInset = !mushafMode,
+                        )
+                    }
+                }
             }
-        }
-    }) {
+        },
+    ) {
+        // The Arabic font picker — Android's FontSelectionDialog as a sheet:
+        // one row per font, the active one checked, tap to apply.
         // Surah-to-surah swipe, matching Android's SurahSwipeContainer. In
         // mushaf mode the pager owns horizontal gestures, so the detector
         // only runs in the ayah-list mode.
@@ -640,13 +649,16 @@ internal fun QuranDetailScreen(
         val swipeModifier = if (!mushafMode) {
             Modifier.pointerInput(number) {
                 detectHorizontalDragGestures(
+                    onDragStart = { swipeTotalX = 0f },
                     onDragEnd = {
-                        if (swipeTotalX < -80f && number < 114) {
+                        if (swipeTotalX < -240f && number < 114) {
                             onOpenSurah(number + 1)
-                        } else if (swipeTotalX > 80f && number > 1) {
+                        } else if (swipeTotalX > 240f && number > 1) {
                             onOpenSurah(number - 1)
                         }
+                        swipeTotalX = 0f
                     },
+                    onDragCancel = { swipeTotalX = 0f },
                 ) { change, dragAmount ->
                     change.consume()
                     swipeTotalX += dragAmount
@@ -656,39 +668,6 @@ internal fun QuranDetailScreen(
             Modifier
         }
         Column(swipeModifier.weight(1f)) {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "Surah ${surah.number} · ${surah.nameEnglish}",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            surah.subtitle(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Text(
-                        surah.nameArabic,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
             // Android-style surah audio bar: prev / play / next with a progress
             // slider and time labels. Prev/next move between surahs (and continue
             // playback when active), matching the Android mini-bar behavior.
@@ -716,7 +695,7 @@ internal fun QuranDetailScreen(
                     }
                 }
             }
-            Surface(
+            if (showAudioPlayer) Surface(
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 shape = RoundedCornerShape(20.dp),
                 border = androidx.compose.foundation.BorderStroke(
@@ -740,6 +719,7 @@ internal fun QuranDetailScreen(
                                     playing = false
                                 } else {
                                     playing = player.play(quranAudioUrl(number))
+                                    if (playing) showAudioPlayer = true
                                 }
                             },
                         ) {
@@ -787,27 +767,7 @@ internal fun QuranDetailScreen(
                     }
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            // Translation language selector; non-English DBs download from the CDN
-            // on demand, Arabic-only included as the "None" chip.
-            androidx.compose.foundation.layout.Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
-            ) {
-                QuranTranslationLanguage.entries.forEach { language ->
-                    androidx.compose.material3.FilterChip(
-                        selected = language == translationLanguage,
-                        onClick = {
-                            translationLanguage = language
-                            store.saveQuranTranslationLanguage(language.code)
-                        },
-                        label = { Text(language.displayName) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
+            if (showAudioPlayer) Spacer(Modifier.height(10.dp))
             // Tafseer / word-study sheet. Word study jumps straight to the word
             // meanings book; Tafseer opens on As-Sa'di. Switching books is instant
             // since the whole ayah row (all books + meanings) was loaded at once.
@@ -907,97 +867,102 @@ internal fun QuranDetailScreen(
                     Button(onClick = { loadAttempt++ }) { Text("Try again") }
                 }
                 is QuranAyahState.Loaded -> {
-                    val filteredVerses = remember(state.verses, query) {
-                        filterQuranVerses(state.verses, query)
+                    val showBismillah = remember(number, state.verses) {
+                        number != 1 &&
+                            number != 9 &&
+                            state.verses.firstOrNull()?.arabicText?.let(::hasLeadingBismillah) == true
                     }
-                    if (!mushafMode) {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            label = { Text("Search ayah, Arabic, or translation") },
-                            leadingIcon = { Icon(NiaIcons.Search, contentDescription = null) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            if (mushafMode) {
-                                "${versesMushafPages(state.verses)} mushaf pages"
-                            } else if (query.isBlank()) {
-                                "${state.verses.size} ayahs"
-                            } else {
-                                "${filteredVerses.size} matches"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        // Android's Arabic font-size stepper (28..60sp).
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "A-",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        if (arabicFontSize > 28f) {
-                                            arabicFontSize -= 1f
-                                            store.saveQuranArabicFontSize(arabicFontSize)
-                                        }
-                                    }
-                                    .padding(horizontal = 6.dp),
-                            )
-                            Text(
-                                arabicFontSize.toInt().toString(),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                "A+",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        if (arabicFontSize < 60f) {
-                                            arabicFontSize += 1f
-                                            store.saveQuranArabicFontSize(arabicFontSize)
-                                        }
-                                    }
-                                    .padding(horizontal = 6.dp),
-                            )
+                    val displayVerses = remember(state.verses, showBismillah) {
+                        if (!showBismillah) {
+                            state.verses
+                        } else {
+                            state.verses.mapIndexed { index, verse ->
+                                if (index == 0) {
+                                    verse.copy(arabicText = removeLeadingBismillah(verse.arabicText))
+                                } else {
+                                    verse
+                                }
+                            }
                         }
                     }
                     if (mushafMode) {
                         MushafPagerView(
-                            surah = surah,
-                            verses = state.verses,
+                            verses = displayVerses,
                             arabicFont = selectedArabicFont,
-                            arabicFontSize = arabicFontSize,
+                            arabicFontSize = arabicFontSize * 0.68f,
                             showTranslation = showTranslation,
                             textAlignment = textAlignment,
+                            showBismillah = showBismillah,
                             tajweedAnnotations = if (tajweedEnabled) tajweedAnnotations else null,
+                            openingContent = {
+                                SurahAlbumInfoCard(
+                                    surah = surah,
+                                    ayahCount = displayVerses.size,
+                                    nameTranslation = state.nameTranslation,
+                                    arabicFont = selectedArabicFont,
+                                    playing = playing,
+                                    onPlayClick = {
+                                        if (playing) {
+                                            player.pause()
+                                            playing = false
+                                        } else {
+                                            playing = player.play(quranAudioUrl(number))
+                                            if (playing) showAudioPlayer = true
+                                        }
+                                    },
+                                )
+                            },
+                            requestedPage = requestedMushafPage,
+                            onPageChanged = { current, total ->
+                                mushafCurrentPage = current
+                                mushafTotalPages = total
+                                requestedMushafPage = current
+                            },
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                         )
-                    } else if (filteredVerses.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().weight(1f),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("No matching ayahs", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
                     } else {
                         LazyColumn(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(0.dp),
                             contentPadding = PaddingValues(bottom = 24.dp),
                         ) {
-                            items(filteredVerses, key = { it.id }) { verse ->
+                            // Android's AlbumInfoCard: the surah panel between
+                            // the artwork and the verses — name translation
+                            // quote, then the info chips row.
+                            item(key = "surah_info_panel") {
+                                SurahAlbumInfoCard(
+                                    surah = surah,
+                                    ayahCount = displayVerses.size,
+                                    nameTranslation = state.nameTranslation,
+                                    arabicFont = selectedArabicFont,
+                                    playing = playing,
+                                    onPlayClick = {
+                                        if (playing) {
+                                            player.pause()
+                                            playing = false
+                                        } else {
+                                            playing = player.play(quranAudioUrl(number))
+                                            if (playing) showAudioPlayer = true
+                                        }
+                                    },
+                                )
+                            }
+                            if (showBismillah) {
+                                item(key = "bismillah") {
+                                    Text(
+                                        text = QURAN_BISMILLAH,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                        fontFamily = QuranArabicFonts.fontFamily(selectedArabicFont),
+                                        fontSize = (arabicFontSize * 0.78f).sp,
+                                        lineHeight = (arabicFontSize * 1.15f).sp,
+                                        textAlign = TextAlign.Center,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                }
+                            }
+                            items(displayVerses, key = { it.id }) { verse ->
                                 QuranAyahReadingBlock(
                                     verse = verse,
                                     showTranslation = showTranslation,
@@ -1009,7 +974,10 @@ internal fun QuranDetailScreen(
                                     } else {
                                         null
                                     },
-                                    onToggleTranslation = { showTranslation = !showTranslation },
+                                    onToggleTranslation = {
+                                        showTranslation = !showTranslation
+                                        store.saveQuranShowTranslation(showTranslation)
+                                    },
                                     onOpenTafseer = { verseId, preselectBook ->
                                         tafseerSelectedBook = preselectBook
                                         tafseerLoading = true
@@ -1029,6 +997,209 @@ internal fun QuranDetailScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+        if (showReadingSettings) {
+            SurahReadingSettingsSheet(
+                previewText = (ayahState as? QuranAyahState.Loaded)?.verses
+                    ?.firstOrNull()?.arabicText
+                    ?: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                selectedFont = selectedArabicFont,
+                fontSize = arabicFontSize,
+                textAlignment = textAlignment,
+                mushafMode = mushafMode,
+                showTranslation = showTranslation,
+                tajweed = tajweedEnabled,
+                tajweedAvailable = !tajweedUnavailable,
+                translationLanguage = translationLanguage,
+                onFontChange = { font ->
+                    selectedArabicFont = font
+                    store.saveQuranArabicFont(font)
+                },
+                onFontSizeChange = { size ->
+                    arabicFontSize = size
+                    store.saveQuranArabicFontSize(size)
+                },
+                onAlignmentChange = { alignment ->
+                    textAlignment = alignment
+                    store.saveQuranTextAlignment(alignment)
+                },
+                onMushafChange = { enabled ->
+                    mushafMode = enabled
+                    store.saveQuranMushafMode(enabled)
+                },
+                onTranslationChange = { enabled ->
+                    showTranslation = enabled
+                    store.saveQuranShowTranslation(enabled)
+                },
+                onTajweedChange = { enabled ->
+                    tajweedEnabled = enabled
+                    store.saveQuranTajweedEnabled(enabled)
+                },
+                onTranslationLanguageChange = { language ->
+                    translationLanguage = language
+                    store.saveQuranTranslationLanguage(language.code)
+                },
+                onDismiss = { showReadingSettings = false },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SurahAlbumInfoCard(
+    surah: com.starception.submission.feature.quran.Surah,
+    ayahCount: Int,
+    nameTranslation: String,
+    arabicFont: String,
+    playing: Boolean,
+    onPlayClick: () -> Unit,
+) {
+    // Lazy layouts clip children drawn beyond an item's bounds. Reserve room
+    // for both overlapping controls so neither is cut at the item boundary.
+    Box(modifier = Modifier.fillMaxWidth().height(223.dp)) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(172.dp)
+                .offset(y = 28.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 12.dp, bottom = 6.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = surah.nameEnglish,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "سُورَةُ ${surah.nameArabic}",
+                        fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (nameTranslation.isNotBlank()) {
+                        Text(
+                            text = "\"$nameTranslation\"",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        InfoChip(text = "$ayahCount Ayahs")
+                        InfoChip(text = surah.revelationType)
+                        InfoChip(text = "Holy Quran")
+                    }
+                }
+            }
+        }
+        Surface(
+            onClick = onPlayClick,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = (-24).dp)
+                .size(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            shadowElevation = 6.dp,
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (playing) "Pause recitation" else "Play surah",
+                    modifier = Modifier.size(30.dp),
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.Filled.KeyboardArrowUp,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .size(46.dp),
+        )
+    }
+}
+
+@Composable
+private fun SurahMushafMiniBar(
+    surah: com.starception.submission.feature.quran.Surah,
+    currentPage: Int,
+    totalPages: Int,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .statusBarsPadding()
+                .fillMaxWidth()
+                .height(44.dp)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "سُورَةُ ${surah.nameArabic}",
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+            )
+            Text(
+                text = " · ${surah.nameEnglish} · ${surah.number}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.68f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowDown,
+                contentDescription = "Show Surah information",
+                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.68f),
+                modifier = Modifier.size(18.dp),
+            )
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.08f),
+            ) {
+                Text(
+                    text = "$currentPage/$totalPages",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+            IconButton(onClick = onPrevious, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = if (currentPage == 1) "Previous Surah" else "Previous page",
+                )
+            }
+            IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = if (currentPage == totalPages) "Next Surah" else "Next page",
+                )
             }
         }
     }
@@ -1089,7 +1260,7 @@ private fun QuranAyahReadingBlock(
         if (showTranslation && verse.translation.isNotBlank()) {
             Spacer(Modifier.height(8.dp))
             Text(
-                "${verse.translation} \u06DD${verse.numberInSurah}",
+                verse.translation,
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1119,9 +1290,6 @@ private fun QuranAyahReadingBlock(
 private fun Int.toArabicIndicDigits(): String = toString().map { digit ->
     if (digit in '0'..'9') ('٠'.code + (digit - '0')).toChar() else digit
 }.joinToString("")
-
-private fun versesMushafPages(verses: List<QuranVerse>): Int =
-    verses.map { it.page }.distinct().size
 
 private fun formatAudioSeconds(totalSeconds: Int): String {
     val minutes = totalSeconds / 60
@@ -1335,6 +1503,654 @@ internal fun FortressChapterScreen(
     }
 }
 
+/**
+ * The reading-settings bottom sheet — Android's floating reading toolbar
+ * layout: drag handle, a live preview of the actual first ayah in the chosen
+ * typeface, a Play-Books-style size slider, segmented alignment icons,
+ * Mushaf/translation/tajweed switch rows, and inline expandable Arabic font
+ * and translation-language pickers with tinted pills. Pull down (or tap the
+ * scrim) to dismiss.
+ */
+@androidx.compose.runtime.Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+private fun SurahReadingSettingsSheet(
+    previewText: String,
+    selectedFont: String,
+    fontSize: Float,
+    textAlignment: String,
+    mushafMode: Boolean,
+    showTranslation: Boolean,
+    tajweed: Boolean,
+    tajweedAvailable: Boolean,
+    translationLanguage: com.starception.submission.shared.quran.QuranTranslationLanguage,
+    onFontChange: (String) -> Unit,
+    onFontSizeChange: (Float) -> Unit,
+    onAlignmentChange: (String) -> Unit,
+    onMushafChange: (Boolean) -> Unit,
+    onTranslationChange: (Boolean) -> Unit,
+    onTajweedChange: (Boolean) -> Unit,
+    onTranslationLanguageChange: (com.starception.submission.shared.quran.QuranTranslationLanguage) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // Entrance: the sheet slides up from below the finger's side of the screen.
+    val slideIn = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) {
+        slideIn.animateTo(
+            1f,
+            androidx.compose.animation.core.tween(durationMillis = 280),
+        )
+    }
+    // Whole-sheet drag-to-dismiss past a threshold, springing back otherwise.
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var expandedSection by remember { mutableStateOf<String?>(null) }
+
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        // No scrim behind the sheet: the ayah text stays visible above it so
+        // the preview and the page read together — Android keeps the page up.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(onClick = onDismiss),
+        )
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .graphicsLayer {
+                    translationY = ((1f - slideIn.value) * size.height) + dragOffset
+                }
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            if (dragAmount > 0f) dragOffset += dragAmount
+                        },
+                        onDragEnd = {
+                            if (dragOffset > 150f) {
+                                onDismiss()
+                            } else {
+                                dragOffset = 0f
+                            }
+                        },
+                        onDragCancel = { dragOffset = 0f },
+                    )
+                },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                topStart = 28.dp,
+                topEnd = 28.dp,
+            ),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shadowElevation = 16.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(bottom = 8.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                // Drag handle — the whole sheet is draggable.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp)
+                        .height(26.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(36.dp)
+                            .height(4.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+                }
+
+                // Food Truck's grouped-form layout: titled sections on cards.
+                SettingsSection(title = "Preview") {
+                    Text(
+                        text = previewText,
+                        fontFamily = com.starception.submission.shared.quran.QuranArabicFonts.fontFamily(selectedFont),
+                        fontSize = fontSize.sp,
+                        lineHeight = (fontSize * 1.7f).sp,
+                        textAlign = when (textAlignment) {
+                            "start" -> TextAlign.Start
+                            "center" -> TextAlign.Center
+                            "end" -> TextAlign.End
+                            else -> TextAlign.Justify
+                        },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    )
+                }
+
+                SettingsSection(title = "Text") {
+                    // Menu-picker rows — the value with a trailing chevron.
+                    SettingsPickerRow(
+                        label = "Arabic font",
+                        value = com.starception.submission.shared.quran.QuranArabicFonts.displayName(selectedFont),
+                        expanded = expandedSection == "font",
+                        onToggle = {
+                            expandedSection = if (expandedSection == "font") null else "font"
+                        },
+                    )
+                    if (expandedSection == "font") {
+                        com.starception.submission.shared.quran.QuranArabicFonts.selectionOrder.forEach { font ->
+                            SettingsOptionRow(
+                                label = com.starception.submission.shared.quran.QuranArabicFonts.displayName(font),
+                                selected = font == selectedFont,
+                                onClick = {
+                                    onFontChange(font)
+                                    expandedSection = null
+                                },
+                            )
+                        }
+                    }
+                    SettingsPickerRow(
+                        label = "Translation",
+                        value = translationLanguage.displayName,
+                        expanded = expandedSection == "language",
+                        onToggle = {
+                            expandedSection = if (expandedSection == "language") null else "language"
+                        },
+                    )
+                    if (expandedSection == "language") {
+                        com.starception.submission.shared.quran.QuranTranslationLanguage.entries.forEach { language ->
+                            SettingsOptionRow(
+                                label = language.displayName,
+                                selected = language == translationLanguage,
+                                onClick = {
+                                    onTranslationLanguageChange(language)
+                                    expandedSection = null
+                                },
+                            )
+                        }
+                    }
+                    SettingsRowDivider()
+                    // Food Truck's quantity stepper: −, value, +.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Text size",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Surface(
+                            onClick = {
+                                haptics.performHapticFeedback(
+                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                                )
+                                onFontSizeChange((fontSize - 1f).coerceIn(28f, 60f))
+                            },
+                            enabled = fontSize > 28f,
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(30.dp),
+                        ) {
+                            Text(
+                                "−",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(0.dp),
+                            )
+                        }
+                        Text(
+                            fontSize.toInt().toString(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 14.dp),
+                        )
+                        Surface(
+                            onClick = {
+                                haptics.performHapticFeedback(
+                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                                )
+                                onFontSizeChange((fontSize + 1f).coerceIn(28f, 60f))
+                            },
+                            enabled = fontSize < 60f,
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(30.dp),
+                        ) {
+                            Text(
+                                "+",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                    }
+                }
+
+                SettingsSection(title = "Layout") {
+                    val options = listOf(
+                        "Left" to "start",
+                        "Center" to "center",
+                        "Right" to "end",
+                        "Justified" to "justify",
+                    )
+                    io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget(
+                        material = {
+                            SingleChoiceSegmentedButtonRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                            ) {
+                                options.forEachIndexed { index, (label, value) ->
+                                    SegmentedButton(
+                                        selected = textAlignment == value,
+                                        onClick = { onAlignmentChange(value) },
+                                        shape = SegmentedButtonDefaults.itemShape(
+                                            index = index,
+                                            count = options.size,
+                                        ),
+                                        icon = {},
+                                    ) {
+                                        Text(label, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+                        },
+                        cupertino = {
+                            // The system's segmented control, like Settings.app.
+                            io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl(
+                                selectedTabIndex = options
+                                    .indexOfFirst { it.second == textAlignment }
+                                    .coerceAtLeast(0),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                            ) {
+                                options.forEach { (label, value) ->
+                                    io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab(
+                                        onClick = { onAlignmentChange(value) },
+                                        isSelected = textAlignment == value,
+                                    ) {
+                                        Text(label)
+                                    }
+                                }
+                            }
+                        },
+                    )
+                }
+
+                SettingsSection(title = "Display") {
+                    SettingsSwitchRow(
+                        label = "Mushaf page",
+                        checked = mushafMode,
+                        onCheckedChange = onMushafChange,
+                    )
+                    SettingsRowDivider()
+                    SettingsSwitchRow(
+                        label = "Show translation",
+                        checked = showTranslation,
+                        onCheckedChange = onTranslationChange,
+                    )
+                    SettingsRowDivider()
+                    SettingsSwitchRow(
+                        label = "Tajweed",
+                        checked = tajweed,
+                        available = tajweedAvailable,
+                        onCheckedChange = onTajweedChange,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Reading controls shared by Dua and Hadith details, without Quran-only options. */
+@androidx.compose.runtime.Composable
+private fun ReaderReadingSettingsSheet(
+    previewText: String,
+    selectedFont: String,
+    fontSize: Float,
+    textAlignment: String,
+    onFontChange: (String) -> Unit,
+    onFontSizeChange: (Float) -> Unit,
+    onAlignmentChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var expandedFontPicker by remember { mutableStateOf(false) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(onClick = onDismiss),
+        )
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .graphicsLayer { translationY = dragOffset }
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            if (dragAmount > 0f) dragOffset += dragAmount
+                        },
+                        onDragEnd = {
+                            if (dragOffset > 150f) onDismiss() else dragOffset = 0f
+                        },
+                        onDragCancel = { dragOffset = 0f },
+                    )
+                },
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shadowElevation = 16.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(bottom = 8.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp).height(26.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(36.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+                }
+                Text(
+                    text = "Reading settings",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+                SettingsSection(title = "Preview") {
+                    Text(
+                        text = previewText,
+                        fontFamily = QuranArabicFonts.fontFamily(selectedFont),
+                        fontSize = fontSize.sp,
+                        lineHeight = (fontSize * 1.65f).sp,
+                        textAlign = readerTextAlignment(textAlignment),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    )
+                }
+                SettingsSection(title = "Text") {
+                    SettingsPickerRow(
+                        label = "Arabic font",
+                        value = QuranArabicFonts.displayName(selectedFont),
+                        expanded = expandedFontPicker,
+                        onToggle = { expandedFontPicker = !expandedFontPicker },
+                    )
+                    if (expandedFontPicker) {
+                        QuranArabicFonts.selectionOrder.forEach { font ->
+                            SettingsOptionRow(
+                                label = QuranArabicFonts.displayName(font),
+                                selected = font == selectedFont,
+                                onClick = {
+                                    onFontChange(font)
+                                    expandedFontPicker = false
+                                },
+                            )
+                        }
+                    }
+                    SettingsRowDivider()
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Text size", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Surface(
+                            onClick = {
+                                haptics.performHapticFeedback(
+                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                                )
+                                onFontSizeChange((fontSize - 1f).coerceIn(28f, 60f))
+                            },
+                            enabled = fontSize > 28f,
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier.size(30.dp),
+                        ) { Text("−", style = MaterialTheme.typography.titleMedium) }
+                        Text(
+                            fontSize.toInt().toString(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 14.dp),
+                        )
+                        Surface(
+                            onClick = {
+                                haptics.performHapticFeedback(
+                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                                )
+                                onFontSizeChange((fontSize + 1f).coerceIn(28f, 60f))
+                            },
+                            enabled = fontSize < 60f,
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier.size(30.dp),
+                        ) { Text("+", style = MaterialTheme.typography.titleMedium) }
+                    }
+                }
+                SettingsSection(title = "Alignment") {
+                    val options = listOf(
+                        "Left" to "start",
+                        "Center" to "center",
+                        "Right" to "end",
+                        "Justified" to "justify",
+                    )
+                    io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl(
+                        selectedTabIndex = options.indexOfFirst { it.second == textAlignment }.coerceAtLeast(0),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    ) {
+                        options.forEach { (label, value) ->
+                            io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab(
+                                onClick = { onAlignmentChange(value) },
+                                isSelected = textAlignment == value,
+                            ) { Text(label) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun readerTextAlignment(value: String): TextAlign = when (value) {
+    "start" -> TextAlign.Start
+    "center" -> TextAlign.Center
+    "end" -> TextAlign.End
+    else -> TextAlign.Justify
+}
+
+/** One Food Truck-style grouped form section: title above a rounded card. */
+@androidx.compose.runtime.Composable
+private fun SettingsSection(
+    title: String,
+    content: @androidx.compose.runtime.Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, bottom = 6.dp),
+        )
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.fillMaxWidth(), content = content)
+        }
+    }
+}
+
+/** A value row that expands its picker inline — SwiftUI's menu-picker look. */
+@androidx.compose.runtime.Composable
+private fun SettingsPickerRow(
+    label: String,
+    value: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Icon(
+            imageVector = NiaIcons.ArrowBack,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .size(12.dp)
+                .rotate(if (expanded) 90f else -90f),
+        )
+    }
+}
+
+/** One picker option — the selected one gets a soft tinted pill. */
+@androidx.compose.runtime.Composable
+private fun SettingsOptionRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 2.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .background(
+                if (selected) {
+                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                } else {
+                    androidx.compose.ui.graphics.Color.Transparent
+                },
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (selected) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        )
+        if (selected) {
+            Spacer(Modifier.weight(1f))
+            Icon(
+                imageVector = NiaIcons.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+/** The hairline between rows inside a section card. */
+@androidx.compose.runtime.Composable
+private fun SettingsRowDivider() {
+    Box(
+        modifier = Modifier
+            .padding(start = 16.dp)
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+    )
+}
+
+/** A label + switch row — SwiftUI's toggle row, Cupertino's switch on iOS. */
+@androidx.compose.runtime.Composable
+private fun SettingsSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    available: Boolean = true,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = available) { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (available) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.weight(1f),
+        )
+        io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSwitch(
+            checked = checked,
+            onCheckedChange = { enabled ->
+                if (available || !enabled) onCheckedChange(enabled)
+            },
+        )
+    }
+}
+
+
+/** Android's InfoChip (NiaTopicTag look): a tinted uppercase pill. */
+@androidx.compose.runtime.Composable
+private fun InfoChip(text: String) {
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    ) {
+        Text(
+            text = text.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+    }
+}
+
 /** One Fortress invocation: numbered position, Arabic, transliteration,
  *  translation, context/instruction/note, and the recorded recitation. */
 @Composable
@@ -1536,6 +2352,10 @@ internal fun SharedDuaDetailScreen(
     var bookmarked by remember(number) {
         mutableStateOf(QURANIC_DUA_NEWS_ID_OFFSET + number in store.bookmarkedNewsIds())
     }
+    var showReadingSettings by remember { mutableStateOf(false) }
+    var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
+    var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
     DisposableEffect(speechSynthesizer) {
         onDispose { speechSynthesizer.stop() }
     }
@@ -1549,51 +2369,57 @@ internal fun SharedDuaDetailScreen(
         store.setNewsBookmarked(newsId, !bookmarked)
         bookmarked = !bookmarked
     }
-    ImmersiveDetailScaffold(onBack = onBack, header = {
-        Box(Modifier.fillMaxWidth().height(220.dp)) {
-            NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        androidx.compose.ui.graphics.Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.42f),
-                            0.4f to Color.Black.copy(alpha = 0.08f),
-                            1f to Color.Transparent,
+    val readingSettingsAction = DetailAction(
+        id = "reading_settings",
+        label = "Reading settings",
+        trailingText = QuranArabicFonts.displayName(selectedArabicFont),
+    ) { showReadingSettings = true }
+    Box(Modifier.fillMaxSize()) {
+        ImmersiveDetailScaffold(onBack = onBack, header = {
+            Box(Modifier.fillMaxWidth().height(220.dp)) {
+                NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                0f to Color.Black.copy(alpha = 0.42f),
+                                0.4f to Color.Black.copy(alpha = 0.08f),
+                                1f to Color.Transparent,
+                            ),
                         ),
-                    ),
-            )
-            Column {
-                DetailToolbar(
-                    onBack = onBack,
-                    inlineActions = listOf(bookmarkAction),
-                    sheetActions = listOf(
-                        DetailAction(
-                            id = "listen",
-                            label = if (listening) "Stop narration" else "Listen (TTS)",
-                            selected = listening,
-                        ) {
-                            listening = !listening
-                            val dua = (state as? DuaDetailState.Loaded)?.dua
-                            if (listening && dua != null) {
-                                val started = speechSynthesizer.speak(text = dua.translation) {
+                )
+                Column {
+                    DetailToolbar(
+                        onBack = onBack,
+                        inlineActions = listOf(bookmarkAction),
+                        sheetActions = listOf(
+                            readingSettingsAction,
+                            DetailAction(
+                                id = "listen",
+                                label = if (listening) "Stop narration" else "Listen (TTS)",
+                                selected = listening,
+                            ) {
+                                listening = !listening
+                                val dua = (state as? DuaDetailState.Loaded)?.dua
+                                if (listening && dua != null) {
+                                    val started = speechSynthesizer.speak(text = dua.translation) {
+                                        listening = false
+                                    }
+                                    if (!started) listening = false
+                                } else {
+                                    speechSynthesizer.stop()
                                     listening = false
                                 }
-                                if (!started) listening = false
-                            } else {
-                                speechSynthesizer.stop()
-                                listening = false
-                            }
-                        },
-                        bookmarkAction,
-                    ),
-                    contentColor = androidx.compose.ui.graphics.Color.White,
-                    toolbarTitle = "Quranic Dua $number",
-                )
+                            },
+                        ),
+                        contentColor = androidx.compose.ui.graphics.Color.White,
+                        toolbarTitle = "Quranic Dua $number",
+                    )
+                }
             }
-        }
-    }) {
-        when (val current = state) {
+        }) {
+            when (val current = state) {
             DuaDetailState.Loading -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -1604,7 +2430,7 @@ internal fun SharedDuaDetailScreen(
             }
             is DuaDetailState.Loaded -> {
                 val dua = current.dua
-                val arabicFontFamily = QuranArabicFonts.fontFamily(QuranArabicFonts.PDMS_SALEEM)
+                val arabicFontFamily = QuranArabicFonts.fontFamily(selectedArabicFont)
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1624,25 +2450,19 @@ internal fun SharedDuaDetailScreen(
                             }
                         }
                     }
-                    item {
-                        HadithListenButton(dua.translation) { enabled ->
-                            if (enabled) {
-                                PlatformSpeechSynthesizer().speak(text = dua.translation)
-                            } else {
-                                PlatformSpeechSynthesizer().stop()
-                            }
-                        }
-                    }
                     if (dua.arabic.isNotBlank()) {
                         item {
                             ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
                                 Text(
                                     dua.arabic,
                                     modifier = Modifier.fillMaxWidth(),
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        textDirection = TextDirection.Rtl,
+                                    ),
                                     fontFamily = arabicFontFamily,
-                                    fontSize = 34.sp,
-                                    lineHeight = 56.sp,
-                                    textAlign = TextAlign.End,
+                                    fontSize = arabicFontSize.sp,
+                                    lineHeight = (arabicFontSize * 1.65f).sp,
+                                    textAlign = readerTextAlignment(textAlignment),
                                 )
                             }
                         }
@@ -1653,7 +2473,12 @@ internal fun SharedDuaDetailScreen(
                                 Text(
                                     dua.transliteration,
                                     modifier = Modifier.fillMaxWidth(),
-                                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        lineHeight = 26.sp,
+                                        fontStyle = FontStyle.Italic,
+                                    ),
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -1664,14 +2489,23 @@ internal fun SharedDuaDetailScreen(
                                 Text(
                                     dua.translation,
                                     modifier = Modifier.fillMaxWidth(),
-                                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        lineHeight = 26.sp,
+                                        fontStyle = FontStyle.Italic,
+                                    ),
+                                    textAlign = TextAlign.Center,
                                 )
                             }
                         }
                     }
                     if (dua.explanation.isNotBlank()) {
                         item {
-                            ReaderSection("Explanation", MaterialTheme.colorScheme.primary) {
+                            ReaderSection(
+                                title = "Explanation",
+                                accent = MaterialTheme.colorScheme.primary,
+                                collapsible = true,
+                                initiallyExpanded = false,
+                            ) {
                                 Text(
                                     dua.explanation,
                                     modifier = Modifier.fillMaxWidth(),
@@ -1683,6 +2517,29 @@ internal fun SharedDuaDetailScreen(
                     }
                 }
             }
+            }
+        }
+        if (showReadingSettings) {
+            ReaderReadingSettingsSheet(
+                previewText = (state as? DuaDetailState.Loaded)?.dua?.arabic
+                    ?: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                selectedFont = selectedArabicFont,
+                fontSize = arabicFontSize,
+                textAlignment = textAlignment,
+                onFontChange = { font ->
+                    selectedArabicFont = font
+                    store.saveQuranArabicFont(font)
+                },
+                onFontSizeChange = { size ->
+                    arabicFontSize = size
+                    store.saveQuranArabicFontSize(size)
+                },
+                onAlignmentChange = { alignment ->
+                    textAlignment = alignment
+                    store.saveQuranTextAlignment(alignment)
+                },
+                onDismiss = { showReadingSettings = false },
+            )
         }
     }
 }
@@ -1896,24 +2753,21 @@ internal fun BukhariHadithDetailScreen(
     }
     var listening by remember { mutableStateOf(false) }
     var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
+    var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
+    var showReadingSettings by remember { mutableStateOf(false) }
     var translationLanguage by remember { mutableStateOf(store.hadithTranslationLanguage()) }
     var translationProvider by remember { mutableStateOf(store.hadithTranslationProvider()) }
-    val arabicFontAction = DetailAction(
-        id = "arabic_font",
-        label = "Arabic font",
+    val readingSettingsAction = DetailAction(
+        id = "reading_settings",
+        label = "Reading settings",
         trailingText = QuranArabicFonts.displayName(selectedArabicFont),
-    ) {
-        val order = QuranArabicFonts.selectionOrder
-        val currentIndex = order.indexOf(selectedArabicFont).coerceAtLeast(0)
-        val next = order[(currentIndex + 1) % order.size]
-        selectedArabicFont = next
-        store.saveQuranArabicFont(next)
-    }
+    ) { showReadingSettings = true }
     // Play-all queue: narrates from the current hadith to the end of the
     // book, auto-advancing the pager as each narration finishes — the shared
     // counterpart of the Android hadith playlist.
     var queueIndex by remember { mutableStateOf<Int?>(null) }
-    val queueSynthesizer = remember { PlatformSpeechSynthesizer() }
+    val speechSynthesizer = remember { PlatformSpeechSynthesizer() }
     when (val current = state) {
         HadithsState.Loading -> SharedDetailScaffold(title = "Sahih al-Bukhari", onBack = onBack) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -1929,23 +2783,35 @@ internal fun BukhariHadithDetailScreen(
             val pagerState = androidx.compose.foundation.pager.rememberPagerState(
                 initialPage = initialIndex,
             ) { hadiths.size }
-            val queueScope = androidx.compose.runtime.rememberCoroutineScope()
             // Drives the queue: scrolls to the queued hadith, narrates it,
             // then enqueues the next one. A null index or a stop cancels.
             LaunchedEffect(queueIndex) {
                 val index = queueIndex ?: return@LaunchedEffect
                 if (index >= hadiths.size) {
                     queueIndex = null
+                    listening = false
                     return@LaunchedEffect
                 }
                 pagerState.animateScrollToPage(index)
                 listening = true
-                val utterance = hadiths[index].english
+                val sourceText = hadiths[index].english
+                val utterance = if (translationLanguage == "en") {
+                    sourceText
+                } else {
+                    SharedTranslationService.translateFromEnglish(
+                        text = sourceText,
+                        targetLang = translationLanguage,
+                        provider = translationProvider,
+                    )
+                }
                 if (utterance.isBlank()) {
                     queueIndex = index + 1
                     return@LaunchedEffect
                 }
-                queueSynthesizer.speak(text = utterance) { error ->
+                val started = speechSynthesizer.speak(
+                    text = utterance,
+                    language = hadithNarrationLanguage(translationLanguage),
+                ) { error ->
                     if (error == null && queueIndex == index) {
                         queueIndex = index + 1
                     } else if (error != null) {
@@ -1953,18 +2819,21 @@ internal fun BukhariHadithDetailScreen(
                         listening = false
                     }
                 }
+                if (!started) {
+                    queueIndex = null
+                    listening = false
+                }
             }
             // Stop narration when the user swipes to another hadith manually.
             LaunchedEffect(pagerState.currentPage) {
                 if (queueIndex == null) {
-                    PlatformSpeechSynthesizer().stop()
+                    speechSynthesizer.stop()
                     listening = false
                 }
             }
-            androidx.compose.runtime.DisposableEffect(Unit) {
+            androidx.compose.runtime.DisposableEffect(speechSynthesizer) {
                 onDispose {
-                    queueSynthesizer.stop()
-                    PlatformSpeechSynthesizer().stop()
+                    speechSynthesizer.stop()
                 }
             }
             val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
@@ -1973,16 +2842,25 @@ internal fun BukhariHadithDetailScreen(
             LaunchedEffect(currentHadith.id, translationLanguage, translationProvider) {
                 if (translationLanguage == "en") {
                     translatedText = null
+                    isTranslating = false
                 } else {
                     isTranslating = true
-                    translatedText = SharedTranslationService.translateFromEnglish(
-                        text = currentHadith.english,
-                        targetLang = translationLanguage,
-                        provider = translationProvider,
-                    )
-                    isTranslating = false
+                    try {
+                        translatedText = SharedTranslationService.translateFromEnglish(
+                            text = currentHadith.english,
+                            targetLang = translationLanguage,
+                            provider = translationProvider,
+                        )
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Throwable) {
+                        translatedText = null
+                    } finally {
+                        isTranslating = false
+                    }
                 }
             }
+            val narrationText = translatedText?.takeIf { it.isNotBlank() } ?: currentHadith.english
             val translationLanguageAction = DetailAction(
                 id = "translation_language",
                 label = "Translation language",
@@ -2010,13 +2888,16 @@ internal fun BukhariHadithDetailScreen(
                 label = if (listening && queueIndex == null) "Stop narration" else "Listen (TTS)",
                 selected = listening && queueIndex == null,
             ) {
-                queueIndex = null
-                queueSynthesizer.stop()
-                listening = !listening
-                if (listening) {
-                    PlatformSpeechSynthesizer().speak(text = currentHadith.english)
+                if (listening && queueIndex == null) {
+                    speechSynthesizer.stop()
+                    listening = false
                 } else {
-                    PlatformSpeechSynthesizer().stop()
+                    queueIndex = null
+                    speechSynthesizer.stop()
+                    listening = speechSynthesizer.speak(
+                        text = narrationText,
+                        language = hadithNarrationLanguage(translationLanguage),
+                    ) { listening = false }
                 }
             }
             val playAllAction = DetailAction(
@@ -2030,19 +2911,21 @@ internal fun BukhariHadithDetailScreen(
                 },
             ) {
                 if (queueIndex != null) {
-                    queueSynthesizer.stop()
+                    speechSynthesizer.stop()
                     queueIndex = null
                     listening = false
                 } else {
+                    speechSynthesizer.stop()
                     queueIndex = pagerState.currentPage
                 }
             }
-            ImmersiveDetailScaffold(onBack = onBack, header = {
+            Box(Modifier.fillMaxSize()) {
+                ImmersiveDetailScaffold(onBack = onBack, header = {
                 Box(Modifier.fillMaxWidth().height(190.dp)) {
                     NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
                     ImmersiveDetailHeaderScrim(
                         title = "Sahih al-Bukhari",
-                        supportingText = "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        supportingText = "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
                         arabicTitle = "صحيح البخاري",
                     )
                     Column {
@@ -2053,7 +2936,7 @@ internal fun BukhariHadithDetailScreen(
                                 playAllAction,
                                 translationLanguageAction,
                                 translationProviderAction,
-                                arabicFontAction,
+                                readingSettingsAction,
                             ),
                             contentColor = androidx.compose.ui.graphics.Color.White,
                             toolbarTitle = "Sahih al-Bukhari · Hadith ${currentHadith.id}",
@@ -2069,13 +2952,20 @@ internal fun BukhariHadithDetailScreen(
                         hadith = hadiths[index],
                         bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },
                         arabicFont = selectedArabicFont,
+                        arabicFontSize = arabicFontSize,
+                        textAlignment = textAlignment,
                         listening = listening && index == pagerState.currentPage,
                         onListeningChange = { enabled ->
-                            listening = enabled
                             if (enabled) {
-                                PlatformSpeechSynthesizer().speak(text = hadiths[index].english)
+                                queueIndex = null
+                                speechSynthesizer.stop()
+                                listening = speechSynthesizer.speak(
+                                    text = narrationText,
+                                    language = hadithNarrationLanguage(translationLanguage),
+                                ) { listening = false }
                             } else {
-                                PlatformSpeechSynthesizer().stop()
+                                speechSynthesizer.stop()
+                                listening = false
                             }
                         },
                         translatedText = if (index == pagerState.currentPage) translatedText else null,
@@ -2090,9 +2980,33 @@ internal fun BukhariHadithDetailScreen(
                     horizontalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+                if (showReadingSettings) {
+                    ReaderReadingSettingsSheet(
+                        previewText = currentHadith.arabic.ifBlank {
+                            "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"
+                        },
+                        selectedFont = selectedArabicFont,
+                        fontSize = arabicFontSize,
+                        textAlignment = textAlignment,
+                        onFontChange = { font ->
+                            selectedArabicFont = font
+                            store.saveQuranArabicFont(font)
+                        },
+                        onFontSizeChange = { size ->
+                            arabicFontSize = size
+                            store.saveQuranArabicFontSize(size)
+                        },
+                        onAlignmentChange = { alignment ->
+                            textAlignment = alignment
+                            store.saveQuranTextAlignment(alignment)
+                        },
+                        onDismiss = { showReadingSettings = false },
                     )
                 }
             }
@@ -2106,6 +3020,8 @@ private fun HadithDetailPage(
     hadith: SharedHadith,
     bookTag: String?,
     arabicFont: String,
+    arabicFontSize: Float,
+    textAlignment: String,
     listening: Boolean,
     onListeningChange: (Boolean) -> Unit,
     translatedText: String? = null,
@@ -2130,7 +3046,7 @@ private fun HadithDetailPage(
             }
         }
         item {
-            HadithListenButton(hadith.english) { enabled ->
+            HadithListenButton(hadith.english, listening) { enabled ->
                 onListeningChange(enabled)
             }
         }
@@ -2140,18 +3056,14 @@ private fun HadithDetailPage(
                     Text(
                         hadith.arabic,
                         modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            textDirection = TextDirection.Rtl,
+                        ),
                         fontFamily = QuranArabicFonts.fontFamily(arabicFont),
-                        fontSize = 26.sp,
-                        lineHeight = 44.sp,
-                        textAlign = TextAlign.End,
+                        fontSize = arabicFontSize.sp,
+                        lineHeight = (arabicFontSize * 1.65f).sp,
+                        textAlign = readerTextAlignment(textAlignment),
                     )
-                }
-            }
-        }
-        if (hadith.english.isNotBlank()) {
-            item {
-                ReaderSection("English translation", MaterialTheme.colorScheme.secondary) {
-                    Text(hadith.english, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
                 }
             }
         }
@@ -2163,19 +3075,45 @@ private fun HadithDetailPage(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        } else if (!translatedText.isNullOrBlank() && translatedText != hadith.english) {
+        } else if (hadith.english.isNotBlank()) {
             item {
+                val hasSelectedTranslation = !translatedText.isNullOrBlank() && translatedText != hadith.english
                 ReaderSection(
-                    "Translation (${SharedTranslationService.displayName(translationLanguage)})",
-                    MaterialTheme.colorScheme.tertiary,
+                    if (hasSelectedTranslation) {
+                        "Translation (${SharedTranslationService.displayName(translationLanguage)})"
+                    } else {
+                        "English translation"
+                    },
+                    MaterialTheme.colorScheme.secondary,
                 ) {
-                    Text(translatedText, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                    Text(
+                        translatedText.takeIf { hasSelectedTranslation } ?: hadith.english,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            lineHeight = 27.sp,
+                            textDirection = if (translationLanguage == "ar" || translationLanguage == "ur") {
+                                TextDirection.Rtl
+                            } else {
+                                TextDirection.Content
+                            },
+                        ),
+                        textAlign = if (translationLanguage == "ar" || translationLanguage == "ur") {
+                            TextAlign.End
+                        } else {
+                            TextAlign.Start
+                        },
+                    )
                 }
             }
         }
         if (hadith.explanation.isNotBlank()) {
             item {
-                ReaderSection("Explanation", MaterialTheme.colorScheme.tertiary) {
+                ReaderSection(
+                    title = "Explanation",
+                    accent = MaterialTheme.colorScheme.tertiary,
+                    collapsible = true,
+                    initiallyExpanded = false,
+                ) {
                     Text(hadith.explanation, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
                 }
             }
@@ -2299,6 +3237,9 @@ internal fun ShamayelHadithDetailScreen(
     }
     var listening by remember { mutableStateOf(false) }
     var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
+    var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
+    var showReadingSettings by remember { mutableStateOf(false) }
     var translationLanguage by remember { mutableStateOf(store.hadithTranslationLanguage()) }
     var translationProvider by remember { mutableStateOf(store.hadithTranslationProvider()) }
     when (val current = state) {
@@ -2318,21 +3259,34 @@ internal fun ShamayelHadithDetailScreen(
             ) { hadiths.size }
             // Play-all queue — same mechanism as the Bukhari detail screen.
             var queueIndex by remember { mutableStateOf<Int?>(null) }
-            val queueSynthesizer = remember { PlatformSpeechSynthesizer() }
+            val speechSynthesizer = remember { PlatformSpeechSynthesizer() }
             LaunchedEffect(queueIndex) {
                 val index = queueIndex ?: return@LaunchedEffect
                 if (index >= hadiths.size) {
                     queueIndex = null
+                    listening = false
                     return@LaunchedEffect
                 }
                 pagerState.animateScrollToPage(index)
                 listening = true
-                val utterance = hadiths[index].english
+                val sourceText = hadiths[index].english
+                val utterance = if (translationLanguage == "en") {
+                    sourceText
+                } else {
+                    SharedTranslationService.translateFromEnglish(
+                        text = sourceText,
+                        targetLang = translationLanguage,
+                        provider = translationProvider,
+                    )
+                }
                 if (utterance.isBlank()) {
                     queueIndex = index + 1
                     return@LaunchedEffect
                 }
-                queueSynthesizer.speak(text = utterance) { error ->
+                val started = speechSynthesizer.speak(
+                    text = utterance,
+                    language = hadithNarrationLanguage(translationLanguage),
+                ) { error ->
                     if (error == null && queueIndex == index) {
                         queueIndex = index + 1
                     } else if (error != null) {
@@ -2340,17 +3294,20 @@ internal fun ShamayelHadithDetailScreen(
                         listening = false
                     }
                 }
-            }
-            LaunchedEffect(pagerState.currentPage) {
-                if (queueIndex == null) {
-                    PlatformSpeechSynthesizer().stop()
+                if (!started) {
+                    queueIndex = null
                     listening = false
                 }
             }
-            androidx.compose.runtime.DisposableEffect(Unit) {
+            LaunchedEffect(pagerState.currentPage) {
+                if (queueIndex == null) {
+                    speechSynthesizer.stop()
+                    listening = false
+                }
+            }
+            androidx.compose.runtime.DisposableEffect(speechSynthesizer) {
                 onDispose {
-                    queueSynthesizer.stop()
-                    PlatformSpeechSynthesizer().stop()
+                    speechSynthesizer.stop()
                 }
             }
             val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
@@ -2359,16 +3316,25 @@ internal fun ShamayelHadithDetailScreen(
             LaunchedEffect(currentHadith.id, translationLanguage, translationProvider) {
                 if (translationLanguage == "en") {
                     translatedText = null
+                    isTranslating = false
                 } else {
                     isTranslating = true
-                    translatedText = SharedTranslationService.translateFromEnglish(
-                        text = currentHadith.english,
-                        targetLang = translationLanguage,
-                        provider = translationProvider,
-                    )
-                    isTranslating = false
+                    try {
+                        translatedText = SharedTranslationService.translateFromEnglish(
+                            text = currentHadith.english,
+                            targetLang = translationLanguage,
+                            provider = translationProvider,
+                        )
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Throwable) {
+                        translatedText = null
+                    } finally {
+                        isTranslating = false
+                    }
                 }
             }
+            val narrationText = translatedText?.takeIf { it.isNotBlank() } ?: currentHadith.english
             val translationLanguageAction = DetailAction(
                 id = "translation_language",
                 label = "Translation language",
@@ -2391,29 +3357,26 @@ internal fun ShamayelHadithDetailScreen(
                 translationProvider = providers[(providers.indexOf(translationProvider) + 1) % providers.size]
                 store.saveHadithTranslationProvider(translationProvider)
             }
-            val arabicFontAction = DetailAction(
-                id = "arabic_font",
-                label = "Arabic font",
+            val readingSettingsAction = DetailAction(
+                id = "reading_settings",
+                label = "Reading settings",
                 trailingText = QuranArabicFonts.displayName(selectedArabicFont),
-            ) {
-                val order = QuranArabicFonts.selectionOrder
-                val currentIndex = order.indexOf(selectedArabicFont).coerceAtLeast(0)
-                val next = order[(currentIndex + 1) % order.size]
-                selectedArabicFont = next
-                store.saveQuranArabicFont(next)
-            }
+            ) { showReadingSettings = true }
             val listenAction = DetailAction(
                 id = "listen",
                 label = if (listening && queueIndex == null) "Stop narration" else "Listen (TTS)",
                 selected = listening && queueIndex == null,
             ) {
-                queueIndex = null
-                queueSynthesizer.stop()
-                listening = !listening
-                if (listening) {
-                    PlatformSpeechSynthesizer().speak(text = currentHadith.english)
+                if (listening && queueIndex == null) {
+                    speechSynthesizer.stop()
+                    listening = false
                 } else {
-                    PlatformSpeechSynthesizer().stop()
+                    queueIndex = null
+                    speechSynthesizer.stop()
+                    listening = speechSynthesizer.speak(
+                        text = narrationText,
+                        language = hadithNarrationLanguage(translationLanguage),
+                    ) { listening = false }
                 }
             }
             val playAllAction = DetailAction(
@@ -2427,19 +3390,21 @@ internal fun ShamayelHadithDetailScreen(
                 },
             ) {
                 if (queueIndex != null) {
-                    queueSynthesizer.stop()
+                    speechSynthesizer.stop()
                     queueIndex = null
                     listening = false
                 } else {
+                    speechSynthesizer.stop()
                     queueIndex = pagerState.currentPage
                 }
             }
-            ImmersiveDetailScaffold(onBack = onBack, header = {
+            Box(Modifier.fillMaxSize()) {
+                ImmersiveDetailScaffold(onBack = onBack, header = {
                 Box(Modifier.fillMaxWidth().height(190.dp)) {
                     NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
                     ImmersiveDetailHeaderScrim(
                         title = "Shama'il At-Tirmidhi",
-                        supportingText = "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        supportingText = "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
                         arabicTitle = "شمائل الترمذي",
                     )
                     Column {
@@ -2450,7 +3415,7 @@ internal fun ShamayelHadithDetailScreen(
                                 playAllAction,
                                 translationLanguageAction,
                                 translationProviderAction,
-                                arabicFontAction,
+                                readingSettingsAction,
                             ),
                             contentColor = androidx.compose.ui.graphics.Color.White,
                             toolbarTitle = "Shama'il At-Tirmidhi · Hadith ${currentHadith.id}",
@@ -2466,13 +3431,20 @@ internal fun ShamayelHadithDetailScreen(
                         hadith = hadiths[index],
                         bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },
                         arabicFont = selectedArabicFont,
+                        arabicFontSize = arabicFontSize,
+                        textAlignment = textAlignment,
                         listening = listening && index == pagerState.currentPage,
                         onListeningChange = { enabled ->
-                            listening = enabled
                             if (enabled) {
-                                PlatformSpeechSynthesizer().speak(text = hadiths[index].english)
+                                queueIndex = null
+                                speechSynthesizer.stop()
+                                listening = speechSynthesizer.speak(
+                                    text = narrationText,
+                                    language = hadithNarrationLanguage(translationLanguage),
+                                ) { listening = false }
                             } else {
-                                PlatformSpeechSynthesizer().stop()
+                                speechSynthesizer.stop()
+                                listening = false
                             }
                         },
                         translatedText = if (index == pagerState.currentPage) translatedText else null,
@@ -2487,9 +3459,33 @@ internal fun ShamayelHadithDetailScreen(
                     horizontalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+                if (showReadingSettings) {
+                    ReaderReadingSettingsSheet(
+                        previewText = currentHadith.arabic.ifBlank {
+                            "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"
+                        },
+                        selectedFont = selectedArabicFont,
+                        fontSize = arabicFontSize,
+                        textAlignment = textAlignment,
+                        onFontChange = { font ->
+                            selectedArabicFont = font
+                            store.saveQuranArabicFont(font)
+                        },
+                        onFontSizeChange = { size ->
+                            arabicFontSize = size
+                            store.saveQuranArabicFontSize(size)
+                        },
+                        onAlignmentChange = { alignment ->
+                            textAlignment = alignment
+                            store.saveQuranTextAlignment(alignment)
+                        },
+                        onDismiss = { showReadingSettings = false },
                     )
                 }
             }
@@ -2500,21 +3496,13 @@ internal fun ShamayelHadithDetailScreen(
 @Composable
 private fun HadithListenButton(
     englishText: String,
+    listening: Boolean,
     onToggle: (enabled: Boolean) -> Unit,
 ) {
-    var listening by remember { mutableStateOf(false) }
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        onDispose {
-            if (listening) {
-                PlatformSpeechSynthesizer().stop()
-            }
-        }
-    }
     if (englishText.isNotBlank()) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
-                listening = !listening
-                onToggle(listening)
+                onToggle(!listening)
             }) {
                 Icon(
                     if (listening) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -2525,6 +3513,21 @@ private fun HadithListenButton(
             }
         }
     }
+}
+
+private fun hadithNarrationLanguage(language: String): String = when (language) {
+    "ar" -> "ar-SA"
+    "bn" -> "bn-BD"
+    "zh" -> "zh-CN"
+    "en" -> "en-US"
+    "es" -> "es-ES"
+    "fr" -> "fr-FR"
+    "id" -> "id-ID"
+    "ru" -> "ru-RU"
+    "sv" -> "sv-SE"
+    "tr" -> "tr-TR"
+    "ur" -> "ur-PK"
+    else -> language
 }
 
 @Composable
@@ -3919,7 +4922,7 @@ internal fun NewsDetailScreen(
     val headerNews = (state as? SharedNewsState.Loaded)?.news?.firstOrNull()
     val rawHeaderType = headerNews?.type?.takeIf(String::isNotBlank) ?: "Invocations"
     val isHadith = rawHeaderType.contains("hadith", ignoreCase = true)
-    val headerType = if (isHadith) "Hadith" else rawHeaderType
+    val headerType = displayNewsType(rawHeaderType)
     ImmersiveDetailScaffold(onBack = onBack, header = {
         Box(Modifier.fillMaxWidth().height(190.dp)) {
             NewsHeaderArtwork(
@@ -4057,11 +5060,10 @@ private fun TopicArticleRow(
     onToggleBookmark: () -> Unit,
     onClick: () -> Unit,
 ) {
-    Card(
+    AdaptiveCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(24.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column {
             NewsHeaderArtwork(
@@ -4129,11 +5131,10 @@ private fun TopicArticleRow(
 
 @Composable
 private fun QuranNewsCard(surah: Surah, onClick: () -> Unit) {
-    Card(
+    AdaptiveCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(24.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column {
             NewsHeaderArtwork(
@@ -4360,8 +5361,11 @@ private val EXPANDED_WIDTH = 700.dp
 private fun ReaderSection(
     title: String,
     accent: Color,
+    collapsible: Boolean = false,
+    initiallyExpanded: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    var expanded by remember(title) { mutableStateOf(initiallyExpanded) }
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
@@ -4376,14 +5380,31 @@ private fun ReaderSection(
             Column(
                 modifier = Modifier.weight(1f).padding(horizontal = 15.dp, vertical = 14.dp),
             ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = accent,
-                )
-                Spacer(Modifier.height(8.dp))
-                content()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(if (collapsible) Modifier.clickable { expanded = !expanded } else Modifier),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accent,
+                    )
+                    if (collapsible) {
+                        Text(
+                            if (expanded) "Hide" else "Show",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = accent,
+                        )
+                    }
+                }
+                if (expanded) {
+                    Spacer(Modifier.height(8.dp))
+                    content()
+                }
             }
         }
     }
@@ -4416,6 +5437,7 @@ private fun ReaderTag(text: String, selected: Boolean = true) {
     }
 }
 
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 internal fun SharedDetailScaffold(
     title: String,
@@ -4423,7 +5445,7 @@ internal fun SharedDetailScaffold(
     maxContentWidth: Dp = 720.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    AdaptiveSurface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -4442,6 +5464,7 @@ internal fun SharedDetailScaffold(
     }
 }
 
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 private fun TopLevelScaffold(
     title: String,
@@ -4460,7 +5483,7 @@ private fun TopLevelScaffold(
     expandedPane: (@Composable (Modifier) -> Unit)? = null,
     content: LazyGridScope.(expanded: Boolean) -> Unit,
 ) {
-    Surface(
+    AdaptiveSurface(
         color = Color.Transparent,
         modifier = Modifier.fillMaxSize().background(screenCanvasBrush()),
     ) {
@@ -4524,31 +5547,40 @@ private fun TopLevelScaffold(
                         grid(Modifier.fillMaxWidth().weight(1f))
                     }
                 }
-                if (useSideRail) {
-                    FloatingSideBar(
-                        items = SharedBottomBarItems,
-                        selectedIndex = selectedIndex,
-                        onSelect = onSelectBottom,
-                        modifier = Modifier.align(Alignment.CenterStart),
-                    )
-                } else {
-                    FloatingBottomBar(
-                        items = SharedBottomBarItems,
-                        selectedIndex = selectedIndex,
-                        onSelect = onSelectBottom,
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                    )
+                if (LocalShowBottomNavigation.current) {
+                    if (useSideRail) {
+                        FloatingSideBar(
+                            items = SharedBottomBarItems,
+                            selectedIndex = selectedIndex,
+                            onSelect = onSelectBottom,
+                            modifier = Modifier.align(Alignment.CenterStart),
+                        )
+                    } else {
+                        FloatingBottomBar(
+                            items = SharedBottomBarItems,
+                            selectedIndex = selectedIndex,
+                            onSelect = onSelectBottom,
+                            onVoiceTap = searchController?.let { controller ->
+                                { controller.openVoice() }
+                            },
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
                 }
             }
         }
         // Pull-to-refresh on every tab page — the app-level container Android
         // gives all top-level destinations; pages without async data pass a
         // refresh that completes immediately so the gesture springs back.
+        // The shared connectivity feed drives the persistent offline row.
         if (onRefresh != null) {
+            val isOnline by com.starception.submission.shared.connectivity.appConnectivity.isOnline
+                .collectAsState()
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,
                 syncResultText = syncResultText,
+                isOffline = !isOnline,
                 prayerAlertState = prayerAlert
                     ?: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
                 modifier = Modifier.fillMaxSize(),
@@ -4560,6 +5592,7 @@ private fun TopLevelScaffold(
 }
 
 /** The shared top bar — identical to the home header on every tab page. */
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 private fun SharedUnifiedHeaderRow(
     searchController: SharedSearchController,
@@ -4580,41 +5613,53 @@ private fun SharedUnifiedHeaderRow(
             showBackground = false,
             onClick = onOpenProfile,
         )
-        Surface(
-            onClick = { searchController.open() },
-            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-            shape = androidx.compose.foundation.shape.CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ) {
-            Row(
-                modifier = Modifier.padding(start = 16.dp, end = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = NiaIcons.Search,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Text(
-                    text = "Search Quran, Hadith and more",
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        AdaptiveWidget(
+            material = {
+                Surface(
+                    onClick = { searchController.open() },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = NiaIcons.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "Search Quran, Hadith and more",
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconTapTarget(
+                            icon = androidx.compose.material.icons.Icons.Filled.Mic,
+                            contentDescription = "Voice search",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            visualSize = 36.dp,
+                            iconSize = 20.dp,
+                            showBackground = false,
+                            onClick = { searchController.openVoice() },
+                        )
+                    }
+                }
+            },
+            cupertino = {
+                io.github.alexzhirkevich.cupertino.CupertinoSearchBarNative(
+                    placeholder = "Search",
+                    onSearchClick = searchController::open,
+                    onVoiceClick = { searchController.openVoice() },
                     modifier = Modifier.weight(1f),
                 )
-                IconTapTarget(
-                    icon = androidx.compose.material.icons.Icons.Filled.Mic,
-                    contentDescription = "Voice search",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    visualSize = 36.dp,
-                    iconSize = 20.dp,
-                    showBackground = false,
-                    onClick = { searchController.openVoice() },
-                )
-            }
-        }
+            },
+        )
         IconTapTarget(
             icon = androidx.compose.material.icons.Icons.Outlined.Settings,
             contentDescription = "Settings",
@@ -4627,29 +5672,103 @@ private fun SharedUnifiedHeaderRow(
     }
 }
 
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 private fun ScreenHeader(title: String, onBack: (() -> Unit)? = null) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(52.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (onBack != null) {
-            IconTapTarget(
-                icon = NiaIcons.ArrowBack,
-                contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.onBackground,
-                onClick = onBack,
-            )
-        }
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+    AdaptiveWidget(
+        material = {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (onBack != null) {
+                    IconTapTarget(
+                        icon = NiaIcons.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        onClick = onBack,
+                    )
+                }
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        cupertino = {
+            if (onBack != null) {
+                CupertinoNavigateBackButton(
+                    onClick = onBack,
+                    modifier = Modifier.height(44.dp),
+                ) {
+                    CupertinoText(
+                        title,
+                        style = CupertinoTheme.typography.title3,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            } else {
+                CupertinoText(
+                    title,
+                    style = CupertinoTheme.typography.title2,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.height(44.dp),
+                )
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalAdaptiveApi::class)
+@Composable
+internal fun AdaptiveCard(
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(16.dp),
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    AdaptiveWidget(
+        material = {
+            if (onClick != null) {
+                androidx.compose.material3.Card(
+                    onClick = onClick,
+                    modifier = modifier,
+                    shape = shape,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    content = content,
+                )
+            } else {
+                androidx.compose.material3.Card(
+                    modifier = modifier,
+                    shape = shape,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    content = content,
+                )
+            }
+        },
+        cupertino = {
+            val surfaceModifier = if (onClick != null) {
+                modifier.clickable(onClick = onClick)
+            } else {
+                modifier
+            }
+            CupertinoSurface(
+                modifier = surfaceModifier,
+                shape = shape,
+                color = CupertinoTheme.colorScheme.secondarySystemGroupedBackground,
+            ) {
+                Column(Modifier.fillMaxWidth(), content = content)
+            }
+        },
+    )
 }
 
 @Composable
@@ -4659,10 +5778,9 @@ private fun SurahRow(
     onClick: () -> Unit,
     onToggleSaved: (() -> Unit)? = null,
 ) {
-    Card(
+    AdaptiveCard(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth().semantics {
             contentDescription = "Surah ${surah.number}, ${surah.nameEnglish}"
         },
@@ -4692,10 +5810,9 @@ private fun SurahRow(
 
 @Composable
 private fun BukhariBookRow(book: BukhariBook, saved: Boolean, onClick: () -> Unit) {
-    Card(
+    AdaptiveCard(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth().semantics {
             contentDescription = "Sahih al-Bukhari book ${book.id}, ${book.nameEnglish}"
         },
@@ -4733,9 +5850,8 @@ internal fun SupportingCard(
     onAction: (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    Card(
+    AdaptiveCard(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth().then(
             if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
         ),

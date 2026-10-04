@@ -66,7 +66,7 @@ object AppIconManager {
         return AppIconChoice.entries.firstOrNull { choice ->
             context.packageManager.getComponentEnabledSetting(choice.componentName(context)) ==
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-        } ?: AppIconChoice.ROYAL
+        } ?: AppIconChoice.HORIZON
     }
 
     fun selectIcon(context: Context, choice: AppIconChoice) {

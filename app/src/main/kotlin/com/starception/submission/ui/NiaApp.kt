@@ -20,7 +20,16 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.res.Configuration
+import android.graphics.BlurMaskFilter
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -28,13 +37,18 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,18 +64,27 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.Help
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration.Short
@@ -69,6 +92,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult.ActionPerformed
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.WindowAdaptiveInfo
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
@@ -85,27 +109,37 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.dismiss
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -127,6 +161,10 @@ import com.starception.submission.core.designsystem.theme.GradientColors
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.LocalGradientColors
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
+import com.starception.submission.core.model.deenly.DeenlyNudge
+import com.starception.submission.core.model.deenly.DeenlyNudgeAction
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.media.MediaControllerUiState
@@ -134,6 +172,7 @@ import com.starception.submission.navigation.NiaNavHost
 import com.starception.submission.navigation.TopLevelDestination
 import com.starception.submission.navigation.navigateToMediaSourceDetail
 import com.starception.submission.settings.navigation.navigateToSettings
+import com.starception.submission.ui.search.VoiceAssistantNudgeBus
 import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
 import com.starception.submission.usersettings.ui.CountrySwitchViewModel
 import kotlinx.coroutines.coroutineScope
@@ -259,7 +298,6 @@ internal fun NiaAppContent(
     val unreadDestinations by appState.topLevelDestinationsWithUnreadResources
         .collectAsStateWithLifecycle()
     val currentDestination = appState.currentDestination
-
     // Check if we're in landscape mode
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -567,20 +605,27 @@ private fun NiaFloatingBottomBar(
     // Circular voice-assistant button beside the floating nav — the same
     // on-device Whisper flow as the search bar's mic (via the bus), now with a
     // live listening animation driven by the real capture state and mic level.
-    val voiceButton = @Composable {
+    val voiceButton = @Composable { voiceModifier: Modifier ->
         val listening by com.starception.submission.ui.search.SearchPrefillBus.listening
             .collectAsStateWithLifecycle()
         val processing by com.starception.submission.ui.search.SearchPrefillBus.processing
             .collectAsStateWithLifecycle()
         val level by com.starception.submission.ui.search.SearchPrefillBus.voiceLevel
             .collectAsStateWithLifecycle()
+        val nudge by VoiceAssistantNudgeBus.nudge.collectAsStateWithLifecycle()
         VoiceAssistantButton(
             listening = listening,
             processing = processing,
             level = level,
+            nudge = nudge,
+            verticalLayout = vertical,
             // Tracks navBarHeight so the voice button stays proportional to the pill.
             buttonSize = if (vertical) 44.dp else 52.dp,
             onClick = { com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch() },
+            onNudgeAction = VoiceAssistantNudgeBus::requestAction,
+            onQuizLongPress = VoiceAssistantNudgeBus::requestQuiz,
+            onNudgeDismiss = VoiceAssistantNudgeBus::requestDismiss,
+            modifier = voiceModifier,
         )
     }
 
@@ -601,19 +646,31 @@ private fun NiaFloatingBottomBar(
         ) {
             pill(Modifier.width(56.dp))
             Spacer(modifier = Modifier.height(8.dp))
-            voiceButton()
+            voiceButton(Modifier)
         }
     } else {
-        Row(
+        Box(
             modifier = modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .fillMaxHeight(),
         ) {
-            pill(Modifier.weight(1f))
-            Spacer(modifier = Modifier.width(10.dp))
-            voiceButton()
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                pill(Modifier.weight(1f))
+                Spacer(modifier = Modifier.width(62.dp))
+            }
+            voiceButton(
+                Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding()
+                    .padding(end = 12.dp, bottom = 8.dp),
+            )
         }
     }
 }
@@ -623,16 +680,30 @@ private fun NiaFloatingBottomBar(
  * transcribing. Listening uses a mic-responsive traveling ripple. When capture
  * ends, those same straight paths progressively bend into five independent
  * curved dashes. The full-size dashes spiral inward at staggered depths without
- * joining into a circle or propeller. Keeping the paths continuous makes the
- * state change feel intentional, while tapping during processing cancels it.
+ * joining into a circle or propeller. A nudge first replaces the bars with a
+ * generation sparkle, then restores the bars before revealing the suggestion.
+ * Keeping these states separate avoids implying that a visible suggestion is
+ * still being generated.
  */
+private enum class VoiceAssistantSurface {
+    Button,
+    Nudge,
+    Quiz,
+}
+
 @Composable
 private fun VoiceAssistantButton(
     listening: Boolean,
     processing: Boolean,
     level: Float,
+    nudge: DeenlyNudge?,
+    verticalLayout: Boolean,
     buttonSize: Dp = 60.dp,
     onClick: () -> Unit,
+    onNudgeAction: () -> Unit,
+    onQuizLongPress: () -> Unit,
+    onNudgeDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val listeningBlend by animateFloatAsState(
         targetValue = if (listening) 1f else 0f,
@@ -669,41 +740,178 @@ private fun VoiceAssistantButton(
         ),
         label = "assistantProcessingSwirl",
     )
-
+    val nudgeGlowPulse by barMotion.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_700, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "assistantNudgeGlow",
+    )
     val container = MaterialTheme.colorScheme.onSurface
     val barColor = MaterialTheme.colorScheme.surface
+    val quizOpen by VoiceAssistantNudgeBus.quizOpen.collectAsStateWithLifecycle()
+    BackHandler(enabled = quizOpen, onBack = VoiceAssistantNudgeBus::closeQuiz)
+    var revealedNudgeId by remember { mutableStateOf<String?>(null) }
+    var sparklingNudgeId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(nudge?.id) {
+        revealedNudgeId = null
+        sparklingNudgeId = null
+        val nudgeId = nudge?.id ?: return@LaunchedEffect
+        sparklingNudgeId = nudgeId
+        delay(1_800)
+        sparklingNudgeId = null
+        delay(800)
+        revealedNudgeId = nudgeId
+    }
+    val canPresentNudge = nudge != null && !listening && !processing
+    val isPreparingNudge = canPresentNudge && revealedNudgeId != nudge?.id
+    val isGeneratingNudge = isPreparingNudge && sparklingNudgeId == nudge?.id
+    val showNudge = canPresentNudge && revealedNudgeId == nudge?.id
+    var typedNudgeText by remember(nudge?.id) { mutableStateOf("") }
+    var isTypingNudge by remember(nudge?.id) { mutableStateOf(false) }
+    LaunchedEffect(showNudge, nudge?.id) {
+        typedNudgeText = ""
+        isTypingNudge = false
+        if (!showNudge) return@LaunchedEffect
+        val label = nudge?.label.orEmpty()
+        isTypingNudge = true
+        delay(120)
+        label.indices.forEach { index ->
+            typedNudgeText = label.take(index + 1)
+            delay(if (label[index] in ".,?!") 90 else 32)
+        }
+        isTypingNudge = false
+    }
+    val nudgeBlend by animateFloatAsState(
+        targetValue = if (isGeneratingNudge) 1f else 0f,
+        animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing),
+        label = "assistantNudgeBlend",
+    )
+    val nudgeBrush = Brush.horizontalGradient(
+        colors = if (LocalDarkTheme.current) {
+            listOf(Color(0xFF303044), Color(0xFF25383E), Color(0xFF273D38))
+        } else {
+            listOf(Color(0xFFEDEAFF), Color(0xFFE8F7FF), Color(0xFFE6FBF2))
+        },
+    )
+    val assistantGlowColor = MaterialTheme.colorScheme.primary
+    var nudgeDragOffset by remember(nudge?.id) { mutableStateOf(Offset.Zero) }
+    var quizDragOffset by remember(quizOpen) { mutableStateOf(Offset.Zero) }
+    val assistantSurface = when {
+        quizOpen -> VoiceAssistantSurface.Quiz
+        showNudge -> VoiceAssistantSurface.Nudge
+        else -> VoiceAssistantSurface.Button
+    }
+    val containerCorner by animateDpAsState(
+        targetValue = when (assistantSurface) {
+            VoiceAssistantSurface.Button -> buttonSize / 2
+            VoiceAssistantSurface.Nudge -> 24.dp
+            VoiceAssistantSurface.Quiz -> 28.dp
+        },
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        label = "assistantContainerCorner",
+    )
+    val containerElevation by animateDpAsState(
+        targetValue = when (assistantSurface) {
+            VoiceAssistantSurface.Button -> 2.dp
+            VoiceAssistantSurface.Nudge -> 3.dp
+            VoiceAssistantSurface.Quiz -> 8.dp
+        },
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        label = "assistantContainerElevation",
+    )
+    val expandedContainerColor = if (LocalDarkTheme.current) {
+        Color(0xFF29373B)
+    } else {
+        Color(0xFFE9F5F7)
+    }
+    val containerColor by animateColorAsState(
+        targetValue = if (assistantSurface == VoiceAssistantSurface.Button) {
+            container
+        } else {
+            expandedContainerColor
+        },
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        label = "assistantContainerColor",
+    )
 
-    Surface(
-        // During processing the same tap routes back to Whisper and cancels it.
-        onClick = onClick,
-        shape = CircleShape,
-        color = container,
-        shadowElevation = 2.dp,
-        modifier = Modifier
-            .size(buttonSize)
-            .semantics {
-                contentDescription = when {
-                    processing -> "Cancel voice processing"
-                    listening -> "Finish listening"
-                    else -> "Start voice search"
-                }
-            }
-            .graphicsLayer {
-                val s = 1f + 0.06f * ampActive
-                scaleX = s
-                scaleY = s
-            },
+    SharedTransitionLayout(
+        modifier = if (verticalLayout) modifier.size(buttonSize) else modifier,
     ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Canvas(
-                modifier = Modifier
-                    .size(if (buttonSize < 56.dp) 25.dp else 30.dp)
-                    .graphicsLayer {
-                        val processingScale = 1f + 0.25f * processingBlend
-                        scaleX = processingScale
-                        scaleY = processingScale
+        Box(
+            modifier = if (verticalLayout) Modifier else Modifier.fillMaxSize(),
+            contentAlignment = if (verticalLayout) Alignment.Center else Alignment.BottomEnd,
+        ) {
+            AnimatedContent(
+                modifier = Modifier.wrapContentSize(),
+                targetState = assistantSurface,
+                transitionSpec = {
+                    (fadeIn(tween(180, delayMillis = 80)) togetherWith fadeOut(tween(120)))
+                        .using(
+                            // sharedBounds owns the surface morph; do not animate the
+                            // AnimatedContent host independently during the same change.
+                            SizeTransform(
+                                clip = false,
+                                sizeAnimationSpec = { _, _ -> snap() },
+                            ),
+                        )
+                },
+                contentAlignment = if (verticalLayout) Alignment.Center else Alignment.BottomEnd,
+                label = "assistantSurfaceContent",
+            ) { surface ->
+                when (surface) {
+                VoiceAssistantSurface.Button -> Surface(
+                    shape = RoundedCornerShape(containerCorner),
+                    color = containerColor,
+                    shadowElevation = containerElevation,
+                    modifier = Modifier
+                        .size(buttonSize)
+                        .sharedBounds(
+                            sharedContentState = rememberSharedContentState(
+                                key = "app-shell-voice-container",
+                            ),
+                            animatedVisibilityScope = this,
+                            boundsTransform = { _, _ ->
+                                tween(320, easing = FastOutSlowInEasing)
+                            },
+                        )
+                        .clip(RoundedCornerShape(containerCorner))
+                .combinedClickable(
+                    // During processing the same tap routes back to Whisper and cancels it.
+                    onClick = when {
+                        showNudge -> onNudgeAction
+                        isPreparingNudge -> ({})
+                        else -> onClick
                     },
-            ) {
+                    onLongClick = onQuizLongPress,
+                )
+                .semantics {
+                    contentDescription = when {
+                        showNudge -> nudge?.label.orEmpty()
+                        isPreparingNudge -> "Generating suggestion"
+                        processing -> "Cancel voice processing"
+                        listening -> "Finish listening"
+                        else -> "Start voice search"
+                    }
+                }
+                .graphicsLayer {
+                    val s = 1f + 0.06f * ampActive
+                    scaleX = s
+                    scaleY = s
+                },
+                ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Canvas(
+                    modifier = Modifier
+                        .size(if (buttonSize < 56.dp) 25.dp else 30.dp)
+                        .graphicsLayer {
+                            val iconScale = 1f + 0.25f * processingBlend - 0.10f * nudgeBlend
+                            scaleX = iconScale
+                            scaleY = iconScale
+                        },
+                ) {
                 val rest = floatArrayOf(0.40f, 0.62f, 1f, 0.62f, 0.40f)
                 val barCount = rest.size
                 val slot = size.width / barCount
@@ -780,24 +988,24 @@ private fun VoiceAssistantButton(
                         dashEnd.y -
                             kotlin.math.cos(dashEndAngle.toDouble()).toFloat() * controlDistance,
                     )
-                    fun morph(from: Offset, to: Offset) = Offset(
-                        from.x + (to.x - from.x) * processingBlend,
-                        from.y + (to.y - from.y) * processingBlend,
+                    fun morph(from: Offset, to: Offset, fraction: Float) = Offset(
+                        from.x + (to.x - from.x) * fraction,
+                        from.y + (to.y - from.y) * fraction,
                     )
 
-                    val pathStart = morph(lineStart, dashStart)
-                    val pathControl1 = morph(lineControl1, dashControl1)
-                    val pathControl2 = morph(lineControl2, dashControl2)
-                    val pathEnd = morph(lineEnd, dashEnd)
+                    val processedStart = morph(lineStart, dashStart, processingBlend)
+                    val processedControl1 = morph(lineControl1, dashControl1, processingBlend)
+                    val processedControl2 = morph(lineControl2, dashControl2, processingBlend)
+                    val processedEnd = morph(lineEnd, dashEnd, processingBlend)
                     val bentPath = Path().apply {
-                        moveTo(pathStart.x, pathStart.y)
+                        moveTo(processedStart.x, processedStart.y)
                         cubicTo(
-                            pathControl1.x,
-                            pathControl1.y,
-                            pathControl2.x,
-                            pathControl2.y,
-                            pathEnd.x,
-                            pathEnd.y,
+                            processedControl1.x,
+                            processedControl1.y,
+                            processedControl2.x,
+                            processedControl2.y,
+                            processedEnd.x,
+                            processedEnd.y,
                         )
                     }
 
@@ -806,7 +1014,8 @@ private fun VoiceAssistantButton(
                         ((1f - inwardProgress) / 0.20f).coerceIn(0f, 1f),
                     )
                     val dashAlpha = 0.12f + edgeFade * 0.88f
-                    val alpha = barAlpha + (dashAlpha - barAlpha) * processingBlend
+                    val processedAlpha = barAlpha + (dashAlpha - barAlpha) * processingBlend
+                    val alpha = processedAlpha * (1f - nudgeBlend)
                     val strokeWidth = barWidth
 
                     drawPath(
@@ -819,7 +1028,343 @@ private fun VoiceAssistantButton(
                         ),
                     )
                 }
+                }
+                VoiceNudgeSparkles(
+                    color = barColor,
+                    morph = nudgeBlend,
+                    modifier = Modifier
+                        .size(if (buttonSize < 56.dp) 38.dp else 44.dp)
+                        .graphicsLayer {
+                            val scale = 0.90f + 0.10f * nudgeBlend
+                            scaleX = scale
+                            scaleY = scale
+                        },
+                )
             }
+                }
+
+                VoiceAssistantSurface.Nudge -> Surface(
+                    onClick = onNudgeAction,
+                    shape = RoundedCornerShape(containerCorner),
+                    color = containerColor,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shadowElevation = containerElevation,
+                    modifier = Modifier
+                        .wrapContentSize(
+                            align = if (verticalLayout) {
+                                Alignment.CenterStart
+                            } else {
+                                Alignment.BottomEnd
+                            },
+                            unbounded = true,
+                        )
+                        .offset(
+                            x = if (verticalLayout) buttonSize + 8.dp else 0.dp,
+                            y = if (verticalLayout) 0.dp else -buttonSize - 8.dp,
+                        )
+                        .width(if (verticalLayout) 260.dp else 300.dp)
+                        .height(if (verticalLayout) 36.dp else 44.dp)
+                        .sharedBounds(
+                            sharedContentState = rememberSharedContentState(
+                                key = "app-shell-voice-container",
+                            ),
+                            animatedVisibilityScope = this,
+                            boundsTransform = { _, _ ->
+                                tween(320, easing = FastOutSlowInEasing)
+                            },
+                        )
+                .pointerInput(showNudge, nudge?.id) {
+                    if (!showNudge) return@pointerInput
+                    var dragOffset = Offset.Zero
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffset += dragAmount
+                            nudgeDragOffset = dragOffset
+                        },
+                        onDragCancel = { nudgeDragOffset = Offset.Zero },
+                        onDragEnd = {
+                            val shouldDismiss =
+                                abs(dragOffset.x) > 72f || dragOffset.y < -48f
+                            if (shouldDismiss) {
+                                onNudgeDismiss()
+                            }
+                            nudgeDragOffset = Offset.Zero
+                        },
+                    )
+                        }
+                        .graphicsLayer {
+                            translationX = nudgeDragOffset.x
+                            translationY = nudgeDragOffset.y
+                            alpha = 1f - minOf(
+                                0.45f,
+                                (abs(nudgeDragOffset.x) + abs(nudgeDragOffset.y)) / 240f,
+                            )
+                        }
+                        .drawBehind {
+                        drawIntoCanvas { canvas ->
+                            val glowPaint = android.graphics.Paint(
+                                android.graphics.Paint.ANTI_ALIAS_FLAG,
+                            ).apply {
+                                color = assistantGlowColor.toArgb()
+                                alpha = ((0.26f + nudgeGlowPulse * 0.08f) * 255).toInt()
+                                maskFilter = BlurMaskFilter(
+                                    9.dp.toPx(),
+                                    BlurMaskFilter.Blur.NORMAL,
+                                )
+                            }
+                            canvas.nativeCanvas.drawRoundRect(
+                                0f,
+                                0f,
+                                size.width,
+                                size.height,
+                                size.height / 2f,
+                                size.height / 2f,
+                                glowPaint,
+                            )
+                        }
+                        }
+                        .semantics {
+                            contentDescription = nudge?.label.orEmpty()
+                        },
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(containerCorner))
+                            .background(nudgeBrush)
+                            .padding(
+                                horizontal = if (verticalLayout) 8.dp else 12.dp,
+                                vertical = if (verticalLayout) 5.dp else 6.dp,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        NudgePreviewThumbnail(
+                            action = nudge?.action,
+                            size = if (verticalLayout) 26.dp else 32.dp,
+                        )
+                        Spacer(Modifier.width(if (verticalLayout) 6.dp else 8.dp))
+                        Text(
+                            text = typedNudgeText + if (isTypingNudge) "|" else "",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(
+                            onClick = onNudgeDismiss,
+                            modifier = Modifier.size(if (verticalLayout) 24.dp else 28.dp),
+                        ) {
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.REMOVE,
+                                contentDescription = "Dismiss suggestion",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = if (verticalLayout) 13.sp else 15.sp,
+                            )
+                        }
+                    }
+                }
+                VoiceAssistantSurface.Quiz -> {
+                    val configuration = LocalConfiguration.current
+                    val quizWidth = minOf(
+                        320.dp,
+                        (configuration.screenWidthDp - if (verticalLayout) 104 else 32).dp,
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(containerCorner),
+                        color = containerColor,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shadowElevation = containerElevation,
+                        modifier = Modifier
+                            .wrapContentSize(
+                                align = if (verticalLayout) {
+                                    Alignment.CenterStart
+                                } else {
+                                    Alignment.BottomEnd
+                                },
+                                unbounded = true,
+                            )
+                            .offset(
+                                x = if (verticalLayout) buttonSize + 12.dp else 0.dp,
+                                y = if (verticalLayout) 0.dp else -buttonSize - 12.dp,
+                            )
+                            .width(quizWidth)
+                            .heightIn(
+                                max = if (verticalLayout) {
+                                    (configuration.screenHeightDp - 32).dp
+                                } else {
+                                    360.dp
+                                },
+                            )
+                            .sharedBounds(
+                                sharedContentState = rememberSharedContentState(
+                                    key = "app-shell-voice-container",
+                                ),
+                                animatedVisibilityScope = this,
+                                boundsTransform = { _, _ ->
+                                    tween(360, easing = FastOutSlowInEasing)
+                                },
+                            )
+                            .pointerInput(quizOpen) {
+                                if (!quizOpen) return@pointerInput
+                                var horizontalOffset = 0f
+                                detectHorizontalDragGestures(
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        horizontalOffset += dragAmount
+                                        quizDragOffset = Offset(horizontalOffset, 0f)
+                                    },
+                                    onDragCancel = { quizDragOffset = Offset.Zero },
+                                    onDragEnd = {
+                                        if (abs(horizontalOffset) > 96f) {
+                                            VoiceAssistantNudgeBus.closeQuiz()
+                                        }
+                                        quizDragOffset = Offset.Zero
+                                    },
+                                )
+                            }
+                            .graphicsLayer {
+                                translationX = quizDragOffset.x
+                                alpha = 1f - minOf(0.45f, abs(quizDragOffset.x) / 320f)
+                            }
+                            .drawBehind {
+                                drawIntoCanvas { canvas ->
+                                    val glowPaint = android.graphics.Paint(
+                                        android.graphics.Paint.ANTI_ALIAS_FLAG,
+                                    ).apply {
+                                        color = assistantGlowColor.toArgb()
+                                        alpha = ((0.22f + nudgeGlowPulse * 0.07f) * 255).toInt()
+                                        maskFilter = BlurMaskFilter(
+                                            12.dp.toPx(),
+                                            BlurMaskFilter.Blur.NORMAL,
+                                        )
+                                    }
+                                    canvas.nativeCanvas.drawRoundRect(
+                                        0f,
+                                        0f,
+                                        size.width,
+                                        size.height,
+                                        containerCorner.toPx(),
+                                        containerCorner.toPx(),
+                                        glowPaint,
+                                    )
+                                }
+                            }
+                            .clip(RoundedCornerShape(containerCorner))
+                            .background(nudgeBrush)
+                            .semantics {
+                                contentDescription = "Islamic quiz"
+                                dismiss {
+                                    VoiceAssistantNudgeBus.closeQuiz()
+                                    true
+                                }
+                            },
+                    ) {
+                        com.starception.submission.feature.prayertimes.components.IslamicQuizContent(
+                            onDismiss = VoiceAssistantNudgeBus::closeQuiz,
+                        )
+                    }
+                }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NudgePreviewThumbnail(
+    action: DeenlyNudgeAction?,
+    size: Dp = 32.dp,
+) {
+    val glyph = when (action) {
+        DeenlyNudgeAction.MARK_PRAYED -> FlaticonIcons.CHECK
+        DeenlyNudgeAction.PLAY_TRAVEL_DUA -> FlaticonIcons.TRAVEL
+        DeenlyNudgeAction.PLAY_QUIZ -> FlaticonIcons.QUIZ
+        DeenlyNudgeAction.OPEN_QIBLA,
+        DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
+        null -> FlaticonIcons.QUICK_ACTION
+    }
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(RoundedCornerShape(9.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center,
+    ) {
+        FlaticonIcon(
+            glyph = glyph,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontSize = if (size < 30.dp) 16.sp else 19.sp,
+        )
+    }
+}
+
+@Composable
+private fun VoiceNudgeSparkles(
+    color: Color,
+    morph: Float,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "voiceNudgeSparkles")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (Math.PI * 2.0).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2_600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "voiceNudgeSparkleOrbit",
+    )
+    val sizes = floatArrayOf(0.27f, 0.19f, 0.15f)
+
+    Canvas(modifier) {
+        if (morph <= 0f) return@Canvas
+        val orbitRadius = size.minDimension * 0.13f
+        sizes.forEachIndexed { index, sizeFraction ->
+            val angle = phase + index * (Math.PI.toFloat() * 2f / sizes.size)
+            val pulse = 0.72f + 0.28f * (
+                kotlin.math.sin((angle * 2f).toDouble()).toFloat() + 1f
+                ) / 2f
+            val radius = size.minDimension * sizeFraction * pulse
+            val orbitCenter = Offset(
+                x = center.x + kotlin.math.cos(angle.toDouble()).toFloat() * orbitRadius,
+                y = center.y + kotlin.math.sin(angle.toDouble()).toFloat() * orbitRadius,
+            )
+            val barCenter = Offset(
+                x = size.width * when (index) {
+                    0 -> 0.23f
+                    1 -> 0.50f
+                    else -> 0.77f
+                },
+                y = center.y,
+            )
+            val sparkleCenter = Offset(
+                x = barCenter.x + (orbitCenter.x - barCenter.x) * morph,
+                y = barCenter.y + (orbitCenter.y - barCenter.y) * morph,
+            )
+            val barHalfLength = size.minDimension * if (index == 1) 0.335f else 0.134f
+            val barHalfWidth = size.minDimension * 0.031f
+            val verticalRadius = barHalfLength + (radius - barHalfLength) * morph
+            val horizontalRadius = barHalfWidth + (radius * 0.72f - barHalfWidth) * morph
+            val innerRadiusX = barHalfWidth + (radius * 0.20f - barHalfWidth) * morph
+            val barInnerRadiusY = (barHalfLength - barHalfWidth).coerceAtLeast(0f)
+            val innerRadiusY = barInnerRadiusY +
+                (verticalRadius * 0.20f - barInnerRadiusY) * morph
+            val sparkle = Path().apply {
+                moveTo(sparkleCenter.x, sparkleCenter.y - verticalRadius)
+                lineTo(sparkleCenter.x + innerRadiusX, sparkleCenter.y - innerRadiusY)
+                lineTo(sparkleCenter.x + horizontalRadius, sparkleCenter.y)
+                lineTo(sparkleCenter.x + innerRadiusX, sparkleCenter.y + innerRadiusY)
+                lineTo(sparkleCenter.x, sparkleCenter.y + verticalRadius)
+                lineTo(sparkleCenter.x - innerRadiusX, sparkleCenter.y + innerRadiusY)
+                lineTo(sparkleCenter.x - horizontalRadius, sparkleCenter.y)
+                lineTo(sparkleCenter.x - innerRadiusX, sparkleCenter.y - innerRadiusY)
+                close()
+            }
+            drawPath(path = sparkle, color = color)
         }
     }
 }

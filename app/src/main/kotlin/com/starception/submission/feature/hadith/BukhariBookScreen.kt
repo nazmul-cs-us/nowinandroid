@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -69,6 +68,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.component.NiaButton
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.hadithdatabase.HadithDatabase
@@ -187,7 +187,10 @@ private fun HadithBookScreen(
     ) {
         value = if (book == null) {
             HadithBookLoadState.Error("This ${config.title} book could not be found.")
-        } else if (!HadithDatabase.isDatabaseAvailable(context, config.databaseFile)) {
+        } else if (!withContext(Dispatchers.IO) {
+                HadithDatabase.isDatabaseAvailable(context, config.databaseFile)
+            }
+        ) {
             HadithBookLoadState.MissingDatabase
         } else {
             try {
@@ -196,7 +199,16 @@ private fun HadithBookScreen(
                         .hadithDao()
                         .getHadithsInRange(book.firstHadithId, book.lastHadithId)
                 }
-                HadithBookLoadState.Loaded(hadiths)
+                if (hadiths.isEmpty()) {
+                    // A legacy empty Room copy can survive an older placeholder asset.
+                    // Treat it as missing content so the download card repairs the source.
+                    withContext(Dispatchers.IO) {
+                        HadithDatabase.clearInstance(context, config.databaseFile)
+                    }
+                    HadithBookLoadState.MissingDatabase
+                } else {
+                    HadithBookLoadState.Loaded(hadiths)
+                }
             } catch (error: Exception) {
                 HadithBookLoadState.Error(error.message ?: "Unable to open ${config.title}.")
             }
@@ -399,14 +411,8 @@ private fun HadithBookList(
                                 maxLines = 1,
                             )
                         }
-                        Button(
+                        NiaButton(
                             onClick = onPlayAllClick,
-                            shape = RoundedCornerShape(
-                                topStart = 20.dp,
-                                topEnd = 20.dp,
-                                bottomEnd = 8.dp,
-                                bottomStart = 20.dp,
-                            ),
                         ) {
                             FlaticonPlayIcon(
                                 contentDescription = null,

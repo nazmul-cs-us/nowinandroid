@@ -42,7 +42,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -81,6 +80,7 @@ import com.starception.submission.core.designsystem.component.NiaBottomSheetFram
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.core.designsystem.component.NiaNavigationSuiteScaffold
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.ThemeBrand
@@ -287,11 +287,11 @@ fun HsvColorWheelDialog(
                             .padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        TextButton(onClick = { showPreview = true }) { Text("Preview") }
+                        NiaTextButton(onClick = { showPreview = true }) { Text("Preview") }
                         Spacer(modifier = Modifier.weight(1f))
-                        TextButton(onClick = onDismiss) { Text("Cancel") }
+                        NiaTextButton(onClick = onDismiss) { Text("Cancel") }
                         Spacer(modifier = Modifier.size(8.dp))
-                        TextButton(onClick = { onConfirm(primary, secondary, tertiary) }) {
+                        NiaTextButton(onClick = { onConfirm(primary, secondary, tertiary) }) {
                             Text("Save")
                         }
                     }
@@ -410,7 +410,7 @@ private fun ThemePreviewScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                TextButton(onClick = onBack) { Text("Back") }
+                NiaTextButton(onClick = onBack) { Text("Back") }
                 NiaOutlinedButton(
                     onClick = onApply,
                 ) {

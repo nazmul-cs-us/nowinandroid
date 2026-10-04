@@ -70,6 +70,7 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(libs.reorderable)
+            implementation(libs.cupertino.adaptive)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

@@ -46,6 +46,23 @@ interface SharedNewsRepository {
     suspend fun newsById(id: Int): SharedNewsResource?
 
     suspend fun searchNews(query: String, limit: Int = 30): List<SharedNewsResource>
+
+    suspend fun searchNewsByType(
+        query: String,
+        type: String,
+        limit: Int = 10,
+    ): List<SharedNewsResource> = searchNews(query, limit).filter {
+        it.type.contains(type, ignoreCase = true)
+    }
+
+    suspend fun searchNewsByType(
+        queries: List<String>,
+        type: String,
+        limit: Int = 10,
+    ): List<SharedNewsResource> = queries
+        .flatMap { searchNewsByType(it, type, limit) }
+        .distinctBy(SharedNewsResource::id)
+        .take(limit)
 }
 
 expect fun createSharedNewsRepository(): SharedNewsRepository

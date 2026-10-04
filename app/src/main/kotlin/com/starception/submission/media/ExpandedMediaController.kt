@@ -46,7 +46,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +55,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.feature.quran.AudioLanguage
 
 /**
@@ -307,7 +307,7 @@ fun ExpandedMediaController(
         Spacer(modifier = Modifier.height(4.dp))
 
         // Close button
-        TextButton(
+        NiaTextButton(
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onAction(MediaAction.Dismiss)

@@ -16,15 +16,16 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.UIKitView
 import platform.Foundation.NSBundle
-import platform.UIKit.UIColor
 import platform.UIKit.UIImage
-import platform.UIKit.UIImageRenderingMode
 import platform.UIKit.UIImageView
 import platform.UIKit.UIViewContentMode
 
@@ -48,17 +49,11 @@ internal actual fun NewsHeaderArtwork(resourceName: String, modifier: Modifier) 
 
 @Composable
 internal actual fun LocationMarkerArtwork(tint: Color, modifier: Modifier) {
-    UIKitView(
-        factory = {
-            UIImageView().apply {
-                contentMode = UIViewContentMode.UIViewContentModeScaleAspectFit
-                image = bundledImage("ic_flaticon_location_marker")
-                    ?.imageWithRenderingMode(UIImageRenderingMode.UIImageRenderingModeAlwaysTemplate)
-                tintColor = tint.toUIColor()
-            }
-        },
+    Icon(
+        imageVector = Icons.Filled.LocationOn,
+        contentDescription = null,
+        tint = tint,
         modifier = modifier,
-        update = { imageView -> imageView.tintColor = tint.toUIColor() },
     )
 }
 
@@ -85,10 +80,3 @@ private fun bundledImage(name: String): UIImage? =
     UIImage.imageNamed(name)
         ?: NSBundle.mainBundle.pathForResource(name, ofType = "png")
             ?.let { UIImage.imageWithContentsOfFile(it) }
-
-private fun Color.toUIColor(): UIColor = UIColor.colorWithRed(
-    red = red.toDouble(),
-    green = green.toDouble(),
-    blue = blue.toDouble(),
-    alpha = alpha.toDouble(),
-)

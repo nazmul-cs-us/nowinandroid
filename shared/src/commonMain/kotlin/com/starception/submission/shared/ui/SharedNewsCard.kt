@@ -69,10 +69,9 @@ internal fun SharedNewsResourceCard(
     currentTopicId: Int? = null,
     compact: Boolean = false,
 ) {
-    Card(
+    AdaptiveCard(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = modifier.fillMaxWidth().semantics {
             stateDescription = if (viewed) "Read" else "Unread"
         },
@@ -101,23 +100,16 @@ internal fun SharedNewsResourceCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    FilledIconToggleButton(
-                        checked = bookmarked,
-                        onCheckedChange = { onToggleBookmark() },
-                        colors = IconButtonDefaults.iconToggleButtonColors(
-                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                    ) {
-                        Icon(
-                            imageVector = if (bookmarked) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
-                            contentDescription = if (bookmarked) {
-                                "Remove bookmark for ${news.title}"
-                            } else {
-                                "Bookmark ${news.title}"
-                            },
-                        )
-                    }
+                    IconTapTarget(
+                        icon = if (bookmarked) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
+                        contentDescription = if (bookmarked) {
+                            "Remove bookmark for ${news.title}"
+                        } else {
+                            "Bookmark ${news.title}"
+                        },
+                        tint = MaterialTheme.colorScheme.primary,
+                        onClick = onToggleBookmark,
+                    )
                 }
                 Spacer(Modifier.height(if (compact) 8.dp else 14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -213,10 +205,8 @@ internal fun SharedNewsDetailContent(news: SharedNewsResource) {
     Spacer(Modifier.height(18.dp))
     val sections = sharedNewsSections(news.content)
     sections.forEach { (title, body) ->
-        Surface(
+        AdaptiveCard(
             shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)),
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         ) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
@@ -252,9 +242,16 @@ internal fun newsHeaderResource(news: SharedNewsResource): String = news.headerI
 
 private fun newsMetadata(news: SharedNewsResource): String = buildList {
     news.publishDate.toString().substringBefore('T').takeIf(String::isNotBlank)?.let(::add)
-    news.type.takeIf(String::isNotBlank)?.let(::add)
+    news.type.takeIf(String::isNotBlank)?.let { add(displayNewsType(it)) }
     news.source?.takeIf(String::isNotBlank)?.let(::add)
 }.joinToString(" · ")
+
+internal fun displayNewsType(type: String): String = when {
+    type.contains("hadith", ignoreCase = true) -> "Hadith"
+    type.contains("dua", ignoreCase = true) -> "Dua"
+    type.contains("surah", ignoreCase = true) -> "Surah"
+    else -> type.filter { it.isLetterOrDigit() || it.isWhitespace() || it in "&-/" }.trim()
+}
 
 internal fun sharedNewsArabicLine(content: String, type: String): String? {
     val section = if (type.contains("surah", ignoreCase = true)) {

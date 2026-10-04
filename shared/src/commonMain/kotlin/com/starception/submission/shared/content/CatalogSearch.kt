@@ -30,20 +30,92 @@ sealed interface CatalogResult {
 fun searchCatalog(query: String): List<CatalogResult> {
     val term = query.trim()
     if (term.isEmpty()) return emptyList()
-    val normalized = term.lowercase()
+    val searchTerms = expandedSearchQueries(term)
     val number = term.toIntOrNull()
     return buildList {
         QuranData.surahs.filter { surah ->
             surah.number == number ||
-                normalized in surah.nameEnglish.lowercase() ||
+                searchTerms.any { matchesCatalogName(surah.nameEnglish, it) } ||
                 term in surah.nameArabic
         }.forEach { add(CatalogResult.Quran(it)) }
         BukhariBooks.all.filter { book ->
             book.id == number ||
-                normalized in book.nameEnglish.lowercase() ||
+                searchTerms.any { matchesCatalogName(book.nameEnglish, it) } ||
                 term in book.nameArabic
         }.forEach { add(CatalogResult.Bukhari(it)) }
     }
+}
+
+private val SearchSynonymGroups = listOf(
+    listOf("prayer", "salah", "salat", "namaz"),
+    listOf("adhan", "azan", "athan", "call to prayer"),
+    listOf("dua", "duaa", "supplication", "invocation"),
+    listOf("dhikr", "zikr", "remembrance"),
+    listOf("wudu", "wudhu", "ablution"),
+    listOf("qibla", "kibla", "prayer direction"),
+    listOf("fasting", "sawm", "roza"),
+    listOf("charity", "zakat", "almsgiving"),
+)
+
+internal fun expandedSearchQueries(query: String): List<String> {
+    val normalized = normalizeSearchText(query)
+    if (normalized.isEmpty()) return emptyList()
+    val exactGroup = SearchSynonymGroups.firstOrNull { normalized in it }
+    if (exactGroup != null) {
+        return (listOf(normalized) + exactGroup).distinct()
+    }
+    val canonicalPhrase = normalized.split(' ').joinToString(" ") { token ->
+        SearchSynonymGroups.firstOrNull { token in it }?.first() ?: token
+    }
+    return listOf(normalized, canonicalPhrase).distinct()
+}
+
+internal fun canonicalSearchQuery(query: String): String {
+    val normalized = normalizeSearchText(query)
+    val exactGroup = SearchSynonymGroups.firstOrNull { normalized in it }
+    if (exactGroup != null) return exactGroup.first()
+    return normalized.split(' ').joinToString(" ") { token ->
+        SearchSynonymGroups.firstOrNull { token in it }?.first() ?: token
+    }
+}
+
+private fun normalizeSearchText(value: String): String = buildString(value.length) {
+    value.lowercase().forEach { character ->
+        when {
+            character.isLetterOrDigit() -> append(character)
+            character == '\'' || character == '’' || character == 'ʼ' -> Unit
+            isNotEmpty() && last() != ' ' -> append(' ')
+        }
+    }
+}.trim()
+
+private fun matchesCatalogName(name: String, query: String): Boolean {
+    val normalizedName = normalizeSearchText(name)
+    if (query in normalizedName) return true
+    if (' ' in query || query.length < 3) return false
+    val tolerance = if (query.length < 5) 1 else 2
+    return normalizedName.split(' ').any { word ->
+        word.length >= 3 && editDistanceAtMost(word, query, tolerance)
+    }
+}
+
+private fun editDistanceAtMost(left: String, right: String, limit: Int): Boolean {
+    if (kotlin.math.abs(left.length - right.length) > limit) return false
+    var previous = IntArray(right.length + 1) { it }
+    left.forEachIndexed { leftIndex, leftChar ->
+        val current = IntArray(right.length + 1)
+        current[0] = leftIndex + 1
+        right.forEachIndexed { rightIndex, rightChar ->
+            current[rightIndex + 1] = minOf(
+                current[rightIndex] + 1,
+                previous[rightIndex + 1] + 1,
+                previous[rightIndex] + if (leftChar == rightChar) 0 else 1,
+            )
+        }
+        if (current.minOrNull()!! > limit) return false
+        previous = current
+    }
+    return previous[right.length] <= limit
 }
 
 data class DailyRecommendation(

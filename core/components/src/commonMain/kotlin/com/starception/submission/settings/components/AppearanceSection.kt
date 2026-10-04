@@ -62,6 +62,9 @@ import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.settings.ThemeSettingsState
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSurface
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSwitch
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
 
 @Composable
 fun AppearanceSection(
@@ -404,6 +407,7 @@ fun ModernSegmentedButtons(
     }
 }
 
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 fun ModernSwitchRow(
     title: String,
@@ -412,10 +416,9 @@ fun ModernSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
+    AdaptiveSurface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
     ) {
         Row(
             modifier = Modifier
@@ -445,15 +448,9 @@ fun ModernSwitchRow(
                 }
             }
 
-            Switch(
+            AdaptiveSwitch(
                 checked = checked,
-                onCheckedChange = null,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = MaterialTheme.colorScheme.primary,
-                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
-                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                ),
+                onCheckedChange = onCheckedChange,
             )
         }
     }

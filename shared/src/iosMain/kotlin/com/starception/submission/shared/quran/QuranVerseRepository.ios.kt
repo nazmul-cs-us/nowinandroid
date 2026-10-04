@@ -61,6 +61,56 @@ private class IosQuranVerseRepository : QuranVerseRepository {
         return withContext(Dispatchers.Default) { readVerses(surahNumber, language) }
     }
 
+    override suspend fun getSurahMetadata(surahNumber: Int): QuranSurahMetadata? {
+        require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
+        return withContext(Dispatchers.Default) { readSurahMetadata(surahNumber) }
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    private suspend fun readSurahMetadata(surahNumber: Int): QuranSurahMetadata? {
+        val databasePath = resolveDatabaseAsset(
+            bundledPath = NSBundle.mainBundle.pathForResource("quran", ofType = "db"),
+            remotePath = "databases/quran/quran.db",
+            cacheName = "quran.db",
+        )
+        return memScoped {
+            val database = alloc<CPointerVar<sqlite3>>()
+            val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
+            if (openResult != SQLITE_OK) {
+                val message = database.value.errorMessage()
+                database.value?.let(::sqlite3_close)
+                error("Unable to open Quran database: $message")
+            }
+            try {
+                val statement = alloc<CPointerVar<sqlite3_stmt>>()
+                val sql = "SELECT name_en_translation, total_verses FROM surahs WHERE number = ?"
+                check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
+                    "Unable to prepare surah metadata query: ${database.value.errorMessage()}"
+                }
+                try {
+                    check(sqlite3_bind_int(statement.value, 1, surahNumber) == SQLITE_OK) {
+                        "Unable to bind surah number: ${database.value.errorMessage()}"
+                    }
+                    if (sqlite3_step(statement.value) == SQLITE_ROW) {
+                        QuranSurahMetadata(
+                            nameTranslation = sqlite3_column_text(statement.value, 0)
+                                ?.reinterpret<ByteVar>()
+                                ?.toKString()
+                                .orEmpty(),
+                            totalVerses = sqlite3_column_int(statement.value, 1),
+                        )
+                    } else {
+                        null
+                    }
+                } finally {
+                    statement.value?.let(::sqlite3_finalize)
+                }
+            } finally {
+                database.value?.let(::sqlite3_close)
+            }
+        }
+    }
+
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun searchAyahs(query: String, limit: Int): List<QuranVerse> =
         withContext(Dispatchers.Default) {

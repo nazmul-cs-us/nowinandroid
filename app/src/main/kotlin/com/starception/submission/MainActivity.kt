@@ -61,6 +61,10 @@ import com.starception.submission.util.isSystemInDarkTheme
 import com.starception.submission.widget.WidgetDiscoveryPrompt
 import com.starception.submission.widget.WidgetNavigationBus
 import dagger.hilt.android.AndroidEntryPoint
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveTheme
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
+import io.github.alexzhirkevich.cupertino.adaptive.MaterialThemeSpec
+import io.github.alexzhirkevich.cupertino.adaptive.Theme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -146,6 +150,7 @@ class MainActivity : FragmentActivity() {
     // PERMISSION MANAGEMENT - Handles location and notification permissions for prayer features
     private lateinit var permissionManager: PermissionManager
 
+    @OptIn(ExperimentalAdaptiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d("MainActivity", "═══════════════════════════════════════════")
         Log.d("MainActivity", "🏠 MAIN ACTIVITY onCreate START")
@@ -294,6 +299,10 @@ class MainActivity : FragmentActivity() {
                 customTertiaryColor = if (resolvedCustomTertiary != 0) androidx.compose.ui.graphics.Color(resolvedCustomTertiary) else androidx.compose.ui.graphics.Color.Unspecified,
                 disableDynamicTheming = resolvedDisableDynamic,
             ) {
+                AdaptiveTheme(
+                    target = Theme.Material3,
+                    material = MaterialThemeSpec.Default(),
+                ) {
                 // Update theme color bridge so View-based components can access theme colors
                 com.starception.submission.util.ThemeColorBridge.UpdateColors()
 
@@ -328,6 +337,7 @@ class MainActivity : FragmentActivity() {
                         )
                         WidgetDiscoveryPrompt()
                     }
+                }
                 }
             }
         }

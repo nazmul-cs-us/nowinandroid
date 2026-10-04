@@ -35,9 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,6 +46,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.images.PrayerSkyPhase
@@ -58,6 +57,7 @@ import com.starception.submission.core.images.resources.insight_prayer_poster_mo
 import com.starception.submission.core.images.resources.insight_prayer_poster_night
 import com.starception.submission.core.images.resources.insight_prayer_poster_night_lights
 import com.starception.submission.core.images.resources.insight_prayer_poster_sun
+import io.github.alexzhirkevich.cupertino.CupertinoSurface
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.PI
 import kotlin.math.sin
@@ -107,13 +107,21 @@ fun PrayerNowTile(
             .coerceIn(0f, 1f)
     }
     val sceneAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = 0.40f)
-    BoxWithConstraints(
+    val shape = RoundedCornerShape(26.dp)
+    CupertinoSurface(
         modifier = modifier
             .fillMaxWidth()
-            .height(tileHeight)
-            .clip(RoundedCornerShape(26.dp))
-            .clickable(onClick = onClick),
+            .height(tileHeight),
+        shape = shape,
+        color = Color(0xFF635A56),
+        shadowElevation = 6.dp,
     ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .clickable(onClick = onClick),
+        ) {
         Image(
             painter = painterResource(
                 if (isNight) Res.drawable.insight_prayer_poster_night
@@ -201,30 +209,36 @@ fun PrayerNowTile(
         )
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(10.dp),
+            modifier = Modifier.fillMaxWidth().padding(11.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TileLabel("Prayer now")
-            Surface(
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                TileLabel("Prayer now")
+            }
+            CupertinoSurface(
+                onClick = onClick,
                 shape = CircleShape,
                 color = Color.Black.copy(alpha = 0.38f),
                 contentColor = Color.White,
+                modifier = Modifier.height(40.dp),
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    modifier = Modifier.padding(start = 11.dp, end = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = "Compass",
+                        style = MaterialTheme.typography.labelSmall,
                         fontSize = 11.sp,
-                        lineHeight = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
                     )
                     Icon(
                         imageVector = Icons.Filled.ChevronRight,
-                        contentDescription = null,
-                        modifier = Modifier.height(16.dp),
+                        contentDescription = "Open prayer compass",
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
@@ -232,87 +246,122 @@ fun PrayerNowTile(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.Bottom,
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(start = 22.dp, end = 22.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             Text(
                 text = headline,
                 fontSize = 17.sp,
                 lineHeight = 22.sp,
-                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.2).sp,
+                fontWeight = FontWeight.Medium,
                 color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = subtitle,
                 fontSize = 13.sp,
                 lineHeight = 17.sp,
                 color = Color.White.copy(alpha = 0.85f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             timelineProgress?.let { progress ->
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(6.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
-                    trackColor = Color.White.copy(alpha = 0.22f),
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.22f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .height(6.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)),
+                    )
+                }
             }
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Bottom,
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Next Prayer",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.75f),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 13.sp,
+                            letterSpacing = 0.7.sp,
+                        ),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = nextPrayer,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
+                        fontSize = 13.25.sp,
+                        lineHeight = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 forecast?.let {
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
                             text = "Forecast",
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                            color = Color.White.copy(alpha = 0.75f),
+                            fontSize = 9.5.sp,
+                            lineHeight = 12.sp,
+                            letterSpacing = 0.3.sp,
+                            color = Color.White.copy(alpha = 0.78f),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
                         )
                         Text(
                             text = it,
-                            fontSize = 14.sp,
-                            lineHeight = 18.sp,
+                            fontSize = 12.5.sp,
+                            lineHeight = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
+                            maxLines = 1,
                         )
                     }
                 }
             }
+        }
         }
     }
 }
 
 @Composable
 private fun TileLabel(text: String) {
-    Box(
+    CupertinoSurface(
+        shape = CircleShape,
+        color = Color.Black.copy(alpha = 0.38f),
+        contentColor = Color.White,
         modifier = Modifier
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.38f))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .height(40.dp),
     ) {
-        Text(
-            text = text,
-            fontSize = 11.sp,
-            lineHeight = 15.sp,
-            color = Color.White,
-        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 11.sp,
+                    letterSpacing = 0.sp,
+                ),
+                fontWeight = FontWeight.Medium,
+                color = Color.White,
+                maxLines = 1,
+            )
+        }
     }
 }

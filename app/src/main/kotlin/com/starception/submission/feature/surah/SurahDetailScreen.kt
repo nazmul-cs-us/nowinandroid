@@ -155,6 +155,7 @@ import com.starception.submission.core.designsystem.component.NiaBottomSheetDefa
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
@@ -3347,7 +3348,7 @@ private fun AlbumPlayerContent(
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showDeleteNoteConfirmation = null }) {
+                        NiaTextButton(onClick = { showDeleteNoteConfirmation = null }) {
                             Text("Cancel")
                         }
                     },
@@ -3491,7 +3492,7 @@ private fun BottomSheetNotesContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (editingNote != null) {
-                TextButton(onClick = onCancelEdit) {
+                NiaTextButton(onClick = onCancelEdit) {
                     Text("Cancel")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -4127,7 +4128,7 @@ private fun BottomSheetTafseerContent(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showLanguageDialog = false }) {
+                NiaTextButton(onClick = { showLanguageDialog = false }) {
                     Text("Done")
                 }
             },
@@ -8904,7 +8905,7 @@ private fun TranslationSelectionDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            NiaTextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         },
@@ -8954,7 +8955,7 @@ private fun FontSelectionDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            NiaTextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         },

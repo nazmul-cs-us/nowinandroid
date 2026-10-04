@@ -29,13 +29,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -49,6 +44,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.shared.travel.DrivingModeCoordinator
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveButton
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveCircularProgressIndicator
+import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveTextButton
+import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
 
 /**
  * Driving mode screen, mirroring the Android driving-mode chain:
@@ -58,6 +57,7 @@ import com.starception.submission.shared.travel.DrivingModeCoordinator
  * ([DrivingModeCoordinator.updateSpeed]); this screen offers manual control
  * and a live stage indicator.
  */
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 internal fun DrivingModeScreen(
     coordinator: DrivingModeCoordinator,
@@ -74,11 +74,8 @@ internal fun DrivingModeScreen(
     }
 
     SharedDetailScaffold(title = "Driving mode", onBack = onBack, maxContentWidth = 680.dp) {
-        Card(
+        AdaptiveCard(
             shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            ),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -98,12 +95,12 @@ internal fun DrivingModeScreen(
                 StageRow("Quran recitation", stage, DrivingModeCoordinator.Stage.QURAN)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { coordinator.start() }) {
+                    AdaptiveButton(onClick = { coordinator.start() }) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Start chain")
                     }
-                    OutlinedButton(onClick = { coordinator.stop() }) {
+                    AdaptiveTextButton(onClick = { coordinator.stop() }) {
                         Icon(Icons.Filled.Pause, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Stop")
@@ -121,6 +118,7 @@ internal fun DrivingModeScreen(
     }
 }
 
+@OptIn(ExperimentalAdaptiveApi::class)
 @Composable
 private fun StageRow(label: String, current: DrivingModeCoordinator.Stage, stage: DrivingModeCoordinator.Stage) {
     val active = current == stage
@@ -131,11 +129,15 @@ private fun StageRow(label: String, current: DrivingModeCoordinator.Stage, stage
     ) {
         Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
             if (active) {
-                CircularProgressIndicator(
+                AdaptiveCircularProgressIndicator(
                     modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                ) {
+                    material {
+                        strokeWidth = 2.dp
+                        color = MaterialTheme.colorScheme.primary
+                    }
+                    cupertino { size = 18.dp }
+                }
             } else {
                 Box(Modifier.size(8.dp))
             }

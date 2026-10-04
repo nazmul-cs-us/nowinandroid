@@ -84,11 +84,12 @@ internal class DefaultSearchContentsRepository @Inject constructor(
         // matches nothing (parsed as a literal token), which is why obvious hits
         // like the "Distress & Anxiety" topic used to disappear. Use prefix
         // matching instead so any token starting with the query is found.
-        val ftsQuery = "$searchQuery*"
+        val normalizedQuery = searchQuery.toCanonicalSearchTerm()
+        val ftsQuery = "$normalizedQuery*"
 
         // Use paginated approach with first page only for Flow-based search
-        val newsResourceIds = newsResourceFtsDao.searchAllNewsResources(ftsQuery, searchQuery)
-        val topicIds = topicFtsDao.searchAllTopics(ftsQuery, searchQuery)
+        val newsResourceIds = newsResourceFtsDao.searchAllNewsResources(ftsQuery, normalizedQuery)
+        val topicIds = topicFtsDao.searchAllTopics(ftsQuery, normalizedQuery)
 
         val newsResourcesFlow = newsResourceIds
             .mapLatest { ids ->
@@ -135,16 +136,17 @@ internal class DefaultSearchContentsRepository @Inject constructor(
         page: Int,
         pageSize: Int,
     ): SearchResult = withContext(ioDispatcher) {
-        val ftsQuery = "$searchQuery*"
+        val normalizedQuery = searchQuery.toCanonicalSearchTerm()
+        val ftsQuery = "$normalizedQuery*"
         val offset = page * pageSize
 
         // Fetch paginated IDs from FTS tables
         val newsResourceIds = newsResourceFtsDao
-            .searchNewsResourcesPaginated(ftsQuery, searchQuery, pageSize, offset)
+            .searchNewsResourcesPaginated(ftsQuery, normalizedQuery, pageSize, offset)
             .mapNotNull { it.toIntOrNull() }
 
         val topicIds = topicFtsDao
-            .searchTopicsPaginated(ftsQuery, searchQuery, pageSize, offset)
+            .searchTopicsPaginated(ftsQuery, normalizedQuery, pageSize, offset)
             .mapNotNull { it.toIntOrNull() }
 
         // Fetch actual data from content database
@@ -171,7 +173,7 @@ internal class DefaultSearchContentsRepository @Inject constructor(
      */
     override suspend fun getSearchResultsCount(searchQuery: String): SearchResultsCount =
         withContext(ioDispatcher) {
-            val ftsQuery = "$searchQuery*"
+            val ftsQuery = "${searchQuery.toCanonicalSearchTerm()}*"
             SearchResultsCount(
                 newsResourcesCount = newsResourceFtsDao.getSearchResultCount(ftsQuery),
                 topicsCount = topicFtsDao.getSearchResultCount(ftsQuery),
@@ -185,6 +187,11 @@ internal class DefaultSearchContentsRepository @Inject constructor(
         ) { newsResourceCount, topicsCount ->
             newsResourceCount + topicsCount
         }
+}
+
+private fun String.toCanonicalSearchTerm(): String = when (trim().lowercase()) {
+    "salah", "salat" -> "prayer"
+    else -> trim()
 }
 
 /**

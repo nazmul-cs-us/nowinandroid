@@ -80,7 +80,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -119,6 +118,7 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
@@ -434,7 +434,7 @@ fun SalahDataCollectionScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteAllDialog = false }) {
+                NiaTextButton(onClick = { showDeleteAllDialog = false }) {
                     Text("Cancel")
                 }
             },
@@ -484,7 +484,7 @@ fun SalahDataCollectionScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteFileDialog = null }) {
+                NiaTextButton(onClick = { showDeleteFileDialog = null }) {
                     Text("Cancel")
                 }
             },
