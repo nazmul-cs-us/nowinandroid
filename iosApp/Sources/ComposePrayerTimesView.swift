@@ -82,7 +82,7 @@ struct NativePrayerTabsView: View {
                 Label {
                     Text(isPreparingNudge ? "Thinking" : "Voice")
                 } icon: {
-                    VoiceNudgeBarsGlyph(generating: isGeneratingNudge)
+                    Image(systemName: isGeneratingNudge ? "sparkles" : "waveform")
                 }
             }
         }

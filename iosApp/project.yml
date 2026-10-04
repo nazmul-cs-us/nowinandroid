@@ -175,9 +175,10 @@ targets:
         # silent — no fix ever arrives and the app just shows the fallback city.
         NSLocationWhenInUseUsageDescription: >-
           Your location is used to calculate prayer times and Qibla direction.
-          Coordinates are shared with Open-Meteo for local weather and with Apple
-          to look up your place name and time zone. If you enable Travel Dua,
-          location may also be used while the app is open to estimate driving.
+          Coordinates are shared with Open-Meteo for local weather, with Apple to
+          look up your place name and time zone, and with BigDataCloud when Apple
+          returns only a generic area name. If you enable Travel Dua, location may
+          also be used while the app is open to estimate driving.
         NSMicrophoneUsageDescription: >-
           The microphone is used only when you test voice recognition or answer a
           hands-free prompt.

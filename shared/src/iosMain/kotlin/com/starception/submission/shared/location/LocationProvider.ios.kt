@@ -17,10 +17,16 @@
 package com.starception.submission.shared.location
 
 import com.starception.submission.core.logging.SharedLog
+import com.starception.submission.shared.weather.httpGet
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import platform.CoreLocation.CLGeocoder
 import platform.CoreLocation.CLLocation
 import platform.CoreLocation.CLLocationManager
@@ -60,7 +66,14 @@ actual class LocationProvider actual constructor() {
         }
 
         val (latitude, longitude) = fix
-        val place = withTimeoutOrNull(GEOCODE_TIMEOUT_MS) { describe(latitude, longitude) }
+        val applePlace = withTimeoutOrNull(GEOCODE_TIMEOUT_MS) { describe(latitude, longitude) }
+        val place = if (applePlace?.hasGenericArea() == true) {
+            withTimeoutOrNull(GEOCODE_TIMEOUT_MS) {
+                describeGenericArea(latitude, longitude, applePlace)
+            } ?: applePlace
+        } else {
+            applePlace
+        }
 
         return DeviceLocation(
             latitude = latitude,
@@ -129,6 +142,41 @@ actual class LocationProvider actual constructor() {
 
     private class Place(val name: String, val offsetHours: Double?, val countryCode: String)
 
+    private fun Place.hasGenericArea(): Boolean = name.substringBefore(',').trim().lowercase() in setOf(
+        "area",
+        "district",
+        "sector",
+        "unnamed road",
+    )
+
+    private suspend fun describeGenericArea(
+        latitude: Double,
+        longitude: Double,
+        applePlace: Place,
+    ): Place? {
+        val response = httpGet(
+            "https://api.bigdatacloud.net/data/reverse-geocode-client" +
+                "?latitude=$latitude&longitude=$longitude&localityLanguage=en",
+        ) ?: return null
+        val root = runCatching { Json.parseToJsonElement(response).jsonObject }.getOrNull() ?: return null
+        val city = root["city"]?.jsonPrimitive?.contentOrNull
+            ?: root["locality"]?.jsonPrimitive?.contentOrNull
+        val country = root["countryName"]?.jsonPrimitive?.contentOrNull
+        val broadNames = setOfNotNull(
+            city,
+            country,
+            root["principalSubdivision"]?.jsonPrimitive?.contentOrNull,
+        )
+        val area = root["localityInfo"]?.jsonObject
+            ?.get("administrative")?.jsonArray
+            ?.mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull }
+            ?.lastOrNull { it !in broadNames }
+        val name = listOfNotNull(area, city, country).distinct().joinToString(", ")
+        return name.takeIf(String::isNotBlank)?.let {
+            Place(it, applePlace.offsetHours, applePlace.countryCode)
+        }
+    }
+
     /**
      * Reverse geocodes for the place name *and* its timezone.
      *
@@ -142,11 +190,17 @@ actual class LocationProvider actual constructor() {
                 CLLocation(latitude = latitude, longitude = longitude),
             ) { placemarks, _ ->
                 val placemark = placemarks?.firstOrNull() as? CLPlacemark
-                // Neighbourhood reads better than the city alone, matching how the
-                // Android app names the location, but either alone is acceptable.
+                // Match Android's subLocality -> featureName -> city priority.
+                // Apple often puts neighbourhoods such as Nad Al Hamar in an
+                // area of interest or the placemark name instead of subLocality.
+                val area = placemark?.subLocality
+                    ?: placemark?.areasOfInterest?.firstOrNull()
+                    ?: placemark?.name
+                val city = placemark?.locality ?: placemark?.administrativeArea
                 val name = listOfNotNull(
-                    placemark?.subLocality ?: placemark?.locality,
-                    placemark?.administrativeArea ?: placemark?.country,
+                    area,
+                    city,
+                    placemark?.country,
                 ).distinct().joinToString(", ")
                 // Seconds, and not every offset is a whole hour: India is +5.5,
                 // Nepal +5.75. secondsFromGMT already accounts for daylight saving.
