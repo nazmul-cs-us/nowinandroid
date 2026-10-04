@@ -73,6 +73,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
@@ -1062,8 +1063,17 @@ private fun VoiceAssistantButton(
                             x = if (verticalLayout) buttonSize + 8.dp else 0.dp,
                             y = if (verticalLayout) 0.dp else -buttonSize - 8.dp,
                         )
-                        .width(if (verticalLayout) 260.dp else 300.dp)
-                        .height(if (verticalLayout) 36.dp else 44.dp)
+                        .widthIn(
+                            max = if (verticalLayout) {
+                                260.dp
+                            } else {
+                                minOf(
+                                    340.dp,
+                                    (LocalConfiguration.current.screenWidthDp - 16).dp,
+                                )
+                            },
+                        )
+                        .heightIn(min = if (verticalLayout) 36.dp else 44.dp)
                         .sharedBounds(
                             sharedContentState = rememberSharedContentState(
                                 key = "app-shell-voice-container",
@@ -1130,7 +1140,7 @@ private fun VoiceAssistantButton(
                 ) {
                     Row(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .wrapContentSize()
                             .clip(RoundedCornerShape(containerCorner))
                             .background(nudgeBrush)
                             .padding(
@@ -1146,11 +1156,9 @@ private fun VoiceAssistantButton(
                         Spacer(Modifier.width(if (verticalLayout) 6.dp else 8.dp))
                         Text(
                             text = typedNudgeText + if (isTypingNudge) "|" else "",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 2,
                         )
                         Spacer(Modifier.width(4.dp))
                         IconButton(
@@ -1195,7 +1203,7 @@ private fun VoiceAssistantButton(
                                 max = if (verticalLayout) {
                                     (configuration.screenHeightDp - 32).dp
                                 } else {
-                                    360.dp
+                                    minOf(480.dp, (configuration.screenHeightDp - 160).dp)
                                 },
                             )
                             .sharedBounds(

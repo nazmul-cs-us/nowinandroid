@@ -37,6 +37,8 @@ import androidx.media.VolumeProviderCompat
 import com.starception.submission.MainActivity
 import com.starception.submission.R
 
+internal const val ADHAN_AUDIO_STREAM = AudioManager.STREAM_ALARM
+
 /**
  * Converts the saved 0–100 user level to MediaPlayer's 0–1 amplitude scale.
  * Squaring gives the percentage a useful perceived-loudness curve: low values
@@ -305,7 +307,7 @@ class AdhanPlaybackService : Service() {
             am.requestAudioFocus(request)
         } else {
             @Suppress("DEPRECATION")
-            am.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN)
+            am.requestAudioFocus(null, ADHAN_AUDIO_STREAM, AudioManager.AUDIOFOCUS_GAIN)
         }
     }
 

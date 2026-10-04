@@ -16,11 +16,17 @@
 
 package com.starception.submission.prayer.service
 
+import android.media.AudioManager
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AdhanPlaybackVolumeTest {
+
+    @Test
+    fun adhanVolumeUiUsesPlaybackAlarmStream() {
+        assertEquals(AudioManager.STREAM_ALARM, ADHAN_AUDIO_STREAM)
+    }
 
     @Test
     fun allPrayersDefaultToFivePercentVolume() {

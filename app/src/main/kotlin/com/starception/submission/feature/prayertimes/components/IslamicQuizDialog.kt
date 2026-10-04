@@ -6,8 +6,12 @@
 
 package com.starception.submission.feature.prayertimes.components
 
+import android.content.res.ColorStateList
+import android.util.TypedValue
+import android.view.ContextThemeWrapper
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,22 +20,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,8 +41,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.component.NiaButton
 import com.starception.submission.core.model.deenly.IslamicQuizBank
 import com.starception.submission.feature.prayertimes.quiz.IslamicQuizRepository
+import com.google.android.material.card.MaterialCardView
 
 @Composable
 fun IslamicQuizDialog(
@@ -73,12 +72,12 @@ fun IslamicQuizContent(
     }
     var questionIndex by remember { mutableIntStateOf(0) }
     var selectedOption by remember { mutableStateOf<Int?>(null) }
+    var answerSubmitted by remember { mutableStateOf(false) }
     var score by remember { mutableIntStateOf(0) }
     val question = questions[questionIndex]
-    val answered = selectedOption != null
+    val answered = answerSubmitted
     val isCorrect = selectedOption == question.correctOption
     val isLastQuestion = questionIndex == questions.lastIndex
-    val displayedScore = score + if (answered && isCorrect) 1 else 0
 
     Column(
         modifier = modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -109,7 +108,7 @@ fun IslamicQuizContent(
                 shape = RoundedCornerShape(50),
             ) {
                 Text(
-                    text = "$displayedScore pts",
+                    text = "$score pts",
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
@@ -143,9 +142,7 @@ fun IslamicQuizContent(
         }
 
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
@@ -155,7 +152,6 @@ fun IslamicQuizContent(
             )
             question.options.forEachIndexed { index, option ->
                 QuizOption(
-                    index = index,
                     text = option,
                     selected = selectedOption == index,
                     correct = index == question.correctOption,
@@ -217,18 +213,24 @@ fun IslamicQuizContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 42.dp),
-            enabled = answered,
+            enabled = selectedOption != null,
             onClick = {
-                if (isCorrect) score++
-                if (isLastQuestion) onDismiss() else {
+                if (!answered) {
+                    answerSubmitted = true
+                    if (isCorrect) score++
+                } else if (isLastQuestion) {
+                    onDismiss()
+                } else {
                     questionIndex++
                     selectedOption = null
+                    answerSubmitted = false
                 }
             },
         ) {
             Text(
                 text = when {
-                    !answered -> "Choose an answer"
+                    selectedOption == null -> "Choose an answer"
+                    !answered -> "Check answer"
                     isLastQuestion -> "Finish quiz"
                     else -> "Next question"
                 },
@@ -247,7 +249,6 @@ fun IslamicQuizContent(
 
 @Composable
 private fun QuizOption(
-    index: Int,
     text: String,
     selected: Boolean,
     correct: Boolean,
@@ -258,6 +259,7 @@ private fun QuizOption(
         targetValue = when {
             answered && correct -> MaterialTheme.colorScheme.primaryContainer
             answered && selected -> MaterialTheme.colorScheme.errorContainer
+            selected -> MaterialTheme.colorScheme.surface
             else -> MaterialTheme.colorScheme.surface
         },
         label = "quizOptionColor",
@@ -267,6 +269,7 @@ private fun QuizOption(
             answered && correct -> MaterialTheme.colorScheme.onPrimaryContainer
             answered && selected -> MaterialTheme.colorScheme.onErrorContainer
             answered -> MaterialTheme.colorScheme.onSurfaceVariant
+            selected -> MaterialTheme.colorScheme.onSurface
             else -> MaterialTheme.colorScheme.onSurface
         },
         label = "quizOptionContentColor",
@@ -275,100 +278,67 @@ private fun QuizOption(
         targetValue = when {
             answered && correct -> MaterialTheme.colorScheme.primary
             answered && selected -> MaterialTheme.colorScheme.error
+            selected -> MaterialTheme.colorScheme.primary
             else -> MaterialTheme.colorScheme.outlineVariant
         },
         label = "quizOptionBorderColor",
     )
-    val badgeColor by animateColorAsState(
-        targetValue = when {
-            answered && correct -> MaterialTheme.colorScheme.primary
-            answered && selected -> MaterialTheme.colorScheme.error
-            else -> MaterialTheme.colorScheme.secondaryContainer
-        },
-        label = "quizOptionBadgeColor",
-    )
-    val badgeContentColor = when {
-        answered && correct -> MaterialTheme.colorScheme.onPrimary
-        answered && selected -> MaterialTheme.colorScheme.onError
-        else -> MaterialTheme.colorScheme.onSecondaryContainer
-    }
-
-    OutlinedCard(
+    val checked = selected || (answered && correct)
+    AndroidView(
         modifier = Modifier
-            .fillMaxWidth()
-            .selectable(
-                selected = selected,
-                enabled = !answered,
-                role = Role.RadioButton,
-                onClick = onClick,
-            ),
-        colors = CardDefaults.outlinedCardColors(
-            containerColor = containerColor,
-            contentColor = contentColor,
-        ),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(
-            width = if (answered && (correct || selected)) 2.dp else 1.dp,
-            color = borderColor,
-        ),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-        ) {
-            Surface(
-                modifier = Modifier.size(24.dp),
-                shape = CircleShape,
-                color = badgeColor,
-                contentColor = badgeContentColor,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = ('A'.code + index).toChar().toString(),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-            Text(
-                text = text,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (selected || (answered && correct)) {
-                    FontWeight.SemiBold
-                } else {
-                    FontWeight.Normal
-                },
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            .fillMaxWidth(),
+        factory = { context ->
+            val density = context.resources.displayMetrics.density
+            val cardContext = ContextThemeWrapper(
+                context,
+                com.google.android.material.R.style.Theme_Material3_DayNight_NoActionBar,
             )
-            if (answered && (correct || selected)) {
-                Icon(
-                    imageVector = if (correct) {
-                        Icons.Rounded.CheckCircle
-                    } else {
-                        Icons.Rounded.Cancel
+            MaterialCardView(cardContext).apply {
+                isCheckable = true
+                isClickable = true
+                isFocusable = true
+                strokeWidth = density.toInt().coerceAtLeast(1)
+                checkedIconSize = (20 * density).toInt()
+                checkedIconMargin = (6 * density).toInt()
+                addView(
+                    TextView(cardContext).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        )
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                        maxLines = 2
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                        setPadding(
+                            (16 * density).toInt(),
+                            (10 * density).toInt(),
+                            (42 * density).toInt(),
+                            (10 * density).toInt(),
+                        )
                     },
-                    contentDescription = if (correct) "Correct answer" else "Incorrect answer",
-                    tint = if (correct) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
-                    modifier = Modifier.size(20.dp),
                 )
-            } else {
-                Surface(
-                    modifier = Modifier.size(18.dp),
-                    shape = CircleShape,
-                    color = Color.Transparent,
-                    border = BorderStroke(
-                        width = 1.5.dp,
-                        color = MaterialTheme.colorScheme.outline,
-                    ),
-                ) {}
             }
-        }
-    }
+        },
+        update = { card ->
+            val label = card.getChildAt(0) as TextView
+            label.text = text
+            label.setTextColor(contentColor.toArgb())
+            label.typeface = android.graphics.Typeface.create(
+                label.typeface,
+                if (checked) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL,
+            )
+            card.setCardBackgroundColor(containerColor.toArgb())
+            card.strokeColor = borderColor.toArgb()
+            card.setCheckedIconTint(ColorStateList.valueOf(borderColor.toArgb()))
+            card.isChecked = checked
+            card.isClickable = !answered
+            card.setOnClickListener(if (answered) null else android.view.View.OnClickListener { onClick() })
+            card.contentDescription = when {
+                answered && correct -> "$text, correct answer"
+                answered && selected -> "$text, incorrect answer"
+                selected -> "$text, selected answer"
+                else -> text
+            }
+        },
+    )
 }

@@ -166,6 +166,7 @@ import com.starception.submission.feature.prayertimes.weather.weatherThresholdPr
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.feature.quran.QuranPlayerViewModel
+import com.starception.submission.prayer.service.ADHAN_AUDIO_STREAM
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -319,15 +320,11 @@ private sealed interface CurrentWeatherLoadState {
 
 /**
  * Which prayer's speaker tap opened the system volume bar. While set, the
- * notification-stream volume changes are captured as THAT prayer's own adhan
- * volume (as a percent of the stream max) instead of a shared value. The bar
- * is a TRANSIENT dial: the stream is restored to its pre-session level when
- * the session expires, so only the per-prayer percent persists.
+ * alarm-stream volume changes are captured as THAT prayer's own adhan
+ * volume (as a percent of the stream max) instead of a shared value.
  */
 internal object AdhanVolumeCapture {
     @Volatile var prayer: String? = null
-
-    @Volatile var preSessionStreamVolume: Int = -1
 
     @Volatile var audioManager: android.media.AudioManager? = null
 
@@ -336,25 +333,20 @@ internal object AdhanVolumeCapture {
     @Volatile private var appContext: android.content.Context? = null
 
     /**
-     * Opens the system volume bar AT [storedPercent] (a transient dial) and
-     * arms the capture session for [prayerName] — registering its own
+     * Opens the system alarm-volume bar at its real current level and arms the
+     * capture session for [prayerName] — registering its own
      * VOLUME_CHANGED receiver so the capture works from ANY surface (the
      * home tune tile and the Settings Adhan rows alike). Every adjustment is
      * persisted straight to the repository, whose flow both UIs collect.
      */
-    fun beginSession(context: android.content.Context, prayerName: String, storedPercent: Int) {
+    fun beginSession(context: android.content.Context, prayerName: String) {
         val appCtx = context.applicationContext
         val manager = appCtx.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-        val maxVolume = manager.getStreamMaxVolume(android.media.AudioManager.STREAM_NOTIFICATION)
-            .coerceAtLeast(1)
         if (prayer != null && prayer != prayerName) {
             endSession()
         }
         audioManager = manager
         appContext = appCtx
-        preSessionStreamVolume = manager.getStreamVolume(
-            android.media.AudioManager.STREAM_NOTIFICATION,
-        )
         prayer = prayerName
 
         // Register the session receiver (replaces any stale one).
@@ -366,10 +358,10 @@ internal object AdhanVolumeCapture {
                 if (prayer != prayerName) return
                 val currentManager = audioManager ?: return
                 val streamVolume = currentManager.getStreamVolume(
-                    android.media.AudioManager.STREAM_NOTIFICATION,
+                    ADHAN_AUDIO_STREAM,
                 )
                 val currentMax = currentManager.getStreamMaxVolume(
-                    android.media.AudioManager.STREAM_NOTIFICATION,
+                    ADHAN_AUDIO_STREAM,
                 ).coerceAtLeast(1)
                 val percent = (streamVolume * 100 / currentMax).coerceIn(0, 100)
                 val capturedPrayer = prayerName
@@ -391,47 +383,25 @@ internal object AdhanVolumeCapture {
             )
         }
 
-        val targetStream = (storedPercent * maxVolume / 100).coerceIn(0, maxVolume)
-        if (targetStream != preSessionStreamVolume) {
-            runCatching {
-                manager.setStreamVolume(
-                    android.media.AudioManager.STREAM_NOTIFICATION,
-                    targetStream,
-                    0,
-                )
-            }
-        }
         manager.adjustStreamVolume(
-            android.media.AudioManager.STREAM_NOTIFICATION,
+            ADHAN_AUDIO_STREAM,
             android.media.AudioManager.ADJUST_SAME,
             android.media.AudioManager.FLAG_SHOW_UI,
         )
     }
 
     /**
-     * Ends the capture session (leaving tune mode, starting a new one, or the
-     * host surface going away) and RESTORES the notification stream to its
-     * pre-session level.
+     * Ends the capture session when tune mode or its host surface goes away.
+     * The alarm stream is intentionally not restored: it is the playback
+     * ceiling, and restoring a quiet level would make adhan inaudible.
      */
     fun endSession() {
-        val restore = preSessionStreamVolume
-        val manager = audioManager
         receiver?.let { stale ->
             appContext?.let { ctx ->
                 runCatching { ctx.unregisterReceiver(stale) }
             }
         }
         receiver = null
-        if (restore >= 0 && manager != null) {
-            runCatching {
-                manager.setStreamVolume(
-                    android.media.AudioManager.STREAM_NOTIFICATION,
-                    restore,
-                    0,
-                )
-            }
-        }
-        preSessionStreamVolume = -1
         prayer = null
     }
 }
@@ -2397,13 +2367,11 @@ fun PrayerTimesScreen(
                                                 )
                                                 .clickable {
                                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    // Shared session: opens the bar AT this prayer's stored
-                                                    // percent and captures the adjustment (works from the tile
-                                                    // and Settings alike).
+                                                    // Show the real alarm level and capture its adjustment for
+                                                    // this prayer (works from the tile and Settings alike).
                                                     AdhanVolumeCapture.beginSession(
                                                         tileContext,
                                                         prayerName,
-                                                        adhanVolume,
                                                     )
                                                 },
                                             contentAlignment = Alignment.Center,

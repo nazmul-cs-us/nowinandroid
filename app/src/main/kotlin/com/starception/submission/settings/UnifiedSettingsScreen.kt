@@ -80,6 +80,7 @@ import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
+import com.starception.submission.prayer.service.ADHAN_AUDIO_STREAM
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppIconSection
 import com.starception.submission.settings.components.AppearanceSection
@@ -380,27 +381,25 @@ fun UnifiedSettingsScreen(
                                         .openDndAccessSettings(dndContext)
                                 },
                                 onShowSystemVolume = {
-                                    // The adhan plays on the notification stream; the
+                                    // The adhan plays on the alarm stream; the
                                     // system volume panel for that stream IS the adhan
                                     // volume control.
                                     val audioManager = dndContext.getSystemService(
                                         android.content.Context.AUDIO_SERVICE,
                                     ) as android.media.AudioManager
                                     audioManager.adjustStreamVolume(
-                                        android.media.AudioManager.STREAM_NOTIFICATION,
+                                        ADHAN_AUDIO_STREAM,
                                         android.media.AudioManager.ADJUST_SAME,
                                         android.media.AudioManager.FLAG_SHOW_UI,
                                     )
                                 },
                                 onAdhanSpeakerTap = { prayerName ->
-                                    // Same interaction as the home tune tile: open the bar
-                                    // AT this prayer's stored percent and capture the
-                                    // adjustment as this prayer's own volume.
-                                    val stored = notificationPreferences
-                                        .getAdhanVolumeForPrayer(prayerName)
+                                    // Same interaction as the home tune tile: show the
+                                    // real alarm level and capture its adjustment for
+                                    // this prayer.
                                     com.starception.submission.feature.prayertimes
                                         .AdhanVolumeCapture
-                                        .beginSession(dndContext, prayerName, stored)
+                                        .beginSession(dndContext, prayerName)
                                 },
                                 speakerOnPainter = androidx.compose.ui.res.painterResource(
                                     com.starception.submission.R.drawable.flaticon_sound_14925297,
