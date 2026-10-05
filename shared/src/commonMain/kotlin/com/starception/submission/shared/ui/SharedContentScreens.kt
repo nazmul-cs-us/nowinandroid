@@ -153,7 +153,6 @@ import com.starception.submission.shared.content.searchCatalog
 import com.starception.submission.shared.content.sharedTopic
 import com.starception.submission.shared.hadith.SharedHadith
 import com.starception.submission.shared.hadith.createSharedHadithRepository
-import com.starception.submission.shared.quran.AyahNumberChip
 import com.starception.submission.shared.quran.QuranArabicFonts
 import com.starception.submission.shared.quran.QuranTranslationLanguage
 import com.starception.submission.shared.quran.QuranVerse
@@ -953,10 +952,11 @@ internal fun QuranDetailScreen(
                                         text = QURAN_BISMILLAH,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                            .padding(horizontal = 16.dp, vertical = 2.dp),
                                         fontFamily = QuranArabicFonts.fontFamily(selectedArabicFont),
-                                        fontSize = (arabicFontSize * 0.78f).sp,
-                                        lineHeight = (arabicFontSize * 1.15f).sp,
+                                        fontSize = (arabicFontSize * 1.3f).sp,
+                                        lineHeight = (arabicFontSize * 1.3f * 1.6f).sp,
+                                        letterSpacing = quranArabicLetterSpacing(selectedArabicFont),
                                         textAlign = TextAlign.Center,
                                         color = MaterialTheme.colorScheme.onSurface,
                                     )
@@ -1218,72 +1218,109 @@ private fun QuranAyahReadingBlock(
     onOpenTafseer: (ayahNumber: Int, preselectBook: Int) -> Unit = { _, _ -> },
 ) {
     val arabicFontFamily = QuranArabicFonts.fontFamily(arabicFont)
-    Column(
+    val textAlign = when (textAlignment) {
+        "center" -> TextAlign.Center
+        "end" -> TextAlign.End
+        "justify" -> TextAlign.Justify
+        else -> TextAlign.Start
+    }
+    val horizontalAlignment = when (textAlignment) {
+        "center" -> Alignment.CenterHorizontally
+        "end" -> Alignment.End
+        else -> Alignment.Start
+    }
+
+    Surface(
+        color = Color.Transparent,
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = {}, onDoubleClick = onToggleTranslation)
+            .combinedClickable(
+                onClick = {},
+                onLongClick = { onOpenTafseer(verse.numberInSurah, 0) },
+                onDoubleClick = onToggleTranslation,
+            )
             .semantics {
                 contentDescription = verse.metadataLabel()
+            },
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Match Android's fixed leading ornament column instead of placing
+            // the marker after the Arabic text.
+            AyahListMarker(ayahNumber = verse.numberInSurah)
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = horizontalAlignment,
+            ) {
+                Text(
+                    text = tajweedAnnotatedString(verse.arabicText, tajweedAnnotations),
+                    modifier = Modifier.fillMaxWidth(),
+                    fontFamily = arabicFontFamily,
+                    fontSize = arabicFontSize.sp,
+                    lineHeight = (arabicFontSize * 1.6f).sp,
+                    letterSpacing = quranArabicLetterSpacing(arabicFont),
+                    textAlign = textAlign,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+
+                if (showTranslation && verse.translation.isNotBlank()) {
+                    val translationFontSize = arabicFontSize * 0.5f
+                    Text(
+                        text = verse.translation,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = translationFontSize.sp,
+                            lineHeight = (translationFontSize * 1.5f).sp,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = textAlign,
+                    )
+                }
             }
-            .padding(horizontal = 4.dp, vertical = 14.dp),
+        }
+    }
+
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+    )
+}
+
+private fun quranArabicLetterSpacing(arabicFont: String) = when (arabicFont) {
+    QuranArabicFonts.INDOPAK -> 0.7.sp
+    QuranArabicFonts.UTHMANI -> 0.6.sp
+    QuranArabicFonts.NOOR_E_HIDAYAT -> 0.4.sp
+    else -> 0.5.sp
+}
+
+@Composable
+private fun AyahListMarker(ayahNumber: Int) {
+    val digits = ayahNumber.toArabicIndicDigits()
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.90f),
+                shape = CircleShape,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
-            verse.metadataLabel(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold,
+            text = digits,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.90f),
+            fontWeight = FontWeight.Medium,
+            fontSize = if (digits.length >= 3) 9.sp else 12.sp,
+            lineHeight = 13.sp,
+            maxLines = 1,
         )
-        Spacer(Modifier.height(5.dp))
-        // Arabic in the selected Quran typeface at Android's default 41sp with
-        // 1.7x leading; the ayah number sits in its rosette chip.
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = tajweedAnnotatedString(verse.arabicText, tajweedAnnotations),
-                modifier = Modifier.weight(1f),
-                fontFamily = arabicFontFamily,
-                fontSize = arabicFontSize.sp,
-                lineHeight = (arabicFontSize * 1.7f).sp,
-                textAlign = when (textAlignment) {
-                    "start" -> TextAlign.Start
-                    "center" -> TextAlign.Center
-                    "end" -> TextAlign.End
-                    else -> TextAlign.Justify
-                },
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            AyahNumberChip(
-                ayahNumber = verse.numberInSurah,
-                fontSize = (arabicFontSize * 0.5f).sp,
-                modifier = Modifier.padding(start = 6.dp, bottom = 6.dp),
-            )
-        }
-        if (showTranslation && verse.translation.isNotBlank()) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                verse.translation,
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // Ayah actions: word meanings + tafseer, matching the Android detail
-        // screen's ayah actions.
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            androidx.compose.material3.TextButton(
-                onClick = { onOpenTafseer(verse.numberInSurah, 3) },
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-            ) {
-                Text("Word study", style = MaterialTheme.typography.labelMedium)
-            }
-            androidx.compose.material3.TextButton(
-                onClick = { onOpenTafseer(verse.numberInSurah, 0) },
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-            ) {
-                Text("Tafseer", style = MaterialTheme.typography.labelMedium)
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
     }
 }
 

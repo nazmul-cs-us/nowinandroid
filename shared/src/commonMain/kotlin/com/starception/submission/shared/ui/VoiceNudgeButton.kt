@@ -31,6 +31,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -58,6 +59,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -79,19 +84,30 @@ internal fun VoiceNudgeButton(
 ) {
     var revealedNudgeId by remember { mutableStateOf<String?>(null) }
     var sparklingNudgeId by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(nudge?.id) {
+    var requestedNudgeId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(nudge?.id, requestedNudgeId) {
         revealedNudgeId = null
         sparklingNudgeId = null
-        val nudgeId = nudge?.id ?: return@LaunchedEffect
+        if (nudge == null) {
+            requestedNudgeId = null
+            return@LaunchedEffect
+        }
+        val nudgeId = nudge.id
+        if (requestedNudgeId != nudgeId) return@LaunchedEffect
         sparklingNudgeId = nudgeId
         delay(1_800)
         sparklingNudgeId = null
         delay(800)
         revealedNudgeId = nudgeId
     }
-    val isPreparing = nudge != null && revealedNudgeId != nudge.id
+    val canPresentNudge = nudge != null && requestedNudgeId == nudge.id
+    val isPreparing = canPresentNudge && revealedNudgeId != nudge?.id
     val isGenerating = isPreparing && sparklingNudgeId == nudge?.id
-    val showSuggestion = nudge != null && revealedNudgeId == nudge.id
+    val showSuggestion = canPresentNudge && revealedNudgeId == nudge?.id
+    val haptic = LocalHapticFeedback.current
+    val nudgePullThreshold = with(LocalDensity.current) { 40.dp.toPx() }
+    val nudgePullHapticStep = with(LocalDensity.current) { 12.dp.toPx() }
+    var nudgePullDistance by remember(nudge?.id) { mutableStateOf(0f) }
     val suggestionBrush = Brush.horizontalGradient(
         listOf(Color(0xFFEDEAFF), Color(0xFFE8F7FF), Color(0xFFE6FBF2)),
     )
@@ -108,13 +124,50 @@ internal fun VoiceNudgeButton(
             },
             modifier = Modifier
                 .fillMaxSize()
+                .pointerInput(nudge?.id, requestedNudgeId) {
+                    val nudgeId = nudge?.id
+                    if (nudgeId == null || requestedNudgeId == nudgeId) {
+                        return@pointerInput
+                    }
+
+                    var totalDragY = 0f
+                    var lastHapticStep = 0
+                    var activationHapticSent = false
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            totalDragY = (totalDragY + dragAmount.y).coerceAtLeast(0f)
+                            nudgePullDistance = totalDragY.coerceAtMost(nudgePullThreshold)
+                            val hapticStep = (totalDragY / nudgePullHapticStep).toInt()
+                            if (hapticStep > lastHapticStep && totalDragY < nudgePullThreshold) {
+                                lastHapticStep = hapticStep
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            if (!activationHapticSent && totalDragY >= nudgePullThreshold) {
+                                activationHapticSent = true
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        },
+                        onDragCancel = { nudgePullDistance = 0f },
+                        onDragEnd = {
+                            if (totalDragY >= nudgePullThreshold) {
+                                requestedNudgeId = nudgeId
+                            }
+                            nudgePullDistance = 0f
+                        },
+                    )
+                }
                 .semantics {
                     role = Role.Button
                     contentDescription = when {
                         showSuggestion -> nudge?.label.orEmpty()
                         isPreparing -> "Generating suggestion"
+                        nudge != null -> "Start voice search. Swipe down for a Now Nudge suggestion"
                         else -> "Start voice search"
                     }
+                }
+                .graphicsLayer {
+                    translationY = nudgePullDistance * 0.24f
                 },
             shape = CircleShape,
             color = MaterialTheme.colorScheme.onSurface,

@@ -265,7 +265,8 @@ fun PrayerTimesScreen(
                 onOpenDrivingMode()
             com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_QUIZ ->
                 showIslamicQuiz = true
-            com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION -> Unit
+            com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION ->
+                onOpenRecommendation()
         }
         dismissNudge(nudge.id)
     }

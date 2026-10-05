@@ -1290,6 +1290,7 @@ fun PrayerTimesScreen(
                         id = "contextual-${contextualNudgeRecommendation.target.hashCode()}",
                         action = com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
                         label = contextualNudgeRecommendation.title,
+                        actionId = contextualNudgeRecommendation.target.deenlyActionId,
                     ),
                 ),
                 dismissedIds = dismissedNudgeIds,
@@ -1297,9 +1298,8 @@ fun PrayerTimesScreen(
         )
     }
     var completedNudgeId by rememberSaveable { mutableStateOf<String?>(null) }
-    var nudgesDismissedForSession by rememberSaveable { mutableStateOf(false) }
     val activeNudge = deenlyNudge?.takeUnless {
-        it.id == completedNudgeId || nudgesDismissedForSession
+        it.id == completedNudgeId
     }
 
     fun dismissNudge(id: String) {
@@ -1328,7 +1328,7 @@ fun PrayerTimesScreen(
                     nudge.prayerName?.let(com.starception.submission.util.PrayerTracker::markPrayerAsPrayed)
                 com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_QIBLA ->
                     showCompassPopup = true
-            com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_TRAVEL_DUA ->
+                com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_TRAVEL_DUA ->
                     com.starception.submission.util.ActivityTracker.triggerFullAudioChain()
                 com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_QUIZ ->
                     com.starception.submission.ui.search.VoiceAssistantNudgeBus.requestQuiz()
@@ -1357,7 +1357,6 @@ fun PrayerTimesScreen(
         val nudge = activeNudge ?: return@LaunchedEffect
         com.starception.submission.ui.search.VoiceAssistantNudgeBus.dismissRequests.collect { id ->
             if (nudge.id == id) {
-                nudgesDismissedForSession = true
                 if (id == "launch-greeting") {
                     launchGreetingPending = false
                 } else {

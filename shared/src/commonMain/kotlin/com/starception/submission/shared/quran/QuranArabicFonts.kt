@@ -16,7 +16,7 @@
 
 package com.starception.submission.shared.quran
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -70,10 +70,9 @@ object QuranArabicFonts {
 }
 
 /**
- * Inline ayah-number chip — the shared counterpart of Android's
- * AyahMarkerRosette. Arabic-Indic digits sit in a circular chip that
- * reads as a stamp on the calligraphy; Android's 8-petal mushaf
- * ornament needs its vector drawable, this chip preserves the pattern.
+ * Inline ayah-number chip — the shared counterpart of Android's list and
+ * Mushaf ornament. The restrained outlined ring matches Android's reading
+ * rows and remains compact enough to sit inside continuous Quran text.
  */
 @Composable
 fun AyahNumberChip(
@@ -89,14 +88,18 @@ fun AyahNumberChip(
             modifier = Modifier
                 .size((fontSize.value * 1.6f).dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.90f),
+                    shape = CircleShape,
+                ),
         )
         Text(
             text = ayahNumber.toString().map { digit ->
                 if (digit in '0'..'9') ('٠'.code + (digit - '0')).toChar() else digit
             }.joinToString(""),
             fontSize = (fontSize.value * 0.78f).sp,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.90f),
             textAlign = TextAlign.Center,
         )
     }

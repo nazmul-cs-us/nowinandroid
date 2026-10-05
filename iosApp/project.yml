@@ -31,8 +31,15 @@ targets:
     sources:
       - path: Sources
         excludes:
+          - Assets.xcassets
           - PrivacyInfo.xcprivacy
           - short_adhan.caf
+      # App icons must be compiled by actool. Keeping the catalog as an explicit
+      # resource prevents XcodeGen from leaving it out of the generated target,
+      # which otherwise produces an app bundle with no icon for notifications.
+      - path: Sources/Assets.xcassets
+        buildPhase: resources
+        type: file
       - path: Sources/PrivacyInfo.xcprivacy
         buildPhase: resources
         type: file

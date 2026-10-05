@@ -21,6 +21,7 @@ import com.starception.submission.core.model.data.BukhariBook
 import com.starception.submission.core.model.data.BukhariBooks
 import com.starception.submission.core.model.data.ShamayelBook
 import com.starception.submission.core.model.data.ShamayelBooks
+import com.starception.submission.core.model.deenly.DeenlyActionIds
 import com.starception.submission.feature.quran.QuranData
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -78,6 +79,19 @@ internal data class ContextualInsightRecommendation(
     val actionDescription: String,
     val target: ContextualRecommendationTarget,
 )
+
+/** Stable action identity used by Now Nudge ranking and outcome telemetry. */
+internal val ContextualRecommendationTarget.deenlyActionId: String
+    get() = when (this) {
+        is ContextualRecommendationTarget.Surah -> DeenlyActionIds.QURAN_OPEN_SURAH
+        is ContextualRecommendationTarget.FortressDua -> DeenlyActionIds.DUA_OPEN_FORTRESS
+        is ContextualRecommendationTarget.Bukhari -> DeenlyActionIds.HADITH_PLAY_BUKHARI_BOOK
+        is ContextualRecommendationTarget.Shamayel -> DeenlyActionIds.HADITH_PLAY_TIRMIDHI_BOOK
+        ContextualRecommendationTarget.BukhariCollection ->
+            DeenlyActionIds.HADITH_FEELING_BLESSED_BUKHARI
+        ContextualRecommendationTarget.ShamayelCollection ->
+            DeenlyActionIds.HADITH_FEELING_BLESSED_TIRMIDHI
+    }
 
 private data class RecommendationWindow(
     val name: String,

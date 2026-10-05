@@ -125,9 +125,11 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.input.pointer.pointerInput
@@ -756,17 +758,23 @@ private fun VoiceAssistantButton(
     BackHandler(enabled = quizOpen, onBack = VoiceAssistantNudgeBus::closeQuiz)
     var revealedNudgeId by remember { mutableStateOf<String?>(null) }
     var sparklingNudgeId by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(nudge?.id) {
+    var requestedNudgeId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(nudge?.id, requestedNudgeId) {
         revealedNudgeId = null
         sparklingNudgeId = null
-        val nudgeId = nudge?.id ?: return@LaunchedEffect
+        if (nudge == null) {
+            requestedNudgeId = null
+            return@LaunchedEffect
+        }
+        val nudgeId = nudge.id
+        if (requestedNudgeId != nudgeId) return@LaunchedEffect
         sparklingNudgeId = nudgeId
         delay(1_800)
         sparklingNudgeId = null
         delay(800)
         revealedNudgeId = nudgeId
     }
-    val canPresentNudge = nudge != null && !listening && !processing
+    val canPresentNudge = nudge != null && requestedNudgeId == nudge.id && !listening && !processing
     val isPreparingNudge = canPresentNudge && revealedNudgeId != nudge?.id
     val isGeneratingNudge = isPreparingNudge && sparklingNudgeId == nudge?.id
     val showNudge = canPresentNudge && revealedNudgeId == nudge?.id
@@ -798,6 +806,10 @@ private fun VoiceAssistantButton(
         },
     )
     val assistantGlowColor = MaterialTheme.colorScheme.primary
+    val haptic = LocalHapticFeedback.current
+    val nudgePullThreshold = with(LocalDensity.current) { 40.dp.toPx() }
+    val nudgePullHapticStep = with(LocalDensity.current) { 12.dp.toPx() }
+    var nudgePullDistance by remember(nudge?.id) { mutableStateOf(0f) }
     var nudgeDragOffset by remember(nudge?.id) { mutableStateOf(Offset.Zero) }
     var quizDragOffset by remember(quizOpen) { mutableStateOf(Offset.Zero) }
     val assistantSurface = when {
@@ -879,6 +891,41 @@ private fun VoiceAssistantButton(
                             },
                         )
                         .clip(RoundedCornerShape(containerCorner))
+                .pointerInput(nudge?.id, listening, processing, requestedNudgeId) {
+                    val nudgeId = nudge?.id
+                    val canRequestNudge = nudgeId != null &&
+                        !listening &&
+                        !processing &&
+                        requestedNudgeId != nudgeId
+                    if (!canRequestNudge) return@pointerInput
+
+                    var totalDragY = 0f
+                    var lastHapticStep = 0
+                    var activationHapticSent = false
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            totalDragY = (totalDragY + dragAmount.y).coerceAtLeast(0f)
+                            nudgePullDistance = totalDragY.coerceAtMost(nudgePullThreshold)
+                            val hapticStep = (totalDragY / nudgePullHapticStep).toInt()
+                            if (hapticStep > lastHapticStep && totalDragY < nudgePullThreshold) {
+                                lastHapticStep = hapticStep
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            if (!activationHapticSent && totalDragY >= nudgePullThreshold) {
+                                activationHapticSent = true
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        },
+                        onDragCancel = { nudgePullDistance = 0f },
+                        onDragEnd = {
+                            if (totalDragY >= nudgePullThreshold) {
+                                requestedNudgeId = nudgeId
+                            }
+                            nudgePullDistance = 0f
+                        },
+                    )
+                }
                 .combinedClickable(
                     // During processing the same tap routes back to Whisper and cancels it.
                     onClick = when {
@@ -894,6 +941,7 @@ private fun VoiceAssistantButton(
                         isPreparingNudge -> "Generating suggestion"
                         processing -> "Cancel voice processing"
                         listening -> "Finish listening"
+                        nudge != null -> "Start voice search. Swipe down for a Now Nudge suggestion"
                         else -> "Start voice search"
                     }
                 }
@@ -901,6 +949,7 @@ private fun VoiceAssistantButton(
                     val s = 1f + 0.06f * ampActive
                     scaleX = s
                     scaleY = s
+                    translationY = nudgePullDistance * 0.24f
                 },
                 ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "modelVersion": "deenly-knowledge-v1",
+  "baseModel": "HuggingFaceTB/SmolLM2-135M-Instruct",
+  "trainingMethod": "LoRA",
+  "edgeRuntime": "llama.cpp",
+  "edgeFormat": "GGUF Q4_K_M",
+  "artifact": {
+    "fileName": "deenly-knowledge-v1-q4_k_m.gguf",
+    "sizeBytes": 105454144,
+    "sha256": "5682dd0dee0dcb9aa22d04c91d69914c0b3c89e62974f82b6f717f7bd9c6574d"
+  },
+  "corpus": {
+    "candidateCount": 152158,
+    "trainCount": 121600,
+    "validationCount": 15426,
+    "testCount": 15132,
+    "sourceTextPolicy": "immutable_sha256",
+    "quranArabicPolicy": "never_model_generated"
+  },
+  "training": {
+    "sampleCount": 1200,
+    "validationSampleCount": 48,
+    "steps": 80,
+    "trainLoss": 0.9010361351072789,
+    "validationLoss": 0.15099982917308807,
+    "validationPerplexity": 1.1629964594107096
+  },
+  "acceptance": {
+    "adapterHeldOutAccepted": 60,
+    "adapterHeldOutRejected": 0,
+    "quantizedHeldOutAccepted": 30,
+    "quantizedHeldOutRejected": 0,
+    "sourceIntegrityViolationsShownToUser": 0
+  },
+  "androidSmokeTest": {
+    "validated": true,
+    "appProcessValidated": true,
+    "date": "2026-10-05",
+    "device": "Samsung SM-S948U",
+    "abi": "arm64-v8a",
+    "artifactHashMatched": true,
+    "generatedPayload": {
+      "contentType": "question",
+      "questionKind": "source_location"
+    },
+    "totalDurationMs": 423
+  },
+  "androidRunner": {
+    "fileName": "libdeenly_completion.so",
+    "sizeBytes": 7360104,
+    "sha256": "6f90f58377324a5a092d08ac618a283398777fd4d989cdb04c85ef53693306f5",
+    "abi": "arm64-v8a"
+  },
+  "delivery": {
+    "bundledInApk": false,
+    "strategy": "versioned app-private download with SHA-256 verification",
+    "fallback": "last valid deterministic content bank"
+  },
+  "llamaCppCommit": "8216c84623cf5b22b29319344ca5e685003892f5"
+}

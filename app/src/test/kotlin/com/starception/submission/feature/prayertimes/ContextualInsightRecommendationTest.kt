@@ -17,6 +17,7 @@
 package com.starception.submission.feature.prayertimes
 
 import com.starception.submission.core.duadatabase.Dua
+import com.starception.submission.core.model.deenly.DeenlyActionIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -79,6 +80,7 @@ class ContextualInsightRecommendationTest {
         )
 
         assertTrue(result.target is ContextualRecommendationTarget.BukhariCollection)
+        assertEquals(DeenlyActionIds.HADITH_FEELING_BLESSED_BUKHARI, result.target.deenlyActionId)
         assertTrue(result.title.startsWith("Feeling blessed?"))
         assertTrue(result.footerText.startsWith("Sahih al-Bukhari"))
     }
@@ -93,6 +95,7 @@ class ContextualInsightRecommendationTest {
         )
 
         assertTrue(result.target is ContextualRecommendationTarget.ShamayelCollection)
+        assertEquals(DeenlyActionIds.HADITH_FEELING_BLESSED_TIRMIDHI, result.target.deenlyActionId)
         assertTrue(result.title.startsWith("Feeling blessed?"))
         assertTrue(result.footerText.startsWith("Shama'il At-Tirmidhi"))
     }

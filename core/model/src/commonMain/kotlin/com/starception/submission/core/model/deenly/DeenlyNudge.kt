@@ -36,6 +36,8 @@ data class DeenlyNudge(
     val action: DeenlyNudgeAction,
     val label: String,
     val prayerName: String? = null,
+    /** Stable catalog ID used by the cross-platform ranker and interaction telemetry. */
+    val actionId: String = action.defaultActionId(),
 )
 
 data class DeenlyNudgeContext(
@@ -122,7 +124,23 @@ fun selectDeenlyNudge(context: DeenlyNudgeContext): DeenlyNudge? {
     }.filterNot { it.id in context.dismissedIds }
     if (fallbackCandidates.isNotEmpty()) {
         val rotationSlot = context.nowMinute / FALLBACK_ROTATION_MINUTES
-        return fallbackCandidates[rotationSlot % fallbackCandidates.size]
+        val explorationIndex = rotationSlot % fallbackCandidates.size
+        return rankDeenlyNudges(
+            candidates = fallbackCandidates.mapIndexed { index, nudge ->
+                DeenlyNudgeCandidate(
+                    nudge = nudge,
+                    signals = DeenlyRankingSignals(
+                        // Preserve the existing four-hour exploration rotation while routing the
+                        // decision through the model that app-wide providers will also use.
+                        contextMatch = if (index == explorationIndex) 1f else 0f,
+                    ),
+                )
+            },
+            context = DeenlyRankingContext(
+                isMediaPlaying = context.isMediaPlaying,
+                dismissedNudgeIds = context.dismissedIds,
+            ),
+        ).firstOrNull()?.candidate?.nudge
     }
 
     return null

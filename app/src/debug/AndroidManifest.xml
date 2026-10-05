@@ -38,5 +38,14 @@
                 <action android:name="com.starception.submission.DEBUG_RENDER_PREVIEWS" />
             </intent-filter>
         </receiver>
+
+        <!-- Runs the source-lock smoke test inside the debug app process. -->
+        <receiver
+            android:name="com.starception.submission.ml.DeenlyKnowledgeSmokeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.starception.submission.debug.DEENLY_KNOWLEDGE_SMOKE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

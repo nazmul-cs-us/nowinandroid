@@ -104,8 +104,8 @@ android {
         resources {
             excludes.add("/META-INF/{AL2.0,LGPL2.1}")
         }
-        // useLegacyPackaging removed for 16KB page size support (AGP 8.5.1+ handles alignment)
-        jniLibs.useLegacyPackaging = false
+        // Extract the private edge runner so ProcessBuilder can execute it in the app sandbox.
+        jniLibs.useLegacyPackaging = true
     }
 
     androidResources {
@@ -137,7 +137,6 @@ dependencies {
 
     // Sherpa-ONNX for offline TTS and speech recognition
     implementation(files("libs/sherpa-onnx-1.12.26.aar"))
-
 
     implementation(projects.core.common)
     implementation(projects.core.assetCache)

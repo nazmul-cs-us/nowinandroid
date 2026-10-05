@@ -126,6 +126,7 @@ class PrayerPosterArtworkTest {
             ayah = WidgetAyah(
                 text = "And to Allah belongs the east and the west. Wherever you turn, there is the Face of Allah.",
                 citation = "Al-Baqarah 2:115",
+                target = WidgetNavigationTarget.Surah(surahNumber = 2, ayahNumber = 115),
             ),
             dayPhase = if (now in 356 until 1103) WidgetDayPhase.DAY else WidgetDayPhase.NIGHT,
             daylightLabel = "Daylight 12h 27m",

@@ -18,6 +18,7 @@ package com.starception.submission.shared.content
 
 import com.starception.submission.core.model.data.BukhariBooks
 import com.starception.submission.core.model.data.ShamayelBooks
+import com.starception.submission.core.model.deenly.DeenlyActionIds
 import com.starception.submission.feature.quran.QuranData
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
@@ -43,6 +44,15 @@ data class ContextualRecommendation(
         data class Shamayel(val bookId: Int) : Target
     }
 }
+
+/** Stable action identity shared with the Now Nudge ranker and event schema. */
+val ContextualRecommendation.deenlyActionId: String
+    get() = when (target) {
+        is ContextualRecommendation.Target.Surah -> DeenlyActionIds.QURAN_OPEN_SURAH
+        is ContextualRecommendation.Target.FortressDua -> DeenlyActionIds.DUA_OPEN_FORTRESS
+        is ContextualRecommendation.Target.Bukhari -> DeenlyActionIds.HADITH_PLAY_BUKHARI_BOOK
+        is ContextualRecommendation.Target.Shamayel -> DeenlyActionIds.HADITH_PLAY_TIRMIDHI_BOOK
+    }
 
 /** Fortress chapters used by the contextual dashboard recommendation. */
 val CONTEXTUAL_DUA_CHAPTER_IDS = setOf(
