@@ -616,16 +616,20 @@ private fun NiaFloatingBottomBar(
         val level by com.starception.submission.ui.search.SearchPrefillBus.voiceLevel
             .collectAsStateWithLifecycle()
         val nudge by VoiceAssistantNudgeBus.nudge.collectAsStateWithLifecycle()
+        val generatingSuggestion by VoiceAssistantNudgeBus.generatingSuggestion
+            .collectAsStateWithLifecycle()
         VoiceAssistantButton(
             listening = listening,
             processing = processing,
             level = level,
             nudge = nudge,
+            generatingSuggestion = generatingSuggestion,
             verticalLayout = vertical,
             // Tracks navBarHeight so the voice button stays proportional to the pill.
             buttonSize = if (vertical) 44.dp else 52.dp,
             onClick = { com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch() },
             onNudgeAction = VoiceAssistantNudgeBus::requestAction,
+            onNudgeRequest = VoiceAssistantNudgeBus::requestSuggestion,
             onQuizLongPress = VoiceAssistantNudgeBus::requestQuiz,
             onNudgeDismiss = VoiceAssistantNudgeBus::requestDismiss,
             modifier = voiceModifier,
@@ -700,10 +704,12 @@ private fun VoiceAssistantButton(
     processing: Boolean,
     level: Float,
     nudge: DeenlyNudge?,
+    generatingSuggestion: Boolean,
     verticalLayout: Boolean,
     buttonSize: Dp = 60.dp,
     onClick: () -> Unit,
     onNudgeAction: () -> Unit,
+    onNudgeRequest: () -> Unit,
     onQuizLongPress: () -> Unit,
     onNudgeDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -759,6 +765,11 @@ private fun VoiceAssistantButton(
     var revealedNudgeId by remember { mutableStateOf<String?>(null) }
     var sparklingNudgeId by remember { mutableStateOf<String?>(null) }
     var requestedNudgeId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        VoiceAssistantNudgeBus.suggestionReady.collect { readyNudgeId ->
+            requestedNudgeId = readyNudgeId
+        }
+    }
     LaunchedEffect(nudge?.id, requestedNudgeId) {
         revealedNudgeId = null
         sparklingNudgeId = null
@@ -776,22 +787,39 @@ private fun VoiceAssistantButton(
     }
     val canPresentNudge = nudge != null && requestedNudgeId == nudge.id && !listening && !processing
     val isPreparingNudge = canPresentNudge && revealedNudgeId != nudge?.id
-    val isGeneratingNudge = isPreparingNudge && sparklingNudgeId == nudge?.id
+    val isGeneratingNudge = generatingSuggestion ||
+        (isPreparingNudge && sparklingNudgeId == nudge?.id)
     val showNudge = canPresentNudge && revealedNudgeId == nudge?.id
-    var typedNudgeText by remember(nudge?.id) { mutableStateOf("") }
-    var isTypingNudge by remember(nudge?.id) { mutableStateOf(false) }
+    var typedNudgeTitle by remember(nudge?.id) { mutableStateOf("") }
+    var typedNudgeBody by remember(nudge?.id) { mutableStateOf("") }
+    var isTypingNudgeTitle by remember(nudge?.id) { mutableStateOf(false) }
+    var isTypingNudgeBody by remember(nudge?.id) { mutableStateOf(false) }
     LaunchedEffect(showNudge, nudge?.id) {
-        typedNudgeText = ""
-        isTypingNudge = false
+        typedNudgeTitle = ""
+        typedNudgeBody = ""
+        isTypingNudgeTitle = false
+        isTypingNudgeBody = false
         if (!showNudge) return@LaunchedEffect
-        val label = nudge?.label.orEmpty()
-        isTypingNudge = true
+
+        val title = nudge?.label.orEmpty()
+        isTypingNudgeTitle = true
         delay(120)
-        label.indices.forEach { index ->
-            typedNudgeText = label.take(index + 1)
-            delay(if (label[index] in ".,?!") 90 else 32)
+        title.indices.forEach { index ->
+            typedNudgeTitle = title.take(index + 1)
+            delay(if (title[index] in ".,?!") 90 else 32)
         }
-        isTypingNudge = false
+        isTypingNudgeTitle = false
+
+        val body = nudge?.supportingText.orEmpty()
+        if (body.isNotBlank()) {
+            delay(90)
+            isTypingNudgeBody = true
+            body.indices.forEach { index ->
+                typedNudgeBody = body.take(index + 1)
+                delay(if (body[index] in ".,?!") 36 else 9)
+            }
+            isTypingNudgeBody = false
+        }
     }
     val nudgeBlend by animateFloatAsState(
         targetValue = if (isGeneratingNudge) 1f else 0f,
@@ -891,11 +919,18 @@ private fun VoiceAssistantButton(
                             },
                         )
                         .clip(RoundedCornerShape(containerCorner))
-                .pointerInput(nudge?.id, listening, processing, requestedNudgeId) {
+                .pointerInput(
+                    nudge?.id,
+                    listening,
+                    processing,
+                    generatingSuggestion,
+                    requestedNudgeId,
+                ) {
                     val nudgeId = nudge?.id
                     val canRequestNudge = nudgeId != null &&
                         !listening &&
                         !processing &&
+                        !generatingSuggestion &&
                         requestedNudgeId != nudgeId
                     if (!canRequestNudge) return@pointerInput
 
@@ -920,7 +955,7 @@ private fun VoiceAssistantButton(
                         onDragCancel = { nudgePullDistance = 0f },
                         onDragEnd = {
                             if (totalDragY >= nudgePullThreshold) {
-                                requestedNudgeId = nudgeId
+                                onNudgeRequest()
                             }
                             nudgePullDistance = 0f
                         },
@@ -939,9 +974,11 @@ private fun VoiceAssistantButton(
                     contentDescription = when {
                         showNudge -> nudge?.label.orEmpty()
                         isPreparingNudge -> "Generating suggestion"
+                        generatingSuggestion -> "Generating suggestion"
                         processing -> "Cancel voice processing"
                         listening -> "Finish listening"
-                        nudge != null -> "Start voice search. Swipe down for a Now Nudge suggestion"
+                        nudge != null ->
+                            "Bot. Tap for voice search. Swipe down for a Now Nudge suggestion"
                         else -> "Start voice search"
                     }
                 }
@@ -1184,7 +1221,11 @@ private fun VoiceAssistantButton(
                         }
                         }
                         .semantics {
-                            contentDescription = nudge?.label.orEmpty()
+                            contentDescription = listOfNotNull(
+                                nudge?.label,
+                                nudge?.supportingText,
+                                nudge?.sourceLabel,
+                            ).joinToString(separator = ". ")
                         },
                 ) {
                     Row(
@@ -1203,12 +1244,31 @@ private fun VoiceAssistantButton(
                             size = if (verticalLayout) 26.dp else 32.dp,
                         )
                         Spacer(Modifier.width(if (verticalLayout) 6.dp else 8.dp))
-                        Text(
-                            text = typedNudgeText + if (isTypingNudge) "|" else "",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                        )
+                        Column(
+                            modifier = Modifier.weight(1f, fill = false),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                text = typedNudgeTitle + if (isTypingNudgeTitle) "\u258C" else "",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            nudge?.supportingText?.takeIf(String::isNotBlank)?.let {
+                                Text(
+                                    text = typedNudgeBody +
+                                        if (isTypingNudgeBody) "\u258C" else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            nudge?.sourceLabel?.takeIf(String::isNotBlank)?.let { sourceLabel ->
+                                Text(
+                                    text = sourceLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
                         Spacer(Modifier.width(4.dp))
                         IconButton(
                             onClick = onNudgeDismiss,

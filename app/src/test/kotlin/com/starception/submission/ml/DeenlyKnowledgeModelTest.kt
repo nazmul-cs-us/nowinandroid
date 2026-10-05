@@ -43,4 +43,20 @@ class DeenlyKnowledgeModelTest {
             ),
         )
     }
+
+    @Test
+    fun parserRejectsUnboundedOrControlCharacterTitles() {
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"knowledge","title":"${"a".repeat(85)}"}""",
+                DeenlyKnowledgeTask.KNOWLEDGE,
+            ),
+        )
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"knowledge","title":"unsafe\ncontrol"}""",
+                DeenlyKnowledgeTask.KNOWLEDGE,
+            ),
+        )
+    }
 }

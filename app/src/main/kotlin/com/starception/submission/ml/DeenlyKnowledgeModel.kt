@@ -7,6 +7,7 @@
 package com.starception.submission.ml
 
 import android.content.Context
+import android.util.Log
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -30,6 +31,8 @@ data class DeenlySourceEnvelope(
     val collection: String,
     val reference: String,
     val topic: String,
+    /** Bounded, non-sensitive app state used to make the title timely. */
+    val appSituation: String? = null,
     /** Exact database text. Canonical Arabic is intentionally not accepted by this API. */
     val sourceText: String,
     val sourceTextSha256: String,
@@ -56,6 +59,7 @@ class DeenlyKnowledgeModel(context: Context) {
     ): DeenlyKnowledgeDecision? = inferenceMutex.withLock {
         withContext(Dispatchers.IO) {
             if (sha256(source.sourceText.toByteArray()) != source.sourceTextSha256.lowercase()) {
+                Log.w(TAG, "Rejected source with a mismatched checksum")
                 return@withContext null
             }
             val modelFile = File(
@@ -63,13 +67,16 @@ class DeenlyKnowledgeModel(context: Context) {
                 "cdn_assets/models/now_nudge/$MODEL_FILE_NAME",
             )
             if (!modelFile.isFile || modelFile.length() != MODEL_SIZE_BYTES) {
+                Log.w(TAG, "Knowledge model is missing or has an unexpected size")
                 return@withContext null
             }
             if (sha256(modelFile) != MODEL_SHA256) {
+                Log.w(TAG, "Knowledge model checksum verification failed")
                 return@withContext null
             }
             val runner = File(appContext.applicationInfo.nativeLibraryDir, RUNNER_FILE_NAME)
             if (!runner.isFile || !runner.canExecute()) {
+                Log.w(TAG, "Knowledge model runner is unavailable")
                 return@withContext null
             }
 
@@ -98,13 +105,27 @@ class DeenlyKnowledgeModel(context: Context) {
                         process.destroyForcibly()
                         stdout.await()
                         stderr.await()
+                        Log.w(TAG, "Knowledge model inference timed out")
                         return@coroutineScope null
                     }
                     val generated = stdout.await()
-                    stderr.await()
-                    if (process.exitValue() != 0) null else parseDecision(generated, task)
+                    val errorOutput = stderr.await()
+                    if (process.exitValue() != 0) {
+                        Log.w(TAG, "Knowledge model runner failed: ${errorOutput.take(LOG_PREVIEW_CHARS)}")
+                        null
+                    } else {
+                        parseDecision(generated, task).also { parsed ->
+                            if (parsed == null) {
+                                Log.w(
+                                    TAG,
+                                    "Rejected model output: ${generated.take(LOG_PREVIEW_CHARS)}",
+                                )
+                            }
+                        }
+                    }
                 }
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                Log.w(TAG, "Knowledge model inference failed", error)
                 null
             }
         }
@@ -115,6 +136,9 @@ class DeenlyKnowledgeModel(context: Context) {
         appendLine("Collection: $collection")
         appendLine("Reference: $reference")
         appendLine("Topic: $topic")
+        appSituation
+            ?.takeIf(String::isNotBlank)
+            ?.let { appendLine("App situation: ${it.take(MAX_APP_SITUATION_CHARS)}") }
         appendLine("Source text:")
         append(sourceText.take(MAX_SOURCE_CHARS))
     }
@@ -127,6 +151,10 @@ class DeenlyKnowledgeModel(context: Context) {
         private const val RUNNER_FILE_NAME = "libdeenly_completion.so"
         private const val INFERENCE_TIMEOUT_SECONDS = 30L
         private const val MAX_SOURCE_CHARS = 1_400
+        private const val MAX_APP_SITUATION_CHARS = 320
+        private const val MAX_TITLE_CHARS = 84
+        private const val LOG_PREVIEW_CHARS = 240
+        private const val TAG = "DeenlyKnowledgeModel"
         private const val SYSTEM_PROMPT = """You create one grounded Islamic learning item from the supplied source.
 Use only the source and metadata. Return one minified JSON object and nothing else. A knowledge
 object has exactly contentType and title. A question object has exactly contentType and
@@ -151,7 +179,11 @@ builds the final item deterministically from its immutable database."""
                 DeenlyKnowledgeTask.KNOWLEDGE -> {
                     if (output.keys != setOf("contentType", "title")) return null
                     val title = output["title"]?.jsonPrimitive?.content?.trim().orEmpty()
-                    title.takeIf(String::isNotEmpty)?.let(DeenlyKnowledgeDecision::Knowledge)
+                    title.takeIf {
+                        it.isNotEmpty() &&
+                            it.length <= MAX_TITLE_CHARS &&
+                            it.none(Char::isISOControl)
+                    }?.let(DeenlyKnowledgeDecision::Knowledge)
                 }
 
                 DeenlyKnowledgeTask.QUESTION -> {

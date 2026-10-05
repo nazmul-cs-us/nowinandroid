@@ -476,6 +476,13 @@ fun NiaNavHost(
                 onSettingsClick = onTopAppBarActionClick,
                 onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
                 onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) },
+                onHadithClick = { collectionName, databaseFile, hadithNumber ->
+                    navController.navigateToHadithDetail(
+                        collectionName = collectionName,
+                        hadithNumber = hadithNumber,
+                        databaseFile = databaseFile,
+                    )
+                },
                 onFortressDuaClick = navController::navigateToFortressDua,
                 onBukhariBookPlayClick = navController::navigateToBukhariBookPlayback,
                 onShamayelBookPlayClick = navController::navigateToShamayelBookPlayback,

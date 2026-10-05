@@ -38,6 +38,10 @@ data class DeenlyNudge(
     val prayerName: String? = null,
     /** Stable catalog ID used by the cross-platform ranker and interaction telemetry. */
     val actionId: String = action.defaultActionId(),
+    /** Optional immutable source text shown below a model-created knowledge title. */
+    val supportingText: String? = null,
+    /** Human-readable citation for [supportingText]. */
+    val sourceLabel: String? = null,
 )
 
 data class DeenlyNudgeContext(
@@ -52,6 +56,8 @@ data class DeenlyNudgeContext(
     val hasVerifiedLocation: Boolean = false,
     val hasQuizAvailable: Boolean = false,
     val launchNudge: DeenlyNudge? = null,
+    /** A grounded learning item selected outside the cross-platform context model. */
+    val knowledgeNudge: DeenlyNudge? = null,
     val fallbackNudges: List<DeenlyNudge> = emptyList(),
     val dismissedIds: Set<String> = emptySet(),
 )
@@ -109,6 +115,10 @@ fun selectDeenlyNudge(context: DeenlyNudgeContext): DeenlyNudge? {
             if (candidate.id !in context.dismissedIds) return candidate
         }
     }
+
+    context.knowledgeNudge
+        ?.takeIf { it.id !in context.dismissedIds }
+        ?.let { return it }
 
     val fallbackCandidates = buildList {
         if (context.hasQuizAvailable) {

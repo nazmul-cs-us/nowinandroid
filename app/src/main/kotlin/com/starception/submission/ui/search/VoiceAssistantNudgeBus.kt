@@ -36,6 +36,17 @@ object VoiceAssistantNudgeBus {
     private val _dismissRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val dismissRequests = _dismissRequests.asSharedFlow()
 
+    private val _suggestionRequests = MutableSharedFlow<Long>(extraBufferCapacity = 1)
+    val suggestionRequests = _suggestionRequests.asSharedFlow()
+
+    private val _suggestionReady = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val suggestionReady = _suggestionReady.asSharedFlow()
+
+    private val _generatingSuggestion = MutableStateFlow(false)
+    val generatingSuggestion = _generatingSuggestion.asStateFlow()
+
+    private var suggestionRequestId = 0L
+
     fun show(nudge: DeenlyNudge?) {
         _nudge.value = nudge
     }
@@ -61,5 +72,24 @@ object VoiceAssistantNudgeBus {
 
     fun requestDismiss() {
         _nudge.value?.id?.let(_dismissRequests::tryEmit)
+    }
+
+    /** Starts one bot turn from the voice button's pull-down gesture. */
+    fun requestSuggestion() {
+        if (_generatingSuggestion.value) return
+        _generatingSuggestion.value = true
+        suggestionRequestId += 1
+        if (!_suggestionRequests.tryEmit(suggestionRequestId)) {
+            _generatingSuggestion.value = false
+        }
+    }
+
+    /** Publishes the context-ranked result and tells the voice button to reveal it. */
+    fun completeSuggestion(nudge: DeenlyNudge?) {
+        if (nudge != null) {
+            _nudge.value = nudge
+            _suggestionReady.tryEmit(nudge.id)
+        }
+        _generatingSuggestion.value = false
     }
 }

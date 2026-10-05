@@ -138,6 +138,51 @@ class DeenlyNudgeTest {
     }
 
     @Test
+    fun groundedKnowledgePrecedesRotatingFallbacksButNotPrayerActions() {
+        val knowledge = DeenlyNudge(
+            id = "model-knowledge-quran-1-4",
+            action = DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
+            label = "From Surah Al-Fatihah",
+            actionId = DeenlyActionIds.LEARNING_OPEN_KNOWLEDGE,
+        )
+        val context = baseContext().copy(
+            knowledgeNudge = knowledge,
+            hasQuizAvailable = true,
+        )
+
+        assertEquals(knowledge, selectDeenlyNudge(context))
+        assertEquals(
+            DeenlyNudgeAction.MARK_PRAYED,
+            selectDeenlyNudge(
+                context.copy(
+                    currentPrayer = "Dhuhr",
+                    currentPrayerMinute = 12 * 60,
+                    nowMinute = 12 * 60 + 20,
+                ),
+            )?.action,
+        )
+    }
+
+    @Test
+    fun dismissedGroundedKnowledgeFallsBackToQuiz() {
+        val knowledge = DeenlyNudge(
+            id = "model-knowledge-quran-1-4",
+            action = DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
+            label = "From Surah Al-Fatihah",
+        )
+
+        val result = selectDeenlyNudge(
+            baseContext().copy(
+                knowledgeNudge = knowledge,
+                hasQuizAvailable = true,
+                dismissedIds = setOf(knowledge.id),
+            ),
+        )
+
+        assertEquals(DeenlyNudgeAction.PLAY_QUIZ, result?.action)
+    }
+
+    @Test
     fun fallbackSuggestionsRotateEveryFourHours() {
         val contextual = DeenlyNudge(
             id = "contextual-reading",
