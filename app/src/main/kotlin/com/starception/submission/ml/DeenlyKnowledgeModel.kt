@@ -110,15 +110,19 @@ class DeenlyKnowledgeModel(context: Context) {
                     "--no-display-prompt",
                     "--no-warmup",
                     "--simple-io",
+                    "--no-conversation",
                 ).start()
                 coroutineScope {
                     val stdout = async { process.inputStream.bufferedReader().readText() }
                     val stderr = async { process.errorStream.bufferedReader().readText() }
                     if (!process.waitFor(INFERENCE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                        process.destroyForcibly()
-                        stdout.await()
-                        stderr.await()
                         Log.w(TAG, "Knowledge model inference timed out")
+                        process.destroyForcibly()
+                        process.waitFor(PROCESS_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                        runCatching { process.inputStream.close() }
+                        runCatching { process.errorStream.close() }
+                        runCatching { stdout.await() }
+                        runCatching { stderr.await() }
                         return@coroutineScope null
                     }
                     val generated = stdout.await()
@@ -168,7 +172,8 @@ class DeenlyKnowledgeModel(context: Context) {
         const val MODEL_SHA256 = "a56a58a51c66fec1548ac32b72ce4b70c4608c24486f5b212fafcba03b5439de"
 
         private const val RUNNER_FILE_NAME = "libdeenly_completion.so"
-        private const val INFERENCE_TIMEOUT_SECONDS = 30L
+        private const val INFERENCE_TIMEOUT_SECONDS = 120L
+        private const val PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 5L
         private const val MAX_SOURCE_CHARS = 1_400
         private const val MAX_APP_SITUATION_CHARS = 320
         private const val MAX_TITLE_CHARS = 84
@@ -255,7 +260,7 @@ or claims unsupported by the source. Prefer a simple explicit detail over interp
                         answer.isEmpty() || answer.length > MAX_ANSWER_CHARS ||
                         evidence.isEmpty() || evidence.length > MAX_EVIDENCE_CHARS ||
                         answer !in verifiedSource || evidence !in verifiedSource || answer !in evidence ||
-                        generatedText.any(String::containsArabic) ||
+                        generatedText.any { it.containsArabic() } ||
                         generatedText.any { text -> text.any(Char::isISOControl) }
                     ) return null
                     DeenlyKnowledgeDecision.GroundedQuestion(

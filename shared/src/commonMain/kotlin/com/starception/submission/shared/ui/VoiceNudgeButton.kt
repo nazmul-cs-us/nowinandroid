@@ -95,14 +95,13 @@ internal fun VoiceNudgeButton(
         val nudgeId = nudge.id
         if (requestedNudgeId != nudgeId) return@LaunchedEffect
         sparklingNudgeId = nudgeId
-        delay(1_800)
-        sparklingNudgeId = null
-        delay(800)
+        delay(5_600)
         revealedNudgeId = nudgeId
+        sparklingNudgeId = null
     }
     val canPresentNudge = nudge != null && requestedNudgeId == nudge.id
     val isPreparing = canPresentNudge && revealedNudgeId != nudge?.id
-    val isGenerating = isPreparing && sparklingNudgeId == nudge?.id
+    val isGenerating = isPreparing
     val showSuggestion = canPresentNudge && revealedNudgeId == nudge?.id
     val haptic = LocalHapticFeedback.current
     val nudgePullThreshold = with(LocalDensity.current) { 40.dp.toPx() }

@@ -165,6 +165,16 @@ The GGUF evaluator mirrors the Android invocation: the same system prompt, task 
 schema, single-turn mode, token limit, and temperature. This prevents a raw prompt test from being
 mistaken for deployable-runtime behavior.
 
+The promoted artifact is recorded in `releases/deenly-question-v2.json`. Cloudflare's authenticated
+object uploader caps individual uploads at 300 MiB, so the 397,807,648-byte GGUF is delivered as
+two independently hashed CDN parts in the `model_now_nudge` category. Android downloads both parts,
+assembles them atomically, verifies the final GGUF SHA-256, and deletes the parts before activation.
+The model remains optional so first launch is not blocked by a 398 MB download.
+
+The current quantized held-out report accepts 46 of 48 samples after applying the same bounded
+option repair used by Android. The remaining two outputs are rejected safely: one has insufficient
+unique options and one has evidence that is not an exact source span.
+
 Do not treat free-form generated answers as authoritative. The mobile model creates only bounded
 learning metadata. It never emits Quran Arabic, IDs, citations, or replacement source bodies; a
 question answer and its evidence are accepted only when both are exact spans of the verified

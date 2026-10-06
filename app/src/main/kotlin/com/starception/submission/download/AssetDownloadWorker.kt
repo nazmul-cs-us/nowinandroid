@@ -128,6 +128,7 @@ class AssetDownloadWorker @AssistedInject constructor(
         "model_asr" -> "Speech Recognition"
         "model_whisper" -> "Whisper"
         "model_kws" -> "Keyword Detection"
+        "model_now_nudge" -> "Now Nudge Question Model"
         else -> category
     }
 

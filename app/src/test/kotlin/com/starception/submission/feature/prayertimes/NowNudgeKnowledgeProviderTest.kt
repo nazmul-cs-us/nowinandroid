@@ -194,6 +194,40 @@ class NowNudgeKnowledgeProviderTest {
     }
 
     @Test
+    fun typedQuestionRanksMatchingTrustedSource() = runBlocking {
+        val unrelated = source.copy(
+            id = "unrelated",
+            reference = "Quran 1:4",
+            topic = "The Opener",
+            sourceText = "Sovereign of the Day of Recompense",
+        )
+        val patience = source.copy(
+            id = "patience",
+            reference = "Quran 2:153",
+            topic = "Patience",
+            sourceText = "Seek help through patience and prayer.",
+        )
+        var selectedReference: String? = null
+        val provider = NowNudgeKnowledgeProvider(
+            sourceLoader = GroundedKnowledgeSourceLoader { _, variation ->
+                if (variation % 2 == 0) unrelated else patience
+            },
+            decisionGenerator = KnowledgeDecisionGenerator { _, envelope ->
+                selectedReference = envelope.reference
+                DeenlyKnowledgeDecision.Knowledge("Patience and prayer")
+            },
+        )
+
+        val result = provider.load(
+            date = date,
+            query = "What does the Quran say about patience?",
+        )
+
+        assertEquals(patience.reference, selectedReference)
+        assertEquals(patience.sourceText, result?.nudge?.supportingText)
+    }
+
+    @Test
     fun dismissedCandidateIsRemovedBeforeModelInference() = runBlocking {
         val dismissed = source.copy(id = "dismissed", topic = "Travel")
         val eligible = source.copy(id = "eligible", reference = "Quran 2:186")

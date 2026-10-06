@@ -82,14 +82,19 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Help
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration.Short
 import androidx.compose.material3.SnackbarHost
@@ -97,6 +102,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult.ActionPerformed
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.WindowAdaptiveInfo
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
@@ -129,6 +135,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -142,6 +151,9 @@ import androidx.compose.ui.semantics.dismiss
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -643,10 +655,12 @@ private fun NiaFloatingBottomBar(
             verticalLayout = vertical,
             // Tracks navBarHeight so the voice button stays proportional to the pill.
             buttonSize = if (vertical) 44.dp else 52.dp,
-            onClick = { com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch() },
+            onVoiceClick = {
+                com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch()
+            },
+            onTypedQuestion = VoiceAssistantNudgeBus::submitTypedPrompt,
             onNudgeAction = VoiceAssistantNudgeBus::requestAction,
-            onNudgeRequest = VoiceAssistantNudgeBus::requestSuggestion,
-            onQuizLongPress = VoiceAssistantNudgeBus::requestQuiz,
+            onNudgeRequest = { VoiceAssistantNudgeBus.requestSuggestion() },
             onNudgeDismiss = VoiceAssistantNudgeBus::requestDismiss,
             onNavigationOccupationChanged = { nudgeOccupiesNavigation = it },
             modifier = voiceModifier,
@@ -705,18 +719,20 @@ private fun NiaFloatingBottomBar(
  * ends, those same straight paths progressively bend into five independent
  * curved dashes. The full-size dashes spiral inward at staggered depths without
  * joining into a circle or propeller. A nudge first replaces the bars with a
- * generation sparkle, then restores the bars before revealing the suggestion.
- * Keeping these states separate avoids implying that a visible suggestion is
- * still being generated.
+ * generation sparkle, then morphs directly into the suggestion. The thinking
+ * surface stays present throughout so the result never appears after a blank gap.
  */
 private enum class VoiceAssistantSurface {
     Button,
+    Composer,
     Thinking,
     Nudge,
     Quiz,
 }
 
 private const val NUDGE_MORPH_DURATION_MILLIS = 420
+private const val NUDGE_REVEAL_DELAY_MILLIS = 5_600L
+private const val NUDGE_THINKING_MESSAGE_MILLIS = 1_400L
 private const val NUDGE_RETURN_CONTENT_HOLD_MILLIS =
     NUDGE_MORPH_DURATION_MILLIS.toLong() + 40L
 
@@ -729,10 +745,10 @@ private fun VoiceAssistantButton(
     generatingSuggestion: Boolean,
     verticalLayout: Boolean,
     buttonSize: Dp = 60.dp,
-    onClick: () -> Unit,
+    onVoiceClick: () -> Unit,
+    onTypedQuestion: (String) -> Unit,
     onNudgeAction: () -> Unit,
     onNudgeRequest: () -> Unit,
-    onQuizLongPress: () -> Unit,
     onNudgeDismiss: () -> Unit,
     onNavigationOccupationChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -787,6 +803,29 @@ private fun VoiceAssistantButton(
     val generatedQuizQuestion by VoiceAssistantNudgeBus.generatedQuizQuestion
         .collectAsStateWithLifecycle()
     BackHandler(enabled = quizOpen, onBack = VoiceAssistantNudgeBus::closeQuiz)
+    var composerOpen by remember { mutableStateOf(false) }
+    var typedQuestion by remember { mutableStateOf("") }
+    val composerFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    BackHandler(enabled = composerOpen) {
+        composerOpen = false
+        keyboardController?.hide()
+    }
+    LaunchedEffect(composerOpen) {
+        if (composerOpen) {
+            delay(NUDGE_MORPH_DURATION_MILLIS.toLong())
+            composerFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+    fun submitTypedQuestion() {
+        val question = typedQuestion.trim()
+        if (question.isEmpty()) return
+        typedQuestion = ""
+        composerOpen = false
+        keyboardController?.hide()
+        onTypedQuestion(question)
+    }
     var revealedNudgeId by remember { mutableStateOf<String?>(null) }
     var sparklingNudgeId by remember { mutableStateOf<String?>(null) }
     var requestedNudgeId by remember { mutableStateOf<String?>(null) }
@@ -805,30 +844,38 @@ private fun VoiceAssistantButton(
         val nudgeId = nudge.id
         if (requestedNudgeId != nudgeId) return@LaunchedEffect
         sparklingNudgeId = nudgeId
-        delay(1_800)
-        sparklingNudgeId = null
-        delay(800)
+        delay(NUDGE_REVEAL_DELAY_MILLIS)
         revealedNudgeId = nudgeId
+        sparklingNudgeId = null
     }
     val canPresentNudge = nudge != null && requestedNudgeId == nudge.id && !listening && !processing
     val isPreparingNudge = canPresentNudge && revealedNudgeId != nudge?.id
-    val isGeneratingNudge = generatingSuggestion ||
-        (isPreparingNudge && sparklingNudgeId == nudge?.id)
+    val isGeneratingNudge = generatingSuggestion || isPreparingNudge
     val showNudge = canPresentNudge && revealedNudgeId == nudge?.id
-    val thinkingMessages = remember {
-        listOf(
-            "Reading your context",
-            "Choosing a trusted source",
-            "Checking the source",
-            "Preparing your nudge",
-        )
-    }
+    val thinkingMessages = listOf(
+        "Understanding context",
+        "Finding trusted source",
+        "Verifying source",
+        when (nudge?.action) {
+            DeenlyNudgeAction.PLAY_QUIZ -> "Composing question"
+            DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION -> "Preparing insight"
+            else -> "Preparing suggestion"
+        },
+    )
     var thinkingMessageIndex by remember { mutableStateOf(0) }
     LaunchedEffect(isGeneratingNudge) {
         thinkingMessageIndex = 0
+        while (isGeneratingNudge && thinkingMessageIndex < thinkingMessages.lastIndex) {
+            delay(NUDGE_THINKING_MESSAGE_MILLIS)
+            thinkingMessageIndex++
+        }
+    }
+    var thinkingDotCount by remember { mutableStateOf(0) }
+    LaunchedEffect(isGeneratingNudge) {
+        thinkingDotCount = 0
         while (isGeneratingNudge) {
-            delay(900)
-            thinkingMessageIndex = (thinkingMessageIndex + 1) % thinkingMessages.size
+            delay(420)
+            thinkingDotCount = (thinkingDotCount + 1) % 4
         }
     }
     var renderedNudge by remember { mutableStateOf(nudge) }
@@ -839,40 +886,6 @@ private fun VoiceAssistantButton(
             // Keep the outgoing card stable until its shared-bounds return to the bot completes.
             delay(NUDGE_RETURN_CONTENT_HOLD_MILLIS)
             renderedNudge = null
-        }
-    }
-    var typedNudgeTitle by remember(renderedNudge?.id) { mutableStateOf("") }
-    var typedNudgeBody by remember(renderedNudge?.id) { mutableStateOf("") }
-    var isTypingNudgeTitle by remember(renderedNudge?.id) { mutableStateOf(false) }
-    var isTypingNudgeBody by remember(renderedNudge?.id) { mutableStateOf(false) }
-    LaunchedEffect(showNudge, nudge?.id) {
-        if (!showNudge) {
-            isTypingNudgeTitle = false
-            isTypingNudgeBody = false
-            return@LaunchedEffect
-        }
-
-        val visibleNudge = nudge ?: return@LaunchedEffect
-        typedNudgeTitle = ""
-        typedNudgeBody = ""
-        val title = visibleNudge.label
-        isTypingNudgeTitle = true
-        delay(120)
-        title.indices.forEach { index ->
-            typedNudgeTitle = title.take(index + 1)
-            delay(if (title[index] in ".,?!") 90 else 32)
-        }
-        isTypingNudgeTitle = false
-
-        val body = visibleNudge.supportingText.orEmpty()
-        if (body.isNotBlank()) {
-            delay(90)
-            isTypingNudgeBody = true
-            body.indices.forEach { index ->
-                typedNudgeBody = body.take(index + 1)
-                delay(if (body[index] in ".,?!") 36 else 9)
-            }
-            isTypingNudgeBody = false
         }
     }
     val nudgeBlend by animateFloatAsState(
@@ -915,10 +928,12 @@ private fun VoiceAssistantButton(
     var quizDragOffset by remember(quizOpen) { mutableStateOf(Offset.Zero) }
     val assistantSurface = when {
         quizOpen -> VoiceAssistantSurface.Quiz
+        composerOpen -> VoiceAssistantSurface.Composer
         isGeneratingNudge -> VoiceAssistantSurface.Thinking
         showNudge -> VoiceAssistantSurface.Nudge
         else -> VoiceAssistantSurface.Button
     }
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     LaunchedEffect(assistantSurface, verticalLayout) {
         onNavigationOccupationChanged(
             !verticalLayout && assistantSurface == VoiceAssistantSurface.Nudge,
@@ -927,6 +942,7 @@ private fun VoiceAssistantButton(
     val containerCorner by animateDpAsState(
         targetValue = when (assistantSurface) {
             VoiceAssistantSurface.Button -> buttonSize / 2
+            VoiceAssistantSurface.Composer -> 22.dp
             VoiceAssistantSurface.Thinking -> 22.dp
             VoiceAssistantSurface.Nudge -> 24.dp
             VoiceAssistantSurface.Quiz -> 28.dp
@@ -937,6 +953,7 @@ private fun VoiceAssistantButton(
     val containerElevation by animateDpAsState(
         targetValue = when (assistantSurface) {
             VoiceAssistantSurface.Button -> 2.dp
+            VoiceAssistantSurface.Composer -> 4.dp
             VoiceAssistantSurface.Thinking -> 3.dp
             VoiceAssistantSurface.Nudge -> 3.dp
             VoiceAssistantSurface.Quiz -> 8.dp
@@ -1051,24 +1068,23 @@ private fun VoiceAssistantButton(
                     )
                 }
                 .combinedClickable(
-                    // During processing the same tap routes back to Whisper and cancels it.
                     onClick = when {
                         showNudge -> onNudgeAction
                         isPreparingNudge -> ({})
-                        else -> onClick
+                        else -> ({ composerOpen = true })
                     },
-                    onLongClick = onQuizLongPress,
+                    onLongClick = onNudgeRequest,
                 )
                 .semantics {
                     contentDescription = when {
                         showNudge -> nudge?.label.orEmpty()
                         isPreparingNudge -> "Generating suggestion"
                         generatingSuggestion -> "Generating suggestion"
-                        processing -> "Cancel voice processing"
+                        processing -> "Voice processing in progress"
                         listening -> "Finish listening"
                         nudge != null ->
-                            "Bot. Tap for voice search. Swipe down for a Now Nudge suggestion"
-                        else -> "Start voice search"
+                            "Now Nudge. Tap to type, long press or swipe down for a suggestion"
+                        else -> "Now Nudge. Tap to type or long press for a suggestion"
                     }
                 }
                 .graphicsLayer {
@@ -1229,6 +1245,127 @@ private fun VoiceAssistantButton(
             }
                 }
 
+                VoiceAssistantSurface.Composer -> Surface(
+                    shape = RoundedCornerShape(containerCorner),
+                    color = containerColor,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shadowElevation = containerElevation,
+                    modifier = Modifier
+                        .wrapContentSize(
+                            align = if (verticalLayout) Alignment.CenterStart else Alignment.BottomEnd,
+                            unbounded = true,
+                        )
+                        .offset(
+                            x = if (verticalLayout) buttonSize + 8.dp else 0.dp,
+                            y = if (verticalLayout) {
+                                0.dp
+                            } else {
+                                -buttonSize - if (imeVisible) 96.dp else 8.dp
+                            },
+                        )
+                        .sharedBounds(
+                            sharedContentState = voiceContainerState,
+                            animatedVisibilityScope = this,
+                            boundsTransform = { _, _ ->
+                                tween(
+                                    durationMillis = NUDGE_MORPH_DURATION_MILLIS,
+                                    easing = FastOutSlowInEasing,
+                                )
+                            },
+                            enter = EnterTransition.None,
+                            exit = ExitTransition.None,
+                            resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+                        )
+                        .width(
+                            if (verticalLayout) {
+                                300.dp
+                            } else {
+                                minOf(
+                                    360.dp,
+                                    (LocalConfiguration.current.screenWidthDp - 24).dp,
+                                )
+                            },
+                        ),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .background(nudgeBrush)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = "Ask Now Nudge",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = "Answers use your downloaded Quran, Hadith, and dua sources",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    composerOpen = false
+                                    keyboardController?.hide()
+                                },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Close")
+                            }
+                        }
+                        OutlinedTextField(
+                            value = typedQuestion,
+                            onValueChange = { typedQuestion = it.take(240) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(composerFocusRequester),
+                            label = { Text("Your question") },
+                            placeholder = { Text("For example: fasting dua") },
+                            minLines = 2,
+                            maxLines = 3,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { submitTypedQuestion() }),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Tip: type “start quiz”",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            TextButton(
+                                onClick = {
+                                    composerOpen = false
+                                    keyboardController?.hide()
+                                    onVoiceClick()
+                                },
+                            ) {
+                                Icon(Icons.Rounded.Mic, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Voice")
+                            }
+                            Button(
+                                onClick = ::submitTypedQuestion,
+                                enabled = typedQuestion.isNotBlank(),
+                            ) {
+                                Text("Ask")
+                                Spacer(Modifier.width(6.dp))
+                                Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null)
+                            }
+                        }
+                    }
+                }
+
                 VoiceAssistantSurface.Thinking -> Surface(
                     shape = RoundedCornerShape(containerCorner),
                     color = containerColor,
@@ -1260,7 +1397,7 @@ private fun VoiceAssistantButton(
                             exit = ExitTransition.None,
                             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                         )
-                        .widthIn(max = if (verticalLayout) 230.dp else 280.dp)
+                        .width(if (verticalLayout) 230.dp else 280.dp)
                         .heightIn(min = if (verticalLayout) 38.dp else 44.dp)
                         .semantics {
                             contentDescription = thinkingMessages[thinkingMessageIndex]
@@ -1282,19 +1419,29 @@ private fun VoiceAssistantButton(
                         )
                         Spacer(Modifier.width(8.dp))
                         AnimatedContent(
-                            targetState = thinkingMessageIndex,
+                            targetState = thinkingMessages[thinkingMessageIndex],
                             transitionSpec = {
-                                fadeIn(tween(180)) togetherWith fadeOut(tween(120))
+                                fadeIn(tween(240)) togetherWith fadeOut(tween(180))
                             },
                             label = "nowNudgeThinkingMessage",
-                        ) { messageIndex ->
-                            Text(
-                                text = thinkingMessages[messageIndex],
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                        ) { message ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = message,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = ".".repeat(thinkingDotCount),
+                                    modifier = Modifier.width(16.dp),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                )
+                            }
                         }
                     }
                 }
@@ -1331,13 +1478,13 @@ private fun VoiceAssistantButton(
                             exit = ExitTransition.None,
                             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                         )
-                        .widthIn(
-                            max = if (verticalLayout) {
-                                260.dp
+                        .width(
+                            if (verticalLayout) {
+                                300.dp
                             } else {
                                 minOf(
-                                    340.dp,
-                                    (LocalConfiguration.current.screenWidthDp - 16).dp,
+                                    360.dp,
+                                    (LocalConfiguration.current.screenWidthDp - 24).dp,
                                 )
                             },
                         )
@@ -1394,8 +1541,8 @@ private fun VoiceAssistantButton(
                                 0f,
                                 size.width,
                                 size.height,
-                                size.height / 2f,
-                                size.height / 2f,
+                                containerCorner.toPx(),
+                                containerCorner.toPx(),
                                 glowPaint,
                             )
                         }
@@ -1408,9 +1555,9 @@ private fun VoiceAssistantButton(
                             ).joinToString(separator = ". ")
                         },
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
-                            .wrapContentSize()
+                            .fillMaxWidth()
                             .animateEnterExit(
                                 enter = fadeIn(
                                     tween(durationMillis = 150, delayMillis = 190),
@@ -1420,52 +1567,75 @@ private fun VoiceAssistantButton(
                             .clip(RoundedCornerShape(containerCorner))
                             .background(nudgeBrush)
                             .padding(
-                                horizontal = if (verticalLayout) 8.dp else 12.dp,
-                                vertical = if (verticalLayout) 5.dp else 6.dp,
+                                horizontal = if (verticalLayout) 14.dp else 18.dp,
+                                vertical = if (verticalLayout) 12.dp else 16.dp,
                             ),
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalArrangement = Arrangement.spacedBy(
+                            if (verticalLayout) 8.dp else 12.dp,
+                        ),
                     ) {
-                        NudgePreviewThumbnail(
-                            action = renderedNudge?.action,
-                            size = if (verticalLayout) 26.dp else 32.dp,
-                        )
-                        Spacer(Modifier.width(if (verticalLayout) 6.dp else 8.dp))
-                        Column(
-                            modifier = Modifier.weight(1f, fill = false),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                text = typedNudgeTitle + if (isTypingNudgeTitle) "\u258C" else "",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
+                            NudgePreviewThumbnail(
+                                action = renderedNudge?.action,
+                                size = if (verticalLayout) 30.dp else 36.dp,
                             )
-                            renderedNudge?.supportingText?.takeIf(String::isNotBlank)?.let {
-                                Text(
-                                    text = typedNudgeBody +
-                                        if (isTypingNudgeBody) "\u258C" else "",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            renderedNudge?.sourceLabel?.takeIf(String::isNotBlank)?.let { sourceLabel ->
-                                Text(
-                                    text = sourceLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "NOW NUDGE",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            IconButton(
+                                onClick = onNudgeDismiss,
+                                modifier = Modifier.size(if (verticalLayout) 28.dp else 32.dp),
+                            ) {
+                                FlaticonIcon(
+                                    glyph = FlaticonIcons.REMOVE,
+                                    contentDescription = "Dismiss suggestion",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = if (verticalLayout) 14.sp else 16.sp,
                                 )
                             }
                         }
-                        Spacer(Modifier.width(4.dp))
-                        IconButton(
-                            onClick = onNudgeDismiss,
-                            modifier = Modifier.size(if (verticalLayout) 24.dp else 28.dp),
-                        ) {
-                            FlaticonIcon(
-                                glyph = FlaticonIcons.REMOVE,
-                                contentDescription = "Dismiss suggestion",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = if (verticalLayout) 13.sp else 15.sp,
+                        Text(
+                            text = renderedNudge?.label.orEmpty(),
+                            style = if (verticalLayout) {
+                                MaterialTheme.typography.titleSmall
+                            } else {
+                                MaterialTheme.typography.titleMedium
+                            },
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        renderedNudge?.supportingText?.takeIf(String::isNotBlank)?.let { body ->
+                            Text(
+                                text = body,
+                                style = if (verticalLayout) {
+                                    MaterialTheme.typography.bodySmall
+                                } else {
+                                    MaterialTheme.typography.bodyMedium
+                                },
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                        renderedNudge?.sourceLabel?.takeIf(String::isNotBlank)?.let { sourceLabel ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                                contentColor = MaterialTheme.colorScheme.primary,
+                            ) {
+                                Text(
+                                    text = sourceLabel,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
                         }
                     }
                 }

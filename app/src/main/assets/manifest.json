@@ -1,12 +1,12 @@
 {
   "version": 1,
   "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
-  "total_size": 8381251323,
-  "total_files": 6925,
+  "total_size": 8785280795,
+  "total_files": 6928,
   "categories": {
     "json_data": {
-      "total_size": 10246616,
-      "file_count": 6,
+      "total_size": 16640472,
+      "file_count": 7,
       "required": true
     },
     "news": {
@@ -77,6 +77,11 @@
     "model_whisper": {
       "total_size": 119777522,
       "file_count": 3,
+      "required": false
+    },
+    "model_now_nudge": {
+      "total_size": 397807648,
+      "file_count": 2,
       "required": false
     },
     "model_asr": {
@@ -4699,6 +4704,18 @@
       "size": 5006,
       "sha256": "fd2ded4050a55d2b1578870ba8697d02371980217806b7558bd0a5cc60f3ba53",
       "category": "model_kws",
+      "required": false
+    },
+    "models/now_nudge/deenly-question-v2-q4_k_m.gguf.part-00": {
+      "size": 198903824,
+      "sha256": "b3594ae9894f7f90ac6191f4c9918f1997b8b1e0e658bddb647206720d6529d1",
+      "category": "model_now_nudge",
+      "required": false
+    },
+    "models/now_nudge/deenly-question-v2-q4_k_m.gguf.part-01": {
+      "size": 198903824,
+      "sha256": "00eef233c4a8ed415bcdc4c1cdfa3e920b9ec6da59b790cf2347a0cd0fb769ab",
+      "category": "model_now_nudge",
       "required": false
     },
     "models/whisper/filters_vocab_en.bin": {

@@ -391,6 +391,7 @@ class AssetDownloadViewModel @Inject constructor(
             "model_asr" -> "Speech Recognition"
             "model_whisper" -> "Whisper STT Engine"
             "model_kws" -> "Keyword Detection"
+            "model_now_nudge" -> "Now Nudge Question Model"
             "bukhari_audio_bn" -> "Bukhari Audio (Bengali)"
             "quran_audio_arabic" -> "Quran Audio (Arabic)"
             "quran_audio_bengali" -> "Quran Audio (Bengali)"
@@ -408,6 +409,7 @@ class AssetDownloadViewModel @Inject constructor(
             category.startsWith("hadith_") -> "Hadith Collections"
             category.startsWith("quran_audio_") || category == "bukhari_audio_bn" -> "Audio Recitations"
             category.startsWith("model_tts_") -> "Text-to-Speech"
+            category == "model_now_nudge" -> "On-device AI"
             category.startsWith("model_") -> "Voice Recognition"
             category == "json_data" || category == "news" || category == "other" -> "App Data"
             else -> "Other"
@@ -421,6 +423,7 @@ class AssetDownloadViewModel @Inject constructor(
             "Hadith Collections" -> "Prophetic traditions and narrations"
             "Audio Recitations" -> "Quran and Hadith audio playback"
             "Text-to-Speech" -> "On-device voice engines for reading"
+            "On-device AI" -> "Private models that run entirely on your device"
             "Voice Recognition" -> "Speech-to-text and voice commands"
             "App Data" -> "Reference data and news content"
             else -> ""
@@ -434,8 +437,9 @@ class AssetDownloadViewModel @Inject constructor(
             "Hadith Collections" -> 1
             "Audio Recitations" -> 2
             "Text-to-Speech" -> 3
-            "Voice Recognition" -> 4
-            "App Data" -> 5
+            "On-device AI" -> 4
+            "Voice Recognition" -> 5
+            "App Data" -> 6
             else -> 6
         }
 
@@ -461,6 +465,7 @@ class AssetDownloadViewModel @Inject constructor(
             "model_asr" -> "On-device speech-to-text engine"
             "model_whisper" -> "Accurate English voice transcription"
             "model_kws" -> "Wake word and voice command detection"
+            "model_now_nudge" -> "Creates source-grounded questions locally without sending content off-device"
             "bukhari_audio_bn" -> "Sahih Bukhari narration in Bengali"
             "quran_audio_arabic" -> "Full Quran recitation by renowned Qari"
             "quran_audio_bengali" -> "Bengali translation audio recitation"

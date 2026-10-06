@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 2,
+  "modelVersion": "deenly-question-v2",
+  "baseModel": "Qwen/Qwen2.5-0.5B-Instruct",
+  "trainingMethod": "LoRA",
+  "edgeRuntime": "llama.cpp",
+  "edgeFormat": "GGUF Q4_K_M",
+  "artifact": {
+    "fileName": "deenly-question-v2-q4_k_m.gguf",
+    "sizeBytes": 397807648,
+    "sha256": "a56a58a51c66fec1548ac32b72ce4b70c4608c24486f5b212fafcba03b5439de",
+    "cdnParts": [
+      {
+        "cdnKey": "models/now_nudge/deenly-question-v2-q4_k_m.gguf.part-00",
+        "sizeBytes": 198903824,
+        "sha256": "b3594ae9894f7f90ac6191f4c9918f1997b8b1e0e658bddb647206720d6529d1"
+      },
+      {
+        "cdnKey": "models/now_nudge/deenly-question-v2-q4_k_m.gguf.part-01",
+        "sizeBytes": 198903824,
+        "sha256": "00eef233c4a8ed415bcdc4c1cdfa3e920b9ec6da59b790cf2347a0cd0fb769ab"
+      }
+    ]
+  },
+  "dataset": {
+    "purpose": "semantic_question_contract_instruction_tuning",
+    "religiousFactsAdded": false,
+    "trainCount": 313,
+    "validationCount": 35,
+    "testCount": 48,
+    "runtimeKnowledgePolicy": "verified_source_envelope_only"
+  },
+  "training": {
+    "steps": 120,
+    "trainLoss": 0.20873371611038843,
+    "validationLoss": 0.12102827429771423,
+    "validationPerplexity": 1.12865682389526
+  },
+  "acceptance": {
+    "quantizedHeldOutAccepted": 46,
+    "quantizedHeldOutRejected": 2,
+    "acceptanceRate": 0.9583333333333334,
+    "runtimeOptionRepairEnabled": true,
+    "sourceIntegrityViolationsShownToUser": 0
+  },
+  "androidSmokeTest": {
+    "validated": true,
+    "appProcessValidated": true,
+    "date": "2026-10-06",
+    "device": "Samsung SM-S948U",
+    "abi": "arm64-v8a",
+    "artifactHashMatched": true,
+    "accepted": true,
+    "generatedPayload": {
+      "contentType": "question",
+      "questionKind": "food",
+      "question": "Which food did Hamza serve at the community meal?",
+      "answer": "bread",
+      "evidence": "Hamza served bread at the community meal.",
+      "options": ["pumpkin", "milk", "olives", "bread"]
+    }
+  },
+  "androidRunner": {
+    "fileName": "libdeenly_completion.so",
+    "sizeBytes": 7360104,
+    "sha256": "6f90f58377324a5a092d08ac618a283398777fd4d989cdb04c85ef53693306f5",
+    "abi": "arm64-v8a"
+  },
+  "delivery": {
+    "bundledInApk": false,
+    "category": "model_now_nudge",
+    "requiredAtFirstLaunch": false,
+    "strategy": "versioned app-private CDN download with size and SHA-256 verification",
+    "fallback": "deterministic source-grounded content"
+  }
+}

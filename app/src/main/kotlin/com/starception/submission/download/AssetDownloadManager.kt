@@ -415,8 +415,10 @@ class AssetDownloadManager @Inject constructor(
                 getOrCreateStateFlow(cdnKey).value =
                     DownloadState.Failed("Unable to resolve asset: $cdnKey")
             }
-            if (result.isComplete) _categoryCompleted.tryEmit(category)
-            return@withContext result.isComplete
+            val categoryComplete = result.isComplete &&
+                (category != NOW_NUDGE_CATEGORY || assembleNowNudgeModel())
+            if (categoryComplete) _categoryCompleted.tryEmit(category)
+            return@withContext categoryComplete
         } finally {
             endGlobalDownload()
         }
@@ -463,15 +465,27 @@ class AssetDownloadManager @Inject constructor(
 
     fun deleteCategory(category: String, manifest: AssetManifest) {
         manifest.getAssetsByCategory(category).forEach { deleteAsset(it.cdnKey) }
+        if (category == NOW_NUDGE_CATEGORY) {
+            nowNudgeModelFile().delete()
+            nowNudgeTemporaryFile().delete()
+        }
     }
 
-    fun getCategoryDownloadedSize(category: String, manifest: AssetManifest): Long =
-        manifest.getAssetsByCategory(category)
+    fun getCategoryDownloadedSize(category: String, manifest: AssetManifest): Long {
+        if (category == NOW_NUDGE_CATEGORY && isNowNudgeModelReady()) {
+            return NOW_NUDGE_MODEL_SIZE
+        }
+        return manifest.getAssetsByCategory(category)
             .filter { isAssetAvailable(it.cdnKey) }
             .sumOf { it.size }
+    }
 
     fun isCategoryComplete(category: String, manifest: AssetManifest): Boolean =
-        manifest.getAssetsByCategory(category).all { isAssetAvailable(it.cdnKey) }
+        if (category == NOW_NUDGE_CATEGORY) {
+            isNowNudgeModelReady()
+        } else {
+            manifest.getAssetsByCategory(category).all { isAssetAvailable(it.cdnKey) }
+        }
 
     /**
      * Check if all assets in a category are bundled in the APK.
@@ -512,11 +526,83 @@ class AssetDownloadManager @Inject constructor(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
+    private fun assembleNowNudgeModel(): Boolean {
+        val target = nowNudgeModelFile()
+        if (isNowNudgeModelReady()) {
+            deleteNowNudgeParts()
+            return true
+        }
+        target.delete()
+
+        val parts = NOW_NUDGE_MODEL_PARTS.map { File(cdnAssetsDir, it) }
+        if (parts.any { !it.isFile }) {
+            Log.e(TAG, "Now Nudge model assembly failed: a verified part is missing")
+            return false
+        }
+
+        val temporary = nowNudgeTemporaryFile()
+        temporary.parentFile?.mkdirs()
+        temporary.delete()
+        return try {
+            temporary.outputStream().buffered().use { output ->
+                parts.forEach { part ->
+                    part.inputStream().buffered().use { input -> input.copyTo(output) }
+                }
+            }
+            val valid = temporary.length() == NOW_NUDGE_MODEL_SIZE &&
+                sha256(temporary) == NOW_NUDGE_MODEL_SHA256
+            if (!valid) {
+                Log.e(TAG, "Now Nudge model assembly failed integrity verification")
+                temporary.delete()
+                false
+            } else {
+                target.parentFile?.mkdirs()
+                if (!temporary.renameTo(target)) {
+                    Log.e(TAG, "Now Nudge model assembly could not activate the verified file")
+                    temporary.delete()
+                    false
+                } else {
+                    deleteNowNudgeParts()
+                    Log.i(TAG, "Now Nudge question model assembled and verified")
+                    true
+                }
+            }
+        } catch (error: Exception) {
+            temporary.delete()
+            Log.e(TAG, "Now Nudge model assembly failed", error)
+            false
+        }
+    }
+
+    private fun isNowNudgeModelReady(): Boolean =
+        nowNudgeModelFile().let { it.isFile && it.length() == NOW_NUDGE_MODEL_SIZE }
+
+    private fun nowNudgeModelFile() = File(cdnAssetsDir, NOW_NUDGE_MODEL_KEY)
+
+    private fun nowNudgeTemporaryFile() = File(cdnAssetsDir, "$NOW_NUDGE_MODEL_KEY.assembling")
+
+    private fun deleteNowNudgeParts() {
+        NOW_NUDGE_MODEL_PARTS.forEach { cdnKey ->
+            File(cdnAssetsDir, cdnKey).delete()
+            verifiedChecksums.remove(cdnKey)
+        }
+    }
+
     companion object {
         private const val TAG = "AssetDownloadManager"
         const val OFFLINE_ERROR = "No internet connection"
         private const val CDN_ASSETS_DIR = "cdn_assets"
         private const val BUFFER_SIZE = 8192
         private const val PROGRESS_UPDATE_INTERVAL = 0.01f
+        private const val NOW_NUDGE_CATEGORY = "model_now_nudge"
+        private const val NOW_NUDGE_MODEL_KEY =
+            "models/now_nudge/deenly-question-v2-q4_k_m.gguf"
+        private const val NOW_NUDGE_MODEL_SIZE = 397_807_648L
+        private const val NOW_NUDGE_MODEL_SHA256 =
+            "a56a58a51c66fec1548ac32b72ce4b70c4608c24486f5b212fafcba03b5439de"
+        private val NOW_NUDGE_MODEL_PARTS = listOf(
+            "$NOW_NUDGE_MODEL_KEY.part-00",
+            "$NOW_NUDGE_MODEL_KEY.part-01",
+        )
     }
 }

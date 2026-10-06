@@ -77,6 +77,7 @@ CATEGORY_RULES = [
     ("sherpa/", "model_asr"),
     ("kws/", "model_kws"),
     ("whisper/", "model_whisper"),
+    ("models/now_nudge/", "model_now_nudge"),
     ("models/", "model_whisper"),
     ("tts/kokoro", "model_tts_kokoro"),
     ("tts/vits", "model_tts_vits"),

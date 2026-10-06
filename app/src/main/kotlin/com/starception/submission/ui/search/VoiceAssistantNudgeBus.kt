@@ -62,7 +62,7 @@ object VoiceAssistantNudgeBus {
     val generatingSuggestion = _generatingSuggestion.asStateFlow()
 
     private var suggestionRequestId = 0L
-    private var suggestionRequestHandler: ((Long) -> Unit)? = null
+    private var suggestionRequestHandler: ((Long, String?) -> Unit)? = null
 
     fun show(nudge: DeenlyNudge?) {
         _nudge.value = nudge
@@ -88,6 +88,19 @@ object VoiceAssistantNudgeBus {
         _quizOpen.value = true
     }
 
+    fun submitTypedPrompt(prompt: String) {
+        val normalized = prompt
+            .trim()
+            .lowercase()
+            .replace(Regex("[^a-z ]"), "")
+            .replace(Regex("\\s+"), " ")
+        if (normalized in QUIZ_COMMANDS) {
+            requestQuiz()
+        } else {
+            requestSuggestion(prompt)
+        }
+    }
+
     fun closeQuiz() {
         _quizOpen.value = false
         _generatedQuizQuestion.value = null
@@ -106,8 +119,11 @@ object VoiceAssistantNudgeBus {
     }
 
     /** Starts one bot turn from the voice button's pull-down gesture. */
-    fun requestSuggestion() {
+    fun requestSuggestion(prompt: String? = null) {
         if (_generatingSuggestion.value) return
+        if (!prompt.isNullOrBlank()) {
+            _nudge.value = null
+        }
         _generatedQuizQuestion.value = null
         _generatingSuggestion.value = true
         suggestionRequestId += 1
@@ -115,7 +131,9 @@ object VoiceAssistantNudgeBus {
         val handler = suggestionRequestHandler
         when {
             handler != null -> {
-                if (runCatching { handler(requestId) }.isFailure) {
+                if (runCatching { handler(requestId, prompt?.trim()?.takeIf(String::isNotEmpty)) }
+                        .isFailure
+                ) {
                     failSuggestion(requestId)
                 }
             }
@@ -133,7 +151,7 @@ object VoiceAssistantNudgeBus {
      * It intentionally survives Home leaving composition so the app-shell bot
      * can generate from any top-level destination.
      */
-    fun setSuggestionRequestHandler(handler: (Long) -> Unit) {
+    fun setSuggestionRequestHandler(handler: ((Long, String?) -> Unit)?) {
         suggestionRequestHandler = handler
     }
 
@@ -182,4 +200,10 @@ object VoiceAssistantNudgeBus {
     }
 
     private const val TAG = "VoiceAssistantNudgeBus"
+    private val QUIZ_COMMANDS = setOf(
+        "begin quiz",
+        "open quiz",
+        "start a quiz",
+        "start quiz",
+    )
 }

@@ -1216,6 +1216,10 @@ fun PrayerTimesScreen(
         NowNudgeKnowledgeProvider.create(
             context = screenContext.applicationContext,
             assetRepository = entryPoint.assetRepository(),
+            duaRepository = EntryPointAccessors.fromApplication(
+                screenContext.applicationContext,
+                PrayerTimeCalculatorEntryPoint::class.java,
+            ).duaRepository(),
         )
     }
     var modelKnowledgeCandidate by remember(nudgeDay) {
@@ -1419,16 +1423,24 @@ fun PrayerTimesScreen(
     val latestBotKnowledgeRankingContext by rememberUpdatedState(botKnowledgeRankingContext)
     val latestLaunchGreeting by rememberUpdatedState(launchGreeting)
     val latestLaunchGreetingPending by rememberUpdatedState(launchGreetingPending)
-    val latestSuggestionRequestHandler = rememberUpdatedState<(Long) -> Unit> { requestId ->
+    val latestSuggestionRequestHandler = rememberUpdatedState<(Long, String?) -> Unit> {
+            requestId,
+            typedPrompt,
+        ->
         val variation = botSourceVariation
         botSourceVariation += 1
-        val requestedTask = if (variation % 2 == 0) {
+        val requestedTask = if (typedPrompt != null) {
+            com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE
+        } else if (variation % 2 == 0) {
             com.starception.submission.ml.DeenlyKnowledgeTask.QUESTION
         } else {
             com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE
         }
         val requestDate = LocalDate.parse(nudgeDay)
-        val appSituation = latestBotAppSituation
+        val appSituation = buildString {
+            append(latestBotAppSituation)
+            typedPrompt?.let { append("; user asks: ${it.take(240)}") }
+        }
         val rankingContext = latestBotKnowledgeRankingContext.copy(
             dismissedNudgeIds = latestDismissedNudgeIds,
         )
@@ -1443,6 +1455,7 @@ fun PrayerTimesScreen(
                 date = requestDate,
                 variation = variation,
                 appSituation = appSituation,
+                query = typedPrompt,
                 rankingContext = rankingContext,
                 task = requestedTask,
             )
@@ -1489,8 +1502,8 @@ fun PrayerTimesScreen(
         // Retain the latest immutable Home context after navigation so the
         // app-shell bot can answer a pull gesture from every destination.
         com.starception.submission.ui.search.VoiceAssistantNudgeBus
-            .setSuggestionRequestHandler { requestId ->
-                latestSuggestionRequestHandler.value(requestId)
+            .setSuggestionRequestHandler { requestId, typedPrompt ->
+                latestSuggestionRequestHandler.value(requestId, typedPrompt)
             }
         onDispose {
             // Deliberately retained. A later Home composition replaces this
@@ -1528,6 +1541,8 @@ fun PrayerTimesScreen(
                         target.databaseFile,
                         target.hadithNumber,
                     )
+                    is NowNudgeKnowledgeTarget.FortressDua ->
+                        onFortressDuaClick(target.dua)
                     null -> Unit
                 }
             } else when (nudge.action) {

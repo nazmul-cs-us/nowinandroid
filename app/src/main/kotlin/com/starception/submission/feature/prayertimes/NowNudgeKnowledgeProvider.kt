@@ -8,6 +8,8 @@ package com.starception.submission.feature.prayertimes
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.starception.submission.core.duadatabase.Dua
+import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithRepository
@@ -46,6 +48,8 @@ internal sealed interface NowNudgeKnowledgeTarget {
         val databaseFile: String,
         val hadithNumber: Int,
     ) : NowNudgeKnowledgeTarget
+
+    data class FortressDua(val dua: Dua) : NowNudgeKnowledgeTarget
 }
 
 internal data class GroundedKnowledgeSource(
@@ -121,6 +125,8 @@ private object EmptyKnowledgeEngagementStore : KnowledgeEngagementStore {
 
 internal fun interface GroundedKnowledgeSourceLoader {
     suspend fun load(date: LocalDate, variation: Int): GroundedKnowledgeSource?
+
+    suspend fun search(query: String, limit: Int): List<GroundedKnowledgeSource> = emptyList()
 }
 
 internal fun interface KnowledgeDecisionGenerator {
@@ -146,17 +152,26 @@ internal class NowNudgeKnowledgeProvider(
         date: LocalDate,
         variation: Int = 0,
         appSituation: String? = null,
+        query: String? = null,
         rankingContext: NowNudgeKnowledgeRankingContext = NowNudgeKnowledgeRankingContext(),
         task: DeenlyKnowledgeTask = DeenlyKnowledgeTask.KNOWLEDGE,
     ): NowNudgeKnowledgeCandidate? {
         val sources = withContext(Dispatchers.IO) {
             buildList {
-                repeat(KNOWLEDGE_CANDIDATE_POOL_SIZE) { offset ->
+                query?.takeIf(String::isNotBlank)?.let { searchQuery ->
+                    addAll(sourceLoader.search(searchQuery, QUERY_SEARCH_LIMIT))
+                }
+                val poolSize = if (query.isNullOrBlank()) {
+                    KNOWLEDGE_CANDIDATE_POOL_SIZE
+                } else {
+                    QUERY_CANDIDATE_POOL_SIZE
+                }
+                repeat(poolSize) { offset ->
                     sourceLoader.load(date, variation + offset)?.let(::add)
                 }
             }.distinctBy(GroundedKnowledgeSource::id)
         }
-        val rankedSource = rankSources(date, sources, rankingContext).firstOrNull()
+        val rankedSource = rankSources(date, sources, rankingContext, query).firstOrNull()
             // Dismissals are honored until the current candidate window is
             // exhausted. At that point prefer a fresh ranking over returning
             // no model turn and leaving the bot with nothing to present.
@@ -167,6 +182,7 @@ internal class NowNudgeKnowledgeProvider(
                         date = date,
                         sources = sources,
                         context = rankingContext.copy(dismissedNudgeIds = emptySet()),
+                        query = query,
                     ).firstOrNull()
                 }
             ?: return null
@@ -219,10 +235,17 @@ internal class NowNudgeKnowledgeProvider(
         date: LocalDate,
         sources: List<GroundedKnowledgeSource>,
         context: NowNudgeKnowledgeRankingContext,
+        query: String? = null,
     ): List<RankedKnowledgeSource> {
-        val byNudgeId = sources.associateBy { source -> source.nudgeId(date) }
+        val typedQuery = query?.takeIf(String::isNotBlank)
+        val eligibleSources = if (typedQuery == null) {
+            sources
+        } else {
+            sources.filter { it.queryMatch(typedQuery) > 0f }
+        }
+        val byNudgeId = eligibleSources.associateBy { source -> source.nudgeId(date) }
         return rankDeenlyNudges(
-            candidates = sources.map { source ->
+            candidates = eligibleSources.map { source ->
                 val engagement = engagementStore.snapshot(
                     source = source,
                     date = date,
@@ -237,7 +260,9 @@ internal class NowNudgeKnowledgeProvider(
                     ),
                     signals = DeenlyRankingSignals(
                         basePriority = 0.5f,
-                        contextMatch = source.contextMatch(context),
+                        contextMatch = typedQuery
+                            ?.let(source::queryMatch)
+                            ?: source.contextMatch(context),
                         userAffinity = engagement.affinity,
                         freshness = engagement.minutesSinceLastShown
                             ?.let { (it / MINUTES_FOR_FULL_FRESHNESS).coerceIn(0f, 1f) }
@@ -268,6 +293,7 @@ internal class NowNudgeKnowledgeProvider(
         fun create(
             context: Context,
             assetRepository: AssetRepository,
+            duaRepository: DuaRepository,
         ): NowNudgeKnowledgeProvider {
             val appContext = context.applicationContext
             val model = DeenlyKnowledgeModel(appContext)
@@ -275,6 +301,7 @@ internal class NowNudgeKnowledgeProvider(
                 sourceLoader = AndroidGroundedKnowledgeSourceLoader(
                     context = appContext,
                     assetRepository = assetRepository,
+                    duaRepository = duaRepository,
                 ),
                 decisionGenerator = KnowledgeDecisionGenerator(model::generate),
                 engagementStore = AndroidKnowledgeEngagementStore(appContext),
@@ -330,6 +357,8 @@ internal class NowNudgeKnowledgeProvider(
                     "Which source contains this translated passage?"
                 is NowNudgeKnowledgeTarget.Hadith ->
                     "Which Hadith collection records this narration?"
+                is NowNudgeKnowledgeTarget.FortressDua ->
+                    "Which dua collection contains this invocation?"
             }
             val question = IslamicQuizQuestion(
                 id = "model-question-$date-${source.id}",
@@ -409,6 +438,8 @@ internal class NowNudgeKnowledgeProvider(
 
         private const val MAX_TITLE_CHARS = 84
         private const val KNOWLEDGE_CANDIDATE_POOL_SIZE = 22
+        private const val QUERY_CANDIDATE_POOL_SIZE = 64
+        private const val QUERY_SEARCH_LIMIT = 12
         private const val MINUTES_FOR_FULL_FRESHNESS = 24f * 60f
         private val SOURCE_LOCATION_OPTIONS = listOf(
             "The Quran",
@@ -447,6 +478,7 @@ private fun String.toDifficulty(): IslamicQuizDifficulty = when (this) {
 private fun GroundedKnowledgeSource.sourceLocationAnswer(): String = when (val destination = target) {
     is NowNudgeKnowledgeTarget.QuranAyah -> "The Quran"
     is NowNudgeKnowledgeTarget.Hadith -> destination.collectionName
+    is NowNudgeKnowledgeTarget.FortressDua -> "Fortress of the Muslim"
 }
 
 private fun GroundedKnowledgeSource.sourceUrl(): String = when (val destination = target) {
@@ -454,10 +486,12 @@ private fun GroundedKnowledgeSource.sourceUrl(): String = when (val destination 
         "https://quran.com/${destination.surahNumber}/${destination.ayahNumber}"
     is NowNudgeKnowledgeTarget.Hadith ->
         "hadith://${destination.databaseFile.removeSuffix(".db")}/${destination.hadithNumber}"
+    is NowNudgeKnowledgeTarget.FortressDua -> "deenly://dua/${destination.dua.id}"
 }
 
 private fun GroundedKnowledgeSource.contentSource(): IslamicContentSource = when {
     target is NowNudgeKnowledgeTarget.QuranAyah -> IslamicContentSource.QURAN
+    target is NowNudgeKnowledgeTarget.FortressDua -> IslamicContentSource.GENERAL
     collection == "sahih_al_bukhari" -> IslamicContentSource.SAHIH_AL_BUKHARI
     collection == "shamayel_at_tirmidhi" -> IslamicContentSource.SHAMAYEL_AT_TIRMIDHI
     else -> IslamicContentSource.GENERAL
@@ -532,6 +566,51 @@ private fun GroundedKnowledgeSource.contextMatch(
     }
     return matchingGroups.toFloat() / signalGroups.size
 }
+
+private fun GroundedKnowledgeSource.queryMatch(query: String?): Float {
+    val terms = query
+        ?.lowercase()
+        ?.split(Regex("[^a-z0-9]+"))
+        ?.filter { it.length >= 3 && it !in QUERY_STOP_WORDS }
+        ?.distinct()
+        .orEmpty()
+    if (terms.isEmpty()) return 0f
+
+    val searchable = "$topic $reference $sourceText".lowercase()
+    val matchingTerms = terms.count { term ->
+        (term == "dua" && target is NowNudgeKnowledgeTarget.FortressDua) ||
+            QUERY_SYNONYMS[term].orEmpty().plus(term).any(searchable::contains)
+    }
+    return matchingTerms.toFloat() / terms.size
+}
+
+private val QUERY_SYNONYMS = mapOf(
+    "dua" to listOf("supplication", "invoke", "call upon", "prayer"),
+    "fast" to listOf("fasting", "ramadan"),
+    "fasting" to listOf("fast", "ramadan"),
+    "mercy" to listOf("merciful", "forgive", "forgiveness"),
+    "pray" to listOf("prayer", "salah", "worship"),
+    "prayer" to listOf("pray", "salah", "worship"),
+)
+
+private val QUERY_STOP_WORDS = setOf(
+    "about",
+    "does",
+    "from",
+    "have",
+    "please",
+    "tell",
+    "that",
+    "the",
+    "this",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+    "with",
+)
 
 private fun String.contextKeywords(): List<String> = when (lowercase()) {
     "fajr" -> listOf("fajr", "dawn", "morning")
@@ -635,6 +714,7 @@ private class AndroidKnowledgeEngagementStore(context: Context) : KnowledgeEngag
 private class AndroidGroundedKnowledgeSourceLoader(
     context: Context,
     private val assetRepository: AssetRepository,
+    private val duaRepository: DuaRepository,
 ) : GroundedKnowledgeSourceLoader {
     private val appContext = context.applicationContext
     private val quranRepository by lazy {
@@ -663,6 +743,31 @@ private class AndroidGroundedKnowledgeSourceLoader(
             if (source != null) return source
         }
         return null
+    }
+
+    override suspend fun search(query: String, limit: Int): List<GroundedKnowledgeSource> {
+        val tokens = query
+            .lowercase()
+            .split(Regex("[^a-z0-9]+"))
+            .filter { it.length >= 3 && it !in QUERY_STOP_WORDS && it != "dua" }
+            .map { if (it == "fasting") "fast" else it }
+            .distinct()
+            .take(3)
+        if (tokens.isEmpty()) return emptyList()
+        return runCatching {
+            duaRepository.searchDuasMultiToken(tokens, limit).mapNotNull { dua ->
+                val sourceText = dua.translation?.takeIf(String::isEnglishGroundedText)
+                    ?: return@mapNotNull null
+                GroundedKnowledgeSource(
+                    id = "fortress-dua-${dua.id}",
+                    collection = "fortress_of_the_muslim",
+                    reference = "Fortress of the Muslim, ${dua.chapterTitle}",
+                    topic = dua.chapterTitle,
+                    sourceText = sourceText,
+                    target = NowNudgeKnowledgeTarget.FortressDua(dua),
+                )
+            }
+        }.getOrDefault(emptyList())
     }
 
     private suspend fun loadQuran(date: LocalDate): GroundedKnowledgeSource? {
@@ -784,7 +889,10 @@ private class AndroidGroundedKnowledgeSourceLoader(
             QuranReference(1, 4),
             QuranReference(2, 115),
             QuranReference(2, 152),
+            QuranReference(2, 183),
+            QuranReference(2, 185),
             QuranReference(2, 186),
+            QuranReference(2, 187),
             QuranReference(2, 286),
             QuranReference(3, 139),
             QuranReference(13, 28),

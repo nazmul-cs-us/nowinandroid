@@ -19,6 +19,29 @@ import org.junit.Test
 
 class VoiceAssistantNudgeBusTest {
     @Test
+    fun startQuizCommandOpensQuiz() {
+        VoiceAssistantNudgeBus.submitTypedPrompt("Start quiz!")
+
+        assertTrue(VoiceAssistantNudgeBus.quizOpen.value)
+        VoiceAssistantNudgeBus.closeQuiz()
+    }
+
+    @Test
+    fun typedQuestionIsForwardedToSuggestionHandler() {
+        var receivedPrompt: String? = null
+        VoiceAssistantNudgeBus.setSuggestionRequestHandler { requestId, prompt ->
+            receivedPrompt = prompt
+            VoiceAssistantNudgeBus.failSuggestion(requestId)
+        }
+
+        VoiceAssistantNudgeBus.requestSuggestion("  What does the Quran say about patience?  ")
+
+        assertEquals("What does the Quran say about patience?", receivedPrompt)
+        assertFalse(VoiceAssistantNudgeBus.generatingSuggestion.value)
+        VoiceAssistantNudgeBus.setSuggestionRequestHandler(null)
+    }
+
+    @Test
     fun pullRequestStartsBotTurnAndCompletionPublishesResult() = runBlocking {
         val request = async(start = CoroutineStart.UNDISPATCHED) {
             VoiceAssistantNudgeBus.suggestionRequests.first()

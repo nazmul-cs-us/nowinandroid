@@ -22,13 +22,15 @@ class DeenlyKnowledgeSmokeReceiver : BroadcastReceiver() {
         if (intent.action != ACTION) return
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            val sourceText = "Sovereign of the Day of Recompense"
+            // Fixed held-out contract fixture. Source quality is evaluated separately; this receiver
+            // proves the packaged runner, promoted artifact, schema, and Android parser work together.
+            val sourceText = "Hamza served bread at the community meal."
             val result = DeenlyKnowledgeModel(context).generate(
                 task = DeenlyKnowledgeTask.QUESTION,
                 source = DeenlySourceEnvelope(
-                    collection = "quran",
-                    reference = "Quran 1:4",
-                    topic = "The Opener",
+                    collection = "contract_smoke",
+                    reference = "Android smoke fixture",
+                    topic = "Food",
                     sourceText = sourceText,
                     sourceTextSha256 = MessageDigest.getInstance("SHA-256")
                         .digest(sourceText.toByteArray())
