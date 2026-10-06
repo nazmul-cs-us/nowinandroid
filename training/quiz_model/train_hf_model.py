@@ -17,7 +17,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument(
         "--model",
-        default="HuggingFaceTB/SmolLM2-135M-Instruct",
+        default="Qwen/Qwen2.5-0.5B-Instruct",
     )
     parser.add_argument("--model-version", default="deenly-knowledge-v0")
     parser.add_argument("--max-train-samples", type=int, default=1200)

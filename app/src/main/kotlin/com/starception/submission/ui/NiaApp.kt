@@ -24,6 +24,9 @@ import android.graphics.BlurMaskFilter
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
@@ -406,6 +409,19 @@ private fun NiaFloatingBottomBar(
         .isSearchOpen.collectAsStateWithLifecycle()
     if (isSearchOpen) return
 
+    // Once the bot has become a Now Nudge, the destination pill can expand into
+    // its vacated slot. On dismissal this value drives the slot open again while
+    // the same shared-bounds surface returns to the bot.
+    var nudgeOccupiesNavigation by remember { mutableStateOf(false) }
+    val voiceSlotWidth by animateDpAsState(
+        targetValue = if (nudgeOccupiesNavigation) 0.dp else 62.dp,
+        animationSpec = tween(
+            durationMillis = NUDGE_MORPH_DURATION_MILLIS,
+            easing = FastOutSlowInEasing,
+        ),
+        label = "bottomNavigationVoiceSlotWidth",
+    )
+
     // The rounded pill holding the destination items with the gooey selection
     // bubble. [sizeModifier] carries the scope-specific main-axis sizing —
     // weight(1f) from the portrait Row, width(64.dp) from the landscape Column —
@@ -632,6 +648,7 @@ private fun NiaFloatingBottomBar(
             onNudgeRequest = VoiceAssistantNudgeBus::requestSuggestion,
             onQuizLongPress = VoiceAssistantNudgeBus::requestQuiz,
             onNudgeDismiss = VoiceAssistantNudgeBus::requestDismiss,
+            onNavigationOccupationChanged = { nudgeOccupiesNavigation = it },
             modifier = voiceModifier,
         )
     }
@@ -670,7 +687,7 @@ private fun NiaFloatingBottomBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 pill(Modifier.weight(1f))
-                Spacer(modifier = Modifier.width(62.dp))
+                Spacer(modifier = Modifier.width(voiceSlotWidth))
             }
             voiceButton(
                 Modifier
@@ -698,6 +715,10 @@ private enum class VoiceAssistantSurface {
     Quiz,
 }
 
+private const val NUDGE_MORPH_DURATION_MILLIS = 420
+private const val NUDGE_RETURN_CONTENT_HOLD_MILLIS =
+    NUDGE_MORPH_DURATION_MILLIS.toLong() + 40L
+
 @Composable
 private fun VoiceAssistantButton(
     listening: Boolean,
@@ -712,6 +733,7 @@ private fun VoiceAssistantButton(
     onNudgeRequest: () -> Unit,
     onQuizLongPress: () -> Unit,
     onNudgeDismiss: () -> Unit,
+    onNavigationOccupationChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listeningBlend by animateFloatAsState(
@@ -761,6 +783,8 @@ private fun VoiceAssistantButton(
     val container = MaterialTheme.colorScheme.onSurface
     val barColor = MaterialTheme.colorScheme.surface
     val quizOpen by VoiceAssistantNudgeBus.quizOpen.collectAsStateWithLifecycle()
+    val generatedQuizQuestion by VoiceAssistantNudgeBus.generatedQuizQuestion
+        .collectAsStateWithLifecycle()
     BackHandler(enabled = quizOpen, onBack = VoiceAssistantNudgeBus::closeQuiz)
     var revealedNudgeId by remember { mutableStateOf<String?>(null) }
     var sparklingNudgeId by remember { mutableStateOf<String?>(null) }
@@ -790,18 +814,31 @@ private fun VoiceAssistantButton(
     val isGeneratingNudge = generatingSuggestion ||
         (isPreparingNudge && sparklingNudgeId == nudge?.id)
     val showNudge = canPresentNudge && revealedNudgeId == nudge?.id
-    var typedNudgeTitle by remember(nudge?.id) { mutableStateOf("") }
-    var typedNudgeBody by remember(nudge?.id) { mutableStateOf("") }
-    var isTypingNudgeTitle by remember(nudge?.id) { mutableStateOf(false) }
-    var isTypingNudgeBody by remember(nudge?.id) { mutableStateOf(false) }
+    var renderedNudge by remember { mutableStateOf(nudge) }
+    LaunchedEffect(nudge) {
+        if (nudge != null) {
+            renderedNudge = nudge
+        } else {
+            // Keep the outgoing card stable until its shared-bounds return to the bot completes.
+            delay(NUDGE_RETURN_CONTENT_HOLD_MILLIS)
+            renderedNudge = null
+        }
+    }
+    var typedNudgeTitle by remember(renderedNudge?.id) { mutableStateOf("") }
+    var typedNudgeBody by remember(renderedNudge?.id) { mutableStateOf("") }
+    var isTypingNudgeTitle by remember(renderedNudge?.id) { mutableStateOf(false) }
+    var isTypingNudgeBody by remember(renderedNudge?.id) { mutableStateOf(false) }
     LaunchedEffect(showNudge, nudge?.id) {
+        if (!showNudge) {
+            isTypingNudgeTitle = false
+            isTypingNudgeBody = false
+            return@LaunchedEffect
+        }
+
+        val visibleNudge = nudge ?: return@LaunchedEffect
         typedNudgeTitle = ""
         typedNudgeBody = ""
-        isTypingNudgeTitle = false
-        isTypingNudgeBody = false
-        if (!showNudge) return@LaunchedEffect
-
-        val title = nudge?.label.orEmpty()
+        val title = visibleNudge.label
         isTypingNudgeTitle = true
         delay(120)
         title.indices.forEach { index ->
@@ -810,7 +847,7 @@ private fun VoiceAssistantButton(
         }
         isTypingNudgeTitle = false
 
-        val body = nudge?.supportingText.orEmpty()
+        val body = visibleNudge.supportingText.orEmpty()
         if (body.isNotBlank()) {
             delay(90)
             isTypingNudgeBody = true
@@ -839,11 +876,35 @@ private fun VoiceAssistantButton(
     val nudgePullHapticStep = with(LocalDensity.current) { 12.dp.toPx() }
     var nudgePullDistance by remember(nudge?.id) { mutableStateOf(0f) }
     var nudgeDragOffset by remember(nudge?.id) { mutableStateOf(Offset.Zero) }
+    var isNudgeDragging by remember(nudge?.id) { mutableStateOf(false) }
+    val displayedNudgeDragX by animateFloatAsState(
+        targetValue = nudgeDragOffset.x,
+        animationSpec = if (isNudgeDragging) {
+            snap()
+        } else {
+            tween(durationMillis = 220, easing = FastOutSlowInEasing)
+        },
+        label = "assistantNudgeDragX",
+    )
+    val displayedNudgeDragY by animateFloatAsState(
+        targetValue = nudgeDragOffset.y,
+        animationSpec = if (isNudgeDragging) {
+            snap()
+        } else {
+            tween(durationMillis = 220, easing = FastOutSlowInEasing)
+        },
+        label = "assistantNudgeDragY",
+    )
     var quizDragOffset by remember(quizOpen) { mutableStateOf(Offset.Zero) }
     val assistantSurface = when {
         quizOpen -> VoiceAssistantSurface.Quiz
         showNudge -> VoiceAssistantSurface.Nudge
         else -> VoiceAssistantSurface.Button
+    }
+    LaunchedEffect(assistantSurface, verticalLayout) {
+        onNavigationOccupationChanged(
+            !verticalLayout && assistantSurface == VoiceAssistantSurface.Nudge,
+        )
     }
     val containerCorner by animateDpAsState(
         targetValue = when (assistantSurface) {
@@ -851,7 +912,7 @@ private fun VoiceAssistantButton(
             VoiceAssistantSurface.Nudge -> 24.dp
             VoiceAssistantSurface.Quiz -> 28.dp
         },
-        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        animationSpec = tween(NUDGE_MORPH_DURATION_MILLIS, easing = FastOutSlowInEasing),
         label = "assistantContainerCorner",
     )
     val containerElevation by animateDpAsState(
@@ -860,7 +921,7 @@ private fun VoiceAssistantButton(
             VoiceAssistantSurface.Nudge -> 3.dp
             VoiceAssistantSurface.Quiz -> 8.dp
         },
-        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        animationSpec = tween(NUDGE_MORPH_DURATION_MILLIS, easing = FastOutSlowInEasing),
         label = "assistantContainerElevation",
     )
     val expandedContainerColor = if (LocalDarkTheme.current) {
@@ -874,25 +935,30 @@ private fun VoiceAssistantButton(
         } else {
             expandedContainerColor
         },
-        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        animationSpec = tween(NUDGE_MORPH_DURATION_MILLIS, easing = FastOutSlowInEasing),
         label = "assistantContainerColor",
     )
-
     SharedTransitionLayout(
         modifier = if (verticalLayout) modifier.size(buttonSize) else modifier,
     ) {
+        val voiceContainerState = rememberSharedContentState(
+            key = "app-shell-voice-container",
+        )
         Box(
             modifier = if (verticalLayout) Modifier else Modifier.fillMaxSize(),
             contentAlignment = if (verticalLayout) Alignment.Center else Alignment.BottomEnd,
         ) {
             AnimatedContent(
+                // Loosen the incoming minimum width while retaining the app-shell's
+                // maximum width. The idle bot can therefore stay circular, while
+                // the nudge target is still free to fill the complete bottom bar.
                 modifier = Modifier.wrapContentSize(),
                 targetState = assistantSurface,
                 transitionSpec = {
-                    (fadeIn(tween(180, delayMillis = 80)) togetherWith fadeOut(tween(120)))
+                    (EnterTransition.None togetherWith ExitTransition.None)
                         .using(
-                            // sharedBounds owns the surface morph; do not animate the
-                            // AnimatedContent host independently during the same change.
+                            // sharedBounds owns the position and size morph. Snapping only the
+                            // AnimatedContent host prevents a second competing bounds animation.
                             SizeTransform(
                                 clip = false,
                                 sizeAnimationSpec = { _, _ -> snap() },
@@ -908,16 +974,20 @@ private fun VoiceAssistantButton(
                     color = containerColor,
                     shadowElevation = containerElevation,
                     modifier = Modifier
-                        .size(buttonSize)
                         .sharedBounds(
-                            sharedContentState = rememberSharedContentState(
-                                key = "app-shell-voice-container",
-                            ),
+                            sharedContentState = voiceContainerState,
                             animatedVisibilityScope = this,
                             boundsTransform = { _, _ ->
-                                tween(320, easing = FastOutSlowInEasing)
+                                tween(
+                                    durationMillis = NUDGE_MORPH_DURATION_MILLIS,
+                                    easing = FastOutSlowInEasing,
+                                )
                             },
+                            enter = EnterTransition.None,
+                            exit = ExitTransition.None,
+                            resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                         )
+                        .size(buttonSize)
                         .clip(RoundedCornerShape(containerCorner))
                 .pointerInput(
                     nudge?.id,
@@ -927,11 +997,10 @@ private fun VoiceAssistantButton(
                     requestedNudgeId,
                 ) {
                     val nudgeId = nudge?.id
-                    val canRequestNudge = nudgeId != null &&
-                        !listening &&
+                    val canRequestNudge = !listening &&
                         !processing &&
                         !generatingSuggestion &&
-                        requestedNudgeId != nudgeId
+                        (nudgeId == null || requestedNudgeId != nudgeId)
                     if (!canRequestNudge) return@pointerInput
 
                     var totalDragY = 0f
@@ -989,7 +1058,17 @@ private fun VoiceAssistantButton(
                     translationY = nudgePullDistance * 0.24f
                 },
                 ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .animateEnterExit(
+                        enter = fadeIn(
+                            tween(durationMillis = 120, delayMillis = 280),
+                        ),
+                        exit = fadeOut(tween(durationMillis = 70)),
+                    ),
+            ) {
                 Canvas(
                     modifier = Modifier
                         .size(if (buttonSize < 56.dp) 25.dp else 30.dp)
@@ -1149,6 +1228,19 @@ private fun VoiceAssistantButton(
                             x = if (verticalLayout) buttonSize + 8.dp else 0.dp,
                             y = if (verticalLayout) 0.dp else -buttonSize - 8.dp,
                         )
+                        .sharedBounds(
+                            sharedContentState = voiceContainerState,
+                            animatedVisibilityScope = this,
+                            boundsTransform = { _, _ ->
+                                tween(
+                                    durationMillis = NUDGE_MORPH_DURATION_MILLIS,
+                                    easing = FastOutSlowInEasing,
+                                )
+                            },
+                            enter = EnterTransition.None,
+                            exit = ExitTransition.None,
+                            resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+                        )
                         .widthIn(
                             max = if (verticalLayout) {
                                 260.dp
@@ -1160,41 +1252,39 @@ private fun VoiceAssistantButton(
                             },
                         )
                         .heightIn(min = if (verticalLayout) 36.dp else 44.dp)
-                        .sharedBounds(
-                            sharedContentState = rememberSharedContentState(
-                                key = "app-shell-voice-container",
-                            ),
-                            animatedVisibilityScope = this,
-                            boundsTransform = { _, _ ->
-                                tween(320, easing = FastOutSlowInEasing)
-                            },
-                        )
-                .pointerInput(showNudge, nudge?.id) {
+                .pointerInput(showNudge, renderedNudge?.id) {
                     if (!showNudge) return@pointerInput
                     var dragOffset = Offset.Zero
                     detectDragGestures(
+                        onDragStart = {
+                            isNudgeDragging = true
+                        },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             dragOffset += dragAmount
                             nudgeDragOffset = dragOffset
                         },
-                        onDragCancel = { nudgeDragOffset = Offset.Zero },
+                        onDragCancel = {
+                            isNudgeDragging = false
+                            nudgeDragOffset = Offset.Zero
+                        },
                         onDragEnd = {
                             val shouldDismiss =
                                 abs(dragOffset.x) > 72f || dragOffset.y < -48f
+                            isNudgeDragging = false
+                            nudgeDragOffset = Offset.Zero
                             if (shouldDismiss) {
                                 onNudgeDismiss()
                             }
-                            nudgeDragOffset = Offset.Zero
                         },
                     )
                         }
                         .graphicsLayer {
-                            translationX = nudgeDragOffset.x
-                            translationY = nudgeDragOffset.y
+                            translationX = displayedNudgeDragX
+                            translationY = displayedNudgeDragY
                             alpha = 1f - minOf(
                                 0.45f,
-                                (abs(nudgeDragOffset.x) + abs(nudgeDragOffset.y)) / 240f,
+                                (abs(displayedNudgeDragX) + abs(displayedNudgeDragY)) / 240f,
                             )
                         }
                         .drawBehind {
@@ -1222,15 +1312,21 @@ private fun VoiceAssistantButton(
                         }
                         .semantics {
                             contentDescription = listOfNotNull(
-                                nudge?.label,
-                                nudge?.supportingText,
-                                nudge?.sourceLabel,
+                                renderedNudge?.label,
+                                renderedNudge?.supportingText,
+                                renderedNudge?.sourceLabel,
                             ).joinToString(separator = ". ")
                         },
                 ) {
                     Row(
                         modifier = Modifier
                             .wrapContentSize()
+                            .animateEnterExit(
+                                enter = fadeIn(
+                                    tween(durationMillis = 150, delayMillis = 190),
+                                ),
+                                exit = fadeOut(tween(durationMillis = 80)),
+                            )
                             .clip(RoundedCornerShape(containerCorner))
                             .background(nudgeBrush)
                             .padding(
@@ -1240,7 +1336,7 @@ private fun VoiceAssistantButton(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         NudgePreviewThumbnail(
-                            action = nudge?.action,
+                            action = renderedNudge?.action,
                             size = if (verticalLayout) 26.dp else 32.dp,
                         )
                         Spacer(Modifier.width(if (verticalLayout) 6.dp else 8.dp))
@@ -1253,7 +1349,7 @@ private fun VoiceAssistantButton(
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            nudge?.supportingText?.takeIf(String::isNotBlank)?.let {
+                            renderedNudge?.supportingText?.takeIf(String::isNotBlank)?.let {
                                 Text(
                                     text = typedNudgeBody +
                                         if (isTypingNudgeBody) "\u258C" else "",
@@ -1261,7 +1357,7 @@ private fun VoiceAssistantButton(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            nudge?.sourceLabel?.takeIf(String::isNotBlank)?.let { sourceLabel ->
+                            renderedNudge?.sourceLabel?.takeIf(String::isNotBlank)?.let { sourceLabel ->
                                 Text(
                                     text = sourceLabel,
                                     style = MaterialTheme.typography.labelSmall,
@@ -1307,21 +1403,25 @@ private fun VoiceAssistantButton(
                                 x = if (verticalLayout) buttonSize + 12.dp else 0.dp,
                                 y = if (verticalLayout) 0.dp else -buttonSize - 12.dp,
                             )
+                            .sharedBounds(
+                                sharedContentState = voiceContainerState,
+                                animatedVisibilityScope = this,
+                                boundsTransform = { _, _ ->
+                                    tween(
+                                        durationMillis = NUDGE_MORPH_DURATION_MILLIS,
+                                        easing = FastOutSlowInEasing,
+                                    )
+                                },
+                                enter = EnterTransition.None,
+                                exit = ExitTransition.None,
+                                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+                            )
                             .width(quizWidth)
                             .heightIn(
                                 max = if (verticalLayout) {
                                     (configuration.screenHeightDp - 32).dp
                                 } else {
                                     minOf(480.dp, (configuration.screenHeightDp - 160).dp)
-                                },
-                            )
-                            .sharedBounds(
-                                sharedContentState = rememberSharedContentState(
-                                    key = "app-shell-voice-container",
-                                ),
-                                animatedVisibilityScope = this,
-                                boundsTransform = { _, _ ->
-                                    tween(360, easing = FastOutSlowInEasing)
                                 },
                             )
                             .pointerInput(quizOpen) {
@@ -1379,9 +1479,19 @@ private fun VoiceAssistantButton(
                                 }
                             },
                     ) {
-                        com.starception.submission.feature.prayertimes.components.IslamicQuizContent(
-                            onDismiss = VoiceAssistantNudgeBus::closeQuiz,
-                        )
+                        Box(
+                            modifier = Modifier.animateEnterExit(
+                                enter = fadeIn(
+                                    tween(durationMillis = 150, delayMillis = 190),
+                                ),
+                                exit = fadeOut(tween(durationMillis = 80)),
+                            ),
+                        ) {
+                            com.starception.submission.feature.prayertimes.components.IslamicQuizContent(
+                                onDismiss = VoiceAssistantNudgeBus::closeQuiz,
+                                featuredQuestion = generatedQuizQuestion,
+                            )
+                        }
                     }
                 }
                 }

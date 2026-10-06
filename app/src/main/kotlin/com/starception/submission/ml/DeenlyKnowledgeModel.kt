@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
@@ -40,11 +41,21 @@ data class DeenlySourceEnvelope(
 
 sealed interface DeenlyKnowledgeDecision {
     data class Knowledge(val title: String) : DeenlyKnowledgeDecision
+
+    /** A self-contained quiz item whose answer and evidence are exact source-text spans. */
+    data class GroundedQuestion(
+        val questionKind: String,
+        val question: String,
+        val answer: String,
+        val evidence: String,
+        val options: List<String>,
+    ) : DeenlyKnowledgeDecision
+
     data object SourceLocationQuestion : DeenlyKnowledgeDecision
 }
 
 /**
- * Runs the reviewed v1 GGUF fully on device.
+ * Runs the reviewed Qwen-based v2 GGUF fully on device.
  *
  * The model may only choose a bounded content shape and, for knowledge cards, a title. IDs,
  * citations, answers, source text, and Quran Arabic remain in the verified database envelope.
@@ -91,7 +102,9 @@ class DeenlyKnowledgeModel(context: Context) {
                     source.toPrompt(task),
                     "--single-turn",
                     "--predict",
-                    "96",
+                    "256",
+                    "--json-schema",
+                    task.outputSchema,
                     "--temp",
                     "0",
                     "--no-display-prompt",
@@ -114,7 +127,7 @@ class DeenlyKnowledgeModel(context: Context) {
                         Log.w(TAG, "Knowledge model runner failed: ${errorOutput.take(LOG_PREVIEW_CHARS)}")
                         null
                     } else {
-                        parseDecision(generated, task).also { parsed ->
+                        parseDecision(generated, task, source.sourceText).also { parsed ->
                             if (parsed == null) {
                                 Log.w(
                                     TAG,
@@ -143,28 +156,48 @@ class DeenlyKnowledgeModel(context: Context) {
         append(sourceText.take(MAX_SOURCE_CHARS))
     }
 
+    private val DeenlyKnowledgeTask.outputSchema: String
+        get() = when (this) {
+            DeenlyKnowledgeTask.KNOWLEDGE -> KNOWLEDGE_JSON_SCHEMA
+            DeenlyKnowledgeTask.QUESTION -> QUESTION_JSON_SCHEMA
+        }
+
     companion object {
-        const val MODEL_FILE_NAME = "deenly-knowledge-v1-q4_k_m.gguf"
-        const val MODEL_SIZE_BYTES = 105_454_144L
-        const val MODEL_SHA256 = "5682dd0dee0dcb9aa22d04c91d69914c0b3c89e62974f82b6f717f7bd9c6574d"
+        const val MODEL_FILE_NAME = "deenly-question-v2-q4_k_m.gguf"
+        const val MODEL_SIZE_BYTES = 491_400_032L
+        const val MODEL_SHA256 = "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db"
 
         private const val RUNNER_FILE_NAME = "libdeenly_completion.so"
         private const val INFERENCE_TIMEOUT_SECONDS = 30L
         private const val MAX_SOURCE_CHARS = 1_400
         private const val MAX_APP_SITUATION_CHARS = 320
         private const val MAX_TITLE_CHARS = 84
+        private const val MAX_QUESTION_CHARS = 180
+        private const val MAX_ANSWER_CHARS = 96
+        private const val MAX_EVIDENCE_CHARS = 420
+        private const val MAX_OPTION_CHARS = 96
         private const val LOG_PREVIEW_CHARS = 240
         private const val TAG = "DeenlyKnowledgeModel"
         private const val SYSTEM_PROMPT = """You create one grounded Islamic learning item from the supplied source.
-Use only the source and metadata. Return one minified JSON object and nothing else. A knowledge
-object has exactly contentType and title. A question object has exactly contentType and
-questionKind. Never output IDs, references, source text, options, answers, or Arabic. The app
-builds the final item deterministically from its immutable database."""
+Use only the supplied source, never memory. Return one minified JSON object and nothing else.
+A knowledge object has exactly contentType and title. For a question, create a natural,
+self-contained global knowledge question that does not say "this narration", "this hadith",
+"this ayah", "this verse", "this passage", "according to", or ask where the text came from.
+A question object has exactly contentType, questionKind, question, answer, evidence, and options.
+questionKind must be one of person, place, food, color, action, number, description, teaching,
+outcome, object, or time. answer must be a short exact contiguous span copied from Source text.
+evidence must be one exact contiguous span copied from Source text and must contain answer.
+options must contain exactly four short unique strings including answer exactly once. Distractors
+must not contradict anything stated in the source. Never output Arabic, IDs, citations, rulings,
+or claims unsupported by the source. Prefer a simple explicit detail over interpretation."""
+        private const val KNOWLEDGE_JSON_SCHEMA = """{"type":"object","properties":{"contentType":{"const":"knowledge"},"title":{"type":"string","minLength":1,"maxLength":84}},"required":["contentType","title"],"additionalProperties":false}"""
+        private const val QUESTION_JSON_SCHEMA = """{"type":"object","properties":{"contentType":{"const":"question"},"questionKind":{"enum":["person","place","food","color","action","number","description","teaching","outcome","object","time"]},"question":{"type":"string","minLength":8,"maxLength":180},"answer":{"type":"string","minLength":1,"maxLength":96},"evidence":{"type":"string","minLength":1,"maxLength":420},"options":{"type":"array","minItems":4,"maxItems":4,"items":{"type":"string","minLength":1,"maxLength":96}}},"required":["contentType","questionKind","question","answer","evidence","options"],"additionalProperties":false}"""
         private val inferenceMutex = Mutex()
 
         internal fun parseDecision(
             rawOutput: String,
             expectedTask: DeenlyKnowledgeTask,
+            sourceText: String? = null,
         ): DeenlyKnowledgeDecision? {
             val start = rawOutput.indexOf('{')
             val end = rawOutput.lastIndexOf('}')
@@ -187,13 +220,90 @@ builds the final item deterministically from its immutable database."""
                 }
 
                 DeenlyKnowledgeTask.QUESTION -> {
-                    if (output.keys != setOf("contentType", "questionKind")) return null
-                    if (output["questionKind"]?.jsonPrimitive?.content != "source_location") {
-                        return null
+                    val questionKind = output["questionKind"]?.jsonPrimitive?.content ?: return null
+                    if (questionKind == "source_location") {
+                        if (output.keys != setOf("contentType", "questionKind")) return null
+                        return DeenlyKnowledgeDecision.SourceLocationQuestion
                     }
-                    DeenlyKnowledgeDecision.SourceLocationQuestion
+                    if (questionKind !in ALLOWED_QUESTION_KINDS) return null
+                    if (
+                        output.keys != setOf(
+                            "contentType",
+                            "questionKind",
+                            "question",
+                            "answer",
+                            "evidence",
+                            "options",
+                        )
+                    ) return null
+                    val verifiedSource = sourceText ?: return null
+                    val question = output["question"]?.jsonPrimitive?.content?.trim().orEmpty()
+                    val answer = output["answer"]?.jsonPrimitive?.content?.trim().orEmpty()
+                    val evidence = output["evidence"]?.jsonPrimitive?.content?.trim().orEmpty()
+                    val options = (output["options"] as? JsonArray)
+                        ?.mapNotNull { (it as? JsonPrimitive)?.content?.trim() }
+                        ?: return null
+                    val generatedText = listOf(question, answer, evidence) + options
+                    if (
+                        question.isEmpty() || question.length > MAX_QUESTION_CHARS ||
+                        !question.endsWith('?') || question.containsForbiddenScopePhrase() ||
+                        answer.isEmpty() || answer.length > MAX_ANSWER_CHARS ||
+                        evidence.isEmpty() || evidence.length > MAX_EVIDENCE_CHARS ||
+                        answer !in verifiedSource || evidence !in verifiedSource || answer !in evidence ||
+                        options.size != 4 ||
+                        options.any { it.isEmpty() || it.length > MAX_OPTION_CHARS } ||
+                        options.distinctBy(String::lowercase).size != 4 ||
+                        options.count { it == answer } != 1 ||
+                        generatedText.any(String::containsArabic) ||
+                        generatedText.any { text -> text.any(Char::isISOControl) }
+                    ) return null
+                    DeenlyKnowledgeDecision.GroundedQuestion(
+                        questionKind = questionKind,
+                        question = question,
+                        answer = answer,
+                        evidence = evidence,
+                        options = options,
+                    )
                 }
             }
+        }
+
+        private val ALLOWED_QUESTION_KINDS = setOf(
+            "person",
+            "place",
+            "food",
+            "color",
+            "action",
+            "number",
+            "description",
+            "teaching",
+            "outcome",
+            "object",
+            "time",
+        )
+
+        private val FORBIDDEN_SCOPE_PHRASES = listOf(
+            "this narration",
+            "this hadith",
+            "this ayah",
+            "this verse",
+            "this passage",
+            "this text",
+            "according to",
+            "which source",
+            "which collection",
+            "which surah contains",
+        )
+
+        private fun String.containsForbiddenScopePhrase(): Boolean {
+            val normalized = lowercase()
+            return FORBIDDEN_SCOPE_PHRASES.any(normalized::contains)
+        }
+
+        private fun String.containsArabic(): Boolean = any { character ->
+            character.code in 0x0600..0x06FF ||
+                character.code in 0x0750..0x077F ||
+                character.code in 0x08A0..0x08FF
         }
 
         private fun sha256(bytes: ByteArray): String =

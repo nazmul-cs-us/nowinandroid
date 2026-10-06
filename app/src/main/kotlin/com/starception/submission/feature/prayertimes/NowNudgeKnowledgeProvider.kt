@@ -7,14 +7,23 @@
 package com.starception.submission.feature.prayertimes
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.model.data.BukhariBooks
 import com.starception.submission.core.model.data.ShamayelBooks
 import com.starception.submission.core.model.deenly.DeenlyActionIds
+import com.starception.submission.core.model.deenly.DeenlyActivity
 import com.starception.submission.core.model.deenly.DeenlyNudge
 import com.starception.submission.core.model.deenly.DeenlyNudgeAction
+import com.starception.submission.core.model.deenly.DeenlyNudgeCandidate
+import com.starception.submission.core.model.deenly.DeenlyRankingContext
+import com.starception.submission.core.model.deenly.DeenlyRankingSignals
+import com.starception.submission.core.model.deenly.IslamicContentSource
+import com.starception.submission.core.model.deenly.IslamicQuizDifficulty
+import com.starception.submission.core.model.deenly.IslamicQuizQuestion
+import com.starception.submission.core.model.deenly.rankDeenlyNudges
 import com.starception.submission.core.qurandatabase.QuranTranslationRepository
 import com.starception.submission.download.AssetRepository
 import com.starception.submission.ml.DeenlyKnowledgeDecision
@@ -51,7 +60,64 @@ internal data class GroundedKnowledgeSource(
 internal data class NowNudgeKnowledgeCandidate(
     val nudge: DeenlyNudge,
     val target: NowNudgeKnowledgeTarget,
+    val sourceId: String,
+    val collection: String,
+    val topic: String,
+    val rankingScore: Float,
+    val quizQuestion: IslamicQuizQuestion? = null,
 )
+
+internal data class NowNudgeKnowledgeRankingContext(
+    val nowMinute: Int = 0,
+    val nowEpochMillis: Long = System.currentTimeMillis(),
+    val currentPrayer: String? = null,
+    val nextPrayer: String? = null,
+    val completedPrayerCount: Int = 0,
+    val activity: DeenlyActivity = DeenlyActivity.UNKNOWN,
+    val isMediaPlaying: Boolean = false,
+    val hasVerifiedLocation: Boolean = false,
+    val dismissedNudgeIds: Set<String> = emptySet(),
+)
+
+internal data class KnowledgeEngagementSnapshot(
+    val impressionsToday: Int = 0,
+    val minutesSinceLastShown: Int? = null,
+    val collectionOpenedCount: Int = 0,
+    val collectionDismissedCount: Int = 0,
+) {
+    val affinity: Float
+        get() = (collectionOpenedCount + 1f) /
+            (collectionOpenedCount + collectionDismissedCount + 2f)
+}
+
+internal interface KnowledgeEngagementStore {
+    fun snapshot(
+        source: GroundedKnowledgeSource,
+        date: LocalDate,
+        nowEpochMillis: Long,
+    ): KnowledgeEngagementSnapshot
+
+    fun recordImpression(candidate: NowNudgeKnowledgeCandidate, date: LocalDate, nowEpochMillis: Long)
+    fun recordOpened(candidate: NowNudgeKnowledgeCandidate)
+    fun recordDismissed(candidate: NowNudgeKnowledgeCandidate)
+}
+
+private object EmptyKnowledgeEngagementStore : KnowledgeEngagementStore {
+    override fun snapshot(
+        source: GroundedKnowledgeSource,
+        date: LocalDate,
+        nowEpochMillis: Long,
+    ) = KnowledgeEngagementSnapshot()
+
+    override fun recordImpression(
+        candidate: NowNudgeKnowledgeCandidate,
+        date: LocalDate,
+        nowEpochMillis: Long,
+    ) = Unit
+
+    override fun recordOpened(candidate: NowNudgeKnowledgeCandidate) = Unit
+    override fun recordDismissed(candidate: NowNudgeKnowledgeCandidate) = Unit
+}
 
 internal fun interface GroundedKnowledgeSourceLoader {
     suspend fun load(date: LocalDate, variation: Int): GroundedKnowledgeSource?
@@ -65,23 +131,46 @@ internal fun interface KnowledgeDecisionGenerator {
 }
 
 /**
- * Turns one immutable database record into a model-titled Now Nudge.
+ * Turns one immutable database record into a grounded Now Nudge.
  *
- * The model never supplies the body, citation, identifier, or destination. Those values stay
- * attached to the exact database record selected by [GroundedKnowledgeSourceLoader].
+ * The model may supply the title. If it is unavailable or invalid, a neutral title is built from
+ * database metadata. The model never supplies the body, citation, identifier, or destination;
+ * those values stay attached to the exact record selected by [GroundedKnowledgeSourceLoader].
  */
 internal class NowNudgeKnowledgeProvider(
     private val sourceLoader: GroundedKnowledgeSourceLoader,
     private val decisionGenerator: KnowledgeDecisionGenerator,
+    private val engagementStore: KnowledgeEngagementStore = EmptyKnowledgeEngagementStore,
 ) {
     suspend fun load(
         date: LocalDate,
         variation: Int = 0,
         appSituation: String? = null,
+        rankingContext: NowNudgeKnowledgeRankingContext = NowNudgeKnowledgeRankingContext(),
+        task: DeenlyKnowledgeTask = DeenlyKnowledgeTask.KNOWLEDGE,
     ): NowNudgeKnowledgeCandidate? {
-        val source = withContext(Dispatchers.IO) {
-            sourceLoader.load(date, variation)
-        } ?: return null
+        val sources = withContext(Dispatchers.IO) {
+            buildList {
+                repeat(KNOWLEDGE_CANDIDATE_POOL_SIZE) { offset ->
+                    sourceLoader.load(date, variation + offset)?.let(::add)
+                }
+            }.distinctBy(GroundedKnowledgeSource::id)
+        }
+        val rankedSource = rankSources(date, sources, rankingContext).firstOrNull()
+            // Dismissals are honored until the current candidate window is
+            // exhausted. At that point prefer a fresh ranking over returning
+            // no model turn and leaving the bot with nothing to present.
+            ?: rankingContext.dismissedNudgeIds
+                .takeIf(Set<String>::isNotEmpty)
+                ?.let {
+                    rankSources(
+                        date = date,
+                        sources = sources,
+                        context = rankingContext.copy(dismissedNudgeIds = emptySet()),
+                    ).firstOrNull()
+                }
+            ?: return null
+        val source = rankedSource.source
         val envelope = DeenlySourceEnvelope(
             collection = source.collection,
             reference = source.reference,
@@ -90,9 +179,90 @@ internal class NowNudgeKnowledgeProvider(
             sourceText = source.sourceText,
             sourceTextSha256 = source.sourceText.sha256(),
         )
-        val decision = decisionGenerator.generate(DeenlyKnowledgeTask.KNOWLEDGE, envelope)
-        return buildCandidate(date, source, decision)
+        val decision = decisionGenerator.generate(task, envelope)
+        return when {
+            task == DeenlyKnowledgeTask.QUESTION &&
+                decision is DeenlyKnowledgeDecision.GroundedQuestion &&
+                decision.isGroundedIn(source.sourceText) -> buildGroundedQuestionCandidate(
+                date = date,
+                source = source,
+                decision = decision,
+                rankingScore = rankedSource.score,
+            )
+            task == DeenlyKnowledgeTask.QUESTION -> buildQuestionCandidate(
+                date = date,
+                source = source,
+                rankingScore = rankedSource.score,
+            )
+            else -> buildCandidate(
+                date = date,
+                source = source,
+                decision = decision,
+                rankingScore = rankedSource.score,
+            )
+        }
     }
+
+    fun recordImpression(
+        candidate: NowNudgeKnowledgeCandidate,
+        date: LocalDate,
+        nowEpochMillis: Long = System.currentTimeMillis(),
+    ) = engagementStore.recordImpression(candidate, date, nowEpochMillis)
+
+    fun recordOpened(candidate: NowNudgeKnowledgeCandidate) =
+        engagementStore.recordOpened(candidate)
+
+    fun recordDismissed(candidate: NowNudgeKnowledgeCandidate) =
+        engagementStore.recordDismissed(candidate)
+
+    private fun rankSources(
+        date: LocalDate,
+        sources: List<GroundedKnowledgeSource>,
+        context: NowNudgeKnowledgeRankingContext,
+    ): List<RankedKnowledgeSource> {
+        val byNudgeId = sources.associateBy { source -> source.nudgeId(date) }
+        return rankDeenlyNudges(
+            candidates = sources.map { source ->
+                val engagement = engagementStore.snapshot(
+                    source = source,
+                    date = date,
+                    nowEpochMillis = context.nowEpochMillis,
+                )
+                DeenlyNudgeCandidate(
+                    nudge = DeenlyNudge(
+                        id = source.nudgeId(date),
+                        action = DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
+                        label = source.topic,
+                        actionId = DeenlyActionIds.LEARNING_OPEN_KNOWLEDGE,
+                    ),
+                    signals = DeenlyRankingSignals(
+                        basePriority = 0.5f,
+                        contextMatch = source.contextMatch(context),
+                        userAffinity = engagement.affinity,
+                        freshness = engagement.minutesSinceLastShown
+                            ?.let { (it / MINUTES_FOR_FULL_FRESHNESS).coerceIn(0f, 1f) }
+                            ?: 1f,
+                        expectedCompletion = source.expectedCompletion(),
+                    ),
+                    minutesSinceLastShown = engagement.minutesSinceLastShown,
+                    impressionsToday = engagement.impressionsToday,
+                )
+            },
+            context = DeenlyRankingContext(
+                isMediaPlaying = context.isMediaPlaying,
+                dismissedNudgeIds = context.dismissedNudgeIds,
+            ),
+        ).mapNotNull { ranked ->
+            byNudgeId[ranked.candidate.nudge.id]?.let { source ->
+                RankedKnowledgeSource(source = source, score = ranked.score)
+            }
+        }
+    }
+
+    private data class RankedKnowledgeSource(
+        val source: GroundedKnowledgeSource,
+        val score: Float,
+    )
 
     companion object {
         fun create(
@@ -107,6 +277,7 @@ internal class NowNudgeKnowledgeProvider(
                     assetRepository = assetRepository,
                 ),
                 decisionGenerator = KnowledgeDecisionGenerator(model::generate),
+                engagementStore = AndroidKnowledgeEngagementStore(appContext),
             )
         }
 
@@ -114,18 +285,19 @@ internal class NowNudgeKnowledgeProvider(
             date: LocalDate,
             source: GroundedKnowledgeSource,
             decision: DeenlyKnowledgeDecision?,
-        ): NowNudgeKnowledgeCandidate? {
-            val generated = decision as? DeenlyKnowledgeDecision.Knowledge ?: return null
-            val title = generated.title
-                .replace(Regex("\\s+"), " ")
-                .trim()
-                .take(MAX_TITLE_CHARS)
-                .trim()
-                .takeIf(String::isNotEmpty)
-                ?: return null
+            rankingScore: Float = 0f,
+        ): NowNudgeKnowledgeCandidate {
+            val title = (decision as? DeenlyKnowledgeDecision.Knowledge)
+                ?.title
+                ?.replace(Regex("\\s+"), " ")
+                ?.trim()
+                ?.take(MAX_TITLE_CHARS)
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+                ?: source.fallbackTitle()
             return NowNudgeKnowledgeCandidate(
                 nudge = DeenlyNudge(
-                    id = "model-knowledge-${date}-${source.id}",
+                    id = source.nudgeId(date),
                     action = DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
                     label = title,
                     actionId = DeenlyActionIds.LEARNING_OPEN_KNOWLEDGE,
@@ -133,10 +305,330 @@ internal class NowNudgeKnowledgeProvider(
                     sourceLabel = source.reference,
                 ),
                 target = source.target,
+                sourceId = source.id,
+                collection = source.collection,
+                topic = source.topic,
+                rankingScore = rankingScore,
+            )
+        }
+
+        internal fun buildQuestionCandidate(
+            date: LocalDate,
+            source: GroundedKnowledgeSource,
+            rankingScore: Float = 0f,
+        ): NowNudgeKnowledgeCandidate {
+            val answer = source.sourceLocationAnswer()
+            val options = (SOURCE_LOCATION_OPTIONS + answer)
+                .distinct()
+                .filterNot { it == answer }
+                .sortedBy { option -> "${source.id}|$option".sha256() }
+                .take(3)
+                .plus(answer)
+                .sortedBy { option -> "${date}|${source.id}|$option".sha256() }
+            val promptLead = when (source.target) {
+                is NowNudgeKnowledgeTarget.QuranAyah ->
+                    "Which source contains this translated passage?"
+                is NowNudgeKnowledgeTarget.Hadith ->
+                    "Which Hadith collection records this narration?"
+            }
+            val question = IslamicQuizQuestion(
+                id = "model-question-$date-${source.id}",
+                prompt = "$promptLead\n\n${source.sourceText}",
+                options = options,
+                correctOption = options.indexOf(answer),
+                explanation = "This passage is recorded as ${source.reference}.",
+                sourceLabel = source.reference,
+                sourceUrl = source.sourceUrl(),
+                sourceCollection = source.contentSource(),
+                sourceReference = source.reference,
+                difficulty = IslamicQuizDifficulty.INTERMEDIATE,
+                topic = source.topic,
+                sourceText = source.sourceText,
+                sourceTextSha256 = source.sourceText.sha256(),
+            )
+            return NowNudgeKnowledgeCandidate(
+                nudge = DeenlyNudge(
+                    id = source.nudgeId(date),
+                    action = DeenlyNudgeAction.PLAY_QUIZ,
+                    label = promptLead,
+                    actionId = DeenlyActionIds.LEARNING_START_QUIZ,
+                    supportingText = source.sourceText,
+                    sourceLabel = "Tap to answer",
+                ),
+                target = source.target,
+                sourceId = source.id,
+                collection = source.collection,
+                topic = source.topic,
+                rankingScore = rankingScore,
+                quizQuestion = question,
+            )
+        }
+
+        internal fun buildGroundedQuestionCandidate(
+            date: LocalDate,
+            source: GroundedKnowledgeSource,
+            decision: DeenlyKnowledgeDecision.GroundedQuestion,
+            rankingScore: Float = 0f,
+        ): NowNudgeKnowledgeCandidate {
+            require(decision.isGroundedIn(source.sourceText)) {
+                "A generated question must be grounded in the immutable source text"
+            }
+            val correctOption = decision.options.indexOf(decision.answer)
+            val question = IslamicQuizQuestion(
+                id = "model-global-question-$date-${source.id}",
+                prompt = decision.question,
+                options = decision.options,
+                correctOption = correctOption,
+                explanation = "${decision.answer}. Evidence: \u201c${decision.evidence}\u201d",
+                sourceLabel = source.reference,
+                sourceUrl = source.sourceUrl(),
+                sourceCollection = source.contentSource(),
+                sourceReference = source.reference,
+                difficulty = decision.questionKind.toDifficulty(),
+                topic = source.topic,
+                sourceText = source.sourceText,
+                sourceTextSha256 = source.sourceText.sha256(),
+            )
+            return NowNudgeKnowledgeCandidate(
+                nudge = DeenlyNudge(
+                    id = "model-global-question-$date-${source.id}",
+                    action = DeenlyNudgeAction.PLAY_QUIZ,
+                    label = decision.question,
+                    actionId = DeenlyActionIds.LEARNING_START_QUIZ,
+                    supportingText = decision.options.joinToString(separator = "  \u2022  "),
+                    sourceLabel = "Tap to answer",
+                ),
+                target = source.target,
+                sourceId = source.id,
+                collection = source.collection,
+                topic = source.topic,
+                rankingScore = rankingScore,
+                quizQuestion = question,
             )
         }
 
         private const val MAX_TITLE_CHARS = 84
+        private const val KNOWLEDGE_CANDIDATE_POOL_SIZE = 22
+        private const val MINUTES_FOR_FULL_FRESHNESS = 24f * 60f
+        private val SOURCE_LOCATION_OPTIONS = listOf(
+            "The Quran",
+            "Sahih al-Bukhari",
+            "Sahih Muslim",
+            "Sunan Abu Dawud",
+            "Jami' at-Tirmidhi",
+            "Sunan an-Nasa'i",
+            "Sunan Ibn Majah",
+            "Muwatta Malik",
+            "Musnad Ahmad",
+            "Sunan ad-Darimi",
+            "Shama'il At-Tirmidhi",
+        )
+    }
+}
+
+private fun DeenlyKnowledgeDecision.GroundedQuestion.isGroundedIn(sourceText: String): Boolean =
+    question.isNotBlank() &&
+        answer.isNotBlank() &&
+        evidence.isNotBlank() &&
+        answer in sourceText &&
+        evidence in sourceText &&
+        answer in evidence &&
+        options.size == 4 &&
+        options.distinctBy(String::lowercase).size == 4 &&
+        options.count { it == answer } == 1
+
+private fun String.toDifficulty(): IslamicQuizDifficulty = when (this) {
+    "person", "place", "food", "color", "number", "object", "time" ->
+        IslamicQuizDifficulty.BEGINNER
+    "action", "description" -> IslamicQuizDifficulty.INTERMEDIATE
+    else -> IslamicQuizDifficulty.ADVANCED
+}
+
+private fun GroundedKnowledgeSource.sourceLocationAnswer(): String = when (val destination = target) {
+    is NowNudgeKnowledgeTarget.QuranAyah -> "The Quran"
+    is NowNudgeKnowledgeTarget.Hadith -> destination.collectionName
+}
+
+private fun GroundedKnowledgeSource.sourceUrl(): String = when (val destination = target) {
+    is NowNudgeKnowledgeTarget.QuranAyah ->
+        "https://quran.com/${destination.surahNumber}/${destination.ayahNumber}"
+    is NowNudgeKnowledgeTarget.Hadith ->
+        "hadith://${destination.databaseFile.removeSuffix(".db")}/${destination.hadithNumber}"
+}
+
+private fun GroundedKnowledgeSource.contentSource(): IslamicContentSource = when {
+    target is NowNudgeKnowledgeTarget.QuranAyah -> IslamicContentSource.QURAN
+    collection == "sahih_al_bukhari" -> IslamicContentSource.SAHIH_AL_BUKHARI
+    collection == "shamayel_at_tirmidhi" -> IslamicContentSource.SHAMAYEL_AT_TIRMIDHI
+    else -> IslamicContentSource.GENERAL
+}
+
+private fun GroundedKnowledgeSource.fallbackTitle(): String {
+    val groundedTopic = topic
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .take(MAX_FALLBACK_TOPIC_CHARS)
+        .trim()
+    return if (groundedTopic.isNotEmpty()) {
+        "From $groundedTopic"
+    } else {
+        "Grounded knowledge"
+    }
+}
+
+private const val MAX_FALLBACK_TOPIC_CHARS = 72
+
+private fun GroundedKnowledgeSource.nudgeId(date: LocalDate): String =
+    "model-knowledge-$date-$id"
+
+private fun GroundedKnowledgeSource.expectedCompletion(): Float = when {
+    sourceText.length <= 320 -> 1f
+    sourceText.length <= 700 -> 0.82f
+    sourceText.length <= 1_200 -> 0.65f
+    sourceText.length <= 1_800 -> 0.48f
+    else -> 0.32f
+}
+
+private fun GroundedKnowledgeSource.contextMatch(
+    context: NowNudgeKnowledgeRankingContext,
+): Float {
+    val searchable = "$topic $sourceText".lowercase()
+    val signalGroups = buildList {
+        val hour = context.nowMinute / 60
+        add(
+            when (hour) {
+                in 4..10 -> listOf("morning", "dawn", "fajr", "sunrise")
+                in 11..15 -> listOf("noon", "midday", "dhuhr", "asr")
+                in 16..20 -> listOf("evening", "sunset", "maghrib")
+                else -> listOf("night", "isha", "sleep")
+            },
+        )
+        (context.currentPrayer ?: context.nextPrayer)?.let { prayer ->
+            add(prayer.contextKeywords())
+            add(listOf("prayer", "pray", "salah", "mosque", "masjid", "worship"))
+        }
+        when (context.activity) {
+            DeenlyActivity.DRIVING ->
+                add(listOf("travel", "journey", "road", "ride", "mount"))
+            DeenlyActivity.PRAYING ->
+                add(listOf("prayer", "pray", "salah", "prostration", "worship"))
+            DeenlyActivity.OTHER,
+            DeenlyActivity.UNKNOWN,
+            -> Unit
+        }
+        if (context.completedPrayerCount < 5) {
+            add(listOf("prayer", "pray", "salah", "worship"))
+        }
+        if (context.isMediaPlaying) {
+            add(listOf("listen", "recite", "recitation", "voice", "heard"))
+        }
+        if (context.hasVerifiedLocation) {
+            add(listOf("mosque", "masjid", "qibla", "makkah", "journey"))
+        }
+    }
+    if (signalGroups.isEmpty()) return 0f
+    val matchingGroups = signalGroups.count { keywords ->
+        keywords.any(searchable::contains)
+    }
+    return matchingGroups.toFloat() / signalGroups.size
+}
+
+private fun String.contextKeywords(): List<String> = when (lowercase()) {
+    "fajr" -> listOf("fajr", "dawn", "morning")
+    "dhuhr", "zuhr" -> listOf("dhuhr", "zuhr", "noon", "midday")
+    "asr" -> listOf("asr", "afternoon")
+    "maghrib" -> listOf("maghrib", "sunset", "evening")
+    "isha" -> listOf("isha", "night")
+    else -> listOf(lowercase())
+}
+
+private class AndroidKnowledgeEngagementStore(context: Context) : KnowledgeEngagementStore {
+    private val preferences: SharedPreferences = context.getSharedPreferences(
+        PREFERENCES_NAME,
+        Context.MODE_PRIVATE,
+    )
+
+    @Synchronized
+    override fun snapshot(
+        source: GroundedKnowledgeSource,
+        date: LocalDate,
+        nowEpochMillis: Long,
+    ): KnowledgeEngagementSnapshot {
+        prepareDay(date)
+        val sourceKey = source.id.storageKey()
+        val collectionKey = source.collection.storageKey()
+        val lastShown = preferences.getLong("$LAST_SHOWN_PREFIX$sourceKey", 0L)
+            .takeIf { it > 0L }
+        val minutesSinceLastShown = lastShown?.let { timestamp ->
+            ((nowEpochMillis - timestamp).coerceAtLeast(0L) / MILLIS_PER_MINUTE)
+                .coerceAtMost(Int.MAX_VALUE.toLong())
+                .toInt()
+        }
+        return KnowledgeEngagementSnapshot(
+            impressionsToday = preferences.getInt("$IMPRESSION_PREFIX$sourceKey", 0),
+            minutesSinceLastShown = minutesSinceLastShown,
+            collectionOpenedCount = preferences.getInt("$OPENED_PREFIX$collectionKey", 0),
+            collectionDismissedCount = preferences.getInt("$DISMISSED_PREFIX$collectionKey", 0),
+        )
+    }
+
+    @Synchronized
+    override fun recordImpression(
+        candidate: NowNudgeKnowledgeCandidate,
+        date: LocalDate,
+        nowEpochMillis: Long,
+    ) {
+        prepareDay(date)
+        val sourceKey = candidate.sourceId.storageKey()
+        val impressionKey = "$IMPRESSION_PREFIX$sourceKey"
+        preferences.edit()
+            .putInt(
+                impressionKey,
+                (preferences.getInt(impressionKey, 0) + 1).coerceAtMost(MAX_COUNTER),
+            )
+            .putLong("$LAST_SHOWN_PREFIX$sourceKey", nowEpochMillis)
+            .apply()
+    }
+
+    @Synchronized
+    override fun recordOpened(candidate: NowNudgeKnowledgeCandidate) {
+        incrementCollectionCounter(OPENED_PREFIX, candidate.collection)
+    }
+
+    @Synchronized
+    override fun recordDismissed(candidate: NowNudgeKnowledgeCandidate) {
+        incrementCollectionCounter(DISMISSED_PREFIX, candidate.collection)
+    }
+
+    private fun incrementCollectionCounter(prefix: String, collection: String) {
+        val key = "$prefix${collection.storageKey()}"
+        preferences.edit()
+            .putInt(key, (preferences.getInt(key, 0) + 1).coerceAtMost(MAX_COUNTER))
+            .apply()
+    }
+
+    private fun prepareDay(date: LocalDate) {
+        val day = date.toString()
+        if (preferences.getString(DAY_KEY, null) == day) return
+        val editor = preferences.edit().putString(DAY_KEY, day)
+        preferences.all.keys
+            .filter { it.startsWith(IMPRESSION_PREFIX) }
+            .forEach(editor::remove)
+        editor.apply()
+    }
+
+    private fun String.storageKey(): String = sha256().take(STORAGE_KEY_CHARS)
+
+    private companion object {
+        const val PREFERENCES_NAME = "now_nudge_knowledge_ranker"
+        const val DAY_KEY = "impression_day"
+        const val IMPRESSION_PREFIX = "impression."
+        const val LAST_SHOWN_PREFIX = "last_shown."
+        const val OPENED_PREFIX = "opened."
+        const val DISMISSED_PREFIX = "dismissed."
+        const val MILLIS_PER_MINUTE = 60_000L
+        const val STORAGE_KEY_CHARS = 16
+        const val MAX_COUNTER = 10_000
     }
 }
 

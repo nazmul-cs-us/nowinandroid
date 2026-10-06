@@ -20,7 +20,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Cancel
@@ -49,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.component.NiaButton
 import com.starception.submission.core.model.deenly.IslamicQuizBank
+import com.starception.submission.core.model.deenly.IslamicQuizQuestion
 import com.starception.submission.feature.prayertimes.quiz.IslamicQuizRepository
 import com.google.android.material.card.MaterialCardView
 
@@ -65,10 +68,15 @@ fun IslamicQuizDialog(
 fun IslamicQuizContent(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    featuredQuestion: IslamicQuizQuestion? = null,
 ) {
-    val initialQuestions = remember { IslamicQuizBank.questions.shuffled() }
-    val questions by produceState(initialValue = initialQuestions, key1 = Unit) {
-        value = IslamicQuizRepository().loadQuestions()
+    val initialQuestions = remember(featuredQuestion?.id) {
+        (listOfNotNull(featuredQuestion) + IslamicQuizBank.questions.shuffled())
+            .distinctBy(IslamicQuizQuestion::id)
+    }
+    val questions by produceState(initialValue = initialQuestions, key1 = featuredQuestion?.id) {
+        value = (listOfNotNull(featuredQuestion) + IslamicQuizRepository().loadQuestions())
+            .distinctBy(IslamicQuizQuestion::id)
     }
     var questionIndex by remember { mutableIntStateOf(0) }
     var selectedOption by remember { mutableStateOf<Int?>(null) }
@@ -80,7 +88,9 @@ fun IslamicQuizContent(
     val isLastQuestion = questionIndex == questions.lastIndex
 
     Column(
-        modifier = modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(

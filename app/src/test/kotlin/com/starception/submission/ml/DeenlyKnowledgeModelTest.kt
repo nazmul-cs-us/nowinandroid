@@ -29,6 +29,47 @@ class DeenlyKnowledgeModelTest {
     }
 
     @Test
+    fun parserAcceptsSelfContainedQuestionWithExactAnswerAndEvidence() {
+        val source = "The month of Ramadan is the one in which the Quran was revealed."
+        assertEquals(
+            DeenlyKnowledgeDecision.GroundedQuestion(
+                questionKind = "time",
+                question = "Which month is explicitly connected with the Quran's revelation?",
+                answer = "Ramadan",
+                evidence = "The month of Ramadan is the one in which the Quran was revealed.",
+                options = listOf("Muharram", "Rajab", "Ramadan", "Shawwal"),
+            ),
+            DeenlyKnowledgeModel.parseDecision(
+                rawOutput = """{"contentType":"question","questionKind":"time","question":"Which month is explicitly connected with the Quran's revelation?","answer":"Ramadan","evidence":"The month of Ramadan is the one in which the Quran was revealed.","options":["Muharram","Rajab","Ramadan","Shawwal"]}""",
+                expectedTask = DeenlyKnowledgeTask.QUESTION,
+                sourceText = source,
+            ),
+        )
+    }
+
+    @Test
+    fun parserRejectsUngroundedOrPassageDependentQuestions() {
+        val source = "He preferred dates."
+        val ungroundedAnswer = """{"contentType":"question","questionKind":"food","question":"Which food did he prefer?","answer":"honey","evidence":"He preferred dates.","options":["dates","honey","bread","milk"]}"""
+        val passageDependent = """{"contentType":"question","questionKind":"food","question":"According to this narration, which food was preferred?","answer":"dates","evidence":"He preferred dates.","options":["dates","honey","bread","milk"]}"""
+
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                ungroundedAnswer,
+                DeenlyKnowledgeTask.QUESTION,
+                source,
+            ),
+        )
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                passageDependent,
+                DeenlyKnowledgeTask.QUESTION,
+                source,
+            ),
+        )
+    }
+
+    @Test
     fun parserRejectsGeneratedSourceOrArabicFields() {
         assertNull(
             DeenlyKnowledgeModel.parseDecision(

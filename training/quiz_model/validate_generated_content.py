@@ -8,6 +8,63 @@ import json
 from typing import Any
 
 
+ALLOWED_QUESTION_KINDS = {
+    "person", "place", "food", "color", "action", "number", "description",
+    "teaching", "outcome", "object", "time",
+}
+FORBIDDEN_SCOPE_PHRASES = (
+    "this narration", "this hadith", "this ayah", "this verse", "this passage",
+    "this text", "according to", "which source", "which collection", "which surah contains",
+)
+
+
+def contains_arabic(text: str) -> bool:
+    return any(
+        "\u0600" <= character <= "\u06ff"
+        or "\u0750" <= character <= "\u077f"
+        or "\u08a0" <= character <= "\u08ff"
+        for character in text
+    )
+
+
+def validate_semantic_question(source_text: str, output: dict[str, Any]) -> tuple[bool, str]:
+    expected_keys = {
+        "contentType", "questionKind", "question", "answer", "evidence", "options"
+    }
+    if set(output) != expected_keys:
+        return False, "unexpected_question_fields"
+    if output.get("questionKind") not in ALLOWED_QUESTION_KINDS:
+        return False, "unsupported_question_kind"
+    question = output.get("question")
+    answer = output.get("answer")
+    evidence = output.get("evidence")
+    options = output.get("options")
+    if not isinstance(question, str) or not question.endswith("?") or not 8 <= len(question) <= 180:
+        return False, "invalid_question"
+    if any(phrase in question.lower() for phrase in FORBIDDEN_SCOPE_PHRASES):
+        return False, "passage_dependent_question"
+    if not isinstance(answer, str) or not 1 <= len(answer) <= 96 or answer not in source_text:
+        return False, "answer_not_exact_source_span"
+    if (
+        not isinstance(evidence, str)
+        or not 1 <= len(evidence) <= 420
+        or evidence not in source_text
+        or answer not in evidence
+    ):
+        return False, "evidence_not_exact_source_span"
+    if (
+        not isinstance(options, list)
+        or len(options) != 4
+        or not all(isinstance(option, str) and 1 <= len(option) <= 96 for option in options)
+        or len({option.casefold() for option in options}) != 4
+        or options.count(answer) != 1
+    ):
+        return False, "invalid_options"
+    if any(contains_arabic(value) for value in [question, answer, evidence, *options]):
+        return False, "model_generated_arabic_forbidden"
+    return True, "accepted"
+
+
 def validate_output(example: dict, generated: str) -> tuple[bool, str]:
     try:
         output: dict[str, Any] = json.loads(generated)
@@ -30,8 +87,11 @@ def validate_output(example: dict, generated: str) -> tuple[bool, str]:
         if not isinstance(output.get("title"), str) or not output["title"].strip():
             return False, "missing_title"
     else:
-        if output != {"contentType": "question", "questionKind": "source_location"}:
-            return False, "unverified_question_template"
+        if output == {"contentType": "question", "questionKind": "source_location"}:
+            return True, "accepted"
+        accepted, reason = validate_semantic_question(example["sourceText"], output)
+        if not accepted:
+            return False, reason
 
     # IDs, references, exact source text, and Arabic stay outside the model. The app resolves them
     # from the already validated request envelope and immutable database row.

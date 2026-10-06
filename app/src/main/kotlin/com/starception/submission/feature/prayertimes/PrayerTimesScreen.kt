@@ -192,8 +192,6 @@ private val PrayerReferenceGold = Color(0xFFD8AB59)
 
 private const val PERMISSION_ONBOARDING_PREFERENCES = "permission_onboarding_preferences"
 private const val KEY_PERMISSION_ONBOARDING_COMPLETE = "initial_permission_flow_complete"
-private const val NOW_NUDGE_SOURCE_COUNT = 11
-
 private enum class PermissionOnboardingStep {
     Intro,
     Location,
@@ -1368,6 +1366,43 @@ fun PrayerTimesScreen(
             )
         }
     }
+    val botKnowledgeRankingContext = remember(
+        prayerTimes,
+        currentTime,
+        prayedPrayersToday,
+        detectedActivity,
+        mediaState.playback.isPlaying,
+        dailyReadingPlayer.isPlaying,
+        locationPermissionState.status,
+        dismissedNudgeIds,
+    ) {
+        val activity = when {
+            detectedActivity.startsWith("Driving", ignoreCase = true) ->
+                com.starception.submission.core.model.deenly.DeenlyActivity.DRIVING
+            detectedActivity.startsWith("Praying", ignoreCase = true) ->
+                com.starception.submission.core.model.deenly.DeenlyActivity.PRAYING
+            detectedActivity.startsWith("Detect", ignoreCase = true) ||
+                detectedActivity.startsWith("Initial", ignoreCase = true) ||
+                detectedActivity.contains("error", ignoreCase = true) ->
+                com.starception.submission.core.model.deenly.DeenlyActivity.UNKNOWN
+            else -> com.starception.submission.core.model.deenly.DeenlyActivity.OTHER
+        }
+        NowNudgeKnowledgeRankingContext(
+            nowMinute = (currentTime.hour * 60) + currentTime.minute,
+            nowEpochMillis = System.currentTimeMillis(),
+            currentPrayer = prayerTimes
+                ?.getActualPrayers(currentTime)
+                ?.firstOrNull { it.isCurrently }
+                ?.name,
+            nextPrayer = prayerTimes?.getNextPrayer(currentTime)?.name,
+            completedPrayerCount = prayedPrayersToday.size,
+            activity = activity,
+            isMediaPlaying = mediaState.playback.isPlaying || dailyReadingPlayer.isPlaying,
+            hasVerifiedLocation = locationPermissionState.status is
+                com.google.accompanist.permissions.PermissionStatus.Granted,
+            dismissedNudgeIds = dismissedNudgeIds,
+        )
+    }
 
     fun dismissNudge(id: String) {
         val updated = dismissedNudgeIds + id
@@ -1381,25 +1416,50 @@ fun PrayerTimesScreen(
     val latestActiveNudge by rememberUpdatedState(activeNudge)
     val latestDismissedNudgeIds by rememberUpdatedState(dismissedNudgeIds)
     val latestBotAppSituation by rememberUpdatedState(botAppSituation)
-    LaunchedEffect(nowNudgeKnowledgeProvider, nudgeDay) {
-        com.starception.submission.ui.search.VoiceAssistantNudgeBus.suggestionRequests.collect {
-            var generatedCandidate: NowNudgeKnowledgeCandidate? = null
-            for (attempt in 0 until NOW_NUDGE_SOURCE_COUNT) {
-                val variation = botSourceVariation
-                botSourceVariation += 1
-                val candidate = nowNudgeKnowledgeProvider.load(
-                    date = LocalDate.parse(nudgeDay),
-                    variation = variation,
-                    appSituation = latestBotAppSituation,
-                )
-                if (candidate != null && candidate.nudge.id !in latestDismissedNudgeIds) {
-                    generatedCandidate = candidate
-                    break
-                }
-            }
-            modelKnowledgeCandidate = generatedCandidate
+    val latestBotKnowledgeRankingContext by rememberUpdatedState(botKnowledgeRankingContext)
+    val latestLaunchGreeting by rememberUpdatedState(launchGreeting)
+    val latestLaunchGreetingPending by rememberUpdatedState(launchGreetingPending)
+    val latestSuggestionRequestHandler = rememberUpdatedState<(Long) -> Unit> { requestId ->
+        val variation = botSourceVariation
+        botSourceVariation += 1
+        val requestedTask = if (variation % 2 == 0) {
+            com.starception.submission.ml.DeenlyKnowledgeTask.QUESTION
+        } else {
+            com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE
+        }
+        val requestDate = LocalDate.parse(nudgeDay)
+        val appSituation = latestBotAppSituation
+        val rankingContext = latestBotKnowledgeRankingContext.copy(
+            dismissedNudgeIds = latestDismissedNudgeIds,
+        )
+        val greeting = latestLaunchGreeting
+        val includeGreeting = latestLaunchGreetingPending
+        val activeNudgeSnapshot = latestActiveNudge
 
-            val situationalAction = latestActiveNudge?.takeIf { nudge ->
+        com.starception.submission.ui.search.VoiceAssistantNudgeBus.processSuggestion(
+            requestId = requestId,
+        ) {
+            val generatedCandidate = nowNudgeKnowledgeProvider.load(
+                date = requestDate,
+                variation = variation,
+                appSituation = appSituation,
+                rankingContext = rankingContext,
+                task = requestedTask,
+            )
+            modelKnowledgeCandidate = generatedCandidate
+            val greetedKnowledgeNudge = generatedCandidate
+                ?.takeIf { it.quizQuestion == null }
+                ?.nudge
+                ?.let { knowledgeNudge ->
+                    combineLaunchGreetingWithKnowledge(
+                        greeting = greeting,
+                        knowledge = knowledgeNudge,
+                        includeGreeting = includeGreeting,
+                    )
+                }
+                ?: generatedCandidate?.nudge
+
+            val situationalAction = activeNudgeSnapshot?.takeIf { nudge ->
                 nudge.action ==
                     com.starception.submission.core.model.deenly.DeenlyNudgeAction.MARK_PRAYED ||
                     nudge.action ==
@@ -1407,12 +1467,34 @@ fun PrayerTimesScreen(
                     nudge.action ==
                     com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_TRAVEL_DUA
             }
-            val botResult = situationalAction ?: generatedCandidate?.nudge ?: latestActiveNudge
+            val botResult = situationalAction ?: greetedKnowledgeNudge ?: activeNudgeSnapshot
+            if (generatedCandidate != null && botResult?.id == generatedCandidate.nudge.id) {
+                nowNudgeKnowledgeProvider.recordImpression(
+                    candidate = generatedCandidate,
+                    date = requestDate,
+                )
+            }
+            com.starception.submission.ui.search.VoiceAssistantNudgeBus
+                .setGeneratedQuizQuestion(
+                    generatedCandidate
+                        ?.takeIf { botResult?.id == it.nudge.id }
+                        ?.quizQuestion,
+                )
             launchGreetingPending = false
             botPresentedNudge = botResult
-            com.starception.submission.ui.search.VoiceAssistantNudgeBus.completeSuggestion(
-                botResult,
-            )
+            botResult
+        }
+    }
+    DisposableEffect(nowNudgeKnowledgeProvider, nudgeDay) {
+        // Retain the latest immutable Home context after navigation so the
+        // app-shell bot can answer a pull gesture from every destination.
+        com.starception.submission.ui.search.VoiceAssistantNudgeBus
+            .setSuggestionRequestHandler { requestId ->
+                latestSuggestionRequestHandler.value(requestId)
+            }
+        onDispose {
+            // Deliberately retained. A later Home composition replaces this
+            // handler with a fresher provider/context snapshot.
         }
     }
 
@@ -1432,7 +1514,11 @@ fun PrayerTimesScreen(
                 nudge.actionId ==
                 com.starception.submission.core.model.deenly.DeenlyActionIds.LEARNING_OPEN_KNOWLEDGE
             ) {
-                when (val target = modelKnowledgeCandidate?.target) {
+                val knowledgeCandidate = modelKnowledgeCandidate?.takeIf {
+                    it.nudge.id == nudge.id
+                }
+                knowledgeCandidate?.let(nowNudgeKnowledgeProvider::recordOpened)
+                when (val target = knowledgeCandidate?.target) {
                     is NowNudgeKnowledgeTarget.QuranAyah -> onSurahClickWithAyah(
                         target.surahNumber,
                         target.ayahNumber,
@@ -1481,6 +1567,9 @@ fun PrayerTimesScreen(
         val nudge = activeNudge ?: return@LaunchedEffect
         com.starception.submission.ui.search.VoiceAssistantNudgeBus.dismissRequests.collect { id ->
             if (nudge.id == id) {
+                modelKnowledgeCandidate
+                    ?.takeIf { it.nudge.id == id }
+                    ?.let(nowNudgeKnowledgeProvider::recordDismissed)
                 if (id == "launch-greeting") {
                     launchGreetingPending = false
                 } else {
@@ -4497,6 +4586,16 @@ fun PrayerTimesScreen(
         } // Close if (popupDialState != null)
 
     } // Close outer Box
+}
+
+internal fun combineLaunchGreetingWithKnowledge(
+    greeting: com.starception.submission.core.model.deenly.DeenlyNudge,
+    knowledge: com.starception.submission.core.model.deenly.DeenlyNudge,
+    includeGreeting: Boolean,
+): com.starception.submission.core.model.deenly.DeenlyNudge = if (includeGreeting) {
+    knowledge.copy(label = greeting.label)
+} else {
+    knowledge
 }
 
 @Composable

@@ -11,10 +11,17 @@ from pathlib import Path
 
 
 SYSTEM_PROMPT = """You create one grounded Islamic learning item from the supplied source.
-Use only the source and metadata. Return one minified JSON object and nothing else. A knowledge
-object has exactly contentType and title. A question object has exactly contentType and
-questionKind. Never output IDs, references, source text, options, answers, or Arabic. The app
-builds the final item deterministically from its immutable database."""
+Use only the supplied source, never memory. Return one minified JSON object and nothing else.
+A knowledge object has exactly contentType and title. For a question, create a natural,
+self-contained global knowledge question that does not say "this narration", "this hadith",
+"this ayah", "this verse", "this passage", "according to", or ask where the text came from.
+A question object has exactly contentType, questionKind, question, answer, evidence, and options.
+questionKind must be one of person, place, food, color, action, number, description, teaching,
+outcome, object, or time. answer must be a short exact contiguous span copied from Source text.
+evidence must be one exact contiguous span copied from Source text and must contain answer.
+options must contain exactly four short unique strings including answer exactly once. Distractors
+must not contradict anything stated in the source. Never output Arabic, IDs, citations, rulings,
+or claims unsupported by the source. Prefer a simple explicit detail over interpretation."""
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,10 +65,20 @@ def build_example(record: dict, max_source_chars: int) -> dict:
             "title": record["title"],
         }
     else:
-        answer = {
-            "contentType": "question",
-            "questionKind": "source_location",
-        }
+        if record.get("questionKind") and record.get("answer") and record.get("evidence"):
+            answer = {
+                "contentType": "question",
+                "questionKind": record["questionKind"],
+                "question": record["prompt"],
+                "answer": record["answer"],
+                "evidence": record["evidence"],
+                "options": record["options"],
+            }
+        else:
+            answer = {
+                "contentType": "question",
+                "questionKind": "source_location",
+            }
     return {
         "id": record["id"],
         "sourceCollection": record["sourceCollection"],
@@ -97,8 +114,8 @@ def prepare(input_path: Path, output_dir: Path, max_source_chars: int) -> dict:
                 target.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     manifest = {
-        "schemaVersion": 1,
-        "baseModel": "HuggingFaceTB/SmolLM2-135M-Instruct",
+        "schemaVersion": 2,
+        "baseModel": "Qwen/Qwen2.5-0.5B-Instruct",
         "splitStrategy": "sha256(sourceCollection|sourceReference|sourceTextSha256), 80/10/10",
         "sourceTextPolicy": "immutable_sha256",
         "quranArabicPolicy": "never_model_generated",
