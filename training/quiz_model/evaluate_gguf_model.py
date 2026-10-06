@@ -11,7 +11,55 @@ import time
 from collections import Counter, defaultdict, deque
 from pathlib import Path
 
-from validate_generated_content import validate_output
+try:
+    from .prepare_hf_dataset import SYSTEM_PROMPT
+    from .validate_generated_content import validate_output
+except ImportError:
+    # Keep direct script execution working from the repository root.
+    from prepare_hf_dataset import SYSTEM_PROMPT
+    from validate_generated_content import validate_output
+
+
+KNOWLEDGE_JSON_SCHEMA = json.dumps(
+    {
+        "type": "object",
+        "properties": {
+            "contentType": {"const": "knowledge"},
+            "title": {"type": "string", "minLength": 1, "maxLength": 84},
+        },
+        "required": ["contentType", "title"],
+        "additionalProperties": False,
+    },
+    separators=(",", ":"),
+)
+QUESTION_JSON_SCHEMA = json.dumps(
+    {
+        "type": "object",
+        "properties": {
+            "contentType": {"const": "question"},
+            "questionKind": {
+                "enum": [
+                    "person", "place", "food", "color", "action", "number",
+                    "description", "teaching", "outcome", "object", "time",
+                ]
+            },
+            "question": {"type": "string", "minLength": 8, "maxLength": 180},
+            "answer": {"type": "string", "minLength": 1, "maxLength": 96},
+            "evidence": {"type": "string", "minLength": 1, "maxLength": 420},
+            "options": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {"type": "string", "minLength": 1, "maxLength": 96},
+            },
+        },
+        "required": [
+            "contentType", "questionKind", "question", "answer", "evidence", "options"
+        ],
+        "additionalProperties": False,
+    },
+    separators=(",", ":"),
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,7 +69,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--runner", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--samples", type=int, default=30)
-    parser.add_argument("--max-new-tokens", type=int, default=96)
+    parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--seed", type=int, default=20261005)
     return parser.parse_args()
 
@@ -32,6 +80,18 @@ def chatml_prompt(example: dict) -> str:
         f"<|im_start|>{message['role']}\n{message['content']}<|im_end|>\n"
         for message in messages
     ) + "<|im_start|>assistant\n"
+
+
+def runtime_request(example: dict) -> tuple[str, str, str]:
+    """Return the exact system, user, and schema inputs used by Android."""
+    messages = example["messages"]
+    expected = json.loads(messages[-1]["content"])
+    schema = (
+        KNOWLEDGE_JSON_SCHEMA
+        if expected["contentType"] == "knowledge"
+        else QUESTION_JSON_SCHEMA
+    )
+    return SYSTEM_PROMPT, messages[-2]["content"], schema
 
 
 def extract_json(text: str) -> str:
@@ -77,15 +137,21 @@ def main() -> None:
     durations_ms: list[int] = []
     for index, example in enumerate(records, start=1):
         started = time.monotonic()
+        system_prompt, user_prompt, output_schema = runtime_request(example)
         completed = subprocess.run(
             [
                 str(args.runner),
                 "--model",
                 str(args.model),
+                "-sys",
+                system_prompt,
                 "--prompt",
-                chatml_prompt(example),
+                user_prompt,
+                "--single-turn",
                 "--predict",
                 str(args.max_new_tokens),
+                "--json-schema",
+                output_schema,
                 "--temp",
                 "0",
                 "--no-display-prompt",
@@ -116,8 +182,9 @@ def main() -> None:
 
     accepted_count = sum(item["accepted"] for item in results)
     report = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "runtime": "llama.cpp",
+        "runtimeContract": "android_system_prompt_json_schema_single_turn",
         "model": args.model.name,
         "samples": len(results),
         "accepted": accepted_count,

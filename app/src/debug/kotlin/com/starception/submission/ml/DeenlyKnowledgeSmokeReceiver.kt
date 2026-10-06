@@ -35,7 +35,12 @@ class DeenlyKnowledgeSmokeReceiver : BroadcastReceiver() {
                         .joinToString(separator = "") { "%02x".format(it) },
                 ),
             )
-            Log.i(TAG, "accepted=${result == DeenlyKnowledgeDecision.SourceLocationQuestion} result=$result")
+            val accepted = result is DeenlyKnowledgeDecision.GroundedQuestion &&
+                result.answer in sourceText &&
+                result.evidence in sourceText &&
+                result.answer in result.evidence &&
+                result.options.count { it == result.answer } == 1
+            Log.i(TAG, "accepted=$accepted result=$result")
             pending.finish()
         }
     }

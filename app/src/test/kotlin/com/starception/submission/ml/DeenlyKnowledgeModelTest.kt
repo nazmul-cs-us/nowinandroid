@@ -48,6 +48,20 @@ class DeenlyKnowledgeModelTest {
     }
 
     @Test
+    fun parserInsertsVerifiedAnswerWhenModelReturnsFourUniqueDistractors() {
+        val source = "Amina planted five trees beside the path."
+        val decision = DeenlyKnowledgeModel.parseDecision(
+            rawOutput = """{"contentType":"question","questionKind":"number","question":"How many trees did Amina plant beside the path?","answer":"five","evidence":"Amina planted five trees beside the path.","options":["two","three","four","seven"]}""",
+            expectedTask = DeenlyKnowledgeTask.QUESTION,
+            sourceText = source,
+        ) as DeenlyKnowledgeDecision.GroundedQuestion
+
+        assertEquals(4, decision.options.size)
+        assertEquals(4, decision.options.distinctBy(String::lowercase).size)
+        assertEquals(1, decision.options.count { it == decision.answer })
+    }
+
+    @Test
     fun parserRejectsUngroundedOrPassageDependentQuestions() {
         val source = "He preferred dates."
         val ungroundedAnswer = """{"contentType":"question","questionKind":"food","question":"Which food did he prefer?","answer":"honey","evidence":"He preferred dates.","options":["dates","honey","bread","milk"]}"""

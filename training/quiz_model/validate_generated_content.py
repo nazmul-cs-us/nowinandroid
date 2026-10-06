@@ -52,13 +52,16 @@ def validate_semantic_question(source_text: str, output: dict[str, Any]) -> tupl
         or answer not in evidence
     ):
         return False, "evidence_not_exact_source_span"
-    if (
-        not isinstance(options, list)
-        or len(options) != 4
-        or not all(isinstance(option, str) and 1 <= len(option) <= 96 for option in options)
-        or len({option.casefold() for option in options}) != 4
-        or options.count(answer) != 1
+    if not isinstance(options, list) or len(options) != 4 or not all(
+        isinstance(option, str) and 1 <= len(option) <= 96 for option in options
     ):
+        return False, "invalid_options"
+    distractors = list(dict.fromkeys(
+        option.casefold() for option in options if option.casefold() != answer.casefold()
+    ))
+    options_are_ready = len({option.casefold() for option in options}) == 4 and options.count(answer) == 1
+    options_are_repairable = len(distractors) >= 3
+    if not options_are_ready and not options_are_repairable:
         return False, "invalid_options"
     if any(contains_arabic(value) for value in [question, answer, evidence, *options]):
         return False, "model_generated_arabic_forbidden"
@@ -93,9 +96,6 @@ def validate_output(example: dict, generated: str) -> tuple[bool, str]:
         if not accepted:
             return False, reason
 
-    # IDs, references, exact source text, and Arabic stay outside the model. The app resolves them
-    # from the already validated request envelope and immutable database row.
-    forbidden = ("id", "reference", "body", "source", "arabic")
-    if any(any(token in key.lower() for token in forbidden) for key in output):
-        return False, "model_generated_arabic_forbidden"
+    # Exact key sets were validated above. Avoid substring matching here: for example,
+    # "evidence" legitimately contains the letters "id" but is not an identifier field.
     return True, "accepted"

@@ -711,6 +711,7 @@ private fun NiaFloatingBottomBar(
  */
 private enum class VoiceAssistantSurface {
     Button,
+    Thinking,
     Nudge,
     Quiz,
 }
@@ -814,6 +815,22 @@ private fun VoiceAssistantButton(
     val isGeneratingNudge = generatingSuggestion ||
         (isPreparingNudge && sparklingNudgeId == nudge?.id)
     val showNudge = canPresentNudge && revealedNudgeId == nudge?.id
+    val thinkingMessages = remember {
+        listOf(
+            "Reading your context",
+            "Choosing a trusted source",
+            "Checking the source",
+            "Preparing your nudge",
+        )
+    }
+    var thinkingMessageIndex by remember { mutableStateOf(0) }
+    LaunchedEffect(isGeneratingNudge) {
+        thinkingMessageIndex = 0
+        while (isGeneratingNudge) {
+            delay(900)
+            thinkingMessageIndex = (thinkingMessageIndex + 1) % thinkingMessages.size
+        }
+    }
     var renderedNudge by remember { mutableStateOf(nudge) }
     LaunchedEffect(nudge) {
         if (nudge != null) {
@@ -898,6 +915,7 @@ private fun VoiceAssistantButton(
     var quizDragOffset by remember(quizOpen) { mutableStateOf(Offset.Zero) }
     val assistantSurface = when {
         quizOpen -> VoiceAssistantSurface.Quiz
+        isGeneratingNudge -> VoiceAssistantSurface.Thinking
         showNudge -> VoiceAssistantSurface.Nudge
         else -> VoiceAssistantSurface.Button
     }
@@ -909,6 +927,7 @@ private fun VoiceAssistantButton(
     val containerCorner by animateDpAsState(
         targetValue = when (assistantSurface) {
             VoiceAssistantSurface.Button -> buttonSize / 2
+            VoiceAssistantSurface.Thinking -> 22.dp
             VoiceAssistantSurface.Nudge -> 24.dp
             VoiceAssistantSurface.Quiz -> 28.dp
         },
@@ -918,6 +937,7 @@ private fun VoiceAssistantButton(
     val containerElevation by animateDpAsState(
         targetValue = when (assistantSurface) {
             VoiceAssistantSurface.Button -> 2.dp
+            VoiceAssistantSurface.Thinking -> 3.dp
             VoiceAssistantSurface.Nudge -> 3.dp
             VoiceAssistantSurface.Quiz -> 8.dp
         },
@@ -1207,6 +1227,76 @@ private fun VoiceAssistantButton(
                         },
                 )
             }
+                }
+
+                VoiceAssistantSurface.Thinking -> Surface(
+                    shape = RoundedCornerShape(containerCorner),
+                    color = containerColor,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shadowElevation = containerElevation,
+                    modifier = Modifier
+                        .wrapContentSize(
+                            align = if (verticalLayout) {
+                                Alignment.CenterStart
+                            } else {
+                                Alignment.BottomEnd
+                            },
+                            unbounded = true,
+                        )
+                        .offset(
+                            x = if (verticalLayout) buttonSize + 8.dp else 0.dp,
+                            y = if (verticalLayout) 0.dp else -buttonSize - 8.dp,
+                        )
+                        .sharedBounds(
+                            sharedContentState = voiceContainerState,
+                            animatedVisibilityScope = this,
+                            boundsTransform = { _, _ ->
+                                tween(
+                                    durationMillis = NUDGE_MORPH_DURATION_MILLIS,
+                                    easing = FastOutSlowInEasing,
+                                )
+                            },
+                            enter = EnterTransition.None,
+                            exit = ExitTransition.None,
+                            resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+                        )
+                        .widthIn(max = if (verticalLayout) 230.dp else 280.dp)
+                        .heightIn(min = if (verticalLayout) 38.dp else 44.dp)
+                        .semantics {
+                            contentDescription = thinkingMessages[thinkingMessageIndex]
+                        },
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .background(nudgeBrush)
+                            .padding(
+                                horizontal = if (verticalLayout) 10.dp else 14.dp,
+                                vertical = if (verticalLayout) 6.dp else 8.dp,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        VoiceNudgeSparkles(
+                            color = MaterialTheme.colorScheme.primary,
+                            morph = 1f,
+                            modifier = Modifier.size(if (verticalLayout) 26.dp else 30.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        AnimatedContent(
+                            targetState = thinkingMessageIndex,
+                            transitionSpec = {
+                                fadeIn(tween(180)) togetherWith fadeOut(tween(120))
+                            },
+                            label = "nowNudgeThinkingMessage",
+                        ) { messageIndex ->
+                            Text(
+                                text = thinkingMessages[messageIndex],
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
 
                 VoiceAssistantSurface.Nudge -> Surface(

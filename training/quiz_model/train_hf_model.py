@@ -202,7 +202,7 @@ def main() -> None:
             else None
         ),
         "quranArabicPolicy": "never_model_generated",
-        "sourceResolution": "contentId_to_verified_local_database",
+        "sourceResolution": "verified_runtime_source_envelope",
     }
     (args.output_dir / "training_manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"

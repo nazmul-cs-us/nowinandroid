@@ -27,7 +27,7 @@ pass reads translated prompts from `quran_en.db`.
 
 ## Local Hugging Face training
 
-The first edge model is `HuggingFaceTB/SmolLM2-135M-Instruct`, trained with LoRA. The generated
+The v1 edge model is `HuggingFaceTB/SmolLM2-135M-Instruct`, trained with LoRA. The generated
 payload intentionally excludes the content ID, citation, source body, and Arabic. Those values stay
 in a validated request envelope and are resolved directly from the immutable database row after
 inference. A model therefore cannot replace or rewrite an ayah or narration.
@@ -118,7 +118,55 @@ approved examples. Never fine-tune only on the newest batch. Promote a version o
 report passes the source-lock validator; otherwise the app continues using its prior model and
 deterministic content bank.
 
+## V2 self-contained question model
+
+V2 uses `Qwen/Qwen2.5-0.5B-Instruct`. Its small semantic-contract dataset contains ordinary,
+non-religious sentences and teaches only the output contract: self-contained wording, exact answer
+and evidence spans, and four unique options. Quran and Hadith knowledge is supplied at runtime from
+the verified local database envelope and is never learned from generated replacements.
+
+```bash
+python3 training/quiz_model/build_semantic_contract_dataset.py \
+  --output-dir build/knowledge-model/semantic-contract-v2
+
+HF_HOME=build/huggingface-cache .venv-knowledge-model/bin/python \
+  training/quiz_model/train_hf_model.py \
+  --data-dir build/knowledge-model/semantic-contract-v2 \
+  --output-dir build/knowledge-model/deenly-question-v2-trained \
+  --model-version deenly-question-v2 \
+  --max-train-samples 313 \
+  --max-eval-samples 35 \
+  --max-steps 120
+
+HF_HOME=build/huggingface-cache .venv-knowledge-model/bin/python \
+  training/quiz_model/merge_hf_adapter.py \
+  --adapter build/knowledge-model/deenly-question-v2-trained/adapter \
+  --output-dir build/knowledge-model/deenly-question-v2-trained/merged
+
+.venv-knowledge-model/bin/python build/llama.cpp/convert_hf_to_gguf.py \
+  build/knowledge-model/deenly-question-v2-trained/merged \
+  --outfile build/knowledge-model/deenly-question-v2-trained/deenly-question-v2-f16.gguf \
+  --outtype f16
+
+build/llama.cpp/build-local/bin/llama-quantize \
+  build/knowledge-model/deenly-question-v2-trained/deenly-question-v2-f16.gguf \
+  build/knowledge-model/deenly-question-v2-trained/deenly-question-v2-q4_k_m.gguf \
+  Q4_K_M
+
+.venv-knowledge-model/bin/python training/quiz_model/evaluate_gguf_model.py \
+  --data build/knowledge-model/semantic-contract-v2/test.jsonl \
+  --model build/knowledge-model/deenly-question-v2-trained/deenly-question-v2-q4_k_m.gguf \
+  --runner build/llama.cpp/build-local/bin/llama-completion \
+  --output build/knowledge-model/deenly-question-v2-trained/semantic_contract_report.json \
+  --samples 48
+```
+
+The GGUF evaluator mirrors the Android invocation: the same system prompt, task prompt, JSON
+schema, single-turn mode, token limit, and temperature. This prevents a raw prompt test from being
+mistaken for deployable-runtime behavior.
+
 Do not treat free-form generated answers as authoritative. The mobile model creates only bounded
-learning metadata. It never emits Quran Arabic, exact source text, IDs, or citations. New
-source-locked content is built and verified offline; Android and iOS keep working with the last
-valid bank if validation fails.
+learning metadata. It never emits Quran Arabic, IDs, citations, or replacement source bodies; a
+question answer and its evidence are accepted only when both are exact spans of the verified
+runtime source. New source-locked content is built and verified offline; clients keep using the
+last valid deterministic content when validation fails.

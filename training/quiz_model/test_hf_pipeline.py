@@ -4,7 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from training.quiz_model.evaluate_gguf_model import balanced_sample, chatml_prompt
+from training.quiz_model.evaluate_gguf_model import (
+    QUESTION_JSON_SCHEMA,
+    balanced_sample,
+    chatml_prompt,
+    runtime_request,
+)
 from training.quiz_model.prepare_hf_dataset import build_example, prepare, split_for
 from training.quiz_model.validate_generated_content import validate_output
 
@@ -71,6 +76,30 @@ class HuggingFacePipelineTest(unittest.TestCase):
             validate_output(example, json.dumps(changed))[1],
         )
 
+    def test_semantic_question_accepts_evidence_without_treating_it_as_an_id(self):
+        source = "Hamza served bread at the community meal."
+        example = {
+            "sourceText": source,
+            "sourceTextSha256": hashlib.sha256(source.encode()).hexdigest(),
+            "messages": [
+                {"role": "system", "content": "test"},
+                {"role": "user", "content": source},
+                {"role": "assistant", "content": json.dumps({"contentType": "question"})},
+            ],
+        }
+        generated = json.dumps(
+            {
+                "contentType": "question",
+                "questionKind": "food",
+                "question": "What did Hamza serve at the community meal?",
+                "answer": "bread",
+                "evidence": source,
+                "options": ["bread", "dates", "milk", "olives"],
+            }
+        )
+
+        self.assertEqual((True, "accepted"), validate_output(example, generated))
+
     def test_gguf_prompt_excludes_expected_answer_and_sampling_is_balanced(self):
         knowledge = build_example(candidate("knowledge"), max_source_chars=100)
         question_candidate = candidate("question")
@@ -80,6 +109,11 @@ class HuggingFacePipelineTest(unittest.TestCase):
         prompt = chatml_prompt(knowledge)
         self.assertTrue(prompt.endswith("<|im_start|>assistant\n"))
         self.assertNotIn(knowledge["messages"][-1]["content"], prompt)
+
+        _, runtime_prompt, output_schema = runtime_request(question)
+        self.assertEqual(question["messages"][-2]["content"], runtime_prompt)
+        self.assertEqual(QUESTION_JSON_SCHEMA, output_schema)
+        self.assertNotIn(question["messages"][-1]["content"], runtime_prompt)
 
         selected = balanced_sample([knowledge] * 4 + [question] * 4, count=2, seed=7)
         self.assertEqual({"quran", "sahih_muslim"}, {item["sourceCollection"] for item in selected})

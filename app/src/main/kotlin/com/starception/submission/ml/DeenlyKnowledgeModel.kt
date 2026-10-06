@@ -164,8 +164,8 @@ class DeenlyKnowledgeModel(context: Context) {
 
     companion object {
         const val MODEL_FILE_NAME = "deenly-question-v2-q4_k_m.gguf"
-        const val MODEL_SIZE_BYTES = 491_400_032L
-        const val MODEL_SHA256 = "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db"
+        const val MODEL_SIZE_BYTES = 397_807_648L
+        const val MODEL_SHA256 = "a56a58a51c66fec1548ac32b72ce4b70c4608c24486f5b212fafcba03b5439de"
 
         private const val RUNNER_FILE_NAME = "libdeenly_completion.so"
         private const val INFERENCE_TIMEOUT_SECONDS = 30L
@@ -243,6 +243,11 @@ or claims unsupported by the source. Prefer a simple explicit detail over interp
                     val options = (output["options"] as? JsonArray)
                         ?.mapNotNull { (it as? JsonPrimitive)?.content?.trim() }
                         ?: return null
+                    val normalizedOptions = normalizeOptions(
+                        question = question,
+                        answer = answer,
+                        options = options,
+                    ) ?: return null
                     val generatedText = listOf(question, answer, evidence) + options
                     if (
                         question.isEmpty() || question.length > MAX_QUESTION_CHARS ||
@@ -250,10 +255,6 @@ or claims unsupported by the source. Prefer a simple explicit detail over interp
                         answer.isEmpty() || answer.length > MAX_ANSWER_CHARS ||
                         evidence.isEmpty() || evidence.length > MAX_EVIDENCE_CHARS ||
                         answer !in verifiedSource || evidence !in verifiedSource || answer !in evidence ||
-                        options.size != 4 ||
-                        options.any { it.isEmpty() || it.length > MAX_OPTION_CHARS } ||
-                        options.distinctBy(String::lowercase).size != 4 ||
-                        options.count { it == answer } != 1 ||
                         generatedText.any(String::containsArabic) ||
                         generatedText.any { text -> text.any(Char::isISOControl) }
                     ) return null
@@ -262,9 +263,38 @@ or claims unsupported by the source. Prefer a simple explicit detail over interp
                         question = question,
                         answer = answer,
                         evidence = evidence,
-                        options = options,
+                        options = normalizedOptions,
                     )
                 }
+            }
+        }
+
+        /**
+         * Repairs only the bounded multiple-choice shape. The correct answer has already been
+         * verified as an exact source span; generated evidence and question wording are never
+         * repaired. If three unique distractors do not survive validation, the whole output is
+         * rejected and the caller uses its deterministic fallback.
+         */
+        private fun normalizeOptions(
+            question: String,
+            answer: String,
+            options: List<String>,
+        ): List<String>? {
+            if (
+                options.size != 4 ||
+                options.any { it.isEmpty() || it.length > MAX_OPTION_CHARS }
+            ) return null
+            if (
+                options.distinctBy(String::lowercase).size == 4 &&
+                options.count { it == answer } == 1
+            ) return options
+
+            val distractors = options
+                .filterNot { it.equals(answer, ignoreCase = true) }
+                .distinctBy(String::lowercase)
+            if (distractors.size < 3) return null
+            return distractors.take(3).toMutableList().apply {
+                add(Math.floorMod(question.hashCode(), 4), answer)
             }
         }
 
