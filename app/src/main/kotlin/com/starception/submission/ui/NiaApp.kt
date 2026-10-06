@@ -1523,6 +1523,11 @@ private fun VoiceAssistantButton(
                                 0.45f,
                                 (abs(displayedNudgeDragX) + abs(displayedNudgeDragY)) / 240f,
                             )
+                            shadowElevation = (8.dp + 4.dp * nudgeGlowPulse).toPx()
+                            shape = RoundedCornerShape(containerCorner)
+                            ambientShadowColor = assistantGlowColor
+                            spotShadowColor = assistantGlowColor
+                            clip = false
                         }
                         .drawBehind {
                         drawIntoCanvas { canvas ->
@@ -1530,9 +1535,9 @@ private fun VoiceAssistantButton(
                                 android.graphics.Paint.ANTI_ALIAS_FLAG,
                             ).apply {
                                 color = assistantGlowColor.toArgb()
-                                alpha = ((0.26f + nudgeGlowPulse * 0.08f) * 255).toInt()
+                                alpha = ((0.34f + nudgeGlowPulse * 0.10f) * 255).toInt()
                                 maskFilter = BlurMaskFilter(
-                                    9.dp.toPx(),
+                                    11.dp.toPx(),
                                     BlurMaskFilter.Blur.NORMAL,
                                 )
                             }
@@ -1768,7 +1773,7 @@ private fun NudgePreviewThumbnail(
     val glyph = when (action) {
         DeenlyNudgeAction.MARK_PRAYED -> FlaticonIcons.CHECK
         DeenlyNudgeAction.PLAY_TRAVEL_DUA -> FlaticonIcons.TRAVEL
-        DeenlyNudgeAction.PLAY_QUIZ -> FlaticonIcons.QUIZ
+        DeenlyNudgeAction.PLAY_QUIZ -> FlaticonIcons.KNOWLEDGE
         DeenlyNudgeAction.OPEN_QIBLA,
         DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
         null -> FlaticonIcons.QUICK_ACTION

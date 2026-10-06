@@ -90,8 +90,8 @@ fun IslamicQuizContent(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -100,16 +100,14 @@ fun IslamicQuizContent(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "KNOWLEDGE CHECK",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    text = "Islamic quiz",
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
                 )
                 Text(
-                    text = "Islamic quiz",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    text = "Choose an answer to reveal the result",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Surface(
@@ -133,89 +131,113 @@ fun IslamicQuizContent(
             }
         }
 
-        Row(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(12.dp),
         ) {
-            Text(
-                text = "Question ${questionIndex + 1} of ${questions.size}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LinearProgressIndicator(
-                progress = { (questionIndex + 1f) / questions.size },
-                modifier = Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            )
-        }
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = question.prompt,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            question.options.forEachIndexed { index, option ->
-                QuizOption(
-                    text = option,
-                    selected = selectedOption == index,
-                    correct = index == question.correctOption,
-                    answered = answered,
-                    onClick = { selectedOption = index },
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = "Question ${questionIndex + 1} of ${questions.size}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                LinearProgressIndicator(
+                    progress = { (questionIndex + 1f) / questions.size },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 )
             }
-            if (answered) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = if (isCorrect) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.errorContainer
-                    },
-                    contentColor = if (isCorrect) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    },
-                    shape = RoundedCornerShape(12.dp),
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 1.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "QUESTION ${questionIndex + 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                )
+                Text(
+                    text = question.prompt,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                question.options.forEachIndexed { index, option ->
+                    QuizOption(
+                        text = "${('A'.code + index).toChar()}. $option",
+                        selected = selectedOption == index,
+                        correct = index == question.correctOption,
+                        answered = answered,
+                        onClick = {
+                            selectedOption = index
+                            answerSubmitted = true
+                            if (index == question.correctOption) score++
+                        },
+                    )
+                }
+            }
+        }
+        if (answered) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = if (isCorrect) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.errorContainer
+                },
+                contentColor = if (isCorrect) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onErrorContainer
+                },
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(
-                                imageVector = if (isCorrect) {
-                                    Icons.Rounded.CheckCircle
-                                } else {
-                                    Icons.Rounded.Cancel
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Text(
-                                text = if (isCorrect) "Correct" else "Not quite",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                        Text(question.explanation, style = MaterialTheme.typography.bodySmall)
+                        Icon(
+                            imageVector = if (isCorrect) {
+                                Icons.Rounded.CheckCircle
+                            } else {
+                                Icons.Rounded.Cancel
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
                         Text(
-                            text = "Source: ${question.sourceLabel}",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            text = if (isCorrect) "Correct" else "Not quite",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
+                    Text(question.explanation, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = "Source: ${question.sourceLabel}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -225,10 +247,7 @@ fun IslamicQuizContent(
                 .heightIn(min = 42.dp),
             enabled = selectedOption != null,
             onClick = {
-                if (!answered) {
-                    answerSubmitted = true
-                    if (isCorrect) score++
-                } else if (isLastQuestion) {
+                if (isLastQuestion) {
                     onDismiss()
                 } else {
                     questionIndex++
@@ -240,7 +259,6 @@ fun IslamicQuizContent(
             Text(
                 text = when {
                     selectedOption == null -> "Choose an answer"
-                    !answered -> "Check answer"
                     isLastQuestion -> "Finish quiz"
                     else -> "Next question"
                 },
