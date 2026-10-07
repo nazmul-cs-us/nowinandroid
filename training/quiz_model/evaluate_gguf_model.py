@@ -12,11 +12,9 @@ from collections import Counter, defaultdict, deque
 from pathlib import Path
 
 try:
-    from .prepare_hf_dataset import SYSTEM_PROMPT
     from .validate_generated_content import validate_output
 except ImportError:
     # Keep direct script execution working from the repository root.
-    from prepare_hf_dataset import SYSTEM_PROMPT
     from validate_generated_content import validate_output
 
 
@@ -39,8 +37,17 @@ QUESTION_JSON_SCHEMA = json.dumps(
             "contentType": {"const": "question"},
             "questionKind": {
                 "enum": [
-                    "person", "place", "food", "color", "action", "number",
-                    "description", "teaching", "outcome", "object", "time",
+                    "person",
+                    "place",
+                    "food",
+                    "color",
+                    "action",
+                    "number",
+                    "description",
+                    "teaching",
+                    "outcome",
+                    "object",
+                    "time",
                 ]
             },
             "question": {"type": "string", "minLength": 8, "maxLength": 180},
@@ -54,8 +61,28 @@ QUESTION_JSON_SCHEMA = json.dumps(
             },
         },
         "required": [
-            "contentType", "questionKind", "question", "answer", "evidence", "options"
+            "contentType",
+            "questionKind",
+            "question",
+            "answer",
+            "evidence",
+            "options",
         ],
+        "additionalProperties": False,
+    },
+    separators=(",", ":"),
+)
+
+
+ANSWER_JSON_SCHEMA = json.dumps(
+    {
+        "type": "object",
+        "properties": {
+            "contentType": {"enum": ["answer", "unanswered"]},
+            "answer": {"type": "string", "maxLength": 96},
+            "evidence": {"type": "string", "maxLength": 420},
+        },
+        "required": ["contentType", "answer", "evidence"],
         "additionalProperties": False,
     },
     separators=(",", ":"),
@@ -71,27 +98,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--samples", type=int, default=30)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--seed", type=int, default=20261005)
+    parser.add_argument(
+        "--no-gpu",
+        action="store_true",
+        help="Run the runner with all layers on CPU (-ngl 0) to avoid GPU contention",
+    )
     return parser.parse_args()
 
 
 def chatml_prompt(example: dict) -> str:
     messages = example["messages"][:-1]
-    return "".join(
-        f"<|im_start|>{message['role']}\n{message['content']}<|im_end|>\n"
-        for message in messages
-    ) + "<|im_start|>assistant\n"
+    return (
+        "".join(
+            f"<|im_start|>{message['role']}\n{message['content']}<|im_end|>\n"
+            for message in messages
+        )
+        + "<|im_start|>assistant\n"
+    )
 
 
 def runtime_request(example: dict) -> tuple[str, str, str]:
     """Return the exact system, user, and schema inputs used by Android."""
     messages = example["messages"]
     expected = json.loads(messages[-1]["content"])
-    schema = (
-        KNOWLEDGE_JSON_SCHEMA
-        if expected["contentType"] == "knowledge"
-        else QUESTION_JSON_SCHEMA
-    )
-    return SYSTEM_PROMPT, messages[-2]["content"], schema
+    if expected["contentType"] in {"answer", "unanswered"}:
+        schema = ANSWER_JSON_SCHEMA
+    elif expected["contentType"] == "knowledge":
+        schema = KNOWLEDGE_JSON_SCHEMA
+    else:
+        schema = QUESTION_JSON_SCHEMA
+    # The example's system message is the runtime contract; it equals SYSTEM_PROMPT
+    # for question/knowledge records and the answer prompt for answer records.
+    return messages[0]["content"], messages[-2]["content"], schema
 
 
 def extract_json(text: str) -> str:
@@ -129,36 +167,41 @@ def balanced_sample(records: list[dict], count: int, seed: int) -> list[dict]:
 
 def main() -> None:
     args = parse_args()
-    records = [json.loads(line) for line in args.data.read_text(encoding="utf-8").splitlines()]
+    records = [
+        json.loads(line) for line in args.data.read_text(encoding="utf-8").splitlines()
+    ]
     records = balanced_sample(records, args.samples, args.seed)
 
     results = []
-    reasons = Counter()
+    reasons: Counter = Counter()
     durations_ms: list[int] = []
     for index, example in enumerate(records, start=1):
         started = time.monotonic()
         system_prompt, user_prompt, output_schema = runtime_request(example)
+        command = [
+            str(args.runner),
+            "--model",
+            str(args.model),
+            "-sys",
+            system_prompt,
+            "--prompt",
+            user_prompt,
+            "--single-turn",
+            "--predict",
+            str(args.max_new_tokens),
+            "--json-schema",
+            output_schema,
+            "--temp",
+            "0",
+            "--no-display-prompt",
+            "--no-warmup",
+            "--simple-io",
+            "--no-conversation",
+        ]
+        if args.no_gpu:
+            command.extend(["-ngl", "0"])
         completed = subprocess.run(
-            [
-                str(args.runner),
-                "--model",
-                str(args.model),
-                "-sys",
-                system_prompt,
-                "--prompt",
-                user_prompt,
-                "--single-turn",
-                "--predict",
-                str(args.max_new_tokens),
-                "--json-schema",
-                output_schema,
-                "--temp",
-                "0",
-                "--no-display-prompt",
-                "--no-warmup",
-                "--simple-io",
-                "--no-conversation",
-            ],
+            command,
             check=True,
             capture_output=True,
             text=True,
@@ -178,7 +221,10 @@ def main() -> None:
                 "durationMs": duration_ms,
             }
         )
-        print(f"[{index}/{len(records)}] {example['id']}: {reason} ({duration_ms} ms)", flush=True)
+        print(
+            f"[{index}/{len(records)}] {example['id']}: {reason} ({duration_ms} ms)",
+            flush=True,
+        )
 
     accepted_count = sum(item["accepted"] for item in results)
     report = {
@@ -191,13 +237,19 @@ def main() -> None:
         "rejected": len(results) - accepted_count,
         "acceptanceRate": accepted_count / len(results) if results else 0.0,
         "sourceIntegrityViolationsShownToUser": 0,
-        "meanDurationMs": round(sum(durations_ms) / len(durations_ms)) if durations_ms else 0,
+        "meanDurationMs": round(sum(durations_ms) / len(durations_ms))
+        if durations_ms
+        else 0,
         "reasons": dict(sorted(reasons.items())),
         "results": results,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
-    print(json.dumps({key: value for key, value in report.items() if key != "results"}, indent=2))
+    print(
+        json.dumps(
+            {key: value for key, value in report.items() if key != "results"}, indent=2
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -1430,7 +1430,7 @@ fun PrayerTimesScreen(
         val variation = botSourceVariation
         botSourceVariation += 1
         val requestedTask = if (typedPrompt != null) {
-            com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE
+            com.starception.submission.ml.DeenlyKnowledgeTask.ANSWER
         } else if (variation % 2 == 0) {
             com.starception.submission.ml.DeenlyKnowledgeTask.QUESTION
         } else {

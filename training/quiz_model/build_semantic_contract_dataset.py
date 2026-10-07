@@ -16,10 +16,18 @@ from pathlib import Path
 
 from prepare_hf_dataset import SYSTEM_PROMPT
 
-
 KINDS = (
-    "person", "place", "food", "color", "action", "number", "description",
-    "teaching", "outcome", "object", "time",
+    "person",
+    "place",
+    "food",
+    "color",
+    "action",
+    "number",
+    "description",
+    "teaching",
+    "outcome",
+    "object",
+    "time",
 )
 
 
@@ -35,32 +43,73 @@ def values() -> dict[str, list[str]]:
     return {
         "names": ["Amina", "Yusuf", "Maryam", "Khalid", "Sara", "Hamza"],
         "people": ["Yusuf", "Maryam", "Khalid", "Sara", "Hamza", "Amina"],
-        "places": ["Makkah", "Madinah", "the library", "the garden", "the market", "the school"],
+        "places": [
+            "Makkah",
+            "Madinah",
+            "the library",
+            "the garden",
+            "the market",
+            "the school",
+        ],
         "foods": ["dates", "honey", "bread", "milk", "olives", "pumpkin"],
         "colors": ["white", "green", "red", "black", "yellow", "blue"],
         "actions": [
-            "washed both hands", "shared the meal", "opened the gate",
-            "helped the traveler", "returned the book", "watered the trees",
+            "washed both hands",
+            "shared the meal",
+            "opened the gate",
+            "helped the traveler",
+            "returned the book",
+            "watered the trees",
         ],
         "numbers": ["two", "three", "four", "five", "seven", "ten"],
-        "descriptions": ["peaceful", "bright", "generous", "patient", "gentle", "grateful"],
+        "descriptions": [
+            "peaceful",
+            "bright",
+            "generous",
+            "patient",
+            "gentle",
+            "grateful",
+        ],
         "teachings": [
-            "honesty builds trust", "patience brings calm", "kindness helps neighbors",
-            "gratitude protects joy", "sharing strengthens friendship", "care prevents waste",
+            "honesty builds trust",
+            "patience brings calm",
+            "kindness helps neighbors",
+            "gratitude protects joy",
+            "sharing strengthens friendship",
+            "care prevents waste",
         ],
         "outcomes": [
-            "the travelers reached shelter safely", "the garden remained healthy",
-            "the family finished before sunset", "the lost book was returned",
-            "the neighbors resolved the problem", "the class completed the work",
+            "the travelers reached shelter safely",
+            "the garden remained healthy",
+            "the family finished before sunset",
+            "the lost book was returned",
+            "the neighbors resolved the problem",
+            "the class completed the work",
         ],
-        "objects": ["a lantern", "the blue cup", "a wooden bowl", "the map", "a book", "the key"],
-        "times": ["before dawn", "after sunset", "on Friday", "at noon", "in the morning", "at night"],
+        "objects": [
+            "a lantern",
+            "the blue cup",
+            "a wooden bowl",
+            "the map",
+            "a book",
+            "the key",
+        ],
+        "times": [
+            "before dawn",
+            "after sunset",
+            "on Friday",
+            "at noon",
+            "in the morning",
+            "at night",
+        ],
     }
 
 
 def rotate_options(pool: list[str], answer: str, index: int) -> list[str]:
     distractors = [value for value in pool if value != answer]
-    chosen = [distractors[(index + offset) % len(distractors)] for offset in range(3)] + [answer]
+    chosen = [
+        distractors[(index + offset) % len(distractors)] for offset in range(3)
+    ] + [answer]
     random.Random(f"{answer}|{index}").shuffle(chosen)
     return chosen
 
@@ -104,7 +153,9 @@ def semantic_example(kind: str, index: int) -> tuple[str, str, str, str, list[st
         pool = data["numbers"]
     elif kind == "description":
         answer = data["descriptions"][answer_index % len(data["descriptions"])]
-        evidence = f"The guide described {name} as {answer} during the difficult journey."
+        evidence = (
+            f"The guide described {name} as {answer} during the difficult journey."
+        )
         question = f"How was {name} described during the difficult journey?"
         pool = data["descriptions"]
     elif kind == "teaching":
@@ -157,18 +208,24 @@ def build_record(kind: str, index: int) -> dict:
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user},
-            {"role": "assistant", "content": json.dumps(payload, separators=(",", ":"))},
+            {
+                "role": "assistant",
+                "content": json.dumps(payload, separators=(",", ":")),
+            },
         ],
     }
 
 
 def build(output_dir: Path, examples_per_kind: int, seed: int) -> dict:
-    splits = {"train": [], "validation": [], "test": []}
+    splits: dict[str, list[dict]] = {"train": [], "validation": [], "test": []}
     for kind in KINDS:
         for index in range(examples_per_kind):
             record = build_record(kind, index)
             split_key = f"{kind}|{record['sourceText']}"
-            bucket = int.from_bytes(hashlib.sha256(split_key.encode()).digest()[:8], "big") % 100
+            bucket = (
+                int.from_bytes(hashlib.sha256(split_key.encode()).digest()[:8], "big")
+                % 100
+            )
             split = "train" if bucket < 80 else "validation" if bucket < 90 else "test"
             splits[split].append(record)
     rng = random.Random(seed)
@@ -195,7 +252,9 @@ def build(output_dir: Path, examples_per_kind: int, seed: int) -> dict:
 
 def main() -> None:
     args = parse_args()
-    print(json.dumps(build(args.output_dir, args.examples_per_kind, args.seed), indent=2))
+    print(
+        json.dumps(build(args.output_dir, args.examples_per_kind, args.seed), indent=2)
+    )
 
 
 if __name__ == "__main__":

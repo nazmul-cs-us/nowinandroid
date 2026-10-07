@@ -11,6 +11,7 @@ import android.content.SharedPreferences
 import com.starception.submission.core.duadatabase.Dua
 import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
+import com.starception.submission.core.hadithdatabase.HadithCollectionMetadata
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.model.data.BukhariBooks
@@ -171,7 +172,8 @@ internal class NowNudgeKnowledgeProvider(
                 }
             }.distinctBy(GroundedKnowledgeSource::id)
         }
-        val rankedSource = rankSources(date, sources, rankingContext, query).firstOrNull()
+        val rankedSources = rankSources(date, sources, rankingContext, query)
+        val rankedSource = rankedSources.firstOrNull()
             // Dismissals are honored until the current candidate window is
             // exhausted. At that point prefer a fresh ranking over returning
             // no model turn and leaving the bot with nothing to present.
@@ -195,6 +197,21 @@ internal class NowNudgeKnowledgeProvider(
             sourceText = source.sourceText,
             sourceTextSha256 = source.sourceText.sha256(),
         )
+        if (task == DeenlyKnowledgeTask.ANSWER) {
+            return answerFromSources(
+                date = date,
+                sources = rankedSources.take(ANSWER_SOURCE_ATTEMPTS),
+                userQuestion = query.orEmpty(),
+                fallback = {
+                    buildCandidate(
+                        date = date,
+                        source = source,
+                        decision = decisionGenerator.generate(DeenlyKnowledgeTask.KNOWLEDGE, envelope),
+                        rankingScore = rankedSource.score,
+                    )
+                },
+            )
+        }
         val decision = decisionGenerator.generate(task, envelope)
         return when {
             task == DeenlyKnowledgeTask.QUESTION &&
@@ -217,6 +234,47 @@ internal class NowNudgeKnowledgeProvider(
                 rankingScore = rankedSource.score,
             )
         }
+    }
+
+    /**
+     * Answers the typed question from the highest-ranked retrieved sources.
+     *
+     * Each attempt hands the model one immutable source and accepts only an exact
+     * quote. An honest "unanswered" or any validation failure moves to the next
+     * source; when every attempt is exhausted the caller falls back to the
+     * verbatim source card so the user always sees a grounded result.
+     */
+    private suspend fun answerFromSources(
+        date: LocalDate,
+        sources: List<RankedKnowledgeSource>,
+        userQuestion: String,
+        fallback: suspend () -> NowNudgeKnowledgeCandidate?,
+    ): NowNudgeKnowledgeCandidate? {
+        val question = userQuestion.trim()
+        if (question.isEmpty()) return fallback()
+        sources.forEach { ranked ->
+            val source = ranked.source
+            val decision = decisionGenerator.generate(
+                task = DeenlyKnowledgeTask.ANSWER,
+                source = DeenlySourceEnvelope(
+                    collection = source.collection,
+                    reference = source.reference,
+                    topic = source.topic,
+                    userQuestion = question,
+                    sourceText = source.sourceText,
+                    sourceTextSha256 = source.sourceText.sha256(),
+                ),
+            )
+            if (decision is DeenlyKnowledgeDecision.GroundedAnswer) {
+                return buildAnswerCandidate(
+                    date = date,
+                    source = source,
+                    decision = decision,
+                    rankingScore = ranked.score,
+                )
+            }
+        }
+        return fallback()
     }
 
     fun recordImpression(
@@ -436,10 +494,48 @@ internal class NowNudgeKnowledgeProvider(
             )
         }
 
+        /**
+         * A grounded direct answer: the label is neutral metadata (never model
+         * generated), the supporting text leads with the verified quote and
+         * follows with the complete verbatim source, and the citation remains
+         * the exact database reference so the card opens the real record.
+         */
+        internal fun buildAnswerCandidate(
+            date: LocalDate,
+            source: GroundedKnowledgeSource,
+            decision: DeenlyKnowledgeDecision.GroundedAnswer,
+            rankingScore: Float = 0f,
+        ): NowNudgeKnowledgeCandidate {
+            val answerTopic = source.topic
+                .replace(Regex("\\s+"), " ")
+                .trim()
+                .take(MAX_TITLE_CHARS)
+                .trim()
+            return NowNudgeKnowledgeCandidate(
+                nudge = DeenlyNudge(
+                    id = "model-answer-$date-${source.id}",
+                    action = DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
+                    label = if (answerTopic.isNotEmpty()) "About $answerTopic" else "Your question",
+                    actionId = DeenlyActionIds.LEARNING_OPEN_KNOWLEDGE,
+                    supportingText = "\u201c${decision.answer}\u201d\n\n${source.sourceText}",
+                    sourceLabel = source.reference,
+                ),
+                target = source.target,
+                sourceId = source.id,
+                collection = source.collection,
+                topic = source.topic,
+                rankingScore = rankingScore,
+            )
+        }
+
         private const val MAX_TITLE_CHARS = 84
         private const val KNOWLEDGE_CANDIDATE_POOL_SIZE = 22
         private const val QUERY_CANDIDATE_POOL_SIZE = 64
-        private const val QUERY_SEARCH_LIMIT = 12
+        // The typed-question search spans Fortress duas, Quran ayahs, and every
+        // Hadith collection; ranking happens after retrieval, so the cap only
+        // bounds how many verified sources are worth ranking at all.
+        private const val QUERY_SEARCH_LIMIT = 32
+        private const val ANSWER_SOURCE_ATTEMPTS = 3
         private const val MINUTES_FOR_FULL_FRESHNESS = 24f * 60f
         private val SOURCE_LOCATION_OPTIONS = listOf(
             "The Quran",
@@ -754,8 +850,12 @@ private class AndroidGroundedKnowledgeSourceLoader(
             .distinct()
             .take(3)
         if (tokens.isEmpty()) return emptyList()
-        return runCatching {
-            duaRepository.searchDuasMultiToken(tokens, limit).mapNotNull { dua ->
+
+        val results = mutableListOf<GroundedKnowledgeSource>()
+
+        // Fortress of the Muslim invocations.
+        runCatching {
+            duaRepository.searchDuasMultiToken(tokens, DUA_SEARCH_LIMIT).mapNotNull { dua ->
                 val sourceText = dua.translation?.takeIf(String::isEnglishGroundedText)
                     ?: return@mapNotNull null
                 GroundedKnowledgeSource(
@@ -767,7 +867,61 @@ private class AndroidGroundedKnowledgeSourceLoader(
                     target = NowNudgeKnowledgeTarget.FortressDua(dua),
                 )
             }
-        }.getOrDefault(emptyList())
+        }.getOrDefault(emptyList()).let(results::addAll)
+
+        // Quran translation ayahs.
+        runCatching {
+            quranRepository.searchAyahsMultiToken(
+                t0 = tokens[0],
+                t1 = tokens.getOrElse(1) { "" },
+                t2 = tokens.getOrElse(2) { "" },
+                limit = QURAN_SEARCH_LIMIT,
+            )
+        }.getOrDefault(emptyList()).forEach { (surah, ayah) ->
+            val sourceText = ayah.text.takeIf(String::isEnglishGroundedText) ?: return@forEach
+            val topic = surah.nameTranslation?.takeIf(String::isNotBlank)
+                ?: surah.nameEnglish?.takeIf(String::isNotBlank)
+                ?: "Surah ${surah.number}"
+            results += GroundedKnowledgeSource(
+                id = "quran-${surah.number}-${ayah.numberInSurah}",
+                collection = "quran",
+                reference = "Quran ${surah.number}:${ayah.numberInSurah}",
+                topic = topic,
+                sourceText = sourceText,
+                target = NowNudgeKnowledgeTarget.QuranAyah(
+                    surahNumber = surah.number,
+                    ayahNumber = ayah.numberInSurah,
+                ),
+            )
+        }
+
+        // Every downloaded Hadith collection, capped per collection so one large
+        // collection cannot crowd out the rest before ranking runs.
+        HADITH_COLLECTIONS.forEach { collection ->
+            if (!HadithDatabase.isDatabaseAvailable(appContext, collection.databaseFile)) {
+                return@forEach
+            }
+            runCatching {
+                val hits = HadithDatabase
+                    .getInstance(appContext, collection.databaseFile, assetRepository)
+                    .hadithDao()
+                    .searchHadithsMultiToken(
+                        t0 = tokens[0],
+                        t1 = tokens.getOrElse(1) { "" },
+                        t2 = tokens.getOrElse(2) { "" },
+                        limit = HADITH_SEARCH_LIMIT_PER_COLLECTION,
+                    )
+                val metadata = HadithDatabase.getCollectionMetadata(
+                    appContext,
+                    collection.databaseFile,
+                )
+                hits.mapNotNull { hit ->
+                    mapHadithToGroundedSource(collection, hit.id, metadata)
+                }
+            }.getOrDefault(emptyList()).let(results::addAll)
+        }
+
+        return results.distinctBy(GroundedKnowledgeSource::id).take(limit)
     }
 
     private suspend fun loadQuran(date: LocalDate): GroundedKnowledgeSource? {
@@ -815,59 +969,69 @@ private class AndroidGroundedKnowledgeSourceLoader(
             lastHadithId.toLong(),
         ).toInt() + 1
 
-        if (collection.databaseFile == BUKHARI_DATABASE) {
-            bukhariTranslations.loadTranslations()
-        }
-
         repeat(minOf(lastHadithId, MAX_HADITH_ATTEMPTS)) { attempt ->
             val hadithId = Math.floorMod(
                 firstId - 1 + (attempt * HADITH_PROBE_STEP),
                 lastHadithId,
             ) + 1
-            val hadith = runCatching {
-                hadithRepository.getHadith(collection.databaseFile, hadithId)
-            }.getOrNull() ?: return@repeat
-
-            val bukhari = if (collection.databaseFile == BUKHARI_DATABASE) {
-                bukhariTranslations.getTranslation(hadithId)
-            } else {
-                null
-            }
-            val sourceText = when (collection.databaseFile) {
-                BUKHARI_DATABASE -> bukhari?.englishText
-                SHAMAYEL_DATABASE -> hadith.englishText
-                else -> hadith.englishText ?: hadith.textPlain
-            }?.takeIf(String::isEnglishGroundedText) ?: return@repeat
-
-            val displayName = metadata?.nameEnglish
-                ?.takeIf(String::isNotBlank)
-                ?: collection.displayName
-            val topic = when (collection.databaseFile) {
-                BUKHARI_DATABASE -> bukhari?.bookName
-                    ?: BukhariBooks.findByHadithId(hadithId)?.nameEnglish
-                SHAMAYEL_DATABASE -> ShamayelBooks.findByHadithId(hadithId)?.nameEnglish
-                else -> displayName
-            }?.takeIf(String::isNotBlank) ?: displayName
-            val reference = if (bukhari != null) {
-                "Sahih al-Bukhari, Volume ${bukhari.volumeNumber}, " +
-                    "Book ${bukhari.bookNumber}, Hadith ${bukhari.hadithNumber}"
-            } else {
-                "$displayName $hadithId"
-            }
-            return GroundedKnowledgeSource(
-                id = "${collection.databaseFile.removeSuffix(".db")}-$hadithId",
-                collection = collection.modelCollection,
-                reference = reference,
-                topic = topic,
-                sourceText = sourceText,
-                target = NowNudgeKnowledgeTarget.Hadith(
-                    collectionName = displayName,
-                    databaseFile = collection.databaseFile,
-                    hadithNumber = hadithId,
-                ),
-            )
+            mapHadithToGroundedSource(collection, hadithId, metadata)?.let { return it }
         }
         return null
+    }
+
+    /**
+     * One immutable hadith record as a grounded source. Shared by the daily
+     * rotation and the typed-question search so both flows present the exact
+     * same text, topic, reference, and navigation target for a hadith ID.
+     */
+    private suspend fun mapHadithToGroundedSource(
+        collection: HadithCollectionSpec,
+        hadithId: Int,
+        metadata: HadithCollectionMetadata?,
+    ): GroundedKnowledgeSource? {
+        val hadith = runCatching {
+            hadithRepository.getHadith(collection.databaseFile, hadithId)
+        }.getOrNull() ?: return null
+
+        val bukhari = if (collection.databaseFile == BUKHARI_DATABASE) {
+            bukhariTranslations.loadTranslations()
+            bukhariTranslations.getTranslation(hadithId)
+        } else {
+            null
+        }
+        val sourceText = when (collection.databaseFile) {
+            BUKHARI_DATABASE -> bukhari?.englishText
+            SHAMAYEL_DATABASE -> hadith.englishText
+            else -> hadith.englishText ?: hadith.textPlain
+        }?.takeIf(String::isEnglishGroundedText) ?: return null
+
+        val displayName = metadata?.nameEnglish
+            ?.takeIf(String::isNotBlank)
+            ?: collection.displayName
+        val topic = when (collection.databaseFile) {
+            BUKHARI_DATABASE -> bukhari?.bookName
+                ?: BukhariBooks.findByHadithId(hadithId)?.nameEnglish
+            SHAMAYEL_DATABASE -> ShamayelBooks.findByHadithId(hadithId)?.nameEnglish
+            else -> displayName
+        }?.takeIf(String::isNotBlank) ?: displayName
+        val reference = if (bukhari != null) {
+            "Sahih al-Bukhari, Volume ${bukhari.volumeNumber}, " +
+                "Book ${bukhari.bookNumber}, Hadith ${bukhari.hadithNumber}"
+        } else {
+            "$displayName $hadithId"
+        }
+        return GroundedKnowledgeSource(
+            id = "${collection.databaseFile.removeSuffix(".db")}-$hadithId",
+            collection = collection.modelCollection,
+            reference = reference,
+            topic = topic,
+            sourceText = sourceText,
+            target = NowNudgeKnowledgeTarget.Hadith(
+                collectionName = displayName,
+                databaseFile = collection.databaseFile,
+                hadithNumber = hadithId,
+            ),
+        )
     }
 
     private data class QuranReference(val surahNumber: Int, val ayahNumber: Int)
@@ -884,6 +1048,9 @@ private class AndroidGroundedKnowledgeSourceLoader(
         const val SHAMAYEL_DATABASE = "shamayele_tirmidhi_complete.db"
         const val MAX_HADITH_ATTEMPTS = 64
         const val HADITH_PROBE_STEP = 37
+        const val DUA_SEARCH_LIMIT = 8
+        const val QURAN_SEARCH_LIMIT = 4
+        const val HADITH_SEARCH_LIMIT_PER_COLLECTION = 2
 
         val QURAN_REFERENCES = listOf(
             QuranReference(1, 4),

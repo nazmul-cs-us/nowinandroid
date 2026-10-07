@@ -114,4 +114,87 @@ class DeenlyKnowledgeModelTest {
             ),
         )
     }
+
+    @Test
+    fun parserAcceptsGroundedAnswerWithExactSpans() {
+        val source = "The Prophet said: whoever feeds a fasting person has the same reward."
+        assertEquals(
+            DeenlyKnowledgeDecision.GroundedAnswer(
+                answer = "the same reward",
+                evidence = "whoever feeds a fasting person has the same reward.",
+            ),
+            DeenlyKnowledgeModel.parseDecision(
+                rawOutput = """{"contentType":"answer","answer":"the same reward","evidence":"whoever feeds a fasting person has the same reward."}""",
+                expectedTask = DeenlyKnowledgeTask.ANSWER,
+                sourceText = source,
+            ),
+        )
+    }
+
+    @Test
+    fun parserAcceptsHonestUnansweredWithEmptySpans() {
+        assertEquals(
+            DeenlyKnowledgeDecision.Unanswered,
+            DeenlyKnowledgeModel.parseDecision(
+                rawOutput = """{"contentType":"unanswered","answer":"","evidence":""}""",
+                expectedTask = DeenlyKnowledgeTask.ANSWER,
+                sourceText = "An unrelated passage about trade caravans.",
+            ),
+        )
+    }
+
+    @Test
+    fun parserRejectsUnansweredThatCarriesSpans() {
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"unanswered","answer":"dates","evidence":"He preferred dates."}""",
+                DeenlyKnowledgeTask.ANSWER,
+                "He preferred dates.",
+            ),
+        )
+    }
+
+    @Test
+    fun parserRejectsUngroundedAnswerSpans() {
+        val source = "He preferred dates."
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"answer","answer":"honey","evidence":"He preferred dates."}""",
+                DeenlyKnowledgeTask.ANSWER,
+                source,
+            ),
+        )
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"answer","answer":"dates","evidence":"He preferred honey above all."}""",
+                DeenlyKnowledgeTask.ANSWER,
+                source,
+            ),
+        )
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"answer","answer":"he preferred dates","evidence":"He preferred dates."}""",
+                DeenlyKnowledgeTask.ANSWER,
+                source,
+            ),
+        )
+    }
+
+    @Test
+    fun parserRejectsAnswerWithExtraFieldsOrArabic() {
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"answer","answer":"dates","evidence":"He preferred dates.","title":"extra"}""",
+                DeenlyKnowledgeTask.ANSWER,
+                "He preferred dates.",
+            ),
+        )
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"answer","answer":"تمر","evidence":"He preferred dates."}""",
+                DeenlyKnowledgeTask.ANSWER,
+                "He preferred dates.",
+            ),
+        )
+    }
 }

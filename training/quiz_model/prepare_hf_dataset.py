@@ -9,7 +9,6 @@ import json
 from collections import Counter
 from pathlib import Path
 
-
 SYSTEM_PROMPT = """You create one grounded Islamic learning item from the supplied source.
 Use only the supplied source, never memory. Return one minified JSON object and nothing else.
 A knowledge object has exactly contentType and title. For a question, create a natural,
@@ -22,6 +21,14 @@ evidence must be one exact contiguous span copied from Source text and must cont
 options must contain exactly four short unique strings including answer exactly once. Distractors
 must not contradict anything stated in the source. Never output Arabic, IDs, citations, rulings,
 or claims unsupported by the source. Prefer a simple explicit detail over interpretation."""
+
+ANSWER_SYSTEM_PROMPT = """You answer the user's question from the supplied source.
+Use only the supplied source, never memory. Return one minified JSON object and nothing else.
+When the supplied source answers the question, contentType is answer, answer is a short exact
+contiguous span copied from Source text, and evidence is one exact contiguous span copied from
+Source text that contains answer. When the supplied source does not answer the question,
+contentType is unanswered and answer and evidence are empty strings. Never output Arabic, IDs,
+citations, rulings, or claims unsupported by the source."""
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,7 +72,11 @@ def build_example(record: dict, max_source_chars: int) -> dict:
             "title": record["title"],
         }
     else:
-        if record.get("questionKind") and record.get("answer") and record.get("evidence"):
+        if (
+            record.get("questionKind")
+            and record.get("answer")
+            and record.get("evidence")
+        ):
             answer = {
                 "contentType": "question",
                 "questionKind": record["questionKind"],
@@ -91,7 +102,9 @@ def build_example(record: dict, max_source_chars: int) -> dict:
             {"role": "user", "content": user},
             {
                 "role": "assistant",
-                "content": json.dumps(answer, ensure_ascii=False, separators=(",", ":")),
+                "content": json.dumps(
+                    answer, ensure_ascii=False, separators=(",", ":")
+                ),
             },
         ],
     }

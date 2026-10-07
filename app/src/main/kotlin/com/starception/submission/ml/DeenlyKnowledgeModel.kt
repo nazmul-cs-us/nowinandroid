@@ -26,6 +26,7 @@ import kotlinx.serialization.json.jsonPrimitive
 enum class DeenlyKnowledgeTask(val wireName: String) {
     KNOWLEDGE("knowledge"),
     QUESTION("question"),
+    ANSWER("answer"),
 }
 
 data class DeenlySourceEnvelope(
@@ -34,6 +35,8 @@ data class DeenlySourceEnvelope(
     val topic: String,
     /** Bounded, non-sensitive app state used to make the title timely. */
     val appSituation: String? = null,
+    /** The typed Now Nudge question, answered only from [sourceText]. */
+    val userQuestion: String? = null,
     /** Exact database text. Canonical Arabic is intentionally not accepted by this API. */
     val sourceText: String,
     val sourceTextSha256: String,
@@ -52,6 +55,15 @@ sealed interface DeenlyKnowledgeDecision {
     ) : DeenlyKnowledgeDecision
 
     data object SourceLocationQuestion : DeenlyKnowledgeDecision
+
+    /** A direct answer to the user's question, quoted verbatim from the source. */
+    data class GroundedAnswer(
+        val answer: String,
+        val evidence: String,
+    ) : DeenlyKnowledgeDecision
+
+    /** The source does not address the user's question. */
+    data object Unanswered : DeenlyKnowledgeDecision
 }
 
 /**
@@ -75,13 +87,13 @@ class DeenlyKnowledgeModel(context: Context) {
             }
             val modelFile = File(
                 appContext.filesDir,
-                "cdn_assets/models/now_nudge/$MODEL_FILE_NAME",
+                "cdn_assets/models/now_nudge/${task.modelFileName}",
             )
-            if (!modelFile.isFile || modelFile.length() != MODEL_SIZE_BYTES) {
+            if (!modelFile.isFile || modelFile.length() != task.modelSizeBytes) {
                 Log.w(TAG, "Knowledge model is missing or has an unexpected size")
                 return@withContext null
             }
-            if (sha256(modelFile) != MODEL_SHA256) {
+            if (sha256(modelFile) != task.modelSha256) {
                 Log.w(TAG, "Knowledge model checksum verification failed")
                 return@withContext null
             }
@@ -97,7 +109,7 @@ class DeenlyKnowledgeModel(context: Context) {
                     "--model",
                     modelFile.absolutePath,
                     "-sys",
-                    SYSTEM_PROMPT,
+                    task.systemPrompt,
                     "--prompt",
                     source.toPrompt(task),
                     "--single-turn",
@@ -149,21 +161,34 @@ class DeenlyKnowledgeModel(context: Context) {
     }
 
     private fun DeenlySourceEnvelope.toPrompt(task: DeenlyKnowledgeTask): String = buildString {
-        appendLine("Task: create a ${task.wireName} item.")
-        appendLine("Collection: $collection")
-        appendLine("Reference: $reference")
-        appendLine("Topic: $topic")
-        appSituation
-            ?.takeIf(String::isNotBlank)
-            ?.let { appendLine("App situation: ${it.take(MAX_APP_SITUATION_CHARS)}") }
-        appendLine("Source text:")
-        append(sourceText.take(MAX_SOURCE_CHARS))
+        if (task == DeenlyKnowledgeTask.ANSWER) {
+            appendLine("Task: answer the user's question.")
+            appendLine("Collection: $collection")
+            appendLine("Reference: $reference")
+            appendLine("Topic: $topic")
+            userQuestion
+                ?.takeIf(String::isNotBlank)
+                ?.let { appendLine("User question: ${it.take(MAX_USER_QUESTION_CHARS)}") }
+            appendLine("Source text:")
+            append(sourceText.take(MAX_SOURCE_CHARS))
+        } else {
+            appendLine("Task: create a ${task.wireName} item.")
+            appendLine("Collection: $collection")
+            appendLine("Reference: $reference")
+            appendLine("Topic: $topic")
+            appSituation
+                ?.takeIf(String::isNotBlank)
+                ?.let { appendLine("App situation: ${it.take(MAX_APP_SITUATION_CHARS)}") }
+            appendLine("Source text:")
+            append(sourceText.take(MAX_SOURCE_CHARS))
+        }
     }
 
     private val DeenlyKnowledgeTask.outputSchema: String
         get() = when (this) {
             DeenlyKnowledgeTask.KNOWLEDGE -> KNOWLEDGE_JSON_SCHEMA
             DeenlyKnowledgeTask.QUESTION -> QUESTION_JSON_SCHEMA
+            DeenlyKnowledgeTask.ANSWER -> ANSWER_JSON_SCHEMA
         }
 
     companion object {
@@ -171,11 +196,43 @@ class DeenlyKnowledgeModel(context: Context) {
         const val MODEL_SIZE_BYTES = 397_807_648L
         const val MODEL_SHA256 = "a56a58a51c66fec1548ac32b72ce4b70c4608c24486f5b212fafcba03b5439de"
 
+        // The answering model (deenly-knowledge-v2) is optional; until it is
+        // downloaded and verified, the ANSWER task falls back to the verbatim
+        // deterministic source card.
+        const val ANSWER_MODEL_FILE_NAME = "deenly-knowledge-v2-q4_k_m.gguf"
+        const val ANSWER_MODEL_SIZE_BYTES = -1L
+        const val ANSWER_MODEL_SHA256 = ""
+
+        private val DeenlyKnowledgeTask.modelFileName: String
+            get() = when (this) {
+                DeenlyKnowledgeTask.ANSWER -> ANSWER_MODEL_FILE_NAME
+                else -> MODEL_FILE_NAME
+            }
+
+        private val DeenlyKnowledgeTask.modelSizeBytes: Long
+            get() = when (this) {
+                DeenlyKnowledgeTask.ANSWER -> ANSWER_MODEL_SIZE_BYTES
+                else -> MODEL_SIZE_BYTES
+            }
+
+        private val DeenlyKnowledgeTask.modelSha256: String
+            get() = when (this) {
+                DeenlyKnowledgeTask.ANSWER -> ANSWER_MODEL_SHA256
+                else -> MODEL_SHA256
+            }
+
+        private val DeenlyKnowledgeTask.systemPrompt: String
+            get() = when (this) {
+                DeenlyKnowledgeTask.ANSWER -> ANSWER_SYSTEM_PROMPT
+                else -> SYSTEM_PROMPT
+            }
+
         private const val RUNNER_FILE_NAME = "libdeenly_completion.so"
         private const val INFERENCE_TIMEOUT_SECONDS = 120L
         private const val PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 5L
         private const val MAX_SOURCE_CHARS = 1_400
         private const val MAX_APP_SITUATION_CHARS = 320
+        private const val MAX_USER_QUESTION_CHARS = 240
         private const val MAX_TITLE_CHARS = 84
         private const val MAX_QUESTION_CHARS = 180
         private const val MAX_ANSWER_CHARS = 96
@@ -195,8 +252,16 @@ evidence must be one exact contiguous span copied from Source text and must cont
 options must contain exactly four short unique strings including answer exactly once. Distractors
 must not contradict anything stated in the source. Never output Arabic, IDs, citations, rulings,
 or claims unsupported by the source. Prefer a simple explicit detail over interpretation."""
+        private const val ANSWER_SYSTEM_PROMPT = """You answer the user's question from the supplied source.
+Use only the supplied source, never memory. Return one minified JSON object and nothing else.
+When the supplied source answers the question, contentType is answer, answer is a short exact
+contiguous span copied from Source text, and evidence is one exact contiguous span copied from
+Source text that contains answer. When the supplied source does not answer the question,
+contentType is unanswered and answer and evidence are empty strings. Never output Arabic, IDs,
+citations, rulings, or claims unsupported by the source."""
         private const val KNOWLEDGE_JSON_SCHEMA = """{"type":"object","properties":{"contentType":{"const":"knowledge"},"title":{"type":"string","minLength":1,"maxLength":84}},"required":["contentType","title"],"additionalProperties":false}"""
         private const val QUESTION_JSON_SCHEMA = """{"type":"object","properties":{"contentType":{"const":"question"},"questionKind":{"enum":["person","place","food","color","action","number","description","teaching","outcome","object","time"]},"question":{"type":"string","minLength":8,"maxLength":180},"answer":{"type":"string","minLength":1,"maxLength":96},"evidence":{"type":"string","minLength":1,"maxLength":420},"options":{"type":"array","minItems":4,"maxItems":4,"items":{"type":"string","minLength":1,"maxLength":96}}},"required":["contentType","questionKind","question","answer","evidence","options"],"additionalProperties":false}"""
+        private const val ANSWER_JSON_SCHEMA = """{"type":"object","properties":{"contentType":{"enum":["answer","unanswered"]},"answer":{"type":"string","maxLength":96},"evidence":{"type":"string","maxLength":420}},"required":["contentType","answer","evidence"],"additionalProperties":false}"""
         private val inferenceMutex = Mutex()
 
         internal fun parseDecision(
@@ -211,7 +276,9 @@ or claims unsupported by the source. Prefer a simple explicit detail over interp
                 Json.parseToJsonElement(rawOutput.substring(start, end + 1)) as? JsonObject
             }.getOrNull() ?: return null
             val contentType = (output["contentType"] as? JsonPrimitive)?.content
-            if (contentType != expectedTask.wireName) return null
+            if (contentType != expectedTask.wireName &&
+                !(expectedTask == DeenlyKnowledgeTask.ANSWER && contentType == "unanswered")
+            ) return null
 
             return when (expectedTask) {
                 DeenlyKnowledgeTask.KNOWLEDGE -> {
@@ -269,6 +336,31 @@ or claims unsupported by the source. Prefer a simple explicit detail over interp
                         answer = answer,
                         evidence = evidence,
                         options = normalizedOptions,
+                    )
+                }
+
+                DeenlyKnowledgeTask.ANSWER -> {
+                    if (output.keys != setOf("contentType", "answer", "evidence")) return null
+                    val answer = output["answer"]?.jsonPrimitive?.content?.trim().orEmpty()
+                    val evidence = output["evidence"]?.jsonPrimitive?.content?.trim().orEmpty()
+                    if (contentType == "unanswered") {
+                        return if (answer.isEmpty() && evidence.isEmpty()) {
+                            DeenlyKnowledgeDecision.Unanswered
+                        } else {
+                            null
+                        }
+                    }
+                    val verifiedSource = sourceText ?: return null
+                    if (
+                        answer.isEmpty() || answer.length > MAX_ANSWER_CHARS ||
+                        evidence.isEmpty() || evidence.length > MAX_EVIDENCE_CHARS ||
+                        answer !in verifiedSource || evidence !in verifiedSource || answer !in evidence ||
+                        listOf(answer, evidence).any { it.containsArabic() } ||
+                        listOf(answer, evidence).any { text -> text.any(Char::isISOControl) }
+                    ) return null
+                    DeenlyKnowledgeDecision.GroundedAnswer(
+                        answer = answer,
+                        evidence = evidence,
                     )
                 }
             }

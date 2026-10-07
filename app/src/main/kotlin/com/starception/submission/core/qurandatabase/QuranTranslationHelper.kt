@@ -483,6 +483,30 @@ class QuranTranslationRepository(
     }
 
     /**
+     * Multi-token ayah search across the whole translation. Every non-empty token
+     * must appear in the ayah text. Returns each hit with its resolved Surah so
+     * callers can build "Quran surah:ayah" references without another lookup.
+     */
+    suspend fun searchAyahsMultiToken(
+        t0: String,
+        t1: String = "",
+        t2: String = "",
+        limit: Int = 8,
+    ): List<Pair<SurahEntity, AyahEntity>> = withContext(Dispatchers.IO) {
+        try {
+            if (t0.isBlank()) return@withContext emptyList()
+            quranDao.searchAyahsMultiToken(t0, t1, t2, limit).mapNotNull { ayah ->
+                quranDao.getSurahById(ayah.surahId)?.let { surah -> surah to ayah }
+            }
+        } catch (e: QuranDatabaseUnavailableException) {
+            emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error searching ayahs for tokens [$t0, $t1, $t2]", e)
+            emptyList()
+        }
+    }
+
+    /**
      * Get Ayahs by page number
      */
     fun getAyahsByPage(pageNumber: Int): Flow<List<Ayah>> {

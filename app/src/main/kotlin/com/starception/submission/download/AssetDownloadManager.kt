@@ -416,7 +416,7 @@ class AssetDownloadManager @Inject constructor(
                     DownloadState.Failed("Unable to resolve asset: $cdnKey")
             }
             val categoryComplete = result.isComplete &&
-                (category != NOW_NUDGE_CATEGORY || assembleNowNudgeModel())
+                (partedModelFor(category)?.let { assemblePartedModel(it) } ?: true)
             if (categoryComplete) _categoryCompleted.tryEmit(category)
             return@withContext categoryComplete
         } finally {
@@ -465,27 +465,30 @@ class AssetDownloadManager @Inject constructor(
 
     fun deleteCategory(category: String, manifest: AssetManifest) {
         manifest.getAssetsByCategory(category).forEach { deleteAsset(it.cdnKey) }
-        if (category == NOW_NUDGE_CATEGORY) {
-            nowNudgeModelFile().delete()
-            nowNudgeTemporaryFile().delete()
+        partedModelFor(category)?.let { model ->
+            partedModelFile(model).delete()
+            File(cdnAssetsDir, "${model.cdnKey}.assembling").delete()
         }
     }
 
     fun getCategoryDownloadedSize(category: String, manifest: AssetManifest): Long {
-        if (category == NOW_NUDGE_CATEGORY && isNowNudgeModelReady()) {
-            return NOW_NUDGE_MODEL_SIZE
+        val model = partedModelFor(category)
+        if (model != null && isPartedModelReady(model)) {
+            return model.sizeBytes
         }
         return manifest.getAssetsByCategory(category)
             .filter { isAssetAvailable(it.cdnKey) }
             .sumOf { it.size }
     }
 
-    fun isCategoryComplete(category: String, manifest: AssetManifest): Boolean =
-        if (category == NOW_NUDGE_CATEGORY) {
-            isNowNudgeModelReady()
+    fun isCategoryComplete(category: String, manifest: AssetManifest): Boolean {
+        val model = partedModelFor(category)
+        return if (model != null) {
+            isPartedModelReady(model)
         } else {
             manifest.getAssetsByCategory(category).all { isAssetAvailable(it.cdnKey) }
         }
+    }
 
     /**
      * Check if all assets in a category are bundled in the APK.
@@ -526,21 +529,38 @@ class AssetDownloadManager @Inject constructor(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun assembleNowNudgeModel(): Boolean {
-        val target = nowNudgeModelFile()
-        if (isNowNudgeModelReady()) {
-            deleteNowNudgeParts()
+    /**
+     * A large GGUF delivered as independently verified CDN parts. Android
+     * downloads every part, assembles them atomically, verifies the final
+     * size and SHA-256, and deletes the parts before activation.
+     */
+    private data class PartedModelArtifact(
+        val category: String,
+        val cdnKey: String,
+        val sizeBytes: Long,
+        val sha256: String,
+        val displayName: String,
+        val partKeys: List<String>,
+    )
+
+    private fun partedModelFor(category: String): PartedModelArtifact? =
+        PARTED_MODELS.firstOrNull { it.category == category }
+
+    private fun assemblePartedModel(model: PartedModelArtifact): Boolean {
+        val target = partedModelFile(model)
+        if (isPartedModelReady(model)) {
+            deletePartedModelParts(model)
             return true
         }
         target.delete()
 
-        val parts = NOW_NUDGE_MODEL_PARTS.map { File(cdnAssetsDir, it) }
+        val parts = model.partKeys.map { File(cdnAssetsDir, it) }
         if (parts.any { !it.isFile }) {
-            Log.e(TAG, "Now Nudge model assembly failed: a verified part is missing")
+            Log.e(TAG, "${model.displayName} assembly failed: a verified part is missing")
             return false
         }
 
-        val temporary = nowNudgeTemporaryFile()
+        val temporary = File(cdnAssetsDir, "${model.cdnKey}.assembling")
         temporary.parentFile?.mkdirs()
         temporary.delete()
         return try {
@@ -549,40 +569,38 @@ class AssetDownloadManager @Inject constructor(
                     part.inputStream().buffered().use { input -> input.copyTo(output) }
                 }
             }
-            val valid = temporary.length() == NOW_NUDGE_MODEL_SIZE &&
-                sha256(temporary) == NOW_NUDGE_MODEL_SHA256
+            val valid = temporary.length() == model.sizeBytes &&
+                sha256(temporary) == model.sha256
             if (!valid) {
-                Log.e(TAG, "Now Nudge model assembly failed integrity verification")
+                Log.e(TAG, "${model.displayName} assembly failed integrity verification")
                 temporary.delete()
                 false
             } else {
                 target.parentFile?.mkdirs()
                 if (!temporary.renameTo(target)) {
-                    Log.e(TAG, "Now Nudge model assembly could not activate the verified file")
+                    Log.e(TAG, "${model.displayName} assembly could not activate the verified file")
                     temporary.delete()
                     false
                 } else {
-                    deleteNowNudgeParts()
-                    Log.i(TAG, "Now Nudge question model assembled and verified")
+                    deletePartedModelParts(model)
+                    Log.i(TAG, "${model.displayName} assembled and verified")
                     true
                 }
             }
         } catch (error: Exception) {
             temporary.delete()
-            Log.e(TAG, "Now Nudge model assembly failed", error)
+            Log.e(TAG, "${model.displayName} assembly failed", error)
             false
         }
     }
 
-    private fun isNowNudgeModelReady(): Boolean =
-        nowNudgeModelFile().let { it.isFile && it.length() == NOW_NUDGE_MODEL_SIZE }
+    private fun isPartedModelReady(model: PartedModelArtifact): Boolean =
+        partedModelFile(model).let { it.isFile && it.length() == model.sizeBytes }
 
-    private fun nowNudgeModelFile() = File(cdnAssetsDir, NOW_NUDGE_MODEL_KEY)
+    private fun partedModelFile(model: PartedModelArtifact) = File(cdnAssetsDir, model.cdnKey)
 
-    private fun nowNudgeTemporaryFile() = File(cdnAssetsDir, "$NOW_NUDGE_MODEL_KEY.assembling")
-
-    private fun deleteNowNudgeParts() {
-        NOW_NUDGE_MODEL_PARTS.forEach { cdnKey ->
+    private fun deletePartedModelParts(model: PartedModelArtifact) {
+        model.partKeys.forEach { cdnKey ->
             File(cdnAssetsDir, cdnKey).delete()
             verifiedChecksums.remove(cdnKey)
         }
@@ -594,15 +612,45 @@ class AssetDownloadManager @Inject constructor(
         private const val CDN_ASSETS_DIR = "cdn_assets"
         private const val BUFFER_SIZE = 8192
         private const val PROGRESS_UPDATE_INTERVAL = 0.01f
+
         private const val NOW_NUDGE_CATEGORY = "model_now_nudge"
         private const val NOW_NUDGE_MODEL_KEY =
             "models/now_nudge/deenly-question-v2-q4_k_m.gguf"
         private const val NOW_NUDGE_MODEL_SIZE = 397_807_648L
         private const val NOW_NUDGE_MODEL_SHA256 =
             "a56a58a51c66fec1548ac32b72ce4b70c4608c24486f5b212fafcba03b5439de"
-        private val NOW_NUDGE_MODEL_PARTS = listOf(
-            "$NOW_NUDGE_MODEL_KEY.part-00",
-            "$NOW_NUDGE_MODEL_KEY.part-01",
+
+        // The answering model; sizes and hashes are filled once the trained
+        // artifact passes its quantized held-out evaluation.
+        private const val NOW_NUDGE_KNOWLEDGE_CATEGORY = "model_now_nudge_knowledge"
+        private const val NOW_NUDGE_KNOWLEDGE_MODEL_KEY =
+            "models/now_nudge/deenly-knowledge-v2-q4_k_m.gguf"
+        private const val NOW_NUDGE_KNOWLEDGE_MODEL_SIZE = -1L
+        private const val NOW_NUDGE_KNOWLEDGE_MODEL_SHA256 = ""
+
+        private val PARTED_MODELS = listOf(
+            PartedModelArtifact(
+                category = NOW_NUDGE_CATEGORY,
+                cdnKey = NOW_NUDGE_MODEL_KEY,
+                sizeBytes = NOW_NUDGE_MODEL_SIZE,
+                sha256 = NOW_NUDGE_MODEL_SHA256,
+                displayName = "Now Nudge question model",
+                partKeys = listOf(
+                    "$NOW_NUDGE_MODEL_KEY.part-00",
+                    "$NOW_NUDGE_MODEL_KEY.part-01",
+                ),
+            ),
+            PartedModelArtifact(
+                category = NOW_NUDGE_KNOWLEDGE_CATEGORY,
+                cdnKey = NOW_NUDGE_KNOWLEDGE_MODEL_KEY,
+                sizeBytes = NOW_NUDGE_KNOWLEDGE_MODEL_SIZE,
+                sha256 = NOW_NUDGE_KNOWLEDGE_MODEL_SHA256,
+                displayName = "Now Nudge knowledge model",
+                partKeys = listOf(
+                    "$NOW_NUDGE_KNOWLEDGE_MODEL_KEY.part-00",
+                    "$NOW_NUDGE_KNOWLEDGE_MODEL_KEY.part-01",
+                ),
+            ),
         )
     }
 }
