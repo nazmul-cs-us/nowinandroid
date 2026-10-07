@@ -177,9 +177,10 @@ private const val HADITH_SECTION_ORDER_KEY = "section_order"
 /**
  * Remembers which hadiths the user has actually heard, per collection, so the
  * "Feeling blessed" shuffle prefers unplayed ones until the collection has been
- * fully played through.
+ * fully played through. Internal: the playback service marks tracks as it
+ * advances the service-owned chain.
  */
-private object PlayedHadithTracker {
+internal object PlayedHadithTracker {
     private const val PREFS = "hadith_played_tracker"
 
     private fun prefs(context: android.content.Context) =
@@ -398,7 +399,6 @@ fun HadithDetailScreen(
     }
     var isBookPlaylistPlayback by remember { mutableStateOf(false) }
     var isBookPlaylistPaused by remember { mutableStateOf(false) }
-    var bookPlaylistJumpTarget by remember { mutableStateOf<Int?>(null) }
 
     // On-demand audio download state
     var isDownloadingAudio by remember { mutableStateOf(false) }
@@ -417,6 +417,9 @@ fun HadithDetailScreen(
     // Notify global media controller when hadith playback state OR hadith changes
     // (so the mini-bar title updates when navigating between hadiths while playing).
     androidx.compose.runtime.LaunchedEffect(isPlaying, hadithNumber) {
+        // The service publishes its own global media state for the service-owned
+        // book chain; a second notification from the screen would fight it.
+        if (isBookPlaylistPlayback) return@LaunchedEffect
         if (!isPlaying && suppressStopNotification) {
             // Skip the (false) notification while a navigation handoff is in progress
             return@LaunchedEffect
@@ -634,24 +637,16 @@ fun HadithDetailScreen(
     // doesn't get a dispose/remount cycle.
     val handleSkipNext: () -> Unit = {
         if (isBookPlaylistPlayback) {
-            val rangeEnd = playbackRangeEnd
-            if (rangeEnd != null && hadithNumber < rangeEnd) {
-                bookPlaylistJumpTarget = hadithNumber + 1
-                isBookPlaylistPaused = false
-                sherpaOnnxTts.stopSpeaking()
-            }
+            // The service owns the queue; ask it to jump instead of steering a
+            // local chain.
+            com.starception.submission.services.ChapterRecitationService.next(context)
         } else if (playbackRangeEnd == null || hadithNumber < playbackRangeEnd) {
             hadithNumber += 1
         }
     }
     val handleSkipPrev: () -> Unit = {
         if (isBookPlaylistPlayback) {
-            val firstAllowed = playbackRangeStart ?: 1
-            if (hadithNumber > firstAllowed) {
-                bookPlaylistJumpTarget = hadithNumber - 1
-                isBookPlaylistPaused = false
-                sherpaOnnxTts.stopSpeaking()
-            }
+            com.starception.submission.services.ChapterRecitationService.previous(context)
         } else {
             val firstAllowed = playbackRangeStart ?: 1
             if (hadithNumber > firstAllowed) hadithNumber -= 1
@@ -699,10 +694,11 @@ fun HadithDetailScreen(
         }
     }
 
-    // Keep book playback independent from recomposition. The former implementation
-    // finished one hadith, changed Compose state, and waited for a LaunchedEffect to
-    // start the next. With the display off that handoff can be deferred indefinitely.
-    // This loop awaits each TTS item directly and therefore advances in the background.
+    // "Play all" / "Feeling blessed" is owned by the ChapterRecitationService
+    // foreground service. The previous implementation ran the chain inside this
+    // composable, so navigating away cancelled the whole sequence; the service
+    // keeps advancing the queue no matter which screen is visible, and this
+    // screen only follows along while it is open.
     androidx.compose.runtime.LaunchedEffect(
         bookPlaylistEnabled,
         playbackRangeStart,
@@ -726,221 +722,66 @@ fun HadithDetailScreen(
             return@LaunchedEffect
         }
 
+        // The screen can re-attach while its service chain is already running
+        // (mini-bar, notification, or back navigation). Don't restart the queue —
+        // just resume following it.
+        val serviceOwnsChain =
+            com.starception.submission.services.ChapterRecitationState.isBookPlaylistActive &&
+                com.starception.submission.services.ChapterRecitationState.subtitle ==
+                collectionName
         isBookPlaylistPlayback = true
+        isTtsBackedPlayback = true
+        if (serviceOwnsChain) {
+            isBookPlaylistPaused = !com.starception.submission.services.ChapterRecitationState.isPlaying
+            val current = com.starception.submission.services.ChapterRecitationState.bookCurrentHadith
+            if (current > 0 && current != hadithNumber) hadithNumber = current
+            return@LaunchedEffect
+        }
+
         isBookPlaylistPaused = false
-        bookPlaylistJumpTarget = null
         shouldAutoPlayAfterLoad = false
         if (isBukhariCollection) bukhariTranslationRepo.loadTranslations()
-        sherpaOnnxTts.setVoice(selectedVoice)
+        com.starception.submission.services.ChapterRecitationService.playHadithBook(
+            context = context,
+            databaseFile = databaseFile,
+            collectionName = collectionName,
+            startHadith = hadithNumber,
+            rangeStart = rangeStart,
+            rangeEnd = rangeEnd,
+            language = selectedLanguage,
+            voiceName = selectedVoice.name,
+            speakerId = selectedSpeakerId,
+            shuffle = shufflePlayback,
+        )
+    }
 
-        try {
-            // Feeling blessed tracks every hadith the user has actually heard:
-            // in shuffle mode unplayed ones come first (random within each
-            // group), so nothing repeats until the whole collection has been
-            // played through.
-            val playedSet = PlayedHadithTracker.playedSet(context, databaseFile)
-            val playlistOrder = if (shufflePlayback) {
-                val shuffled = (rangeStart..rangeEnd).shuffled()
-                val unplayed = shuffled.filter { it !in playedSet }
-                if (unplayed.size < shuffled.size) {
-                    unplayed + shuffled.filter { it in playedSet }
-                } else {
-                    unplayed
-                }
-            } else {
-                (rangeStart..rangeEnd).toList()
+    // Follow the service-owned chain while this screen is open: advance the
+    // visible hadith as the service advances the queue, and clear the book
+    // playback state when the chain finishes or is stopped.
+    androidx.compose.runtime.DisposableEffect(collectionName) {
+        val onTrackChanged: (Int, Boolean, Boolean, String) -> Unit = {
+                number, playing, active, activeCollection ->
+            if (active && activeCollection == collectionName) {
+                isBookPlaylistPlayback = true
+                isPlaying = playing
+                isBookPlaylistPaused = !playing
+                if (number != hadithNumber) hadithNumber = number
+            } else if (!active && isBookPlaylistPlayback) {
+                isBookPlaylistPlayback = false
+                isBookPlaylistPaused = false
+                isTtsBackedPlayback = false
+                isPlaying = false
+                bookPlaylistEnabled = false
             }
-            var playlistIndex = 0
-            var offlineNotified = false
-            while (playlistIndex < playlistOrder.size) {
-                if (!bookPlaylistEnabled) break
-                val number = playlistOrder[playlistIndex]
-                // The collection DB may not be downloaded yet — HadithDatabase
-                // throws IllegalStateException for a missing file. Treat that
-                // like a missing hadith and skip on instead of crashing the
-                // playlist effect.
-                val nextHadith = runCatching {
-                    repository.getHadith(databaseFile, number)
-                }.getOrNull()
-                if (nextHadith == null) {
-                    playlistIndex += 1
-                    continue
-                }
-                val englishText = if (isBukhariCollection) {
-                    bukhariTranslationRepo.getEnglishText(number) ?: nextHadith.textPlain
-                } else {
-                    nextHadith.englishText ?: nextHadith.textPlain
-                }
-                if (englishText == null) {
-                    playlistIndex += 1
-                    continue
-                }
-                val spokenText = when {
-                    isBukhariCollection -> englishText
-                    selectedLanguage == "en" -> englishText
-                    selectedLanguage == "ar" -> nextHadith.textArabic
-                    selectedLanguage == "bn" && nextHadith.bengaliText != null ->
-                        nextHadith.bengaliText
-                    else -> runCatching {
-                        translationService.translateFromEnglish(englishText, selectedLanguage)
-                    }.getOrNull() ?: englishText
-                }
-
-                playbackGeneration += 1
-                prevHadithNumberRef = number
-                hadithNumber = number
-                PlayedHadithTracker.markPlayed(context, databaseFile, number)
-                hadithCache[number] = nextHadith
-                hadith = nextHadith
-                translatedText = spokenText
-                isLoading = false
-                isPlaying = true
-                isTtsBackedPlayback = true
-                com.starception.submission.services.ChapterRecitationService
-                    .showExternalPlayback(
-                        context = context,
-                        title = "Hadith #$number",
-                        subtitle = collectionName,
-                    )
-
-                // Once this hadith starts playing, Sherpa's native engine is idle. Use
-                // that playback window to prepare the next English fallback as one clip,
-                // so Play All normally pays the preparation cost only for the first item.
-                val nextNumber = if (shufflePlayback) {
-                    playlistOrder.getOrNull(playlistIndex + 1)
-                } else if (number < rangeEnd) {
-                    number + 1
-                } else {
-                    null
-                }
-                val nextSherpaText = nextNumber?.takeIf {
-                    isBukhariCollection || selectedLanguage == "en"
-                }?.let { upcoming ->
-                    val nextHasBengaliRecording = isBukhariCollection &&
-                        selectedLanguage == "bn" &&
-                        audioDownloadHelper.resolveHadithAudioFile(upcoming) != null
-                    if (nextHasBengaliRecording) {
-                        EnglishTtsTextNormalizer.hadithIntro(upcoming, collectionName)
-                    } else {
-                        val upcomingHadith = runCatching {
-                            repository.getHadith(databaseFile, upcoming)
-                        }.getOrNull()
-                        val nextEnglishText = if (isBukhariCollection) {
-                            bukhariTranslationRepo.getEnglishText(upcoming)
-                                ?: upcomingHadith?.textPlain
-                        } else {
-                            upcomingHadith?.englishText ?: upcomingHadith?.textPlain
-                        }
-                        nextEnglishText?.let {
-                            "${EnglishTtsTextNormalizer.hadithIntro(upcoming, collectionName)} $it"
-                        }
-                    }
-                }
-
-                val preGenerateNext: () -> Unit = {
-                    nextSherpaText?.let { nextText ->
-                        sherpaOnnxTts.preGenerateAsync(
-                            text = nextText,
-                            speakerId = selectedSpeakerId,
-                        )
-                    }
-                }
-
-                suspend fun playWithSherpa(): Boolean {
-                    if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
-                        bookPlaylistEnabled = false
-                        showTtsModelDownload = true
-                        return false
-                    }
-                    sherpaOnnxTts.setVoice(selectedVoice)
-                    return sherpaOnnxTts.speakCachedOrGenerate(
-                        text = "${EnglishTtsTextNormalizer.hadithIntro(number, collectionName)} " +
-                            spokenText,
-                        speakerId = selectedSpeakerId,
-                        onPlaybackStart = preGenerateNext,
-                    )
-                }
-
-                suspend fun playNumberIntroWithSherpa(): Boolean =
-                    sherpaOnnxTts.speakCachedOrGenerate(
-                        text = EnglishTtsTextNormalizer.hadithIntro(number, collectionName),
-                        speakerId = selectedSpeakerId,
-                        onPlaybackStart = preGenerateNext,
-                    )
-
-                val completed = if (isBukhariCollection && selectedLanguage == "bn") {
-                    var audioFile = audioDownloadHelper.resolveHadithAudioFile(number)
-                    if (audioFile == null && !audioDownloadHelper.isOnline()) {
-                        // No cached recording and no network: don't stall the Play-All loop on
-                        // a network timeout for every item. Notify once, then use the on-device
-                        // English Sherpa voice for the rest of the book.
-                        if (!offlineNotified) {
-                            offlineNotified = true
-                            kotlinx.coroutines.withContext(Dispatchers.Main) {
-                                android.widget.Toast.makeText(
-                                    context,
-                                    "No internet connection",
-                                    android.widget.Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        }
-                    } else if (audioFile == null) {
-                        val cdnKey = audioDownloadHelper.getHadithCdnKey(number)
-                        isDownloadingAudio = true
-                        audioFile = when (audioDownloadHelper.downloadAudio(cdnKey)) {
-                            is AssetDownloadManager.DownloadState.Completed ->
-                                audioDownloadHelper.resolveHadithAudioFile(number)
-                            else -> null
-                        }
-                        isDownloadingAudio = false
-                    }
-                    if (audioFile != null) {
-                        val introCompleted = playNumberIntroWithSherpa()
-                        val recordingCompleted = introCompleted && bookPlaylistEnabled &&
-                            playHadithRecordingAndAwait(
-                                context = context,
-                                source = audioFile.absolutePath,
-                                hadithNumber = number,
-                            )
-                        if (recordingCompleted) {
-                            true
-                        } else if (bookPlaylistEnabled) {
-                            playWithSherpa()
-                        } else {
-                            false
-                        }
-                    } else {
-                        playWithSherpa()
-                    }
-                } else if (isBukhariCollection || selectedLanguage == "en") {
-                    playWithSherpa()
-                } else {
-                    speakWithAndroidTtsAndAwait(
-                        context = context,
-                        text = spokenText,
-                        language = selectedLanguage,
-                        existingTts = textToSpeech,
-                        onTtsCreated = { textToSpeech = it },
-                    )
-                }
-                val requestedHadith = bookPlaylistJumpTarget
-                if (requestedHadith != null) {
-                    bookPlaylistJumpTarget = null
-                    val jumpIndex = playlistOrder.indexOf(requestedHadith)
-                    if (jumpIndex < 0) break
-                    playlistIndex = jumpIndex
-                    continue
-                }
-                if (!completed || !bookPlaylistEnabled) break
-                playlistIndex += 1
+        }
+        com.starception.submission.services.ChapterRecitationState.onBookTrackChanged = onTrackChanged
+        onDispose {
+            if (
+                com.starception.submission.services.ChapterRecitationState.onBookTrackChanged ===
+                onTrackChanged
+            ) {
+                com.starception.submission.services.ChapterRecitationState.onBookTrackChanged = null
             }
-        } finally {
-            isBookPlaylistPlayback = false
-            isBookPlaylistPaused = false
-            bookPlaylistJumpTarget = null
-            isTtsBackedPlayback = false
-            isPlaying = false
-            com.starception.submission.services.ChapterRecitationService.stop(context)
         }
     }
 
@@ -1349,20 +1190,18 @@ fun HadithDetailScreen(
                             currentSkipPrev()
                         }
                         val pauseCb: () -> Unit = {
-                            if (isBookPlaylistPlayback && !isBookPlaylistPaused) {
-                                isBookPlaylistPaused = true
-                                sherpaOnnxTts.pauseSpeaking()
-                                isPlaying = false
-                            } else if (!isBookPlaylistPlayback && isPlaying) {
+                            if (isBookPlaylistPlayback) {
+                                com.starception.submission.services.ChapterRecitationService
+                                    .toggle(context)
+                            } else if (isPlaying) {
                                 currentHandlePlayClick()
                             }
                         }
                         val resumeCb: () -> Unit = {
-                            if (isBookPlaylistPlayback && isBookPlaylistPaused) {
-                                isBookPlaylistPaused = false
-                                sherpaOnnxTts.resumeSpeaking()
-                                isPlaying = true
-                            } else if (!isBookPlaylistPlayback && !isPlaying) {
+                            if (isBookPlaylistPlayback) {
+                                com.starception.submission.services.ChapterRecitationService
+                                    .toggle(context)
+                            } else if (!isPlaying) {
                                 currentHandlePlayClick()
                             }
                         }

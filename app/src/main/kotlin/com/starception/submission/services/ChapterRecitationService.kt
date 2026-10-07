@@ -545,8 +545,19 @@ class ChapterRecitationService : Service() {
         bookPlaylistStart = rangeStart
         bookPlaylistEnd = rangeEnd
         bookPlaylistCurrent = startHadith.coerceIn(rangeStart, rangeEnd)
+        // "Feeling blessed" semantics: the shuffle keeps every hadith the user
+        // has actually heard in the back, so nothing repeats until the whole
+        // collection has been played through.
         bookPlaylistOrder = if (shuffle) {
-            (rangeStart..rangeEnd).shuffled()
+            val played = com.starception.submission.feature.hadith.PlayedHadithTracker
+                .playedSet(applicationContext, databaseFile)
+            val shuffled = (rangeStart..rangeEnd).shuffled()
+            val unplayed = shuffled.filter { it !in played }
+            if (unplayed.size < shuffled.size) {
+                unplayed + shuffled.filter { it in played }
+            } else {
+                unplayed
+            }
         } else {
             (rangeStart..rangeEnd).toList()
         }
@@ -576,7 +587,6 @@ class ChapterRecitationService : Service() {
             )
             val translationService = TranslationService.getInstance(applicationContext)
             val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
-            val isShamayel = databaseFile.contains("shamayele_tirmidhi", ignoreCase = true)
             if (isBukhari) bukhariRepository.loadTranslations()
             sherpaOnnxTts.setVoice(voice)
 
@@ -594,6 +604,10 @@ class ChapterRecitationService : Service() {
                     }
                     bookPlaylistCurrent = number
                     ChapterRecitationState.updateBookCurrent(number)
+                    // The played set powers the feeling-blessed shuffle and the
+                    // book progress UI; the service is the queue owner now.
+                    com.starception.submission.feature.hadith.PlayedHadithTracker
+                        .markPlayed(applicationContext, databaseFile, number)
                     bookRenderer = BookRenderer.PREPARING
 
                     val hadith = runCatching { repository.getHadith(databaseFile, number) }
@@ -617,7 +631,7 @@ class ChapterRecitationService : Service() {
                     while (bookPlaylistPaused && generation == bookPlaylistGeneration) delay(100)
                     if (generation != bookPlaylistGeneration || requestedBookTrack != null) continue
 
-                    val spokenText = if (language == "en" || isShamayel) {
+                    val spokenText = if (language == "en") {
                         englishText
                     } else {
                         runCatching {
@@ -648,7 +662,10 @@ class ChapterRecitationService : Service() {
                             speakerId = speakerId,
                             generation = generation,
                         )
-                    } else if (language != "en" && !isBukhari && !isShamayel) {
+                    } else if (language != "en" && !isBukhari) {
+                        // Shama'il At-Tirmidhi and every other collection follow the
+                        // selected language through translation + Android TTS, matching
+                        // the per-hadith playback the book screen has always used.
                         speakBookWithAndroidTts(
                             text = spokenText,
                             language = language,
