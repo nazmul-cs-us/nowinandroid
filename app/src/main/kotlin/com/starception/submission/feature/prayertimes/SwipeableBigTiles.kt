@@ -1505,7 +1505,8 @@ fun SwipeableBigTiles(
     }
     val focusedLogicalPage = pagerState.settledPage % insightPageCount
     val liveQiblaHeading = rememberLiveCompassHeading(
-        enabled = focusedLogicalPage == 3 && isResumed && !showGlobePopup,
+        enabled = (focusedLogicalPage == 0 || focusedLogicalPage == 3) &&
+            isResumed && !showGlobePopup,
         latitude = prayerTimes?.location?.latitude,
         longitude = prayerTimes?.location?.longitude,
     )
@@ -1812,7 +1813,10 @@ fun SwipeableBigTiles(
                                     pagerState.currentPageOffsetFraction
                             },
                             timelineProgress = prayerWindowProgress(prayerTimes, currentTime),
-                            actionLabel = "Compass",
+                            directionalHintBearing = qiblaBearing,
+                            deviceHeadingDegrees = liveQiblaHeading,
+                            actionLabel = null,
+                            actionIcon = Icons.Default.Navigation,
                             actionDescription = "Open prayer compass",
                             onClick = {
                                 interactionEpoch++
@@ -2443,7 +2447,10 @@ private fun PrayerPosterInsightCard(
     isFocused: Boolean,
     backgroundPageOffset: () -> Float,
     timelineProgress: Float?,
-    actionLabel: String,
+    directionalHintBearing: Int?,
+    deviceHeadingDegrees: Float?,
+    actionLabel: String?,
+    actionIcon: ImageVector? = null,
     actionDescription: String,
     onClick: () -> Unit,
 ) {
@@ -2504,7 +2511,10 @@ private fun PrayerPosterInsightCard(
             isFocused = isFocused,
             backgroundPageOffset = backgroundPageOffset,
             timelineProgress = timelineProgress,
+            directionalHintBearing = directionalHintBearing,
+            deviceHeadingDegrees = deviceHeadingDegrees,
             actionLabel = actionLabel,
+            actionIcon = actionIcon,
             actionDescription = actionDescription,
             onClick = onClick,
         )
@@ -2554,6 +2564,7 @@ private fun InsightPreviewCard(
     directionalHintBearing: Int? = null,
     deviceHeadingDegrees: Float? = null,
     actionLabel: String? = null,
+    actionIcon: ImageVector? = null,
     actionDescription: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
@@ -2610,6 +2621,22 @@ private fun InsightPreviewCard(
         targetValue = foregroundSceneDarkness,
         animationSpec = tween(durationMillis = 2_400, easing = FastOutSlowInEasing),
         label = "insightForegroundSceneDarkness",
+    )
+    var revealBottomContent by remember { mutableStateOf(false) }
+    LaunchedEffect(isFocused) {
+        revealBottomContent = false
+        if (isFocused) {
+            delay(90)
+            revealBottomContent = true
+        }
+    }
+    val bottomContentReveal by animateFloatAsState(
+        targetValue = if (revealBottomContent) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = if (revealBottomContent) 420 else 150,
+            easing = FastOutSlowInEasing,
+        ),
+        label = "insightBottomContentReveal",
     )
     Surface(
         modifier = Modifier
@@ -3157,11 +3184,13 @@ private fun InsightPreviewCard(
                                         )
                                     }
                                     Icon(
-                                        imageVector = Icons.Default.ChevronRight,
+                                        imageVector = actionIcon ?: Icons.Default.ChevronRight,
                                         contentDescription = actionDescription,
                                         tint = Color.White,
                                         modifier = Modifier.size(
-                                            if (isReadingHeader) {
+                                            if (actionIcon != null) {
+                                                20.dp
+                                            } else if (isReadingHeader) {
                                                 16.dp
                                             } else if (actionLabel != null) {
                                                 18.dp
@@ -3181,6 +3210,10 @@ private fun InsightPreviewCard(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = bottomContentReveal
+                        translationY = (1f - bottomContentReveal) * 12.dp.toPx()
+                    }
                     .padding(
                         start = titleHorizontalPadding,
                         end = titleHorizontalPadding,
