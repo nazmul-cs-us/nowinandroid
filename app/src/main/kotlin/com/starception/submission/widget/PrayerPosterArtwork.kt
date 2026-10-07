@@ -646,10 +646,20 @@ internal object PrayerPosterArtwork {
             val heightZenithY = target.top + target.height() * if (isNight) 0.17f else 0.15f
             val ridgeAnchoredZenithY = horizonY - target.width() * if (isNight) 0.26f else 0.28f
             val zenithY = maxOf(heightZenithY, ridgeAnchoredZenithY)
-            val y = horizonY - (horizonY - zenithY) * altitude
             val radius = min(target.width(), target.height()) * if (isNight) 0.066f else 0.058f
+            val bodyRadius = radius * 0.90f
+            val arcY = horizonY - (horizonY - zenithY) * altitude
+            // The scene uses a different vertical crop as the card changes aspect ratio.
+            // Keep part of the body behind the mapped ridge in both compact and expanded cards.
+            val y = if (clipBehindMountain) {
+                mountainRidgeY(target, x)?.let { ridgeY ->
+                    maxOf(arcY, ridgeY - bodyRadius * 0.55f)
+                } ?: arcY
+            } else {
+                arcY
+            }
             val glowRadius = radius * if (isNight) 2.35f else 3.0f
-            val glowColor = if (isNight) 0xFFD8E7FF.toInt() else 0xFFFFB72E.toInt()
+            val glowColor = if (isNight) 0xFFD8E7FF.toInt() else 0xFFFFD65A.toInt()
             canvas.drawCircle(
                 x,
                 y,
@@ -669,12 +679,11 @@ internal object PrayerPosterArtwork {
                     )
                 },
             )
-            val bodyRadius = radius * 0.90f
             drawCircularCelestialTexture(
                 resource = if (isNight) {
                     R.drawable.prayer_widget_moon_real_nasa_v1
                 } else {
-                    R.drawable.prayer_widget_sun_real_v3
+                    R.drawable.prayer_widget_sun_real_3d_v1
                 },
                 cx = x,
                 cy = y,
@@ -700,9 +709,8 @@ internal object PrayerPosterArtwork {
                             x - bodyRadius * 0.18f,
                             y - bodyRadius * 0.16f,
                             bodyRadius * 1.18f,
-                            // The v2 texture already carries a clean luminous surface.
-                            // Keep this as a restrained highlight instead of washing its
-                            // detail into the mottled yellow disc the old texture became.
+                            // The texture already carries a luminous surface, so keep this
+                            // highlight restrained rather than washing out its plasma detail.
                             intArrayOf(0x30FFF9D2, 0x10FFE589, Color.TRANSPARENT),
                             floatArrayOf(0f, 0.52f, 1f),
                             Shader.TileMode.CLAMP,
@@ -729,37 +737,7 @@ internal object PrayerPosterArtwork {
             // Source-normalized ridge samples follow the mountain silhouette in each
             // moonless/sunless scene. Clipping to the sky leaves the original mountain
             // pixels untouched, so the celestial body appears naturally behind the ridge.
-            val ridge = if (isNight) {
-                floatArrayOf(
-                    0.00f, 0.55f,
-                    0.10f, 0.55f,
-                    0.18f, 0.53f,
-                    0.28f, 0.56f,
-                    0.36f, 0.52f,
-                    0.46f, 0.55f,
-                    0.57f, 0.49f,
-                    0.64f, 0.47f,
-                    0.73f, 0.52f,
-                    0.84f, 0.55f,
-                    0.93f, 0.51f,
-                    1.00f, 0.48f,
-                )
-            } else {
-                floatArrayOf(
-                    0.00f, 0.58f,
-                    0.10f, 0.57f,
-                    0.20f, 0.58f,
-                    0.30f, 0.56f,
-                    0.41f, 0.52f,
-                    0.50f, 0.57f,
-                    0.60f, 0.55f,
-                    0.70f, 0.52f,
-                    0.78f, 0.55f,
-                    0.86f, 0.51f,
-                    0.94f, 0.53f,
-                    1.00f, 0.49f,
-                )
-            }
+            val ridge = mountainRidgePoints()
             fun mapX(normalized: Float): Float = target.left +
                 ((normalized * source.width - crop.left) / crop.width().toFloat()) * target.width()
             fun mapY(normalized: Float): Float = target.top +
@@ -776,6 +754,59 @@ internal object PrayerPosterArtwork {
                 }
                 close()
             }
+        }
+
+        private fun mountainRidgeY(target: RectF, targetX: Float): Float? {
+            val source = artwork(context, sceneBaseResource()) ?: return null
+            val crop = sceneCrop(source, SCENE_CROP_BIAS_Y)
+            val sourceX = crop.left +
+                ((targetX - target.left) / target.width()).coerceIn(0f, 1f) * crop.width()
+            val normalizedX = sourceX / source.width
+            val ridge = mountainRidgePoints()
+            for (index in 0 until ridge.lastIndex - 2 step 2) {
+                val startX = ridge[index]
+                val endX = ridge[index + 2]
+                if (normalizedX in startX..endX) {
+                    val segmentProgress = ((normalizedX - startX) / (endX - startX)).coerceIn(0f, 1f)
+                    val normalizedY = ridge[index + 1] +
+                        (ridge[index + 3] - ridge[index + 1]) * segmentProgress
+                    return target.top +
+                        ((normalizedY * source.height - crop.top) / crop.height()) * target.height()
+                }
+            }
+            return null
+        }
+
+        private fun mountainRidgePoints(): FloatArray = if (isNight) {
+            floatArrayOf(
+                0.00f, 0.55f,
+                0.10f, 0.55f,
+                0.18f, 0.53f,
+                0.28f, 0.56f,
+                0.36f, 0.52f,
+                0.46f, 0.55f,
+                0.57f, 0.49f,
+                0.64f, 0.47f,
+                0.73f, 0.52f,
+                0.84f, 0.55f,
+                0.93f, 0.51f,
+                1.00f, 0.48f,
+            )
+        } else {
+            floatArrayOf(
+                0.00f, 0.58f,
+                0.10f, 0.57f,
+                0.20f, 0.58f,
+                0.30f, 0.56f,
+                0.41f, 0.52f,
+                0.50f, 0.57f,
+                0.60f, 0.55f,
+                0.70f, 0.52f,
+                0.78f, 0.55f,
+                0.86f, 0.51f,
+                0.94f, 0.53f,
+                1.00f, 0.49f,
+            )
         }
 
         private fun drawCircularCelestialTexture(
