@@ -650,11 +650,16 @@ internal object PrayerPosterArtwork {
             val bodyRadius = radius * 0.90f
             val arcY = horizonY - (horizonY - zenithY) * altitude
             // The scene uses a different vertical crop as the card changes aspect ratio.
-            // Keep part of the body behind the mapped ridge in both compact and expanded cards.
+            // The body rides the mapped mountain ridge: at its horizontal position the
+            // ridge height is sampled and the body sits perched on the peak edge —
+            // most of the disc above, the rest clipped behind the mountain — in both
+            // compact and expanded cards, at every hour. The arc only supplies the
+            // horizontal sunrise-to-sunset cycle and a fallback when the ridge is
+            // unavailable.
             val y = if (clipBehindMountain) {
                 mountainRidgeY(target, x)?.let { ridgeY ->
-                    maxOf(arcY, ridgeY - bodyRadius * 0.55f)
-                } ?: arcY
+                    ridgeY - bodyRadius * 0.55f
+                } ?: minOf(arcY, target.top + target.height() * 0.60f)
             } else {
                 arcY
             }
