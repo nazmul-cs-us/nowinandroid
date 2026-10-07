@@ -98,6 +98,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.widget.NestedScrollView
+import androidx.core.widget.TextViewCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.imageLoader
@@ -411,9 +412,20 @@ fun AppTopSearchBar(
                 // same family Compose uses via NiaTheme. SearchBar/SearchView are View
                 // components so they ignore Compose Typography and default to system sans.
                 val appTypeface = appSearchTypeface(ctx)
-                searchBar.textView?.setHintTextColor(pillTextColor)
-                searchBar.textView?.setTextColor(pillTextColor)
-                searchBar.textView?.typeface = appTypeface
+                searchBar.textView?.apply {
+                    setHintTextColor(pillTextColor)
+                    setTextColor(pillTextColor)
+                    typeface = appTypeface
+                    setSingleLine(true)
+                    ellipsize = null
+                    TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                        this,
+                        14,
+                        18,
+                        1,
+                        TypedValue.COMPLEX_UNIT_SP,
+                    )
+                }
                 searchView.hint = SearchHints.hintFor()
                 searchView.getEditText().typeface = appTypeface
                 // Mic tap: capture straight away when permission is held, otherwise

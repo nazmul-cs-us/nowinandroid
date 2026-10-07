@@ -273,7 +273,10 @@ internal object PrayerPosterArtwork {
 
         fun drawSceneOnly() {
             drawScene()
-            drawMovingCelestial(RectF(0f, 0f, width, height))
+            drawMovingCelestial(
+                target = RectF(0f, 0f, width, height),
+                clipBehindMountain = true,
+            )
             drawOuterHairline()
         }
 
@@ -608,7 +611,17 @@ internal object PrayerPosterArtwork {
             )
         }
 
-        private fun drawMovingCelestial(target: RectF) {
+        private fun drawMovingCelestial(
+            target: RectF,
+            clipBehindMountain: Boolean = false,
+        ) {
+            val mountainClipSaveCount = if (clipBehindMountain) {
+                mountainSkyClip(target)?.let { skyClip ->
+                    canvas.save().also { canvas.clipPath(skyClip) }
+                }
+            } else {
+                null
+            }
             val progress = if (isNight) {
                 val nightEnd = state.sky.sunrise + 24 * 60
                 val current = if (state.sky.now < state.sky.sunrise) {
@@ -707,6 +720,62 @@ internal object PrayerPosterArtwork {
                     color = if (isNight) 0x70EAF2FF else 0x72FFE18A
                 },
             )
+            mountainClipSaveCount?.let(canvas::restoreToCount)
+        }
+
+        private fun mountainSkyClip(target: RectF): Path? {
+            val source = artwork(context, sceneBaseResource()) ?: return null
+            val crop = sceneCrop(source, SCENE_CROP_BIAS_Y)
+            // Source-normalized ridge samples follow the mountain silhouette in each
+            // moonless/sunless scene. Clipping to the sky leaves the original mountain
+            // pixels untouched, so the celestial body appears naturally behind the ridge.
+            val ridge = if (isNight) {
+                floatArrayOf(
+                    0.00f, 0.55f,
+                    0.10f, 0.55f,
+                    0.18f, 0.53f,
+                    0.28f, 0.56f,
+                    0.36f, 0.52f,
+                    0.46f, 0.55f,
+                    0.57f, 0.49f,
+                    0.64f, 0.47f,
+                    0.73f, 0.52f,
+                    0.84f, 0.55f,
+                    0.93f, 0.51f,
+                    1.00f, 0.48f,
+                )
+            } else {
+                floatArrayOf(
+                    0.00f, 0.58f,
+                    0.10f, 0.57f,
+                    0.20f, 0.58f,
+                    0.30f, 0.56f,
+                    0.41f, 0.52f,
+                    0.50f, 0.57f,
+                    0.60f, 0.55f,
+                    0.70f, 0.52f,
+                    0.78f, 0.55f,
+                    0.86f, 0.51f,
+                    0.94f, 0.53f,
+                    1.00f, 0.49f,
+                )
+            }
+            fun mapX(normalized: Float): Float = target.left +
+                ((normalized * source.width - crop.left) / crop.width().toFloat()) * target.width()
+            fun mapY(normalized: Float): Float = target.top +
+                ((normalized * source.height - crop.top) / crop.height().toFloat()) * target.height()
+
+            return Path().apply {
+                moveTo(target.left, target.top)
+                lineTo(target.right, target.top)
+                for (index in ridge.lastIndex - 1 downTo 0 step 2) {
+                    lineTo(
+                        mapX(ridge[index]).coerceIn(target.left, target.right),
+                        mapY(ridge[index + 1]).coerceIn(target.top, target.bottom),
+                    )
+                }
+                close()
+            }
         }
 
         private fun drawCircularCelestialTexture(

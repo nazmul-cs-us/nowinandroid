@@ -51,7 +51,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -152,8 +151,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -870,14 +871,22 @@ private fun VoiceAssistantButton(
             thinkingMessageIndex++
         }
     }
-    var thinkingDotCount by remember { mutableStateOf(0) }
-    LaunchedEffect(isGeneratingNudge) {
-        thinkingDotCount = 0
-        while (isGeneratingNudge) {
-            delay(420)
-            thinkingDotCount = (thinkingDotCount + 1) % 4
-        }
-    }
+    val thinkingTextStyle = MaterialTheme.typography.labelLarge.copy(
+        fontWeight = FontWeight.SemiBold,
+    )
+    val thinkingTextMeasurer = rememberTextMeasurer()
+    val thinkingMessage = thinkingMessages[thinkingMessageIndex]
+    val thinkingPillWidth by animateDpAsState(
+        targetValue = with(LocalDensity.current) {
+            thinkingTextMeasurer.measure(
+                text = thinkingMessage,
+                style = thinkingTextStyle,
+                maxLines = 1,
+            ).size.width.toDp()
+        } + if (verticalLayout) 54.dp else 66.dp,
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        label = "assistantThinkingWidth",
+    )
     var renderedNudge by remember { mutableStateOf(nudge) }
     LaunchedEffect(nudge) {
         if (nudge != null) {
@@ -905,27 +914,6 @@ private fun VoiceAssistantButton(
     val nudgePullThreshold = with(LocalDensity.current) { 40.dp.toPx() }
     val nudgePullHapticStep = with(LocalDensity.current) { 12.dp.toPx() }
     var nudgePullDistance by remember(nudge?.id) { mutableStateOf(0f) }
-    var nudgeDragOffset by remember(nudge?.id) { mutableStateOf(Offset.Zero) }
-    var isNudgeDragging by remember(nudge?.id) { mutableStateOf(false) }
-    val displayedNudgeDragX by animateFloatAsState(
-        targetValue = nudgeDragOffset.x,
-        animationSpec = if (isNudgeDragging) {
-            snap()
-        } else {
-            tween(durationMillis = 220, easing = FastOutSlowInEasing)
-        },
-        label = "assistantNudgeDragX",
-    )
-    val displayedNudgeDragY by animateFloatAsState(
-        targetValue = nudgeDragOffset.y,
-        animationSpec = if (isNudgeDragging) {
-            snap()
-        } else {
-            tween(durationMillis = 220, easing = FastOutSlowInEasing)
-        },
-        label = "assistantNudgeDragY",
-    )
-    var quizDragOffset by remember(quizOpen) { mutableStateOf(Offset.Zero) }
     val assistantSurface = when {
         quizOpen -> VoiceAssistantSurface.Quiz
         composerOpen -> VoiceAssistantSurface.Composer
@@ -1285,7 +1273,37 @@ private fun VoiceAssistantButton(
                                     (LocalConfiguration.current.screenWidthDp - 24).dp,
                                 )
                             },
-                        ),
+                        )
+                        .graphicsLayer {
+                            shadowElevation = (6.dp + 2.dp * nudgeGlowPulse).toPx()
+                            shape = RoundedCornerShape(containerCorner)
+                            ambientShadowColor = assistantGlowColor.copy(alpha = 0.55f)
+                            spotShadowColor = assistantGlowColor.copy(alpha = 0.55f)
+                            clip = false
+                        }
+                        .drawBehind {
+                            drawIntoCanvas { canvas ->
+                                val glowPaint = android.graphics.Paint(
+                                    android.graphics.Paint.ANTI_ALIAS_FLAG,
+                                ).apply {
+                                    color = assistantGlowColor.toArgb()
+                                    alpha = ((0.34f + nudgeGlowPulse * 0.10f) * 255).toInt()
+                                    maskFilter = BlurMaskFilter(
+                                        11.dp.toPx(),
+                                        BlurMaskFilter.Blur.NORMAL,
+                                    )
+                                }
+                                canvas.nativeCanvas.drawRoundRect(
+                                    0f,
+                                    0f,
+                                    size.width,
+                                    size.height,
+                                    containerCorner.toPx(),
+                                    containerCorner.toPx(),
+                                    glowPaint,
+                                )
+                            }
+                        },
                 ) {
                     Column(
                         modifier = Modifier
@@ -1397,10 +1415,40 @@ private fun VoiceAssistantButton(
                             exit = ExitTransition.None,
                             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                         )
-                        .width(if (verticalLayout) 230.dp else 280.dp)
+                        .width(thinkingPillWidth)
                         .heightIn(min = if (verticalLayout) 38.dp else 44.dp)
+                        .graphicsLayer {
+                            shadowElevation = (6.dp + 2.dp * nudgeGlowPulse).toPx()
+                            shape = RoundedCornerShape(containerCorner)
+                            ambientShadowColor = assistantGlowColor.copy(alpha = 0.55f)
+                            spotShadowColor = assistantGlowColor.copy(alpha = 0.55f)
+                            clip = false
+                        }
+                        .drawBehind {
+                            drawIntoCanvas { canvas ->
+                                val glowPaint = android.graphics.Paint(
+                                    android.graphics.Paint.ANTI_ALIAS_FLAG,
+                                ).apply {
+                                    color = assistantGlowColor.toArgb()
+                                    alpha = ((0.34f + nudgeGlowPulse * 0.10f) * 255).toInt()
+                                    maskFilter = BlurMaskFilter(
+                                        11.dp.toPx(),
+                                        BlurMaskFilter.Blur.NORMAL,
+                                    )
+                                }
+                                canvas.nativeCanvas.drawRoundRect(
+                                    0f,
+                                    0f,
+                                    size.width,
+                                    size.height,
+                                    containerCorner.toPx(),
+                                    containerCorner.toPx(),
+                                    glowPaint,
+                                )
+                            }
+                        }
                         .semantics {
-                            contentDescription = thinkingMessages[thinkingMessageIndex]
+                            contentDescription = thinkingMessage
                         },
                 ) {
                     Row(
@@ -1419,29 +1467,18 @@ private fun VoiceAssistantButton(
                         )
                         Spacer(Modifier.width(8.dp))
                         AnimatedContent(
-                            targetState = thinkingMessages[thinkingMessageIndex],
+                            targetState = thinkingMessage,
                             transitionSpec = {
                                 fadeIn(tween(240)) togetherWith fadeOut(tween(180))
                             },
                             label = "nowNudgeThinkingMessage",
                         ) { message ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = message,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = ".".repeat(thinkingDotCount),
-                                    modifier = Modifier.width(16.dp),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                )
-                            }
+                            Text(
+                                text = message,
+                                style = thinkingTextStyle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
@@ -1489,44 +1526,11 @@ private fun VoiceAssistantButton(
                             },
                         )
                         .heightIn(min = if (verticalLayout) 36.dp else 44.dp)
-                .pointerInput(showNudge, renderedNudge?.id) {
-                    if (!showNudge) return@pointerInput
-                    var dragOffset = Offset.Zero
-                    detectDragGestures(
-                        onDragStart = {
-                            isNudgeDragging = true
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            dragOffset += dragAmount
-                            nudgeDragOffset = dragOffset
-                        },
-                        onDragCancel = {
-                            isNudgeDragging = false
-                            nudgeDragOffset = Offset.Zero
-                        },
-                        onDragEnd = {
-                            val shouldDismiss =
-                                abs(dragOffset.x) > 72f || dragOffset.y < -48f
-                            isNudgeDragging = false
-                            nudgeDragOffset = Offset.Zero
-                            if (shouldDismiss) {
-                                onNudgeDismiss()
-                            }
-                        },
-                    )
-                        }
                         .graphicsLayer {
-                            translationX = displayedNudgeDragX
-                            translationY = displayedNudgeDragY
-                            alpha = 1f - minOf(
-                                0.45f,
-                                (abs(displayedNudgeDragX) + abs(displayedNudgeDragY)) / 240f,
-                            )
-                            shadowElevation = (8.dp + 4.dp * nudgeGlowPulse).toPx()
+                            shadowElevation = (6.dp + 2.dp * nudgeGlowPulse).toPx()
                             shape = RoundedCornerShape(containerCorner)
-                            ambientShadowColor = assistantGlowColor
-                            spotShadowColor = assistantGlowColor
+                            ambientShadowColor = assistantGlowColor.copy(alpha = 0.55f)
+                            spotShadowColor = assistantGlowColor.copy(alpha = 0.55f)
                             clip = false
                         }
                         .drawBehind {
@@ -1630,6 +1634,7 @@ private fun VoiceAssistantButton(
                         }
                         renderedNudge?.sourceLabel?.takeIf(String::isNotBlank)?.let { sourceLabel ->
                             Surface(
+                                modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
                                 contentColor = MaterialTheme.colorScheme.primary,
@@ -1639,6 +1644,7 @@ private fun VoiceAssistantButton(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Center,
                                 )
                             }
                         }
@@ -1689,27 +1695,12 @@ private fun VoiceAssistantButton(
                                     minOf(480.dp, (configuration.screenHeightDp - 160).dp)
                                 },
                             )
-                            .pointerInput(quizOpen) {
-                                if (!quizOpen) return@pointerInput
-                                var horizontalOffset = 0f
-                                detectHorizontalDragGestures(
-                                    onHorizontalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        horizontalOffset += dragAmount
-                                        quizDragOffset = Offset(horizontalOffset, 0f)
-                                    },
-                                    onDragCancel = { quizDragOffset = Offset.Zero },
-                                    onDragEnd = {
-                                        if (abs(horizontalOffset) > 96f) {
-                                            VoiceAssistantNudgeBus.closeQuiz()
-                                        }
-                                        quizDragOffset = Offset.Zero
-                                    },
-                                )
-                            }
                             .graphicsLayer {
-                                translationX = quizDragOffset.x
-                                alpha = 1f - minOf(0.45f, abs(quizDragOffset.x) / 320f)
+                                shadowElevation = (6.dp + 2.dp * nudgeGlowPulse).toPx()
+                                shape = RoundedCornerShape(containerCorner)
+                                ambientShadowColor = assistantGlowColor.copy(alpha = 0.55f)
+                                spotShadowColor = assistantGlowColor.copy(alpha = 0.55f)
+                                clip = false
                             }
                             .drawBehind {
                                 drawIntoCanvas { canvas ->
@@ -1717,9 +1708,9 @@ private fun VoiceAssistantButton(
                                         android.graphics.Paint.ANTI_ALIAS_FLAG,
                                     ).apply {
                                         color = assistantGlowColor.toArgb()
-                                        alpha = ((0.22f + nudgeGlowPulse * 0.07f) * 255).toInt()
+                                        alpha = ((0.34f + nudgeGlowPulse * 0.10f) * 255).toInt()
                                         maskFilter = BlurMaskFilter(
-                                            12.dp.toPx(),
+                                            11.dp.toPx(),
                                             BlurMaskFilter.Blur.NORMAL,
                                         )
                                     }
