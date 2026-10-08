@@ -43,6 +43,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -51,6 +52,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,6 +83,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
@@ -110,7 +113,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -734,6 +739,46 @@ private enum class VoiceAssistantSurface {
 private const val NUDGE_MORPH_DURATION_MILLIS = 420
 private const val NUDGE_REVEAL_DELAY_MILLIS = 5_600L
 private const val NUDGE_THINKING_MESSAGE_MILLIS = 1_400L
+
+/**
+ * Playful spinner verbs shown in the thinking pill after the informative
+ * status messages, in the spirit of a good CLI spinner: once the pill has said
+ * what it is actually doing, it cycles through these while the model works.
+ */
+private val NUDGE_THINKING_VERBS = listOf(
+    "Accomplishing", "Actioning", "Actualizing", "Architecting", "Baking", "Beaming",
+    "Beboppin'", "Befuddling", "Billowing", "Blanching", "Bloviating", "Boogieing",
+    "Boondoggling", "Booping", "Bootstrapping", "Brewing", "Bunning", "Burrowing",
+    "Calculating", "Canoodling", "Caramelizing", "Cascading", "Catapulting", "Cerebrating",
+    "Channeling", "Choreographing", "Churning", "Clauding", "Coalescing", "Cogitating",
+    "Combobulating", "Composing", "Computing", "Concocting", "Considering", "Contemplating",
+    "Cooking", "Crafting", "Creating", "Crunching", "Crystallizing", "Cultivating",
+    "Deciphering", "Deliberating", "Determining", "Dilly-dallying", "Discombobulating",
+    "Doing", "Doodling", "Drizzling", "Ebbing", "Effecting", "Elucidating", "Embellishing",
+    "Enchanting", "Envisioning", "Evaporating", "Fermenting", "Fiddle-faddling", "Finagling",
+    "Flambéing", "Flibbertigibbeting", "Flowing", "Flummoxing", "Fluttering", "Forging",
+    "Forming", "Frolicking", "Frosting", "Gallivanting", "Galloping", "Garnishing",
+    "Generating", "Gesticulating", "Germinating", "Gitifying", "Grooving", "Gusting",
+    "Harmonizing", "Hashing", "Hatching", "Herding", "Honking", "Hullaballooing",
+    "Hyperspacing", "Ideating", "Imagining", "Improvising", "Incubating", "Inferring",
+    "Infusing", "Ionizing", "Jitterbugging", "Julienning", "Kneading", "Leavening",
+    "Levitating", "Lollygagging", "Manifesting", "Marinating", "Meandering",
+    "Metamorphosing", "Misting", "Moonwalking", "Moseying", "Mulling", "Mustering",
+    "Musing", "Nebulizing", "Nesting", "Newspapering", "Noodling", "Nucleating",
+    "Orbiting", "Orchestrating", "Osmosing", "Perambulating", "Percolating", "Perusing",
+    "Philosophising", "Photosynthesizing", "Pollinating", "Pondering", "Pontificating",
+    "Pouncing", "Precipitating", "Prestidigitating", "Processing", "Proofing",
+    "Propagating", "Puttering", "Puzzling", "Quantumizing", "Razzle-dazzling",
+    "Razzmatazzing", "Recombobulating", "Reticulating", "Roosting", "Ruminating",
+    "Sautéing", "Scampering", "Schlepping", "Scurrying", "Seasoning", "Shenaniganing",
+    "Shimmying", "Simmering", "Skedaddling", "Sketching", "Slithering", "Smooshing",
+    "Sock-hopping", "Spelunking", "Spinning", "Sprouting", "Stewing", "Sublimating",
+    "Swirling", "Swooping", "Symbioting", "Synthesizing", "Tempering", "Thinking",
+    "Thundering", "Tinkering", "Tomfoolering", "Topsy-turvying", "Transfiguring",
+    "Transmuting", "Twisting", "Undulating", "Unfurling", "Unravelling", "Vibing",
+    "Waddling", "Wandering", "Warping", "Whatchamacalliting", "Whirlpooling", "Whirring",
+    "Whisking", "Wibbling", "Working", "Wrangling", "Zesting", "Zigzagging",
+)
 private const val NUDGE_RETURN_CONTENT_HOLD_MILLIS =
     NUDGE_MORPH_DURATION_MILLIS.toLong() + 40L
 
@@ -853,7 +898,7 @@ private fun VoiceAssistantButton(
     val isPreparingNudge = canPresentNudge && revealedNudgeId != nudge?.id
     val isGeneratingNudge = generatingSuggestion || isPreparingNudge
     val showNudge = canPresentNudge && revealedNudgeId == nudge?.id
-    val thinkingMessages = listOf(
+    val informativeThinkingMessages = listOf(
         "Understanding context",
         "Finding trusted source",
         "Verifying source",
@@ -863,10 +908,15 @@ private fun VoiceAssistantButton(
             else -> "Preparing suggestion"
         },
     )
+    // After the informative prefix, the pill cycles through the playful
+    // spinner verbs; a fresh shuffle per generation keeps the rotation lively.
+    val verbRotation by remember(isGeneratingNudge) {
+        mutableStateOf(NUDGE_THINKING_VERBS.shuffled())
+    }
     var thinkingMessageIndex by remember { mutableStateOf(0) }
     LaunchedEffect(isGeneratingNudge) {
         thinkingMessageIndex = 0
-        while (isGeneratingNudge && thinkingMessageIndex < thinkingMessages.lastIndex) {
+        while (isGeneratingNudge) {
             delay(NUDGE_THINKING_MESSAGE_MILLIS)
             thinkingMessageIndex++
         }
@@ -875,7 +925,11 @@ private fun VoiceAssistantButton(
         fontWeight = FontWeight.SemiBold,
     )
     val thinkingTextMeasurer = rememberTextMeasurer()
-    val thinkingMessage = thinkingMessages[thinkingMessageIndex]
+    val thinkingMessage = if (thinkingMessageIndex < informativeThinkingMessages.size) {
+        informativeThinkingMessages[thinkingMessageIndex]
+    } else {
+        verbRotation[(thinkingMessageIndex - informativeThinkingMessages.size) % verbRotation.size]
+    }
     val thinkingPillWidth by animateDpAsState(
         targetValue = with(LocalDensity.current) {
             thinkingTextMeasurer.measure(
@@ -923,8 +977,13 @@ private fun VoiceAssistantButton(
     }
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     LaunchedEffect(assistantSurface, verticalLayout) {
+        // The destination pill expands into the vacated voice slot while any
+        // expanded assistant surface occupies the button's slot — not only the
+        // presented Now Nudge, but also the "Ask Now Nudge" composer and the
+        // "Composing question" thinking card.
         onNavigationOccupationChanged(
-            !verticalLayout && assistantSurface == VoiceAssistantSurface.Nudge,
+            !verticalLayout && assistantSurface != VoiceAssistantSurface.Button &&
+                assistantSurface != VoiceAssistantSurface.Quiz,
         )
     }
     val containerCorner by animateDpAsState(
@@ -1345,7 +1404,8 @@ private fun VoiceAssistantButton(
                                 .focusRequester(composerFocusRequester),
                             label = { Text("Your question") },
                             placeholder = { Text("For example: fasting dua") },
-                            minLines = 2,
+                            singleLine = false,
+                            minLines = 1,
                             maxLines = 3,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                             keyboardActions = KeyboardActions(onSend = { submitTypedQuestion() }),
@@ -1384,7 +1444,17 @@ private fun VoiceAssistantButton(
                     }
                 }
 
-                VoiceAssistantSurface.Thinking -> Surface(
+                VoiceAssistantSurface.Thinking -> {
+                    // Swiping the thinking card down cancels the generation:
+                    // the card tracks the finger, and past a short threshold
+                    // the in-flight turn is dropped and the assistant springs
+                    // back to its resting button instead of waiting out the
+                    // model.
+                    var thinkingDragOffset by remember { mutableFloatStateOf(0f) }
+                    val thinkingCancelThresholdPx = with(LocalDensity.current) { 64.dp.toPx() }
+                    val thinkingView = LocalView.current
+                    val densityScope = rememberCoroutineScope()
+                    Surface(
                     shape = RoundedCornerShape(containerCorner),
                     color = containerColor,
                     contentColor = MaterialTheme.colorScheme.onSurface,
@@ -1402,6 +1472,40 @@ private fun VoiceAssistantButton(
                             x = if (verticalLayout) buttonSize + 8.dp else 0.dp,
                             y = if (verticalLayout) 0.dp else -buttonSize - 8.dp,
                         )
+                        .graphicsLayer {
+                            translationY = thinkingDragOffset
+                        }
+                        .pointerInput(verticalLayout) {
+                            detectVerticalDragGestures(
+                                onDragEnd = {
+                                    if (thinkingDragOffset != 0f) {
+                                        densityScope.launch {
+                                            animate(
+                                                initialValue = thinkingDragOffset,
+                                                targetValue = 0f,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMedium,
+                                                ),
+                                            ) { value, _ ->
+                                                thinkingDragOffset = value
+                                            }
+                                        }
+                                    }
+                                },
+                            ) { change, dragAmount ->
+                                change.consume()
+                                thinkingDragOffset =
+                                    (thinkingDragOffset + dragAmount).coerceAtLeast(0f)
+                                if (thinkingDragOffset >= thinkingCancelThresholdPx) {
+                                    thinkingDragOffset = 0f
+                                    thinkingView.performHapticFeedback(
+                                        android.view.HapticFeedbackConstants.LONG_PRESS,
+                                    )
+                                    VoiceAssistantNudgeBus.cancelSuggestion()
+                                }
+                            }
+                        }
                         .sharedBounds(
                             sharedContentState = voiceContainerState,
                             animatedVisibilityScope = this,
@@ -1465,7 +1569,7 @@ private fun VoiceAssistantButton(
                             morph = 1f,
                             modifier = Modifier.size(if (verticalLayout) 26.dp else 30.dp),
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(3.dp))
                         AnimatedContent(
                             targetState = thinkingMessage,
                             transitionSpec = {
@@ -1482,9 +1586,9 @@ private fun VoiceAssistantButton(
                         }
                     }
                 }
+                }
 
                 VoiceAssistantSurface.Nudge -> Surface(
-                    onClick = onNudgeAction,
                     shape = RoundedCornerShape(containerCorner),
                     color = containerColor,
                     contentColor = MaterialTheme.colorScheme.onSurface,
@@ -1633,19 +1737,37 @@ private fun VoiceAssistantButton(
                             )
                         }
                         renderedNudge?.sourceLabel?.takeIf(String::isNotBlank)?.let { sourceLabel ->
+                            // The card body is deliberately not tappable: reading
+                            // a tap anywhere on the surface made accidental
+                            // navigation too easy. This chip is the one explicit
+                            // way to open the source (or start the quiz).
                             Surface(
+                                onClick = onNudgeAction,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
                                 contentColor = MaterialTheme.colorScheme.primary,
                             ) {
-                                Text(
-                                    text = sourceLabel,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center,
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = sourceLabel,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                                        contentDescription = "Open source",
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
                             }
                         }
                     }

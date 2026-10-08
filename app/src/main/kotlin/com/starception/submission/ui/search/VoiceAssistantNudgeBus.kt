@@ -36,6 +36,7 @@ object VoiceAssistantNudgeBus {
     // destination happened to receive the pull gesture. A screen may provide
     // the context snapshot, but navigation must not cancel the in-flight turn.
     private val suggestionScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var suggestionJob: kotlinx.coroutines.Job? = null
 
     private val _nudge = MutableStateFlow<DeenlyNudge?>(null)
     val nudge = _nudge.asStateFlow()
@@ -83,9 +84,33 @@ object VoiceAssistantNudgeBus {
         }
     }
 
+    /**
+     * True until the next nudge turn runs; the Home handler should schedule
+     * that turn as a QUESTION task so the quiz gets a fresh model-composed
+     * question instead of only the deterministic bank.
+     */
+    @Volatile
+    var quizQuestionRequested = false
+        private set
+
+    fun consumeQuizQuestionRequest(): Boolean {
+        val requested = quizQuestionRequested
+        quizQuestionRequested = false
+        return requested
+    }
+
     fun requestQuiz() {
         _nudge.value = null
         _quizOpen.value = true
+        // The bank questions render instantly, but the quiz should lead with
+        // what the on-device model can compose from a verified source: start a
+        // question turn in the background and hand the result to the open quiz.
+        // A question already in hand (for example, from the nudge that opened
+        // the quiz) skips the extra turn.
+        if (_generatedQuizQuestion.value == null) {
+            quizQuestionRequested = true
+            requestSuggestion()
+        }
     }
 
     fun submitTypedPrompt(prompt: String) {
@@ -171,7 +196,8 @@ object VoiceAssistantNudgeBus {
         requestId: Long,
         generate: suspend () -> DeenlyNudge?,
     ) {
-        suggestionScope.launch {
+        suggestionJob?.cancel()
+        suggestionJob = suggestionScope.launch {
             val generation = runCatching {
                 // Resolve Main lazily so local JVM tests can initialize the bus
                 // without an Android Main dispatcher, while Compose state still
@@ -183,6 +209,22 @@ object VoiceAssistantNudgeBus {
             }
             completeSuggestion(requestId, generation.getOrNull())
         }
+    }
+
+    /**
+     * Cancels the in-flight generation and returns the assistant to its
+     * resting button. Swiping the thinking card calls this so the user is
+     * never stuck waiting on a turn they no longer want. The request id is
+     * bumped, so any result the cancelled job still produces is discarded
+     * as stale by [completeSuggestion].
+     */
+    fun cancelSuggestion() {
+        suggestionRequestId += 1
+        suggestionJob?.cancel()
+        suggestionJob = null
+        _generatingSuggestion.value = false
+        _nudge.value = null
+        _generatedQuizQuestion.value = null
     }
 
     /** Publishes the context-ranked result and tells the voice button to reveal it. */
