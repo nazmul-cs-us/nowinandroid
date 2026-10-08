@@ -168,7 +168,9 @@ def main() -> None:
         logging_steps=5,
         eval_strategy="steps",
         eval_steps=max(20, args.max_steps // 3),
-        save_strategy="no",
+        save_strategy="steps",
+        save_steps=200,
+        save_total_limit=2,
         report_to=[],
         remove_unused_columns=False,
         dataloader_pin_memory=False,
@@ -182,7 +184,18 @@ def main() -> None:
         eval_dataset=GroundedDataset(eval_records),
         data_collator=collate,
     )
-    train_result = trainer.train()
+    # Power-off safe: resume from the newest checkpoint when one exists. The
+    # dataset is seeded and deterministic, so a resumed run continues the
+    # optimizer and scheduler state exactly where it stopped.
+    checkpoints = sorted(
+        (args.output_dir / "checkpoints").glob("checkpoint-*"),
+        key=lambda path: int(path.name.rsplit("-", 1)[-1]),
+    )
+    if checkpoints:
+        print(f"Resuming training from {checkpoints[-1]}", flush=True)
+        train_result = trainer.train(resume_from_checkpoint=str(checkpoints[-1]))
+    else:
+        train_result = trainer.train()
     eval_metrics = trainer.evaluate()
 
     adapter_dir = args.output_dir / "adapter"
