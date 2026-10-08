@@ -3054,15 +3054,14 @@ fun PrayerTimesScreen(
                                     } else {
                                         syncBottomClearanceReclaim
                                     }
-                                // The strip absorbs the full held banner inset without
-                                // crediting the status-bar giveback: the search chrome
-                                // does not reliably return that height, and any
-                                // unabsorbed remainder pushed the location card under
-                                // the floating navigation. Over-absorbing only lifts
-                                // the bottom content slightly — never clips it.
-                                val syncContentCompression =
+                                // Compress flexible Insights by the banner displacement that remains
+                                // after the search chrome gives back its status-bar inset. This keeps
+                                // every control below Insights in normal layout flow.
+                                val syncContentCompression = (
                                     syncState.transientContentOffsetY +
-                                        syncState.heldContentInsetTop
+                                        syncState.heldContentInsetTop -
+                                        syncTopInsetReclaim
+                                    ).coerceAtLeast(0.dp)
                                 // A persistent sync/prayer strip used to collapse Insights all the way to
                                 // 170dp on every phone. On tall portrait displays (Pixel 9 Pro included)
                                 // that made the dashboard finish roughly 40dp too early, leaving a large
@@ -3083,6 +3082,14 @@ fun PrayerTimesScreen(
                                     }
                                 val portraitInsightHeight = (portraitInsightRestingHeight - syncContentCompression)
                                     .coerceAtLeast(portraitInsightMinHeight)
+                                // The enlarged tile previously reapplied a fixed 348dp floor inside
+                                // SwipeableBigTiles, losing the banner compression and forcing the
+                                // prayer controls into floating navigation. Preserve the resting
+                                // expansion geometry, then subtract the same remaining displacement.
+                                val portraitExpandedInsightHeight = (
+                                    maxOf(portraitInsightRestingHeight + 92.dp, 348.dp) -
+                                        syncContentCompression
+                                    ).coerceAtLeast(280.dp)
 
                                 if (isLandscape) {
                                     // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right
@@ -3371,7 +3378,7 @@ fun PrayerTimesScreen(
                                         // leaving that surplus as empty space above the toggle, the single
                                         // remaining prayer row grows by the same amount — so the bottom
                                         // controls keep their exact resting placement.
-                                        val insightStripGrowth = maxOf(portraitInsightHeight + 92.dp, 348.dp) -
+                                        val insightStripGrowth = portraitExpandedInsightHeight -
                                             portraitInsightHeight
                                         val insightRowCompensation = (tileHeight - insightStripGrowth)
                                             .coerceAtLeast(0.dp)
@@ -3456,6 +3463,7 @@ fun PrayerTimesScreen(
                                                 },
                                                 timeOffsets = storedOffsets,
                                                 portraitStripHeight = portraitInsightHeight,
+                                                portraitExpandedStripHeight = portraitExpandedInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
                                                 compactForExpandedPrayers = false,

@@ -1287,6 +1287,7 @@ fun SwipeableBigTiles(
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
     isLandscape: Boolean = false,
     portraitStripHeight: Dp = 288.dp,
+    portraitExpandedStripHeight: Dp? = null,
     compactForExpandedPrayers: Boolean = false,
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
@@ -1626,7 +1627,8 @@ fun SwipeableBigTiles(
         portraitStripHeight.value +
             ((170f - portraitStripHeight.value) * compactProgress)
         ).dp
-    val expandedStripHeight = maxOf(portraitStripHeight + 92.dp, 348.dp)
+    val expandedStripHeight = portraitExpandedStripHeight
+        ?: maxOf(portraitStripHeight + 92.dp, 348.dp)
     val animatedStripHeight = (
         stripHeight.value +
             ((expandedStripHeight.value - stripHeight.value) * expansionProgress)

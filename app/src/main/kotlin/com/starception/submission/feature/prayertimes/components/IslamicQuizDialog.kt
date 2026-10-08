@@ -12,6 +12,12 @@ import android.view.ContextThemeWrapper
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,19 +44,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.component.NiaButton
 import com.starception.submission.core.model.deenly.IslamicQuizBank
+import com.starception.submission.core.model.deenly.IslamicQuizDifficulty
 import com.starception.submission.core.model.deenly.IslamicQuizQuestion
 import com.starception.submission.feature.prayertimes.quiz.IslamicQuizRepository
 import com.google.android.material.card.MaterialCardView
@@ -87,6 +97,20 @@ fun IslamicQuizContent(
     val answered = answerSubmitted
     val isCorrect = selectedOption == question.correctOption
     val isLastQuestion = questionIndex == questions.lastIndex
+    // A small spring bump every time the score grows.
+    val scoreBump = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(score) {
+        if (score > 0) {
+            scoreBump.snapTo(0.75f)
+            scoreBump.animateTo(
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.spring(
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+                ),
+            )
+        }
+    }
 
     Column(
         modifier = modifier
@@ -111,15 +135,17 @@ fun IslamicQuizContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                shape = RoundedCornerShape(50),
+            // Design-system tag, consistent with topic tags elsewhere in the app.
+            com.starception.submission.core.designsystem.component.NiaTopicTag(
+                followed = true,
+                onClick = {},
+                modifier = Modifier.graphicsLayer {
+                    scaleX = scoreBump.value
+                    scaleY = scoreBump.value
+                },
             ) {
                 Text(
-                    text = "$score pts",
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "$score pts".uppercase(),
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -147,8 +173,13 @@ fun IslamicQuizContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.SemiBold,
                 )
+                val animatedProgress by animateFloatAsState(
+                    targetValue = (questionIndex + 1f) / questions.size,
+                    animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+                    label = "quizProgress",
+                )
                 LinearProgressIndicator(
-                    progress = { (questionIndex + 1f) / questions.size },
+                    progress = { animatedProgress },
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -156,6 +187,7 @@ fun IslamicQuizContent(
             }
         }
 
+        val questionIsArabic = question.prompt.isArabicText()
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
@@ -166,21 +198,59 @@ fun IslamicQuizContent(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(
-                    text = "QUESTION ${questionIndex + 1}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "QUESTION ${questionIndex + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Design-system tag keeps the level badge consistent with
+                    // the app's topic tags.
+                    com.starception.submission.core.designsystem.component.NiaTopicTag(
+                        followed = false,
+                        onClick = {},
+                    ) {
+                        Text(
+                            text = when (question.difficulty) {
+                                IslamicQuizDifficulty.BEGINNER -> "Easy"
+                                IslamicQuizDifficulty.INTERMEDIATE -> "Medium"
+                                IslamicQuizDifficulty.ADVANCED -> "Hard"
+                            }.uppercase(),
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+                if (question.topic.isNotBlank() && question.topic != "general") {
+                    Text(
+                        text = question.topic,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = if (questionIsArabic) TextAlign.Right else TextAlign.Start,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Text(
                     text = question.prompt,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    textAlign = if (questionIsArabic) TextAlign.Right else TextAlign.Start,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 question.options.forEachIndexed { index, option ->
                     QuizOption(
-                        text = "${('A'.code + index).toChar()}. $option",
+                        text = option,
+                        optionIndex = index,
+                        arabic = questionIsArabic,
                         selected = selectedOption == index,
                         correct = index == question.correctOption,
                         answered = answered,
@@ -193,7 +263,12 @@ fun IslamicQuizContent(
                 }
             }
         }
-        if (answered) {
+        AnimatedVisibility(
+            visible = answered,
+            enter = expandVertically(
+                animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
+            ) + fadeIn(animationSpec = tween(durationMillis = 260)),
+        ) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = if (isCorrect) {
@@ -279,6 +354,8 @@ fun IslamicQuizContent(
 @Composable
 private fun QuizOption(
     text: String,
+    optionIndex: Int,
+    arabic: Boolean,
     selected: Boolean,
     correct: Boolean,
     answered: Boolean,
@@ -313,6 +390,14 @@ private fun QuizOption(
         label = "quizOptionBorderColor",
     )
     val checked = selected || (answered && correct)
+    // Arabic options get Arabic letter labels so the text reads naturally
+    // right-to-left instead of a Latin "A." prefix fighting the direction.
+    val prefix = if (arabic) {
+        listOf("أ.", "ب.", "ج.", "د.").getOrElse(optionIndex) { "" }
+    } else {
+        "${('A'.code + optionIndex).toChar()}. "
+    }
+    val label = if (arabic) "$text $prefix" else "$prefix$text"
     AndroidView(
         modifier = Modifier
             .fillMaxWidth(),
@@ -349,11 +434,16 @@ private fun QuizOption(
             }
         },
         update = { card ->
-            val label = card.getChildAt(0) as TextView
-            label.text = text
-            label.setTextColor(contentColor.toArgb())
-            label.typeface = android.graphics.Typeface.create(
-                label.typeface,
+            val optionLabel = card.getChildAt(0) as TextView
+            optionLabel.text = label
+            optionLabel.setTextColor(contentColor.toArgb())
+            optionLabel.gravity = if (arabic) {
+                android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL
+            } else {
+                android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+            }
+            optionLabel.typeface = android.graphics.Typeface.create(
+                optionLabel.typeface,
                 if (checked) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL,
             )
             card.setCardBackgroundColor(containerColor.toArgb())
@@ -370,4 +460,9 @@ private fun QuizOption(
             }
         },
     )
+}
+
+/** Arabic display text (question or option) rendered right-to-left. */
+private fun String.isArabicText(): Boolean = any { character ->
+    character.code in 0x0600..0x06FF || character.code in 0x0750..0x077F
 }

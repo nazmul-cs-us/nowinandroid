@@ -54,6 +54,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -114,6 +116,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -199,9 +202,11 @@ import com.starception.submission.settings.navigation.navigateToSettings
 import com.starception.submission.ui.search.VoiceAssistantNudgeBus
 import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
 import com.starception.submission.usersettings.ui.CountrySwitchViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.reflect.KClass
 
@@ -739,6 +744,7 @@ private enum class VoiceAssistantSurface {
 private const val NUDGE_MORPH_DURATION_MILLIS = 420
 private const val NUDGE_REVEAL_DELAY_MILLIS = 5_600L
 private const val NUDGE_THINKING_MESSAGE_MILLIS = 1_400L
+private const val ASK_SUGGESTION_COUNT = 8
 
 /**
  * Playful spinner verbs shown in the thinking pill after the informative
@@ -849,6 +855,7 @@ private fun VoiceAssistantButton(
     val generatedQuizQuestion by VoiceAssistantNudgeBus.generatedQuizQuestion
         .collectAsStateWithLifecycle()
     BackHandler(enabled = quizOpen, onBack = VoiceAssistantNudgeBus::closeQuiz)
+    val composerContext = LocalContext.current
     var composerOpen by remember { mutableStateOf(false) }
     var typedQuestion by remember { mutableStateOf("") }
     val composerFocusRequester = remember { FocusRequester() }
@@ -1410,6 +1417,62 @@ private fun VoiceAssistantButton(
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                             keyboardActions = KeyboardActions(onSend = { submitTypedQuestion() }),
                         )
+                        // Suggestion chips while the field is empty: one tap fills
+                        // the question, ready for Ask. The chips come from the
+                        // Fortress of the Muslim chapter titles in the app's own
+                        // database — real invocation contexts the retrieval can
+                        // match exactly — and they hide once typing starts.
+                        val askSuggestions by produceState(
+                            initialValue = emptyList<String>(),
+                            key1 = composerOpen,
+                        ) {
+                            if (composerOpen) {
+                                value = withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        val duaDao = com.starception.submission.core.duadatabase.DuaDatabase
+                                            .getInstance(composerContext)
+                                            .duaDao()
+                                        val repository = com.starception.submission.core.duadatabase.DuaRepository(duaDao)
+                                        repository.getAllChapters()
+                                            .filter { it.duaCount > 0 && it.title.isNotBlank() }
+                                            .map { it.title }
+                                            .shuffled()
+                                            .take(ASK_SUGGESTION_COUNT)
+                                    }.getOrDefault(emptyList())
+                                }
+                            }
+                        }
+                        if (typedQuestion.isEmpty() && askSuggestions.isNotEmpty()) {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                items(
+                                    count = askSuggestions.size,
+                                    key = { askSuggestions[it] },
+                                ) { index ->
+                                    val suggestion = askSuggestions[index]
+                                    Surface(
+                                        onClick = { typedQuestion = suggestion },
+                                        shape = RoundedCornerShape(50),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                            alpha = 0.55f,
+                                        ),
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    ) {
+                                        Text(
+                                            text = suggestion,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.padding(
+                                                horizontal = 10.dp,
+                                                vertical = 6.dp,
+                                            ),
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
@@ -1726,15 +1789,55 @@ private fun VoiceAssistantButton(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         renderedNudge?.supportingText?.takeIf(String::isNotBlank)?.let { body ->
-                            Text(
-                                text = body,
-                                style = if (verticalLayout) {
-                                    MaterialTheme.typography.bodySmall
-                                } else {
-                                    MaterialTheme.typography.bodyMedium
-                                },
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            // Answer cards carry "“<quote>”\n\n<source body>": show the
+                            // verified quote as the hero line and the full source
+                            // beneath it, instead of one undifferentiated blob.
+                            val answerQuote = body.substringBefore("\n\n")
+                            val sourceBody = body.substringAfter("\n\n", "")
+                            val isAnswerCard = sourceBody.isNotBlank() &&
+                                answerQuote.length <= 140 &&
+                                answerQuote.startsWith("\u201C")
+                            if (isAnswerCard) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                ) {
+                                    Text(
+                                        text = answerQuote,
+                                        style = if (verticalLayout) {
+                                            MaterialTheme.typography.bodySmall
+                                        } else {
+                                            MaterialTheme.typography.bodyMedium
+                                        },
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    )
+                                }
+                                if (sourceBody.isNotBlank()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = sourceBody,
+                                        style = if (verticalLayout) {
+                                            MaterialTheme.typography.bodySmall
+                                        } else {
+                                            MaterialTheme.typography.bodyMedium
+                                        },
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = body,
+                                    style = if (verticalLayout) {
+                                        MaterialTheme.typography.bodySmall
+                                    } else {
+                                        MaterialTheme.typography.bodyMedium
+                                    },
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                         renderedNudge?.sourceLabel?.takeIf(String::isNotBlank)?.let { sourceLabel ->
                             // The card body is deliberately not tappable: reading
@@ -1814,7 +1917,12 @@ private fun VoiceAssistantButton(
                                 max = if (verticalLayout) {
                                     (configuration.screenHeightDp - 32).dp
                                 } else {
-                                    minOf(480.dp, (configuration.screenHeightDp - 160).dp)
+                                    // The quiz content grew (difficulty tag, topic
+                                    // line, answer feedback); the old 480dp cap
+                                    // clipped the options and action button on
+                                    // common screens. Follow the window with a
+                                    // bottom clearance for the floating nav.
+                                    minOf(640.dp, (configuration.screenHeightDp - 120).dp)
                                 },
                             )
                             .graphicsLayer {
