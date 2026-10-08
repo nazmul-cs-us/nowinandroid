@@ -134,6 +134,13 @@ class SyncContainerState(
     val maxDragDistance: Float = 0f,
     val wobbleIntensity: Float = 0f,
     val heldContentInsetTop: Dp = 0.dp,
+    /**
+     * The rigid sheet translation of the in-progress finger drag, beyond the
+     * held banner inset. Sheets that want their bottom edge to stay pinned
+     * above floating chrome (Home's navigation pill) subtract this from a
+     * flexible section's height so the slide is absorbed, not passed down.
+     */
+    val transientContentOffsetY: Dp = 0.dp,
     val pullModifier: Modifier = Modifier,
 )
 
@@ -516,6 +523,15 @@ fun PullToSyncContainer(
     val activeStatus = statuses.getOrNull(activeStatusIndex)
 
     val heldContentInsetTop = (refreshingOffset.value * maxRevealDpForBanners).dp
+    // The transient finger-drag portion of the reveal, applied to the sheet as
+    // a rigid translation in the placement phase. Exposed so adaptive content
+    // can hand this displacement to a flexible section instead of its bottom.
+    val transientContentOffsetY = (
+        (
+            (dragDistanceAnimated / maxDragDistance).coerceIn(0f, 1f) -
+                refreshingOffset.value
+            ).coerceAtLeast(0f) * maxRevealDpForBanners
+        ).dp
 
     // Create sync container state for content
     val syncState = SyncContainerState(
@@ -524,6 +540,7 @@ fun PullToSyncContainer(
         maxDragDistance = maxDragDistance,
         wobbleIntensity = wobbleIntensity,
         heldContentInsetTop = heldContentInsetTop,
+        transientContentOffsetY = transientContentOffsetY,
         pullModifier = Modifier.nestedScroll(nestedScrollConnection),
     )
 

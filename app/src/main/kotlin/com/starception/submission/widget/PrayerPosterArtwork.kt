@@ -226,6 +226,20 @@ internal object PrayerPosterArtwork {
         }
     }
 
+    /**
+     * Decodes every scene texture the poster renderer needs into the shared
+     * artwork cache. The first Prayer Now tile render otherwise pays the full
+     * poster + celestial decode cost while the card sits on its flat
+     * placeholder color; warming once on screen entry makes the first scene
+     * appear with the other tiles instead of seconds after them.
+     */
+    fun prewarm(context: Context) {
+        artwork(context, R.drawable.prayer_widget_poster_night_moonless_hq_v4)
+        artwork(context, R.drawable.prayer_widget_poster_day_no_sun_v2)
+        artwork(context, R.drawable.prayer_widget_sun_real_3d_v1)
+        artwork(context, R.drawable.prayer_widget_moon_real_nasa_v1)
+    }
+
     private fun artwork(context: Context, resource: Int): Bitmap? = synchronized(artworkCache) {
         artworkCache[resource] ?: BitmapFactory.decodeResource(context.resources, resource)
             ?.also { artworkCache[resource] = it }

@@ -1136,6 +1136,7 @@ private val INSIGHT_INDICATOR_GAP = 10.dp
 
 /** Key in `insight_carousel_preferences` holding the chosen indicator style name. */
 private const val INSIGHT_INDICATOR_STYLE_KEY = "insight_indicator_style"
+private const val INSIGHT_EXPANDED_PAGE_KEY = "insight_expanded_logical_page"
 
 /**
  * Width : height of a resting insight card, from the reference design at
@@ -1298,15 +1299,28 @@ fun SwipeableBigTiles(
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
     isInteractionBlocked: Boolean = false,
     weatherThresholds: PrayerWeatherThresholds = PrayerWeatherThresholds(),
+    onExpandedPageChange: ((Int?) -> Unit)? = null,
+    collapseExpandedTileRequest: Int = 0,
 ) {
     val insightPageCount = INSIGHT_PAGE_COUNT
     val middleLoopStart = insightPageCount
-    val pagerState = rememberPagerState(
-        initialPage = middleLoopStart,
-        pageCount = { insightPageCount * 3 },
-    )
     val view = LocalView.current
     val context = LocalContext.current
+    val carouselPreferences = remember(context) {
+        context.getSharedPreferences("insight_carousel_preferences", Context.MODE_PRIVATE)
+    }
+    // A long-press expansion is a deliberate reading state. rememberSaveable
+    // covers recreation, but the user expects the enlarged tile to still be
+    // there after fully closing and reopening the app, so it persists here and
+    // both the expansion and the pager start on the stored page.
+    val persistedExpandedPage = remember {
+        carouselPreferences.getInt(INSIGHT_EXPANDED_PAGE_KEY, -1)
+            .takeIf { it in 0 until insightPageCount }
+    }
+    val pagerState = rememberPagerState(
+        initialPage = middleLoopStart + (persistedExpandedPage ?: 0),
+        pageCount = { insightPageCount * 3 },
+    )
     val lifecycleOwner = LocalLifecycleOwner.current
     val detectedActivity by com.starception.submission.util.ActivityTracker.currentActivity
         .collectAsStateWithLifecycle()
@@ -1314,9 +1328,6 @@ fun SwipeableBigTiles(
     val carouselScope = rememberCoroutineScope()
     var showGlobePopup by rememberSaveable { mutableStateOf(false) }
     var showAutoSwipeSettings by remember { mutableStateOf(false) }
-    val carouselPreferences = remember(context) {
-        context.getSharedPreferences("insight_carousel_preferences", Context.MODE_PRIVATE)
-    }
     var autoSwipeEnabled by remember {
         mutableStateOf(carouselPreferences.getBoolean("auto_swipe_enabled", true))
     }
@@ -1355,7 +1366,28 @@ fun SwipeableBigTiles(
     var isUserTouching by remember { mutableStateOf(false) }
     var interactionEpoch by remember { mutableIntStateOf(0) }
     var isAutoAdvancing by remember { mutableStateOf(false) }
-    var expandedLogicalPage by rememberSaveable { mutableStateOf<Int?>(null) }
+    var expandedLogicalPage by rememberSaveable { mutableStateOf(persistedExpandedPage) }
+    LaunchedEffect(collapseExpandedTileRequest) {
+        // The host hands the enlarged tile's space to another section (for
+        // example, the full prayer schedule): fold the tile back down.
+        if (collapseExpandedTileRequest > 0 && expandedLogicalPage != null) {
+            expandedLogicalPage = null
+            interactionEpoch++
+        }
+    }
+    LaunchedEffect(expandedLogicalPage) {
+        // Keep disk in step with the in-memory expansion so a closed-and-reopened
+        // app lands back on the enlarged tile. The host also observes this to
+        // re-balance the page (for example, reclaiming space from the prayer
+        // rows while a tile is enlarged).
+        onExpandedPageChange?.invoke(expandedLogicalPage)
+        carouselPreferences.edit()
+            .apply {
+                expandedLogicalPage?.let { putInt(INSIGHT_EXPANDED_PAGE_KEY, it) }
+                    ?: remove(INSIGHT_EXPANDED_PAGE_KEY)
+            }
+            .apply()
+    }
     var pendingPrayerUndo by remember { mutableStateOf<PrayerUndoState?>(null) }
     val autoAdvanceProgress = remember { Animatable(0f) }
     val pagerFlingBehavior = PagerDefaults.flingBehavior(
@@ -2456,6 +2488,15 @@ private fun PrayerPosterInsightCard(
 ) {
     val context = LocalContext.current
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // Warm the poster decoder and the widget-state cache before the first
+        // render needs them, so the Prayer Now scene shows up with the other
+        // tiles rather than a beat behind them.
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching { loadPrayerWidgetStateCached(context) }
+                PrayerPosterArtwork.prewarm(context)
+            }
+        }
         val widthDp = maxWidth.value.coerceAtLeast(1f)
         val heightDp = maxHeight.value.coerceAtLeast(1f)
         val minuteKey = currentTime.hour * 60 + currentTime.minute
@@ -2762,7 +2803,27 @@ private fun InsightPreviewCard(
                     bitmap = backgroundBitmap,
                     contentDescription = null,
                     contentScale = ContentScale.FillBounds,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // The rendered scene follows the same counter-scroll depth
+                            // as the painter-backed tiles so Prayer Now does not feel
+                            // static while swiping past it.
+                            val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                            val restingMotion = ambientMotion * focusedMotionStrength
+                            val imageScale = 1.065f + (restingMotion * 0.006f)
+                            val requestedTranslationX = -pageOffset * 18.dp.toPx()
+                            val maxCoveredHorizontalShift = (
+                                (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
+                                ).coerceAtLeast(0f)
+                            scaleX = imageScale
+                            scaleY = imageScale
+                            translationX = requestedTranslationX.coerceIn(
+                                -maxCoveredHorizontalShift,
+                                maxCoveredHorizontalShift,
+                            )
+                            translationY = restingMotion * 4.dp.toPx()
+                        },
                 )
             } else if (backgroundPainterRes != null) {
                 Crossfade(
@@ -3437,7 +3498,11 @@ private fun InsightPreviewCard(
                         verticalAlignment = Alignment.Bottom,
                     ) {
                         Column(
-                            modifier = Modifier.weight(if (narrowFooter) 1.42f else 1.48f),
+                            // The forecast metric ("33°C", "60%") must fit next to
+                            // its weather icon without ellipsizing; give the metric
+                            // column a larger share of a short footer than the raw
+                            // half-width intuition suggests.
+                            modifier = Modifier.weight(if (narrowFooter) 1.30f else 1.40f),
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             Text(
@@ -3512,7 +3577,7 @@ private fun InsightPreviewCard(
                                     ),
                             )
                             Column(
-                                modifier = Modifier.weight(if (narrowFooter) 0.58f else 0.52f),
+                                modifier = Modifier.weight(if (narrowFooter) 0.70f else 0.60f),
                                 horizontalAlignment = Alignment.End,
                                 verticalArrangement = Arrangement.spacedBy(1.dp),
                             ) {
@@ -3574,7 +3639,10 @@ private fun InsightPreviewCard(
                                             // Prayer Now's night scrim; thermometer/rain
                                             // retain their authored shading normally.
                                             useSolidTint = visual == PrayerWeatherVisual.Humidity,
-                                            modifier = Modifier.size(if (narrowFooter) 17.dp else 20.dp),
+                                            // On the compact card the metric needs every
+                                            // point of width it can get to show "33°C"
+                                            // instead of "3…".
+                                            modifier = Modifier.size(if (narrowFooter) 15.dp else 20.dp),
                                         )
                                         Text(
                                             text = metric,
@@ -3586,6 +3654,7 @@ private fun InsightPreviewCard(
                                             color = Color.White,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 1,
+                                            softWrap = false,
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                     }
