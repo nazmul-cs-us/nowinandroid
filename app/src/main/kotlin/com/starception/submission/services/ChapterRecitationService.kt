@@ -563,6 +563,16 @@ class ChapterRecitationService : Service() {
         }
         if (!shuffle) {
             bookPlaylistOrder = bookPlaylistOrder.dropWhile { it < bookPlaylistCurrent }
+        } else if (bookPlaylistCurrent > rangeStart) {
+            // A mid-playlist restart (for example, a translation-language change)
+            // must continue from the hadith the chain was on. Rotate the shuffled
+            // order so that hadith leads instead of jumping to a random one; a
+            // fresh shuffle start (start == range start) keeps its random opener.
+            val currentIndex = bookPlaylistOrder.indexOf(bookPlaylistCurrent)
+            if (currentIndex > 0) {
+                bookPlaylistOrder = bookPlaylistOrder.drop(currentIndex) +
+                    bookPlaylistOrder.take(currentIndex)
+            }
         }
         requestedBookTrack = null
         ChapterRecitationState.setBookPlaylist(

@@ -649,6 +649,30 @@ private fun androidx.navigation.NavController.navigateToFortressDua(
 }
 
 /**
+ * Resolves the hadith database file for a playing collection's display name.
+ *
+ * The media mini-bar only knows the collection name the playback service
+ * publishes ("Shamai'l At-Tirmidhi", "Sahih Muslim", …). Shama'il must match
+ * before Tirmidhi because its display name contains both.
+ */
+internal fun hadithDatabaseFileForCollection(collectionName: String): String {
+    val name = collectionName.lowercase()
+    return when {
+        "shamai" in name || "shamay" in name -> "shamayele_tirmidhi_complete.db"
+        "bukhari" in name -> "sahih_bukhari.db"
+        "muslim" in name -> "sahih_muslim.db"
+        "abu dawud" in name || "abudawud" in name -> "sunan_abu_dawud.db"
+        "nasa" in name -> "sunan_nasai.db"
+        "ibn majah" in name || "ibnmajah" in name -> "sunan_ibn_majah.db"
+        "muwatta" in name || "malik" in name -> "muwatta_malik.db"
+        "musnad" in name || "ahmad" in name -> "musnad_ahmad.db"
+        "darimi" in name -> "sunan_darimi.db"
+        "tirmidhi" in name -> "sunan_tirmidhi.db"
+        else -> "sahih_bukhari.db"
+    }
+}
+
+/**
  * Opens the detail page for whatever the media mini-bar is playing — Quran
  * surah, hadith TTS, or a Fortress dua recitation. Shared by the app-level
  * PullToSyncContainer (NiaApp) and the Home screen's inner container.
@@ -661,11 +685,13 @@ fun androidx.navigation.NavController.navigateToMediaSourceDetail(
             navigateToSurah(source.surahIndex + 1)
         }
         is com.starception.submission.media.MediaSource.Hadith -> {
-            // Only Bukhari flows through hadith TTS playback today.
+            // Play All / Feeling Blessed chains run from the playback service for
+            // every collection now, so resolve the database file from the
+            // published collection name instead of assuming Bukhari.
             navigateToHadithDetail(
                 collectionName = source.collectionName,
                 hadithNumber = source.hadithNumber,
-                databaseFile = "sahih_bukhari.db",
+                databaseFile = hadithDatabaseFileForCollection(source.collectionName),
             )
         }
         is com.starception.submission.media.MediaSource.Fortress -> {

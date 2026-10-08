@@ -699,6 +699,11 @@ fun HadithDetailScreen(
     // composable, so navigating away cancelled the whole sequence; the service
     // keeps advancing the queue no matter which screen is visible, and this
     // screen only follows along while it is open.
+    // Settings the running service chain was started with. When the user
+    // changes the translation language (or voice) mid-playlist, the chain must
+    // restart with the new settings from the current hadith — re-attaching
+    // alone would keep reading in the old language.
+    var chainSettingsKey by remember { mutableStateOf<String?>(null) }
     androidx.compose.runtime.LaunchedEffect(
         bookPlaylistEnabled,
         playbackRangeStart,
@@ -722,22 +727,32 @@ fun HadithDetailScreen(
             return@LaunchedEffect
         }
 
-        // The screen can re-attach while its service chain is already running
-        // (mini-bar, notification, or back navigation). Don't restart the queue —
-        // just resume following it.
+        val settingsKey = "$selectedLanguage|${selectedVoice.name}|$selectedSpeakerId"
         val serviceOwnsChain =
             com.starception.submission.services.ChapterRecitationState.isBookPlaylistActive &&
                 com.starception.submission.services.ChapterRecitationState.subtitle ==
                 collectionName
         isBookPlaylistPlayback = true
         isTtsBackedPlayback = true
-        if (serviceOwnsChain) {
+        if (serviceOwnsChain && chainSettingsKey == settingsKey) {
+            // The screen re-attached to its own chain (mini-bar, notification,
+            // back navigation) with unchanged settings: just resume following
+            // it instead of restarting the queue.
             isBookPlaylistPaused = !com.starception.submission.services.ChapterRecitationState.isPlaying
             val current = com.starception.submission.services.ChapterRecitationState.bookCurrentHadith
             if (current > 0 && current != hadithNumber) hadithNumber = current
             return@LaunchedEffect
         }
 
+        val startHadith = if (serviceOwnsChain) {
+            // Mid-playback settings change: continue from the hadith the chain
+            // is on rather than restarting the book.
+            com.starception.submission.services.ChapterRecitationState.bookCurrentHadith
+                .takeIf { it > 0 } ?: hadithNumber
+        } else {
+            hadithNumber
+        }
+        chainSettingsKey = settingsKey
         isBookPlaylistPaused = false
         shouldAutoPlayAfterLoad = false
         if (isBukhariCollection) bukhariTranslationRepo.loadTranslations()
@@ -745,7 +760,7 @@ fun HadithDetailScreen(
             context = context,
             databaseFile = databaseFile,
             collectionName = collectionName,
-            startHadith = hadithNumber,
+            startHadith = startHadith,
             rangeStart = rangeStart,
             rangeEnd = rangeEnd,
             language = selectedLanguage,
