@@ -139,6 +139,48 @@ def validate_answer(source_text: str, output: dict[str, Any]) -> tuple[bool, str
     return True, "accepted"
 
 
+def validate_topic_question(output: dict[str, Any]) -> tuple[bool, str]:
+    """Topic mode: compose a question about a Knowledge area from the verified
+    Dorar bank. There is no source passage, so evidence copies the answer and
+    Arabic is the expected language — only the shape rules apply."""
+    if set(output) != {
+        "contentType",
+        "questionKind",
+        "question",
+        "answer",
+        "evidence",
+        "options",
+    }:
+        return False, "unexpected_question_fields"
+    if output.get("contentType") != "question":
+        return False, "content_type_mismatch"
+    if output.get("questionKind") not in ALLOWED_QUESTION_KINDS:
+        return False, "unsupported_question_kind"
+    question = output.get("question")
+    answer = output.get("answer")
+    evidence = output.get("evidence")
+    options = output.get("options")
+    if not isinstance(question, str) or not 8 <= len(question) <= 180:
+        return False, "invalid_question"
+    if not isinstance(answer, str) or not 1 <= len(answer) <= 96:
+        return False, "invalid_answer"
+    if evidence != answer:
+        return False, "topic_evidence_must_copy_answer"
+    if (
+        not isinstance(options, list)
+        or len(options) != 4
+        or not all(
+            isinstance(option, str) and 1 <= len(option) <= 96 for option in options
+        )
+    ):
+        return False, "invalid_options"
+    if len({option.casefold() for option in options}) != 4:
+        return False, "options_not_unique"
+    if options.count(answer) != 1:
+        return False, "answer_not_in_options_once"
+    return True, "accepted"
+
+
 def validate_output(example: dict, generated: str) -> tuple[bool, str]:
     try:
         output: dict[str, Any] = json.loads(generated)
@@ -146,14 +188,24 @@ def validate_output(example: dict, generated: str) -> tuple[bool, str]:
     except (json.JSONDecodeError, KeyError, TypeError) as error:
         return False, f"invalid_json:{type(error).__name__}"
 
+    # Topic mode has no source passage; skip the source hash gate and apply
+    # shape-only validation with Arabic allowed.
+    user_prompt = example["messages"][-2]["content"]
+    if "Knowledge area:" in user_prompt:
+        try:
+            return validate_topic_question(output)
+        except (KeyError, TypeError) as error:
+            return False, f"invalid_json:{type(error).__name__}"
+
     if (
         hashlib.sha256(example["sourceText"].encode()).hexdigest()
         != example["sourceTextSha256"]
     ):
         return False, "input_source_hash_mismatch"
 
-    # The answer model may legitimately return "unanswered" for an "answer" example,
-    # so dispatch on the answer family before any strict content-type equality check.
+    # The answer model may legitimately return "unanswered" for an "answer"
+    # example, so dispatch on the answer family before any strict content-type
+    # equality check.
     if expected["contentType"] in {"answer", "unanswered"}:
         return validate_answer(example["sourceText"], output)
 

@@ -5,8 +5,8 @@
   "total_files": 6928,
   "categories": {
     "json_data": {
-      "total_size": 16640472,
-      "file_count": 7,
+      "total_size": 19570239,
+      "file_count": 8,
       "required": true
     },
     "news": {
@@ -41730,6 +41730,12 @@
       "sha256": "9f6e662cca5f4a91fa07cbaca33e3ec4c8ef9389967495e55bbbdeb2d7dd496b",
       "category": "json_data",
       "required": true
+    },
+    "json/islamic_quiz_bank.json": {
+      "size": 2929767,
+      "sha256": "922af206ee44409f9b88f1e964d3d4c43af8590d4078e0342079248a731a3ce9",
+      "category": "json_data",
+      "required": false
     }
   }
 }

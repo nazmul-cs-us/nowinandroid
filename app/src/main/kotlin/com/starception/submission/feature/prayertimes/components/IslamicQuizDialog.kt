@@ -74,8 +74,9 @@ fun IslamicQuizContent(
         (listOfNotNull(featuredQuestion) + IslamicQuizBank.questions.shuffled())
             .distinctBy(IslamicQuizQuestion::id)
     }
+    val quizContext = androidx.compose.ui.platform.LocalContext.current
     val questions by produceState(initialValue = initialQuestions, key1 = featuredQuestion?.id) {
-        value = (listOfNotNull(featuredQuestion) + IslamicQuizRepository().loadQuestions())
+        value = (listOfNotNull(featuredQuestion) + IslamicQuizRepository(quizContext).loadQuestions())
             .distinctBy(IslamicQuizQuestion::id)
     }
     var questionIndex by remember { mutableIntStateOf(0) }
