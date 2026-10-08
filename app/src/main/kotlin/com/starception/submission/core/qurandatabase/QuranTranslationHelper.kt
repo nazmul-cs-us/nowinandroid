@@ -464,6 +464,37 @@ class QuranTranslationRepository(
     }
 
     /**
+     * Multi-token ayah search where each token slot accepts synonym alternatives
+     * as pre-wrapped SQL patterns ('%prophet%'). Returns each hit with its
+     * resolved Surah so callers can build references without another lookup.
+     */
+    suspend fun searchAyahsMultiTokenAny(
+        p0: String,
+        a0: String = "",
+        b0: String = "",
+        p1: String = "",
+        a1: String = "",
+        b1: String = "",
+        p2: String = "",
+        a2: String = "",
+        b2: String = "",
+        limit: Int = 8,
+    ): List<Pair<SurahEntity, AyahEntity>> = withContext(Dispatchers.IO) {
+        try {
+            if (p0.isBlank()) return@withContext emptyList()
+            quranDao.searchAyahsMultiTokenAny(p0, a0, b0, p1, a1, b1, p2, a2, b2, limit)
+                .mapNotNull { ayah ->
+                    quranDao.getSurahById(ayah.surahId)?.let { surah -> surah to ayah }
+                }
+        } catch (e: QuranDatabaseUnavailableException) {
+            emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error searching ayahs for [$p0 $p1 $p2]", e)
+            emptyList()
+        }
+    }
+
+    /**
      * Get a specific Ayah by its global number
      */
     suspend fun getAyahByNumber(ayahNumber: Int): Ayah? = withContext(Dispatchers.IO) {

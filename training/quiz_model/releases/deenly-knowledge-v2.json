@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "modelVersion": "deenly-knowledge-v2",
+  "baseModel": "Qwen/Qwen2.5-0.5B-Instruct",
+  "trainingMethod": "LoRA",
+  "edgeRuntime": "llama.cpp",
+  "edgeFormat": "GGUF Q4_K_M",
+  "artifact": {
+    "fileName": "deenly-knowledge-v2-q4_k_m.gguf",
+    "sizeBytes": 397807648,
+    "sha256": "82a7a44c6c948969ab2303fb57d8e69995ae361744099edf79a785eac455a08f",
+    "cdnParts": [
+      {
+        "cdnKey": "models/now_nudge/deenly-knowledge-v2-q4_k_m.gguf.part-00",
+        "sizeBytes": 198903824,
+        "sha256": "1ccf6823e49300e71de097170d943a938cba6fd1aac1eff8a13f45cec4ee1ffa"
+      },
+      {
+        "cdnKey": "models/now_nudge/deenly-knowledge-v2-q4_k_m.gguf.part-01",
+        "sizeBytes": 198903824,
+        "sha256": "f00375fe127220675b6f8489f1fc7e4a61caf5dd4219ddcdfa2d53c186b00664"
+      }
+    ]
+  },
+  "dataset": {
+    "purpose": "grounded_answer_contract_instruction_tuning",
+    "religiousFactsAdded": false,
+    "trainCount": 544,
+    "validationCount": 70,
+    "testCount": 71,
+    "runtimeKnowledgePolicy": "verified_source_envelope_only",
+    "answerPolicy": "exact_contiguous_source_spans_or_unanswered"
+  },
+  "training": {
+    "steps": 320,
+    "epochs": 2.35,
+    "trainLoss": 0.10110510993003845,
+    "validationLoss": 0.03730282962322235,
+    "validationPerplexity": 1.0380066633224487
+  },
+  "acceptance": {
+    "quantizedHeldOutAccepted": 34,
+    "quantizedHeldOutRejected": 26,
+    "acceptanceRate": 0.5666666666666667,
+    "byRecordFamily": {
+      "contractAnswers": "22/24",
+      "corpusAnswers": "12/33",
+      "contractUnanswered": "0/3"
+    },
+    "runtimeShortSourcePreference": true,
+    "sourceIntegrityViolationsShownToUser": 0
+  },
+  "delivery": {
+    "bundledInApk": false,
+    "category": "model_now_nudge_knowledge",
+    "requiredAtFirstLaunch": false,
+    "strategy": "versioned app-private CDN download with size and SHA-256 verification",
+    "fallback": "verbatim source-grounded knowledge card from the deterministic content bank"
+  }
+}

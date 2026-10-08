@@ -397,7 +397,10 @@ def corpus_records(
             source_text = bound_source(passage["text"], max_source_chars)
             for span_start, span_end in sentence_spans(source_text):
                 sentence = source_text[span_start:span_end].strip()
-                if not (40 <= len(sentence) <= 420) or not is_clean_english(sentence):
+                # A 0.5B model copies short spans reliably and long ones poorly
+                # (measured: accepted evidence averages ~78 chars, rejected
+                # ~120). Skip sentences too long to quote cleanly.
+                if not (40 <= len(sentence) <= 240) or not is_clean_english(sentence):
                     continue
                 located = topic_for(sentence)
                 if located is None:
@@ -411,6 +414,24 @@ def corpus_records(
                 ):
                     continue
                 if contains_arabic(answer):
+                    continue
+                # Evidence: the shortest sentence prefix that still contains the
+                # whole answer, cut at a word boundary so it remains a contiguous
+                # source span while staying short enough for the model to quote.
+                answer_end = sentence.find(answer) + len(answer)
+                evidence_cut = min(len(sentence), max(answer_end, 110))
+                evidence = sentence[:evidence_cut]
+                if evidence_cut < len(sentence):
+                    evidence = evidence.rstrip(" ,;:")
+                    evidence = (
+                        evidence[:answer_end]
+                        if len(evidence) < answer_end
+                        else evidence
+                    )
+                    boundary = evidence.rsplit(" ", 1)
+                    if len(boundary) > 1 and len(boundary[0]) >= answer_end:
+                        evidence = boundary[0]
+                if answer not in evidence or evidence not in source_text:
                     continue
                 template = QUESTION_TEMPLATES[
                     int.from_bytes(
@@ -432,7 +453,7 @@ def corpus_records(
                         payload={
                             "contentType": "answer",
                             "answer": answer,
-                            "evidence": sentence,
+                            "evidence": evidence,
                         },
                     )
                 )
@@ -537,12 +558,16 @@ def split_for(record: dict) -> str:
 
 def build(args: argparse.Namespace) -> dict:
     contract = contract_records(args.contract_examples_per_kind)
+    # Unanswered examples must be provably off-topic or the model learns to
+    # fight its own reading. Only the synthetic contract pairs guarantee that:
+    # a corpus passage without the topic *keyword* can still be about the
+    # topic, and those ambiguous labels produced degenerate output.
     contract_unanswered = contract_unanswered_records(args.contract_unanswered_per_kind)
     passages = passage_corpus(args.quran_translation, args.hadith_db)
     corpus = corpus_records(
         passages,
         answer_target=args.corpus_answer_target,
-        unanswered_target=args.corpus_unanswered_target,
+        unanswered_target=0,
         max_source_chars=args.max_source_chars,
     )
 

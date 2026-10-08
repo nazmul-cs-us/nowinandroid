@@ -170,7 +170,11 @@ class DeenlyKnowledgeModel(context: Context) {
                 ?.takeIf(String::isNotBlank)
                 ?.let { appendLine("User question: ${it.take(MAX_USER_QUESTION_CHARS)}") }
             appendLine("Source text:")
-            append(sourceText.take(MAX_SOURCE_CHARS))
+            // The answering model was trained on short passages: a 0.5B copies
+            // exact spans from ~600 chars reliably but degenerates on longer
+            // ones. Retrieval still selects the full source; the prompt keeps
+            // only the opening the model can quote from.
+            append(sourceText.take(ANSWER_MAX_SOURCE_CHARS))
         } else {
             appendLine("Task: create a ${task.wireName} item.")
             appendLine("Collection: $collection")
@@ -192,16 +196,21 @@ class DeenlyKnowledgeModel(context: Context) {
         }
 
     companion object {
-        const val MODEL_FILE_NAME = "deenly-question-v2-q4_k_m.gguf"
+        // deenly-question-v3: trained on the semantic contract plus REAL corpus
+        // records, so it quotes the actual source instead of regurgitating the
+        // synthetic examples the v2 release memorized.
+        const val MODEL_FILE_NAME = "deenly-question-v3-q4_k_m.gguf"
         const val MODEL_SIZE_BYTES = 397_807_648L
-        const val MODEL_SHA256 = "a56a58a51c66fec1548ac32b72ce4b70c4608c24486f5b212fafcba03b5439de"
+        const val MODEL_SHA256 =
+            "b5366d1fd1016cbf406705984f09462bfae39ef89a499d74452d4499b2d14106"
 
-        // The answering model (deenly-knowledge-v2) is optional; until it is
-        // downloaded and verified, the ANSWER task falls back to the verbatim
-        // deterministic source card.
+        // The answering model (deenly-knowledge-v2). Every generated answer and
+        // evidence quote is validated as an exact span of the verified source
+        // before display; failures fall back to the verbatim source card.
         const val ANSWER_MODEL_FILE_NAME = "deenly-knowledge-v2-q4_k_m.gguf"
-        const val ANSWER_MODEL_SIZE_BYTES = -1L
-        const val ANSWER_MODEL_SHA256 = ""
+        const val ANSWER_MODEL_SIZE_BYTES = 397_807_648L
+        const val ANSWER_MODEL_SHA256 =
+            "82a7a44c6c948969ab2303fb57d8e69995ae361744099edf79a785eac455a08f"
 
         private val DeenlyKnowledgeTask.modelFileName: String
             get() = when (this) {
@@ -231,6 +240,7 @@ class DeenlyKnowledgeModel(context: Context) {
         private const val INFERENCE_TIMEOUT_SECONDS = 120L
         private const val PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 5L
         private const val MAX_SOURCE_CHARS = 1_400
+        private const val ANSWER_MAX_SOURCE_CHARS = 600
         private const val MAX_APP_SITUATION_CHARS = 320
         private const val MAX_USER_QUESTION_CHARS = 240
         private const val MAX_TITLE_CHARS = 84

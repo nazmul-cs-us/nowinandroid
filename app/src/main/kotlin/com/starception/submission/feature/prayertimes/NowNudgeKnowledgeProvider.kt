@@ -200,7 +200,17 @@ internal class NowNudgeKnowledgeProvider(
         if (task == DeenlyKnowledgeTask.ANSWER) {
             return answerFromSources(
                 date = date,
-                sources = rankedSources.take(ANSWER_SOURCE_ATTEMPTS),
+                // The answering model quotes short passages reliably (92% on
+                // concise sources) and degrades on long ones. Keep the ranked
+                // relevance order first and use brevity only as a tie-breaker,
+                // so a more relevant hadith beats a short generic ayah.
+                sources = rankedSources
+                    .take(ANSWER_CANDIDATE_WINDOW)
+                    .sortedWith(
+                        compareByDescending<RankedKnowledgeSource> { it.score }
+                            .thenBy { it.sourceTextLength },
+                    )
+                    .take(ANSWER_SOURCE_ATTEMPTS),
                 userQuestion = query.orEmpty(),
                 fallback = {
                     buildCandidate(
@@ -214,17 +224,21 @@ internal class NowNudgeKnowledgeProvider(
         }
         val decision = decisionGenerator.generate(task, envelope)
         return when {
-            task == DeenlyKnowledgeTask.QUESTION &&
-                decision is DeenlyKnowledgeDecision.GroundedQuestion &&
+            task == DeenlyKnowledgeTask.QUESTION && decision is DeenlyKnowledgeDecision.GroundedQuestion &&
                 decision.isGroundedIn(source.sourceText) -> buildGroundedQuestionCandidate(
                 date = date,
                 source = source,
                 decision = decision,
                 rankingScore = rankedSource.score,
             )
-            task == DeenlyKnowledgeTask.QUESTION -> buildQuestionCandidate(
+            // When the model's question does not validate, present the source
+            // itself as a knowledge card instead of the old "which collection
+            // records this" quiz fallback — asking where a passage comes from
+            // is rarely interesting and reads as a trivia chore.
+            task == DeenlyKnowledgeTask.QUESTION -> buildCandidate(
                 date = date,
                 source = source,
+                decision = null,
                 rankingScore = rankedSource.score,
             )
             else -> buildCandidate(
@@ -345,7 +359,9 @@ internal class NowNudgeKnowledgeProvider(
     private data class RankedKnowledgeSource(
         val source: GroundedKnowledgeSource,
         val score: Float,
-    )
+    ) {
+        val sourceTextLength: Int get() = source.sourceText.length
+    }
 
     companion object {
         fun create(
@@ -394,60 +410,6 @@ internal class NowNudgeKnowledgeProvider(
                 collection = source.collection,
                 topic = source.topic,
                 rankingScore = rankingScore,
-            )
-        }
-
-        internal fun buildQuestionCandidate(
-            date: LocalDate,
-            source: GroundedKnowledgeSource,
-            rankingScore: Float = 0f,
-        ): NowNudgeKnowledgeCandidate {
-            val answer = source.sourceLocationAnswer()
-            val options = (SOURCE_LOCATION_OPTIONS + answer)
-                .distinct()
-                .filterNot { it == answer }
-                .sortedBy { option -> "${source.id}|$option".sha256() }
-                .take(3)
-                .plus(answer)
-                .sortedBy { option -> "${date}|${source.id}|$option".sha256() }
-            val promptLead = when (source.target) {
-                is NowNudgeKnowledgeTarget.QuranAyah ->
-                    "Which source contains this translated passage?"
-                is NowNudgeKnowledgeTarget.Hadith ->
-                    "Which Hadith collection records this narration?"
-                is NowNudgeKnowledgeTarget.FortressDua ->
-                    "Which dua collection contains this invocation?"
-            }
-            val question = IslamicQuizQuestion(
-                id = "model-question-$date-${source.id}",
-                prompt = "$promptLead\n\n${source.sourceText}",
-                options = options,
-                correctOption = options.indexOf(answer),
-                explanation = "This passage is recorded as ${source.reference}.",
-                sourceLabel = source.reference,
-                sourceUrl = source.sourceUrl(),
-                sourceCollection = source.contentSource(),
-                sourceReference = source.reference,
-                difficulty = IslamicQuizDifficulty.INTERMEDIATE,
-                topic = source.topic,
-                sourceText = source.sourceText,
-                sourceTextSha256 = source.sourceText.sha256(),
-            )
-            return NowNudgeKnowledgeCandidate(
-                nudge = DeenlyNudge(
-                    id = source.nudgeId(date),
-                    action = DeenlyNudgeAction.PLAY_QUIZ,
-                    label = promptLead,
-                    actionId = DeenlyActionIds.LEARNING_START_QUIZ,
-                    supportingText = source.sourceText,
-                    sourceLabel = "Tap to answer",
-                ),
-                target = source.target,
-                sourceId = source.id,
-                collection = source.collection,
-                topic = source.topic,
-                rankingScore = rankingScore,
-                quizQuestion = question,
             )
         }
 
@@ -536,20 +498,8 @@ internal class NowNudgeKnowledgeProvider(
         // bounds how many verified sources are worth ranking at all.
         private const val QUERY_SEARCH_LIMIT = 32
         private const val ANSWER_SOURCE_ATTEMPTS = 3
+        private const val ANSWER_CANDIDATE_WINDOW = 8
         private const val MINUTES_FOR_FULL_FRESHNESS = 24f * 60f
-        private val SOURCE_LOCATION_OPTIONS = listOf(
-            "The Quran",
-            "Sahih al-Bukhari",
-            "Sahih Muslim",
-            "Sunan Abu Dawud",
-            "Jami' at-Tirmidhi",
-            "Sunan an-Nasa'i",
-            "Sunan Ibn Majah",
-            "Muwatta Malik",
-            "Musnad Ahmad",
-            "Sunan ad-Darimi",
-            "Shama'il At-Tirmidhi",
-        )
     }
 }
 
@@ -569,12 +519,6 @@ private fun String.toDifficulty(): IslamicQuizDifficulty = when (this) {
         IslamicQuizDifficulty.BEGINNER
     "action", "description" -> IslamicQuizDifficulty.INTERMEDIATE
     else -> IslamicQuizDifficulty.ADVANCED
-}
-
-private fun GroundedKnowledgeSource.sourceLocationAnswer(): String = when (val destination = target) {
-    is NowNudgeKnowledgeTarget.QuranAyah -> "The Quran"
-    is NowNudgeKnowledgeTarget.Hadith -> destination.collectionName
-    is NowNudgeKnowledgeTarget.FortressDua -> "Fortress of the Muslim"
 }
 
 private fun GroundedKnowledgeSource.sourceUrl(): String = when (val destination = target) {
@@ -668,16 +612,29 @@ private fun GroundedKnowledgeSource.queryMatch(query: String?): Float {
         ?.lowercase()
         ?.split(Regex("[^a-z0-9]+"))
         ?.filter { it.length >= 3 && it !in QUERY_STOP_WORDS }
+        ?.map(::stemSearchToken)
         ?.distinct()
         .orEmpty()
     if (terms.isEmpty()) return 0f
 
     val searchable = "$topic $reference $sourceText".lowercase()
-    val matchingTerms = terms.count { term ->
-        (term == "dua" && target is NowNudgeKnowledgeTarget.FortressDua) ||
-            QUERY_SYNONYMS[term].orEmpty().plus(term).any(searchable::contains)
+    var matchedWeight = 0f
+    var totalWeight = 0f
+    for (term in terms) {
+        // A term with corpus synonyms ("favorite" → loved/preferred/liked)
+        // expresses the question's specific intent; matching it weighs more
+        // than the plain co-occurrence of a generic noun like "food". Without
+        // this, "prophet's favorite food" ties between "The Prophet loved
+        // honey" and an unrelated verse that merely mentions prophets eating.
+        val weight = if (term in QUERY_SYNONYMS) 1.5f else 1f
+        totalWeight += weight
+        val isDuaTerm = term == "dua" && target is NowNudgeKnowledgeTarget.FortressDua
+        val matched = isDuaTerm ||
+            term in searchable ||
+            QUERY_SYNONYMS[term].orEmpty().any(searchable::contains)
+        if (matched) matchedWeight += weight
     }
-    return matchingTerms.toFloat() / terms.size
+    return if (totalWeight <= 0f) 0f else matchedWeight / totalWeight
 }
 
 private val QUERY_SYNONYMS = mapOf(
@@ -687,7 +644,32 @@ private val QUERY_SYNONYMS = mapOf(
     "mercy" to listOf("merciful", "forgive", "forgiveness"),
     "pray" to listOf("prayer", "salah", "worship"),
     "prayer" to listOf("pray", "salah", "worship"),
+    "favorite" to listOf("loved", "preferred", "liked", "best"),
+    "favourite" to listOf("loved", "preferred", "liked", "best"),
 )
+
+/**
+ * Words users type that hadith and Quran translations word differently. The
+ * retrieval embeds each corpus phrasing as a SQL alternative inside the typed
+ * token's slot, so "the Prophet's favorite food" reaches the narrations about
+ * what the Prophet loved to eat in a single query.
+ */
+private val CORPUS_SEARCH_SYNONYMS = mapOf(
+    "favorite" to listOf("loved", "liked"),
+    "favourite" to listOf("loved", "liked"),
+    "love" to listOf("liked", "beloved"),
+    "hate" to listOf("disliked", "detested"),
+)
+
+/**
+ * Simple plural stemming so "prophets" matches "Prophet" and "Prophet's" in
+ * the SQL LIKE search, and "foods" matches "food".
+ */
+private fun stemSearchToken(token: String): String = when {
+    token == "fasting" -> "fast"
+    token.length > 3 && token.endsWith("s") && !token.endsWith("ss") -> token.dropLast(1)
+    else -> token
+}
 
 private val QUERY_STOP_WORDS = setOf(
     "about",
@@ -841,21 +823,73 @@ private class AndroidGroundedKnowledgeSourceLoader(
         return null
     }
 
+    /** One query token plus its corpus-synonym alternatives, as SQL patterns. */
+    private data class SearchSlot(
+        val primary: String,
+        val firstAlternative: String = "",
+        val secondAlternative: String = "",
+    ) {
+        constructor(token: String) : this(
+            primary = "%$token%",
+            firstAlternative = CORPUS_SEARCH_SYNONYMS[token]?.getOrNull(0)?.let { "%$it%" }.orEmpty(),
+            secondAlternative = CORPUS_SEARCH_SYNONYMS[token]?.getOrNull(1)?.let { "%$it%" }.orEmpty(),
+        )
+    }
+
     override suspend fun search(query: String, limit: Int): List<GroundedKnowledgeSource> {
         val tokens = query
             .lowercase()
             .split(Regex("[^a-z0-9]+"))
             .filter { it.length >= 3 && it !in QUERY_STOP_WORDS && it != "dua" }
-            .map { if (it == "fasting") "fast" else it }
+            .map(::stemSearchToken)
             .distinct()
             .take(3)
         if (tokens.isEmpty()) return emptyList()
 
-        val results = mutableListOf<GroundedKnowledgeSource>()
+        // Search plan, strictest first. The synonym alternatives live INSIDE
+        // each SQL slot, so "prophet's favorite food" runs one query for
+        // prophet AND (favorite|loved|liked) AND food instead of re-scanning
+        // every collection per synonym. Each fallback step only runs when the
+        // previous found nothing, and the pair steps keep the synonyms —
+        // "prophet AND loved" finds the narrations about what the Prophet
+        // loved to eat, which is the question's real intent.
+        val slots = tokens.map(::SearchSlot)
+        val plans = buildList {
+            add(slots)
+            when (slots.size) {
+                3 -> {
+                    add(listOf(slots[0], slots[1]))
+                    add(listOf(slots[0], slots[2]))
+                    add(listOf(slots[1], slots[2]))
+                    add(listOf(slots[0]))
+                }
+                2 -> {
+                    add(listOf(slots[0]))
+                    add(listOf(slots[1]))
+                }
+            }
+        }.distinct()
 
-        // Fortress of the Muslim invocations.
+        for (plan in plans) {
+            val results = searchCorpora(plan, limit)
+            if (results.isNotEmpty()) return results.take(limit)
+        }
+        return emptyList()
+    }
+
+    private suspend fun searchCorpora(
+        slots: List<SearchSlot>,
+        limit: Int,
+    ): List<GroundedKnowledgeSource> {
+        val results = mutableListOf<GroundedKnowledgeSource>()
+        val slot = { index: Int -> slots.getOrElse(index) { SearchSlot("") } }
+
+        // Fortress of the Muslim invocations (primary tokens only).
         runCatching {
-            duaRepository.searchDuasMultiToken(tokens, DUA_SEARCH_LIMIT).mapNotNull { dua ->
+            duaRepository.searchDuasMultiToken(
+                slots.map { it.primary.removeSurrounding("%") },
+                DUA_SEARCH_LIMIT,
+            ).mapNotNull { dua ->
                 val sourceText = dua.translation?.takeIf(String::isEnglishGroundedText)
                     ?: return@mapNotNull null
                 GroundedKnowledgeSource(
@@ -871,10 +905,16 @@ private class AndroidGroundedKnowledgeSourceLoader(
 
         // Quran translation ayahs.
         runCatching {
-            quranRepository.searchAyahsMultiToken(
-                t0 = tokens[0],
-                t1 = tokens.getOrElse(1) { "" },
-                t2 = tokens.getOrElse(2) { "" },
+            quranRepository.searchAyahsMultiTokenAny(
+                p0 = slot(0).primary,
+                a0 = slot(0).firstAlternative,
+                b0 = slot(0).secondAlternative,
+                p1 = slot(1).primary,
+                a1 = slot(1).firstAlternative,
+                b1 = slot(1).secondAlternative,
+                p2 = slot(2).primary,
+                a2 = slot(2).firstAlternative,
+                b2 = slot(2).secondAlternative,
                 limit = QURAN_SEARCH_LIMIT,
             )
         }.getOrDefault(emptyList()).forEach { (surah, ayah) ->
@@ -905,10 +945,16 @@ private class AndroidGroundedKnowledgeSourceLoader(
                 val hits = HadithDatabase
                     .getInstance(appContext, collection.databaseFile, assetRepository)
                     .hadithDao()
-                    .searchHadithsMultiToken(
-                        t0 = tokens[0],
-                        t1 = tokens.getOrElse(1) { "" },
-                        t2 = tokens.getOrElse(2) { "" },
+                    .searchHadithsMultiTokenAny(
+                        p0 = slot(0).primary,
+                        a0 = slot(0).firstAlternative,
+                        b0 = slot(0).secondAlternative,
+                        p1 = slot(1).primary,
+                        a1 = slot(1).firstAlternative,
+                        b1 = slot(1).secondAlternative,
+                        p2 = slot(2).primary,
+                        a2 = slot(2).firstAlternative,
+                        b2 = slot(2).secondAlternative,
                         limit = HADITH_SEARCH_LIMIT_PER_COLLECTION,
                     )
                 val metadata = HadithDatabase.getCollectionMetadata(
@@ -921,7 +967,7 @@ private class AndroidGroundedKnowledgeSourceLoader(
             }.getOrDefault(emptyList()).let(results::addAll)
         }
 
-        return results.distinctBy(GroundedKnowledgeSource::id).take(limit)
+        return results.distinctBy(GroundedKnowledgeSource::id)
     }
 
     private suspend fun loadQuran(date: LocalDate): GroundedKnowledgeSource? {

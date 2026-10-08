@@ -620,13 +620,14 @@ class AssetDownloadManager @Inject constructor(
         private const val NOW_NUDGE_MODEL_SHA256 =
             "a56a58a51c66fec1548ac32b72ce4b70c4608c24486f5b212fafcba03b5439de"
 
-        // The answering model; sizes and hashes are filled once the trained
-        // artifact passes its quantized held-out evaluation.
+        // The answering model; assembled from two verified CDN parts like the
+        // question model (the authenticated uploader caps at 300 MiB).
         private const val NOW_NUDGE_KNOWLEDGE_CATEGORY = "model_now_nudge_knowledge"
         private const val NOW_NUDGE_KNOWLEDGE_MODEL_KEY =
             "models/now_nudge/deenly-knowledge-v2-q4_k_m.gguf"
-        private const val NOW_NUDGE_KNOWLEDGE_MODEL_SIZE = -1L
-        private const val NOW_NUDGE_KNOWLEDGE_MODEL_SHA256 = ""
+        private const val NOW_NUDGE_KNOWLEDGE_MODEL_SIZE = 397_807_648L
+        private const val NOW_NUDGE_KNOWLEDGE_MODEL_SHA256 =
+            "82a7a44c6c948969ab2303fb57d8e69995ae361744099edf79a785eac455a08f"
 
         private val PARTED_MODELS = listOf(
             PartedModelArtifact(

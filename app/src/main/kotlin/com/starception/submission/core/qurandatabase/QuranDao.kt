@@ -177,6 +177,34 @@ interface QuranDao {
         limit: Int,
     ): List<AyahEntity>
 
+    /**
+     * Multi-token ayah search where every token slot accepts up to two synonym
+     * alternatives, pre-wrapped as SQL patterns ('%prophet%'). One query covers
+     * a typed word and its corpus phrasings together.
+     */
+    @Query(
+        """
+        SELECT * FROM ayahs
+        WHERE (:p0 = '' OR text LIKE :p0 OR (:a0 <> '' AND text LIKE :a0) OR (:b0 <> '' AND text LIKE :b0))
+          AND (:p1 = '' OR text LIKE :p1 OR (:a1 <> '' AND text LIKE :a1) OR (:b1 <> '' AND text LIKE :b1))
+          AND (:p2 = '' OR text LIKE :p2 OR (:a2 <> '' AND text LIKE :a2) OR (:b2 <> '' AND text LIKE :b2))
+        ORDER BY length(text) ASC, number ASC
+        LIMIT :limit
+    """,
+    )
+    suspend fun searchAyahsMultiTokenAny(
+        p0: String,
+        a0: String = "",
+        b0: String = "",
+        p1: String = "",
+        a1: String = "",
+        b1: String = "",
+        p2: String = "",
+        a2: String = "",
+        b2: String = "",
+        limit: Int,
+    ): List<AyahEntity>
+
     // ============= Combined Queries =============
 
     /**

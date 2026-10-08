@@ -25,11 +25,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-steps", type=int, default=120)
     parser.add_argument("--max-length", type=int, default=768)
     parser.add_argument("--seed", type=int, default=20261005)
+    parser.add_argument(
+        "--cpu",
+        action="store_true",
+        help="Force CPU training; avoids the GPU contention that makes the desktop unresponsive",
+    )
     return parser.parse_args()
 
 
 def read_sample(path: Path, limit: int, seed: int) -> list[dict]:
-    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    records = [
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()
+    ]
     groups: dict[str, list[dict]] = {}
     for record in records:
         groups.setdefault(record["sourceCollection"], []).append(record)
@@ -38,7 +45,7 @@ def read_sample(path: Path, limit: int, seed: int) -> list[dict]:
         rng.shuffle(group)
 
     # Round-robin prevents Musnad Ahmad (the largest collection) from dominating a small edge run.
-    balanced = []
+    balanced: list[dict] = []
     group_names = sorted(groups)
     while len(balanced) < limit:
         added = False
@@ -134,7 +141,7 @@ def main() -> None:
         ),
     )
 
-    def collate(batch: list[dict[str, list[int]]]) -> dict[str, "torch.Tensor"]:
+    def collate(batch: list[dict[str, list[int]]]) -> dict[str, torch.Tensor]:
         length = max(len(item["input_ids"]) for item in batch)
         inputs, masks, labels = [], [], []
         for item in batch:
@@ -166,6 +173,7 @@ def main() -> None:
         remove_unused_columns=False,
         dataloader_pin_memory=False,
         seed=args.seed,
+        use_cpu=args.cpu,
     )
     trainer = Trainer(
         model=model,
@@ -192,7 +200,9 @@ def main() -> None:
         "maxSteps": args.max_steps,
         "maxLength": args.max_length,
         "seed": args.seed,
-        "datasetManifestSha256": hashlib.sha256(dataset_manifest.read_bytes()).hexdigest(),
+        "datasetManifestSha256": hashlib.sha256(
+            dataset_manifest.read_bytes()
+        ).hexdigest(),
         "trainLoss": train_result.training_loss,
         "evalLoss": eval_metrics.get("eval_loss"),
         "evalPerplexity": (

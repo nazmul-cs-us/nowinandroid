@@ -96,6 +96,42 @@ interface HadithDao {
     ): List<HadithEntity>
 
     /**
+     * Multi-token AND search where every token slot accepts up to two synonym
+     * alternatives. Patterns arrive pre-wrapped with SQL wildcards
+     * ('%prophet%'), so one query covers "prophet's favorite food" together
+     * with the corpus phrasings (loved, liked) without re-scanning the
+     * collection per variant.
+     */
+    @Query(
+        """
+        SELECT * FROM hadiths
+        WHERE (:p0 = '' OR text_plain LIKE :p0 OR text_arabic LIKE :p0
+            OR (:a0 <> '' AND (text_plain LIKE :a0 OR text_arabic LIKE :a0))
+            OR (:b0 <> '' AND (text_plain LIKE :b0 OR text_arabic LIKE :b0)))
+          AND (:p1 = '' OR text_plain LIKE :p1 OR text_arabic LIKE :p1
+            OR (:a1 <> '' AND (text_plain LIKE :a1 OR text_arabic LIKE :a1))
+            OR (:b1 <> '' AND (text_plain LIKE :b1 OR text_arabic LIKE :b1)))
+          AND (:p2 = '' OR text_plain LIKE :p2 OR text_arabic LIKE :p2
+            OR (:a2 <> '' AND (text_plain LIKE :a2 OR text_arabic LIKE :a2))
+            OR (:b2 <> '' AND (text_plain LIKE :b2 OR text_arabic LIKE :b2)))
+        ORDER BY id ASC
+        LIMIT :limit
+    """,
+    )
+    suspend fun searchHadithsMultiTokenAny(
+        p0: String,
+        a0: String = "",
+        b0: String = "",
+        p1: String = "",
+        a1: String = "",
+        b1: String = "",
+        p2: String = "",
+        a2: String = "",
+        b2: String = "",
+        limit: Int = 20,
+    ): List<HadithEntity>
+
+    /**
      * Get hadiths in range
      */
     @Query("SELECT * FROM hadiths WHERE id BETWEEN :startId AND :endId ORDER BY id ASC")

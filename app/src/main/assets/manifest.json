@@ -84,6 +84,11 @@
       "file_count": 2,
       "required": false
     },
+    "model_now_nudge_knowledge": {
+      "total_size": 397807648,
+      "file_count": 2,
+      "required": false
+    },
     "model_asr": {
       "total_size": 43649301,
       "file_count": 4,
@@ -4716,6 +4721,18 @@
       "size": 198903824,
       "sha256": "00eef233c4a8ed415bcdc4c1cdfa3e920b9ec6da59b790cf2347a0cd0fb769ab",
       "category": "model_now_nudge",
+      "required": false
+    },
+    "models/now_nudge/deenly-knowledge-v2-q4_k_m.gguf.part-00": {
+      "size": 198903824,
+      "sha256": "1ccf6823e49300e71de097170d943a938cba6fd1aac1eff8a13f45cec4ee1ffa",
+      "category": "model_now_nudge_knowledge",
+      "required": false
+    },
+    "models/now_nudge/deenly-knowledge-v2-q4_k_m.gguf.part-01": {
+      "size": 198903824,
+      "sha256": "f00375fe127220675b6f8489f1fc7e4a61caf5dd4219ddcdfa2d53c186b00664",
+      "category": "model_now_nudge_knowledge",
       "required": false
     },
     "models/whisper/filters_vocab_en.bin": {

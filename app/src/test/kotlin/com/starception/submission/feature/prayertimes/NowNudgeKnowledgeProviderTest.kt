@@ -72,7 +72,7 @@ class NowNudgeKnowledgeProviderTest {
     }
 
     @Test
-    fun questionTaskBuildsVerifiedOptionsAroundTheExactSource() = runBlocking {
+    fun sourceLocationModelOutputFallsBackToTheGroundedKnowledgeCard() = runBlocking {
         val provider = NowNudgeKnowledgeProvider(
             sourceLoader = GroundedKnowledgeSourceLoader { _, _ -> source },
             decisionGenerator = KnowledgeDecisionGenerator { task, _ ->
@@ -85,17 +85,14 @@ class NowNudgeKnowledgeProviderTest {
             date = date,
             task = DeenlyKnowledgeTask.QUESTION,
         )!!
-        val question = candidate.quizQuestion!!
 
-        assertEquals(DeenlyNudgeAction.PLAY_QUIZ, candidate.nudge.action)
-        assertEquals(DeenlyActionIds.LEARNING_START_QUIZ, candidate.nudge.actionId)
+        // "Which collection is this from" trivia was retired as a fallback; the
+        // user sees the source itself instead.
+        assertNull(candidate.quizQuestion)
+        assertEquals(DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION, candidate.nudge.action)
+        assertEquals(DeenlyActionIds.LEARNING_OPEN_KNOWLEDGE, candidate.nudge.actionId)
         assertEquals(source.sourceText, candidate.nudge.supportingText)
-        assertEquals(source.sourceText, question.sourceText)
-        assertTrue(question.prompt.endsWith(source.sourceText))
-        assertEquals(4, question.options.distinct().size)
-        assertEquals("The Quran", question.options[question.correctOption])
-        assertEquals(source.reference, question.sourceLabel)
-        assertEquals(source.sourceText.sha256(), question.sourceTextSha256)
+        assertEquals(source.reference, candidate.nudge.sourceLabel)
     }
 
     @Test
@@ -130,7 +127,7 @@ class NowNudgeKnowledgeProviderTest {
     }
 
     @Test
-    fun ungroundedModelQuestionFallsBackToSourceLocationQuestion() = runBlocking {
+    fun ungroundedModelQuestionFallsBackToTheGroundedKnowledgeCard() = runBlocking {
         val provider = NowNudgeKnowledgeProvider(
             sourceLoader = GroundedKnowledgeSourceLoader { _, _ -> source },
             decisionGenerator = KnowledgeDecisionGenerator { _, _ ->
@@ -146,8 +143,11 @@ class NowNudgeKnowledgeProviderTest {
 
         val candidate = provider.load(date, task = DeenlyKnowledgeTask.QUESTION)!!
 
-        assertTrue(candidate.quizQuestion!!.prompt.startsWith("Which source"))
-        assertEquals("The Quran", candidate.quizQuestion!!.options[candidate.quizQuestion!!.correctOption])
+        // The ungrounded question never reaches the user; the verbatim source
+        // card is shown instead of the retired source-location trivia.
+        assertNull(candidate.quizQuestion)
+        assertEquals(source.sourceText, candidate.nudge.supportingText)
+        assertEquals(source.reference, candidate.nudge.sourceLabel)
     }
 
     @Test
