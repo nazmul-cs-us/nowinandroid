@@ -269,10 +269,17 @@ fun PrayerTimesScreen(
                 // Typed Fortress answers carry the destination chapter in the
                 // nudge id; open it directly instead of the generic insight.
                 val fortressChapterId = nudge.typedFortressChapterId()
-                if (fortressChapterId != null) {
-                    onOpenFortressChapter(fortressChapterId)
-                } else {
-                    onOpenRecommendation()
+                when {
+                    fortressChapterId != null -> onOpenFortressChapter(fortressChapterId)
+                    else -> {
+                        // Typed Bukhari answers open the exact hadith detail.
+                        val bukhariHadithId = nudge.typedBukhariHadithId()
+                        if (bukhariHadithId != null) {
+                            onOpenBukhariHadith(bukhariHadithId)
+                        } else {
+                            onOpenRecommendation()
+                        }
+                    }
                 }
             }
         }
