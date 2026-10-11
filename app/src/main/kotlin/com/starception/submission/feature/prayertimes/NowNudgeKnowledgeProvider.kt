@@ -13,6 +13,7 @@ import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithCollectionMetadata
 import com.starception.submission.core.hadithdatabase.HadithDatabase
+import com.starception.submission.core.hadithdatabase.HadithEntity
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.model.data.BukhariBooks
 import com.starception.submission.core.model.data.ShamayelBooks
@@ -722,9 +723,13 @@ private fun GroundedKnowledgeSource.queryMatch(query: String?): Float {
         val weight = if (term in QUERY_SYNONYMS) 1.5f else 1f
         totalWeight += weight
         val isDuaTerm = term == "dua" && target is NowNudgeKnowledgeTarget.FortressDua
+        // Whole-word matching: substring hits are false overlap — "disliked"
+        // is not "liked", and the "heat" of Hellfire is not "eat". A verse
+        // that only substring-matches the question must not outrank real
+        // preference narrations.
         val matched = isDuaTerm ||
-            term in searchable ||
-            QUERY_SYNONYMS[term].orEmpty().any(searchable::contains)
+            containsWordBoundary(searchable, term) ||
+            QUERY_SYNONYMS[term].orEmpty().any { containsWordBoundary(searchable, it) }
         if (matched) matchedWeight += weight
     }
     return if (totalWeight <= 0f) 0f else matchedWeight / totalWeight
@@ -780,18 +785,34 @@ private val PROPHET_ATTRIBUTE_INTENT_TERMS = setOf(
     "routine", "daily", "pray", "prays", "prayed", "prayer", "prayers",
 )
 
+/** Whole-word containment: substring hits like "dis|liked" or "h|eat|" never match. */
+internal fun containsWordBoundary(text: String, term: String): Boolean {
+    if (term.isEmpty()) return false
+    val pattern = WORD_BOUNDARY_REGEXES.getOrPut(term) {
+        Regex("\\b${Regex.escape(term)}\\b")
+    }
+    return pattern.containsMatchIn(text)
+}
+
+private val WORD_BOUNDARY_REGEXES = mutableMapOf<String, Regex>()
+
 /**
  * True when the source states a preference directly — "Rasulullah loved halwa
  * and honey", "I have loved to eat gourd" — from ANY collection. Conditional
  * or negated constructions ("he used to eat if he liked the food", "never
  * criticized any food") are deliberately excluded: they describe behavior with
- * food, not what was loved.
+ * food, not what was loved. Whole-word verb matching keeps "disliked" out of
+ * "liked" hits while "disliked X" still counts as its own (negative)
+ * preference statement.
  */
 internal fun containsDirectPreferenceStatement(text: String): Boolean {
     val lower = text.lowercase()
     for (verb in DIRECT_PREFERENCE_VERBS) {
-        var index = lower.indexOf(verb)
-        while (index >= 0) {
+        val pattern = WORD_BOUNDARY_REGEXES.getOrPut(verb) {
+            Regex("\\b${Regex.escape(verb)}\\b")
+        }
+        for (match in pattern.findAll(lower)) {
+            val index = match.range.first
             val prefixStart = (index - PREFERENCE_CONDITIONAL_WINDOW_CHARS).coerceAtLeast(0)
             val prefix = lower.substring(prefixStart, index)
             val after = lower.substring(index + verb.length)
@@ -799,7 +820,6 @@ internal fun containsDirectPreferenceStatement(text: String): Boolean {
             if (!isPassive && PREFERENCE_CONDITIONAL_MARKERS.none(prefix::contains)) {
                 return true
             }
-            index = lower.indexOf(verb, index + 1)
         }
     }
     return false
@@ -810,6 +830,8 @@ private val DIRECT_PREFERENCE_VERBS = listOf(
     "loves",
     "liked",
     "likes",
+    "disliked",
+    "dislikes",
     "preferred",
     "prefers",
     "favourite",
@@ -898,7 +920,7 @@ internal fun isPreferenceAdjacentAnswer(answer: String, evidence: String): Boole
     // object: "he used to eat if he liked the food" is etiquette, not a
     // stated favourite, so the clause must not read as verb-introduced.
     if (PREFERENCE_CONDITIONAL_MARKERS.any(lowered::contains) ||
-        PREFERENCE_VERBS.any(lowered::contains)
+        PREFERENCE_VERBS.any { containsWordBoundary(lowered, it) }
     ) {
         return false
     }
@@ -906,7 +928,7 @@ internal fun isPreferenceAdjacentAnswer(answer: String, evidence: String): Boole
     if (answerStart <= 0) return false
     val windowStart = (answerStart - PREFERENCE_WINDOW_CHARS).coerceAtLeast(0)
     val prefix = evidence.substring(windowStart, answerStart).lowercase()
-    return PREFERENCE_VERBS.any(prefix::contains)
+    return PREFERENCE_VERBS.any { containsWordBoundary(prefix, it) }
 }
 
 /** Answers at or above this score stop the attempt loop immediately. */
@@ -921,6 +943,8 @@ private val PREFERENCE_VERBS = listOf(
     "liked",
     "loves",
     "likes",
+    "disliked",
+    "dislikes",
     "preferred",
     "prefers",
     "used to eat",
@@ -1319,30 +1343,7 @@ private class AndroidGroundedKnowledgeSourceLoader(
                     appContext,
                     collection.databaseFile,
                 )
-                val hits = if (runCatching { dao.hasFtsTable() }.getOrDefault(0) > 0) {
-                    // FTS5 bm25 ranking: short, dense passages that match
-                    // the query intent naturally rise above long narrations
-                    // that merely contain the literal tokens. "Rasulullah
-                    // loved halwa and honey" (198 chars) outscores a 4,000
-                    // -char hadith that incidentally mentions food.
-                    val ftsQuery = buildFtsMatchQuery(slots)
-                    if (ftsQuery.isNotBlank()) {
-                        dao.searchHadithsRanked(
-                            SimpleSQLiteQuery(
-                                """
-                                SELECT h.* FROM hadiths h
-                                JOIN hadiths_fts ON hadiths_fts.rowid = h.id
-                                WHERE hadiths_fts MATCH ?
-                                ORDER BY bm25(hadiths_fts)
-                                LIMIT ?
-                                """,
-                                arrayOf(ftsQuery, HADITH_SEARCH_LIMIT_PER_COLLECTION),
-                            ),
-                        )
-                    } else {
-                        emptyList()
-                    }
-                } else {
+                val likeFallback: suspend () -> List<HadithEntity> = {
                     dao.searchHadithsMultiTokenAny(
                         p0 = slot(0).primary,
                         a0 = slot(0).firstAlternative,
@@ -1359,9 +1360,58 @@ private class AndroidGroundedKnowledgeSourceLoader(
                         limit = HADITH_SEARCH_LIMIT_PER_COLLECTION,
                     )
                 }
+                val hits = if (runCatching { dao.hasFtsTable() }.getOrDefault(0) > 0) {
+                    // FTS5 bm25 ranking: short, dense passages that match
+                    // the query intent naturally rise above long narrations
+                    // that merely contain the literal tokens. "Rasulullah
+                    // loved halwa and honey" (198 chars) outscores a 4,000
+                    // -char hadith that incidentally mentions food.
+                    val ftsQuery = buildFtsMatchQuery(slots)
+                    if (ftsQuery.isNotBlank()) {
+                        // Some devices ship system SQLite without the FTS5
+                        // module (observed: Samsung Android 16, "no such
+                        // module: fts5"). Fall back to the multi-token LIKE
+                        // search so those collections still answer instead
+                        // of silently dropping out of the pool.
+                        runCatching {
+                            dao.searchHadithsRanked(
+                                SimpleSQLiteQuery(
+                                    """
+                                    SELECT h.* FROM hadiths h
+                                    JOIN hadiths_fts ON hadiths_fts.rowid = h.id
+                                    WHERE hadiths_fts MATCH ?
+                                    ORDER BY bm25(hadiths_fts)
+                                    LIMIT ?
+                                    """,
+                                    arrayOf(ftsQuery, HADITH_SEARCH_LIMIT_PER_COLLECTION),
+                                ),
+                            )
+                        }.getOrElse { error ->
+                            android.util.Log.w(
+                                "NowNudgeSearch",
+                                "FTS unavailable for ${collection.databaseFile}; " +
+                                    "using the LIKE fallback",
+                                error,
+                            )
+                            likeFallback()
+                        }
+                    } else {
+                        emptyList()
+                    }
+                } else {
+                    likeFallback()
+                }
                 hits.mapNotNull { hit ->
                     mapHadithToGroundedSource(collection, hit.id, metadata)
                 }
+            }.onFailure { error ->
+                // A collection that silently drops out of the search pool makes
+                // answers look wrong with no trace; surface the cause.
+                android.util.Log.w(
+                    "NowNudgeSearch",
+                    "collection search failed: ${collection.databaseFile}",
+                    error,
+                )
             }.getOrDefault(emptyList()).let(results::addAll)
         }
 

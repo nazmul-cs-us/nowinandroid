@@ -9,6 +9,7 @@ package com.starception.submission.ml
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class DeenlyKnowledgeModelTest {
     @Test
@@ -155,8 +156,10 @@ class DeenlyKnowledgeModelTest {
     }
 
     @Test
-    fun parserRejectsUngroundedAnswerSpans() {
+    fun parserRejectsUngroundedAnswersAndRepairsQuotingSlips() {
         val source = "He preferred dates."
+        // An answer with no source support — not even case-insensitively —
+        // is still rejected outright.
         assertNull(
             DeenlyKnowledgeModel.parseDecision(
                 """{"contentType":"answer","answer":"honey","evidence":"He preferred dates."}""",
@@ -164,20 +167,23 @@ class DeenlyKnowledgeModelTest {
                 source,
             ),
         )
-        assertNull(
-            DeenlyKnowledgeModel.parseDecision(
-                """{"contentType":"answer","answer":"dates","evidence":"He preferred honey above all."}""",
-                DeenlyKnowledgeTask.ANSWER,
-                source,
-            ),
-        )
-        assertNull(
-            DeenlyKnowledgeModel.parseDecision(
-                """{"contentType":"answer","answer":"he preferred dates","evidence":"He preferred dates."}""",
-                DeenlyKnowledgeTask.ANSWER,
-                source,
-            ),
-        )
+        // A grounded answer with fabricated evidence keeps the answer and
+        // replaces the evidence with the source's own sentence — nothing
+        // the model wrote is ever displayed.
+        val repaired = DeenlyKnowledgeModel.parseDecision(
+            """{"contentType":"answer","answer":"dates","evidence":"He preferred honey above all."}""",
+            DeenlyKnowledgeTask.ANSWER,
+            source,
+        ) as DeenlyKnowledgeDecision.GroundedAnswer
+        assertEquals("dates", repaired.answer)
+        assertEquals("He preferred dates.", repaired.evidence)
+        // Case slips adopt the source's exact casing instead of failing.
+        val caseRepaired = DeenlyKnowledgeModel.parseDecision(
+            """{"contentType":"answer","answer":"he preferred dates","evidence":"He preferred dates."}""",
+            DeenlyKnowledgeTask.ANSWER,
+            source,
+        ) as DeenlyKnowledgeDecision.GroundedAnswer
+        assertEquals("He preferred dates", caseRepaired.answer)
     }
 
     @Test
@@ -192,6 +198,43 @@ class DeenlyKnowledgeModelTest {
         assertNull(
             DeenlyKnowledgeModel.parseDecision(
                 """{"contentType":"answer","answer":"تمر","evidence":"He preferred dates."}""",
+                DeenlyKnowledgeTask.ANSWER,
+                "He preferred dates.",
+            ),
+        )
+    }
+
+    @Test
+    fun answerCaseSlipIsRepairedToTheSourceCasing() {
+        val source = "Narrated Anas: Thareed was served, in which dubbaa was added."
+        val decision = DeenlyKnowledgeModel.parseDecision(
+            """{"contentType":"answer","answer":"thareed was served, in which dubbaa was added.","evidence":"Thareed was served, in which dubbaa was added."}""",
+            DeenlyKnowledgeTask.ANSWER,
+            source,
+        ) as DeenlyKnowledgeDecision.GroundedAnswer
+        assertEquals("Thareed was served, in which dubbaa was added.", decision.answer)
+    }
+
+    @Test
+    fun evidenceQuoteTyposFallBackToTheSourceSentence() {
+        // The device model answered "honey" perfectly but quoted the evidence
+        // with a leading double quote instead of the source's apostrophe.
+        val source = "'Ayeshah Radiyallahu 'Anha says: \"Rasulullah loved halwa and honey\"."
+        val decision = DeenlyKnowledgeModel.parseDecision(
+            """{"contentType":"answer","answer":"honey","evidence":"\"Ayeshah Radiyallahu 'Anha says: Rasulullah loved halwa and honey"}""",
+            DeenlyKnowledgeTask.ANSWER,
+            source,
+        ) as DeenlyKnowledgeDecision.GroundedAnswer
+        assertEquals("honey", decision.answer)
+        assertTrue(decision.evidence.contains("loved halwa and honey"))
+        assertTrue(source.contains(decision.evidence))
+    }
+
+    @Test
+    fun answersStillRejectWhenNotEvenCaseInsensitivelyInTheSource() {
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"answer","answer":"pizza","evidence":"He preferred dates."}""",
                 DeenlyKnowledgeTask.ANSWER,
                 "He preferred dates.",
             ),

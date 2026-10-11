@@ -247,6 +247,9 @@ class DeenlyKnowledgeModel(context: Context) {
         private const val MAX_QUESTION_CHARS = 180
         private const val MAX_ANSWER_CHARS = 96
         private const val MAX_EVIDENCE_CHARS = 420
+        private const val ANSWER_EVIDENCE_MIN_CHARS = 110
+        private val ANSWER_SENTENCE_REGEX =
+            Regex("[^.!?]+[.!?]+(?=\\s|[\"'\\u201d]|$)|[^.!?]+\$")
         private const val MAX_OPTION_CHARS = 96
         private const val LOG_PREVIEW_CHARS = 240
         private const val TAG = "DeenlyKnowledgeModel"
@@ -352,20 +355,42 @@ citations, rulings, or claims unsupported by the source."""
 
                 DeenlyKnowledgeTask.ANSWER -> {
                     if (output.keys != setOf("contentType", "answer", "evidence")) return null
-                    val answer = output["answer"]?.jsonPrimitive?.content?.trim().orEmpty()
-                    val evidence = output["evidence"]?.jsonPrimitive?.content?.trim().orEmpty()
+                    val modelAnswer = output["answer"]?.jsonPrimitive?.content?.trim().orEmpty()
+                    val modelEvidence = output["evidence"]?.jsonPrimitive?.content?.trim().orEmpty()
                     if (contentType == "unanswered") {
-                        return if (answer.isEmpty() && evidence.isEmpty()) {
+                        return if (modelAnswer.isEmpty() && modelEvidence.isEmpty()) {
                             DeenlyKnowledgeDecision.Unanswered
                         } else {
                             null
                         }
                     }
                     val verifiedSource = sourceText ?: return null
+                    // Bounded repair, ANSWER task only: the model's quoting
+                    // slips — a lowercase "thareed" for the source's
+                    // "Thareed", or a stray leading quote — must not discard
+                    // an otherwise exact span. Every repaired value adopts
+                    // the source's own characters, so grounding is preserved.
+                    val answer = if (
+                        modelAnswer.isNotEmpty() &&
+                        modelAnswer.length <= MAX_ANSWER_CHARS &&
+                        modelAnswer !in verifiedSource
+                    ) {
+                        verifiedSource.locateCaseInsensitiveSpan(modelAnswer) ?: return null
+                    } else {
+                        modelAnswer
+                    }
+                    if (answer.isEmpty() || answer.length > MAX_ANSWER_CHARS) return null
+                    val evidence = when {
+                        modelEvidence.isNotEmpty() &&
+                            modelEvidence.length <= MAX_EVIDENCE_CHARS &&
+                            modelEvidence in verifiedSource &&
+                            answer in modelEvidence -> modelEvidence
+
+                        else -> verifiedSource.buildEvidenceAround(answer) ?: return null
+                    }
                     if (
-                        answer.isEmpty() || answer.length > MAX_ANSWER_CHARS ||
                         evidence.isEmpty() || evidence.length > MAX_EVIDENCE_CHARS ||
-                        answer !in verifiedSource || evidence !in verifiedSource || answer !in evidence ||
+                        evidence !in verifiedSource || answer !in evidence ||
                         listOf(answer, evidence).any { it.containsArabic() } ||
                         listOf(answer, evidence).any { text -> text.any(Char::isISOControl) }
                     ) return null
@@ -442,6 +467,41 @@ citations, rulings, or claims unsupported by the source."""
             character.code in 0x0600..0x06FF ||
                 character.code in 0x0750..0x077F ||
                 character.code in 0x08A0..0x08FF
+        }
+
+        /** The source's exact characters for a case-slipped model quote, or null. */
+        private fun String.locateCaseInsensitiveSpan(modelQuote: String): String? {
+            if (modelQuote.isEmpty()) return null
+            val start = lowercase().indexOf(modelQuote.lowercase())
+            if (start < 0) return null
+            return substring(start, (start + modelQuote.length).coerceAtMost(length))
+        }
+
+        /**
+         * Deterministic evidence fallback: the shortest sentence containing
+         * the answer, cut at a word boundary when it runs past the answer —
+         * the same construction the answer-contract dataset trains on. Always
+         * an exact contiguous span of the source.
+         */
+        private fun String.buildEvidenceAround(answer: String): String? {
+            if (answer.isEmpty() || answer !in this) return null
+            var best: String? = null
+            for (match in ANSWER_SENTENCE_REGEX.findAll(this)) {
+                val sentence = match.value.trim()
+                if (answer !in sentence) continue
+                if (best == null || sentence.length < best.length) best = sentence
+            }
+            val sentence = best ?: return null
+            val answerEnd = sentence.indexOf(answer) + answer.length
+            val cut = minOf(sentence.length, maxOf(answerEnd, ANSWER_EVIDENCE_MIN_CHARS))
+            var evidence = sentence.take(cut)
+            if (cut < sentence.length) {
+                evidence = evidence.trimEnd(' ', ',', ';', ':')
+                val boundary = evidence.lastIndexOf(' ')
+                if (boundary >= answerEnd) evidence = evidence.take(boundary)
+            }
+            if (answer !in evidence) return null
+            return evidence.takeIf { it.length <= MAX_EVIDENCE_CHARS }
         }
 
         // The v4 topic mode occasionally leaks training placeholders such as
