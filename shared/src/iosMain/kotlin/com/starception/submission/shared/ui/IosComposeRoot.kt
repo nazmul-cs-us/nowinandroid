@@ -259,11 +259,33 @@ private suspend fun downloadRequiredContent(
 }
 
 private val iosVoiceSearchRequests = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
-private val iosNudgeActionRequests = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(
-    extraBufferCapacity = 1,
+
+// Now Nudge bot bridge. The native tab shell owns the surfaces; the shared
+// NowNudgeBus owns the turns. These observers forward the bus state to Swift,
+// and the request functions hand user intents to the bus.
+private val iosNudgeBridgeScope = kotlinx.coroutines.CoroutineScope(
+    kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main,
 )
-private var currentIosNudgeLabel: String? = null
-private var iosNudgeObserver: ((String?) -> Unit)? = null
+private var iosPresentedNudgeObserver:
+    ((com.starception.submission.core.model.deenly.DeenlyNudge?) -> Unit)? = null
+private var iosGeneratingObserver: ((Boolean) -> Unit)? = null
+private var iosSuggestionReadyObserver: ((String) -> Unit)? = null
+
+private val iosPresentedNudgeCollector = iosNudgeBridgeScope.launch {
+    com.starception.submission.shared.ui.NowNudgeBus.presentedNudge.collect { nudge ->
+        iosPresentedNudgeObserver?.invoke(nudge)
+    }
+}
+private val iosGeneratingCollector = iosNudgeBridgeScope.launch {
+    com.starception.submission.shared.ui.NowNudgeBus.generating.collect { generating ->
+        iosGeneratingObserver?.invoke(generating)
+    }
+}
+private val iosSuggestionReadyCollector = iosNudgeBridgeScope.launch {
+    com.starception.submission.shared.ui.NowNudgeBus.suggestionReady.collect { nudgeId ->
+        iosSuggestionReadyObserver?.invoke(nudgeId)
+    }
+}
 
 @Suppress("FunctionName", "unused")
 fun RequestVoiceSearch(tabIndex: Int) {
@@ -271,26 +293,54 @@ fun RequestVoiceSearch(tabIndex: Int) {
 }
 
 @Suppress("FunctionName", "unused")
-fun ObserveDeenlyNudge(observer: (String?) -> Unit) {
-    iosNudgeObserver = observer
-    observer(currentIosNudgeLabel)
+fun ObserveDeenlyNudge(
+    observer: (com.starception.submission.core.model.deenly.DeenlyNudge?) -> Unit,
+) {
+    iosPresentedNudgeObserver = observer
+    observer(com.starception.submission.shared.ui.NowNudgeBus.presentedNudge.value)
 }
 
 @Suppress("FunctionName", "unused")
 fun StopObservingDeenlyNudge() {
-    iosNudgeObserver = null
+    iosPresentedNudgeObserver = null
+    iosGeneratingObserver = null
+    iosSuggestionReadyObserver = null
+}
+
+@Suppress("FunctionName", "unused")
+fun ObserveGeneratingSuggestion(observer: (Boolean) -> Unit) {
+    iosGeneratingObserver = observer
+    observer(com.starception.submission.shared.ui.NowNudgeBus.generating.value)
+}
+
+@Suppress("FunctionName", "unused")
+fun ObserveSuggestionReady(observer: (String) -> Unit) {
+    iosSuggestionReadyObserver = observer
+}
+
+@Suppress("FunctionName", "unused")
+fun RequestDeenlyNudgeSuggestion(prompt: String?) {
+    com.starception.submission.shared.ui.NowNudgeBus.requestSuggestion(prompt)
+}
+
+@Suppress("FunctionName", "unused")
+fun CancelDeenlyNudgeSuggestion() {
+    com.starception.submission.shared.ui.NowNudgeBus.cancelSuggestion()
 }
 
 @Suppress("FunctionName", "unused")
 fun RequestDeenlyNudgeAction() {
-    iosNudgeActionRequests.tryEmit(Unit)
+    com.starception.submission.shared.ui.NowNudgeBus.requestAction()
 }
 
-private fun publishDeenlyNudge(
-    nudge: com.starception.submission.core.model.deenly.DeenlyNudge?,
-) {
-    currentIosNudgeLabel = nudge?.label
-    iosNudgeObserver?.invoke(currentIosNudgeLabel)
+@Suppress("FunctionName", "unused")
+fun RequestDeenlyNudgeDismiss() {
+    com.starception.submission.shared.ui.NowNudgeBus.requestDismiss()
+}
+
+@Suppress("FunctionName", "unused")
+fun RequestComposerSuggestions(onReady: (List<String>) -> Unit) {
+    com.starception.submission.shared.ui.NowNudgeBus.requestComposerSuggestions(onReady)
 }
 
 @Suppress("FunctionName")
@@ -785,8 +835,10 @@ private fun createPrayerTimesViewController(
                         } else {
                             null
                         },
-                        onNudgeChanged = ::publishDeenlyNudge,
-                        externalNudgeActionRequests = iosNudgeActionRequests,
+                        onNudgeChanged = { nudge ->
+                            NowNudgeBus.updateAmbient(nudge)
+                        },
+                        externalNudgeActionRequests = NowNudgeBus.actionRequests,
                     )
                 },
                 prayerDay = day,

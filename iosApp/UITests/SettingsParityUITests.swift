@@ -52,19 +52,20 @@ final class SettingsParityUITests: XCTestCase {
         XCTAssertTrue(download.waitForExistence(timeout: 20))
     }
 
-    func testNativeVoiceTabOpensSharedVoiceSearch() {
+    func testHeaderMicOpensSharedVoiceSearch() {
         app.terminate()
         app.launchArguments = []
         app.launch()
 
-        let voice = app.buttons["Voice"]
-        XCTAssertTrue(voice.waitForExistence(timeout: 30))
-        voice.tap()
+        // The header mic is the single voice-search surface, matching Android.
+        let mic = app.buttons["Voice search"].firstMatch
+        XCTAssertTrue(mic.waitForExistence(timeout: 30))
+        mic.tap()
 
         XCTAssertTrue(app.buttons["Close search"].waitForExistence(timeout: 10))
     }
 
-    func testMoreHubKeepsCourseInterestsAndVoiceAvailable() {
+    func testMoreHubKeepsCourseAndNudgeBotAvailable() {
         app.terminate()
         app.launchArguments = []
         app.launch()
@@ -81,8 +82,12 @@ final class SettingsParityUITests: XCTestCase {
             app.staticTexts["Small lessons. Meaningful progress."].waitForExistence(timeout: 20)
         )
 
-        app.buttons["Voice"].tap()
-        XCTAssertTrue(app.buttons["Close search"].waitForExistence(timeout: 10))
+        // The app-shell Now Nudge bot stays available outside Home, like
+        // Android's app-shell VoiceAssistantButton.
+        let bot = app.buttons["nowNudgeBot"]
+        XCTAssertTrue(bot.waitForExistence(timeout: 10))
+        bot.tap()
+        XCTAssertTrue(app.staticTexts["Ask Now Nudge"].waitForExistence(timeout: 10))
     }
 
     func testPrayerScheduleCanExpand() {
@@ -120,11 +125,20 @@ final class SettingsParityUITests: XCTestCase {
         add(screenshot)
     }
 
-    func testDeenlyNudgeUsesCompactActionCapsule() {
+    func testDeenlyNudgeBotSummonsAndActsOnSuggestion() {
         app.terminate()
         app.launchArguments = ["--preview-deenly-nudge"]
         app.launch()
 
+        // Long-press the bot, the same summon gesture as Android's
+        // VoiceAssistantButton; the pull-down gesture is harder to drive
+        // reliably from XCUITest.
+        let bot = app.buttons["nowNudgeBot"]
+        XCTAssertTrue(bot.waitForExistence(timeout: 30))
+        bot.press(forDuration: 1.0)
+
+        // The thinking pill runs its informative messages before the card
+        // reveals, so allow for the full generation + sparkle pacing.
         let nudge = app.staticTexts["Mark Asr prayed"]
         XCTAssertTrue(nudge.waitForExistence(timeout: 30))
         let screenshot = XCTAttachment(screenshot: app.screenshot())

@@ -205,7 +205,7 @@ fun PrayerTimesScreen(
     hasVerifiedLocation: Boolean = true,
     nudgeOverride: com.starception.submission.core.model.deenly.DeenlyNudge? = null,
     onNudgeChanged: (com.starception.submission.core.model.deenly.DeenlyNudge?) -> Unit = {},
-    externalNudgeActionRequests: kotlinx.coroutines.flow.Flow<Unit>? = null,
+    externalNudgeActionRequests: kotlinx.coroutines.flow.Flow<com.starception.submission.core.model.deenly.DeenlyNudge>? = null,
 ) {
     var showAllPrayers by remember { mutableStateOf(false) }
     var isTuningSchedule by remember { mutableStateOf(false) }
@@ -265,8 +265,16 @@ fun PrayerTimesScreen(
                 onOpenDrivingMode()
             com.starception.submission.core.model.deenly.DeenlyNudgeAction.PLAY_QUIZ ->
                 showIslamicQuiz = true
-            com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION ->
-                onOpenRecommendation()
+            com.starception.submission.core.model.deenly.DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION -> {
+                // Typed Fortress answers carry the destination chapter in the
+                // nudge id; open it directly instead of the generic insight.
+                val fortressChapterId = nudge.typedFortressChapterId()
+                if (fortressChapterId != null) {
+                    onOpenFortressChapter(fortressChapterId)
+                } else {
+                    onOpenRecommendation()
+                }
+            }
         }
         dismissNudge(nudge.id)
     }
@@ -276,9 +284,23 @@ fun PrayerTimesScreen(
         onDispose { onNudgeChanged(null) }
     }
 
-    LaunchedEffect(deenlyNudge?.id, externalNudgeActionRequests) {
-        externalNudgeActionRequests?.collect {
-            deenlyNudge?.let(::performNudgeAction)
+    LaunchedEffect(externalNudgeActionRequests) {
+        externalNudgeActionRequests?.collect { requestedNudge ->
+            performNudgeAction(requestedNudge)
+        }
+    }
+
+    // The app-shell bot lives outside this screen; these are its platform
+    // requests — opening the shared quiz for typed quiz commands, and
+    // recording explicit dismissals of the presented nudge.
+    LaunchedEffect(Unit) {
+        com.starception.submission.shared.ui.NowNudgeBus.quizOpenRequests.collect {
+            showIslamicQuiz = true
+        }
+    }
+    LaunchedEffect(Unit) {
+        com.starception.submission.shared.ui.NowNudgeBus.dismissRequests.collect { dismissedId ->
+            dismissNudge(dismissedId)
         }
     }
 
