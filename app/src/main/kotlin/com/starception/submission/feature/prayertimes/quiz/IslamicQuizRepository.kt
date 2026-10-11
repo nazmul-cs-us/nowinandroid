@@ -14,6 +14,7 @@ import com.starception.submission.core.model.deenly.IslamicQuizQuestion
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -30,12 +31,27 @@ import kotlinx.serialization.json.Json
  */
 class IslamicQuizRepository(
     private val context: Context? = null,
-    private val json: Json = Json { ignoreUnknownKeys = true },
+    private val json: Json = Json {
+        ignoreUnknownKeys = true
+        // The bank is authored content: a stray null in any field replaces the
+        // default instead of failing the whole 5,000+ record parse.
+        coerceInputValues = true
+    },
 ) {
     suspend fun loadQuestions(): List<IslamicQuizQuestion> = withContext(Dispatchers.IO) {
-        val remoteQuestions = runCatching { loadSurahQuestions() }.getOrDefault(emptyList())
-        val arabicBank = loadArabicBankQuestions()
-        (remoteQuestions + IslamicQuizBank.questions + arabicBank)
+        // The remote surah lookup can stall on a slow connection for its full
+        // timeout; the offline bank is the bulk of the pool, so load both at
+        // once instead of making five thousand questions wait behind one call.
+        val remoteDeferred = async { runCatching { loadSurahQuestions() }.getOrDefault(emptyList()) }
+        val arabicBankDeferred = async { loadArabicBankQuestions() }
+        val remote = remoteDeferred.await()
+        val arabicBank = arabicBankDeferred.await()
+        android.util.Log.i(
+            "IslamicQuiz",
+            "pool loaded: bank=${arabicBank.size} remote=${remote.size} " +
+                "curated=${IslamicQuizBank.questions.size}",
+        )
+        (remote + IslamicQuizBank.questions + arabicBank)
             .distinctBy { it.id }
             .shuffled()
     }
@@ -80,7 +96,10 @@ class IslamicQuizRepository(
             appContext.assets.open(ARABIC_BANK_ASSET).bufferedReader().use { reader ->
                 json.decodeFromString<List<DorarBankQuestion>>(reader.readText())
             }
-        }.getOrDefault(emptyList())
+        }.getOrElse { error ->
+            android.util.Log.e("IslamicQuiz", "bank parse failed", error)
+            emptyList()
+        }
         val mapped = parsed.mapNotNull { record ->
             if (record.options.size != 3) return@mapNotNull null
             if (record.correctOption !in 0..2) return@mapNotNull null

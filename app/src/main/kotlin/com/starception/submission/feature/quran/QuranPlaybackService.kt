@@ -199,12 +199,33 @@ class QuranPlaybackService : Service() {
             wasPlayingBeforeChange = shouldAutoPlay
 
             currentSurahIndex = index
-            val audioFile = resolveAudioFile(index)
+            var audioFile = resolveAudioFile(index)
             Log.d("PlaybackTrace", "🎵 audioFile=${audioFile?.absolutePath} | exists=${audioFile?.exists()} | size=${audioFile?.length()}")
 
             if (audioFile == null || !audioFile.exists()) {
-                // File not available locally - trigger on-demand download
-                val cdnKey = audioDownloadHelper.getQuranCdnKey(index, audioLanguage)
+                // The selected language's audio is not available locally.
+                // Fall back to the Arabic recitation — it is the primary
+                // audio and the one every reading surface should be able
+                // to play regardless of translation-language preference.
+                if (audioLanguage != AudioLanguage.ARABIC_ONLY) {
+                    val arabicFile = resolveAudioFile(index, AudioLanguage.ARABIC_ONLY)
+                    if (arabicFile != null && arabicFile.exists()) {
+                        Log.i(
+                            "QuranService",
+                            "Audio for $audioLanguage not found; falling back to Arabic for surah $index",
+                        )
+                        audioFile = arabicFile
+                    }
+                }
+            }
+
+            if (audioFile == null || !audioFile.exists()) {
+                // Still no audio: trigger on-demand download for Arabic,
+                // since it is the most universally available rendition.
+                val cdnKey = audioDownloadHelper.getQuranCdnKey(
+                    index,
+                    if (audioLanguage != AudioLanguage.ARABIC_ONLY) AudioLanguage.ARABIC_ONLY else audioLanguage,
+                )
                 if (cdnKey != null && onAudioNeedsDownload != null) {
                     Log.i("QuranService", "Audio not found, requesting download: $cdnKey")
                     onAudioNeedsDownload?.invoke(cdnKey, null)
@@ -214,12 +235,26 @@ class QuranPlaybackService : Service() {
                 return
             }
 
+            // Samsung's MediaPlayer can enter an unrecoverable native error
+            // state after a failed prepare — reset() does not clear it, and
+            // every subsequent setDataSource/prepareAsync fails with -38.
+            // Always play through a freshly created player, and pass the
+            // file by descriptor: some Samsung builds reject path-based
+            // data sources for OGG files in app-private storage.
+            runCatching { mediaPlayer?.release() }
+            initializePlayer()
             mediaPlayer?.apply {
-                Log.d("PlaybackTrace", "🎵 reset+setDataSource+prepareAsync")
-                reset()
-                setDataSource(audioFile.absolutePath)
+                Log.d("PlaybackTrace", "🎵 fresh player: setDataSource(fd)+prepareAsync")
+                try {
+                    java.io.FileInputStream(audioFile).use { fis ->
+                        setDataSource(fis.fd)
+                    }
+                } catch (e: Exception) {
+                    Log.e("PlaybackTrace", "🎵 setDataSource(fd) failed: ${e.message}, falling back to path")
+                    setDataSource(audioFile.absolutePath)
+                }
                 prepareAsync()
-            } ?: Log.e("PlaybackTrace", "🎵 mediaPlayer is NULL!")
+            } ?: Log.e("PlaybackTrace", "🎵 mediaPlayer is NULL after init!")
 
             onSurahChanged?.invoke(index)
             onGlobalSurahChanged?.invoke(index)
@@ -464,6 +499,9 @@ class QuranPlaybackService : Service() {
      */
     private fun resolveAudioFile(index: Int): File? =
         audioDownloadHelper.resolveQuranAudioFile(index, audioLanguage)
+
+    private fun resolveAudioFile(index: Int, language: AudioLanguage): File? =
+        audioDownloadHelper.resolveQuranAudioFile(index, language)
 
     private fun updateMediaSessionMetadata() {
         val surah = QuranData.surahs[currentSurahIndex]

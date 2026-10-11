@@ -119,6 +119,22 @@ internal object DailyReminderRepository {
         return loaded ?: FALLBACK
     }
 
+    /** A stable, prayer-specific hadith for expanded prayer UI surfaces. */
+    suspend fun loadPrayerHadith(
+        context: Context,
+        prayerName: String,
+    ): DailyReminder? {
+        val day = LocalDate.now().toEpochDay().toInt()
+        val seed = day * 31 + prayerName.lowercase().hashCode()
+        return runCatching {
+            loadPrayerHadith(
+                repository = HadithRepository.getInstance(context),
+                prayerName = prayerName,
+                seed = seed,
+            )
+        }.getOrNull()
+    }
+
     private suspend fun loadHadith(
         context: Context,
         seed: Int,

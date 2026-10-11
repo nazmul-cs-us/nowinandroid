@@ -1225,6 +1225,11 @@ fun PrayerTimesScreen(
     var modelKnowledgeCandidate by remember(nudgeDay) {
         mutableStateOf<NowNudgeKnowledgeCandidate?>(null)
     }
+    var expandedInsightPage by rememberSaveable { mutableStateOf<Int?>(null) }
+    var expandedAiCandidate by remember(nudgeDay) {
+        mutableStateOf<NowNudgeKnowledgeCandidate?>(null)
+    }
+    var expandedAiLoading by remember { mutableStateOf(false) }
     var botSourceVariation by rememberSaveable(nudgeDay) { mutableIntStateOf(0) }
     val nudgePreferences = remember(screenContext) {
         screenContext.getSharedPreferences("deenly_nudge", Context.MODE_PRIVATE)
@@ -1406,6 +1411,41 @@ fun PrayerTimesScreen(
                 com.google.accompanist.permissions.PermissionStatus.Granted,
             dismissedNudgeIds = dismissedNudgeIds,
         )
+    }
+
+    val latestExpandedKnowledgeContext by rememberUpdatedState(botKnowledgeRankingContext)
+    val latestExpandedAppSituation by rememberUpdatedState(botAppSituation)
+    LaunchedEffect(expandedInsightPage, nudgeDay) {
+        if (expandedInsightPage != 4) return@LaunchedEffect
+        expandedAiLoading = true
+        expandedAiCandidate = runCatching {
+            nowNudgeKnowledgeProvider.load(
+                date = LocalDate.parse(nudgeDay),
+                variation = 64,
+                appSituation = latestExpandedAppSituation,
+                rankingContext = latestExpandedKnowledgeContext,
+                task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
+            )
+        }.getOrNull()
+        expandedAiCandidate?.let { candidate ->
+            nowNudgeKnowledgeProvider.recordImpression(candidate, LocalDate.parse(nudgeDay))
+        }
+        expandedAiLoading = false
+    }
+    val openExpandedAiCandidate: (NowNudgeKnowledgeCandidate) -> Unit = { candidate ->
+        nowNudgeKnowledgeProvider.recordOpened(candidate)
+        when (val target = candidate.target) {
+            is NowNudgeKnowledgeTarget.QuranAyah -> onSurahClickWithAyah(
+                target.surahNumber,
+                target.ayahNumber,
+            )
+            is NowNudgeKnowledgeTarget.Hadith -> onHadithClick(
+                target.collectionName,
+                target.databaseFile,
+                target.hadithNumber,
+            )
+            is NowNudgeKnowledgeTarget.FortressDua -> onFortressDuaClick(target.dua)
+        }
     }
 
     fun dismissNudge(id: String) {
@@ -3466,10 +3506,14 @@ fun PrayerTimesScreen(
                                                 portraitExpandedStripHeight = portraitExpandedInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
-                                                compactForExpandedPrayers = false,
-                                                onExpandedPageChange = { expandedPage ->
-                                                    insightTileExpanded = expandedPage != null
-                                                },
+                                                 compactForExpandedPrayers = false,
+                                                 modelKnowledgeCandidate = expandedAiCandidate,
+                                                 isModelKnowledgeLoading = expandedAiLoading,
+                                                 onModelKnowledgeClick = openExpandedAiCandidate,
+                                                 onExpandedPageChange = { expandedPage ->
+                                                     insightTileExpanded = expandedPage != null
+                                                     expandedInsightPage = expandedPage
+                                                 },
                                                 collapseExpandedTileRequest = collapseTileRequest,
                                                 onSurahClick = onSurahClick,
                                                 onSurahClickWithAyah = onSurahClickWithAyah,

@@ -16,9 +16,16 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -26,6 +33,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -36,6 +44,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,9 +66,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +87,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -94,6 +106,7 @@ import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.audio.quranAudioUrl
+import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.content.CONTEXTUAL_DUA_CHAPTER_IDS
 import com.starception.submission.shared.content.ContextualRecommendation
 import com.starception.submission.shared.content.createSharedFortressRepository
@@ -101,6 +114,10 @@ import com.starception.submission.shared.content.contextualRecommendation
 import com.starception.submission.shared.qibla.HeadingProvider
 import com.starception.submission.shared.qibla.HeadingReading
 import com.starception.submission.shared.qibla.qiblaBearing
+import com.starception.submission.shared.quran.QuranArabicFonts
+import com.starception.submission.shared.quran.QuranTranslationLanguage
+import com.starception.submission.shared.quran.QuranVerse
+import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.salah.FARD_PRAYERS
 import com.starception.submission.shared.salah.SalahProgress
 import io.github.alexzhirkevich.cupertino.CupertinoSliderNative
@@ -152,6 +169,15 @@ fun InsightPager(
         pageCount = { pageCount * 3 },
     )
     val pagerScope = rememberCoroutineScope()
+    var expandedLogicalPage by rememberSaveable { mutableStateOf<Int?>(null) }
+    val effectiveTileHeight by animateDpAsState(
+        targetValue = if (expandedLogicalPage != null) tileHeight + 92.dp else tileHeight,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "iosInsightTileHeight",
+    )
     val qiblaBearing = remember(latitude, longitude) {
         qiblaBearing(latitude, longitude).roundToInt()
     }
@@ -216,9 +242,13 @@ fun InsightPager(
         if (qiblaPageVisible) headingProvider.start { heading = it }
         onDispose { headingProvider.stop() }
     }
-    LaunchedEffect(pagerState.settledPage, pagerState.isScrollInProgress) {
+    LaunchedEffect(
+        pagerState.settledPage,
+        pagerState.isScrollInProgress,
+        expandedLogicalPage,
+    ) {
         autoAdvanceProgress.snapTo(0f)
-        if (pagerState.isScrollInProgress) return@LaunchedEffect
+        if (pagerState.isScrollInProgress || expandedLogicalPage != null) return@LaunchedEffect
         autoAdvanceProgress.animateTo(
             targetValue = 1f,
             animationSpec = tween(durationMillis = 30_000, easing = LinearEasing),
@@ -306,10 +336,10 @@ fun InsightPager(
             // Keep Android's card aspect ratio. Partial-width pages leave a
             // neighboring card visible; a two-pane hero can consume its column.
             val boundedPageWidth = maxPageWidth?.let { minOf(maxWidth, it) } ?: maxWidth
-            val pageWidth = if (fullWidthPage) {
+            val pageWidth = if (fullWidthPage || expandedLogicalPage != null) {
                 boundedPageWidth
             } else {
-                (tileHeight * (250f / 288f))
+                (effectiveTileHeight * (250f / 288f))
                     .coerceAtMost(minOf(maxWidth * 0.64f, boundedPageWidth))
                     .coerceAtLeast(140.dp)
             }
@@ -317,11 +347,17 @@ fun InsightPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(pageWidth),
                 pageSpacing = 14.dp,
-                contentPadding = PaddingValues(end = if (fullWidthPage) 0.dp else 18.dp),
+                contentPadding = PaddingValues(
+                    end = if (fullWidthPage || expandedLogicalPage != null) 0.dp else 18.dp,
+                ),
                 beyondViewportPageCount = 1,
-                modifier = Modifier.fillMaxWidth().height(tileHeight),
+                modifier = Modifier.fillMaxWidth().height(effectiveTileHeight),
             ) { page ->
                 val logicalPage = page % pageCount
+                val isExpanded = expandedLogicalPage == logicalPage
+                val onLongClick = {
+                    expandedLogicalPage = if (isExpanded) null else logicalPage
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -353,8 +389,9 @@ fun InsightPager(
                                 .firstOrNull { it.name == "Maghrib" }
                                 ?.let { it.hour * 60 + it.minute }
                                 ?: 1_080,
-                            tileHeight = tileHeight,
+                            tileHeight = effectiveTileHeight,
                             onClick = onOpenQibla,
+                            onLongClick = onLongClick,
                         )
 
                         1 -> ArtworkTile(
@@ -376,7 +413,8 @@ fun InsightPager(
                                     "${salah.remainingCount} remain · ${salah.nextUnprayed} is next"
                                 else -> "${salah.remainingCount} prayers remain today"
                             },
-                            tileHeight = tileHeight,
+                            tileHeight = effectiveTileHeight,
+                            onLongClick = onLongClick,
                         ) {
                             SalahMarkers(
                                 completed = salah.completed,
@@ -410,7 +448,8 @@ fun InsightPager(
                                 title = surah.nameEnglish,
                                 subtitle = surah.nameArabic,
                                 footerText = surah.subtitle(),
-                                tileHeight = tileHeight,
+                                tileHeight = effectiveTileHeight,
+                                onLongClick = onLongClick,
                                 topEndContent = {
                                     CupertinoSurface(
                                         onClick = {
@@ -449,38 +488,39 @@ fun InsightPager(
                                     onOpenQuran(surah.number)
                                 },
                                 content = {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 10.dp, start = 12.dp, end = 12.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                    ) {
-                                        if (isReadingAudio && duration > 0f) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                modifier = Modifier.fillMaxWidth(),
-                                            ) {
-                                                Text(
-                                                    formatTileSeconds(position.toInt()),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.White,
-                                                )
-                                                CupertinoSliderNative(
-                                                    value = (position / duration).coerceIn(0f, 1f),
-                                                    onValueChange = { fraction ->
-                                                        position = fraction * duration
-                                                        quranPlayer.seekTo(position)
-                                                    },
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .padding(horizontal = 8.dp),
-                                                )
-                                                Text(
-                                                    formatTileSeconds(duration.toInt()),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.White,
-                                                )
-                                            }
+                                    if (isExpanded) {
+                                        ExpandedReadingPreview(
+                                            surahNumber = surah.number,
+                                            surahName = surah.nameEnglish,
+                                            isPlaying = isReadingAudio,
+                                        )
+                                    } else if (isReadingAudio && duration > 0f) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 10.dp, start = 12.dp, end = 12.dp),
+                                        ) {
+                                            Text(
+                                                formatTileSeconds(position.toInt()),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.White,
+                                            )
+                                            CupertinoSliderNative(
+                                                value = (position / duration).coerceIn(0f, 1f),
+                                                onValueChange = { fraction ->
+                                                    position = fraction * duration
+                                                    quranPlayer.seekTo(position)
+                                                },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .padding(horizontal = 8.dp),
+                                            )
+                                            Text(
+                                                formatTileSeconds(duration.toInt()),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.White,
+                                            )
                                         }
                                     }
                                 },
@@ -521,8 +561,9 @@ fun InsightPager(
                                 title = "$qiblaBearing° toward Makkah",
                                 subtitle = qiblaCardinalDirection(qiblaBearing),
                                 footerText = "Open the live compass and 3D globe",
-                                tileHeight = tileHeight,
+                                tileHeight = effectiveTileHeight,
                                 onClick = onOpenQibla,
+                                onLongClick = onLongClick,
                                 topEndContent = {
                                     Box {
                                          CupertinoSurface(
@@ -567,7 +608,8 @@ fun InsightPager(
                             title = recommendation.title,
                             subtitle = recommendation.supportingText,
                             footerText = recommendation.footerText,
-                            tileHeight = tileHeight,
+                            tileHeight = effectiveTileHeight,
+                            onLongClick = onLongClick,
                             onClick = {
                                 when (val target = recommendation.target) {
                                     is ContextualRecommendation.Target.Surah -> onOpenQuran(target.number)
@@ -695,6 +737,167 @@ private fun SharedPrayerDay.prayerWindowProgress(): Float? {
         .coerceIn(0f, 1f)
 }
 
+private val ReadingPreviewGold = Color(0xFFD8AB59)
+
+private fun Int.toArabicIndic(): String = toString().map { digit ->
+    if (digit in '0'..'9') ('٠'.code + (digit - '0')).toChar() else digit
+}.joinToString("")
+
+/** Android-parity Quran rendering used only by an enlarged reading tile. */
+@Composable
+private fun ExpandedReadingPreview(
+    surahNumber: Int,
+    surahName: String,
+    isPlaying: Boolean,
+) {
+    val store = remember { SharedContentStore() }
+    val mushafMode = remember { store.quranMushafMode() }
+    val arabicFont = remember { store.quranArabicFont() }
+    val arabicFontSize = remember { store.quranArabicFontSize() }
+    val translationLanguage = remember {
+        QuranTranslationLanguage.fromCode(store.quranTranslationLanguage())
+    }
+    val repository = remember { createQuranVerseRepository() }
+    var verses by remember(surahNumber) { mutableStateOf<List<QuranVerse>>(emptyList()) }
+    var activeIndex by remember(surahNumber) { mutableIntStateOf(0) }
+    LaunchedEffect(surahNumber, translationLanguage) {
+        verses = runCatching {
+            repository.getVersesBySurah(surahNumber, translationLanguage).take(3)
+        }.getOrDefault(emptyList())
+        activeIndex = 0
+    }
+    LaunchedEffect(verses.size, mushafMode) {
+        if (!mushafMode && verses.size > 1) {
+            while (true) {
+                kotlinx.coroutines.delay(5_200L)
+                activeIndex = (activeIndex + 1) % verses.size
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 112.dp, max = 132.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.Black.copy(alpha = 0.38f))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(18.dp),
+            )
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "SURAH $surahNumber · ${surahName.uppercase()}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        letterSpacing = 1.sp,
+                    ),
+                    color = Color.White.copy(alpha = 0.68f),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = when {
+                        isPlaying -> "PLAYING"
+                        mushafMode -> verses.firstOrNull()?.page?.let { "MUSHAF · PAGE $it" } ?: "MUSHAF"
+                        else -> "${activeIndex + 1}/${verses.size.coerceAtLeast(1)}"
+                    },
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        letterSpacing = 0.8.sp,
+                    ),
+                    color = ReadingPreviewGold,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            if (mushafMode) {
+                AnimatedContent(
+                    targetState = verses,
+                    transitionSpec = {
+                        (fadeIn(tween(380)) + scaleIn(initialScale = 0.985f, animationSpec = tween(420))) togetherWith
+                            (fadeOut(tween(180)) + scaleOut(targetScale = 0.985f, animationSpec = tween(220)))
+                    },
+                    label = "expandedMushafPassage",
+                ) { passage ->
+                    Text(
+                        text = passage.take(3).joinToString(" ") { verse ->
+                            "${verse.arabicText.trim()} ﴿${verse.numberInSurah.toArabicIndic()}﴾"
+                        }.ifBlank { "Preparing today's passage…" },
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                            fontSize = (arabicFontSize * 0.46f).coerceIn(17f, 23f).sp,
+                            lineHeight = (arabicFontSize * 0.70f).coerceIn(27f, 34f).sp,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = Color.White.copy(alpha = if (passage.isEmpty()) 0.58f else 0.96f),
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            } else {
+                AnimatedContent(
+                    targetState = verses.getOrNull(activeIndex),
+                    transitionSpec = {
+                        (fadeIn(tween(380)) + scaleIn(initialScale = 0.985f, animationSpec = tween(420))) togetherWith
+                            (fadeOut(tween(180)) + scaleOut(targetScale = 0.985f, animationSpec = tween(220)))
+                    },
+                    label = "expandedReadingAyah",
+                ) { verse ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Text(
+                            text = verse?.arabicText?.trim().orEmpty()
+                                .ifBlank { "Preparing today's passage…" },
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                                fontSize = (arabicFontSize * 0.46f).coerceIn(17f, 23f).sp,
+                                lineHeight = (arabicFontSize * 0.66f).coerceIn(26f, 32f).sp,
+                                letterSpacing = 0.sp,
+                            ),
+                            color = Color.White.copy(alpha = if (verse == null) 0.58f else 0.96f),
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        verse?.translation?.takeIf(String::isNotBlank)?.let { translation ->
+                            Text(
+                                text = translation,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp,
+                                ),
+                                color = Color.White.copy(alpha = 0.66f),
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** Cupertino rendering of Android's artwork insight card. */
 @Composable
 private fun ArtworkTile(
@@ -711,6 +914,7 @@ private fun ArtworkTile(
     footerText: String? = null,
     topEndContent: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     content: @Composable (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(26.dp)
@@ -726,7 +930,16 @@ private fun ArtworkTile(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+                .then(
+                    when {
+                        onLongClick != null -> Modifier.combinedClickable(
+                            onClick = onClick ?: {},
+                            onLongClick = onLongClick,
+                        )
+                        onClick != null -> Modifier.clickable(onClick = onClick)
+                        else -> Modifier
+                    },
+                ),
         ) {
         Image(
             painter = painterResource(artwork),

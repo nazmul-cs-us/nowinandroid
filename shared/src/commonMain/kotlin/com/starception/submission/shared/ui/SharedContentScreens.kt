@@ -2197,6 +2197,22 @@ private fun FortressInvocationCard(
     playing: Boolean,
     onTogglePlay: () -> Unit,
 ) {
+    val contentStore = remember { SharedContentStore() }
+    val preferredLanguage = remember { contentStore.duaTranslationLanguage() }
+    var displayedTranslation by remember(invocation.chapterId, invocation.position, preferredLanguage) {
+        mutableStateOf(invocation.translation)
+    }
+    LaunchedEffect(invocation.chapterId, invocation.position, preferredLanguage) {
+        displayedTranslation = if (preferredLanguage == "en") {
+            invocation.translation
+        } else {
+            SharedTranslationService.translateFromEnglish(
+                text = invocation.translation,
+                targetLang = preferredLanguage,
+                provider = SharedTranslationService.PROVIDER_AUTO,
+            )
+        }
+    }
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -2243,10 +2259,10 @@ private fun FortressInvocationCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (invocation.translation.isNotBlank()) {
+            if (displayedTranslation.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    invocation.translation,
+                    displayedTranslation,
                     style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
                 )
             }
@@ -2393,6 +2409,20 @@ internal fun SharedDuaDetailScreen(
     var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
     var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
     var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
+    val preferredLanguage = remember { store.duaTranslationLanguage() }
+    var displayedTranslation by remember(number, preferredLanguage) { mutableStateOf("") }
+    LaunchedEffect(number, preferredLanguage, state) {
+        val dua = (state as? DuaDetailState.Loaded)?.dua ?: return@LaunchedEffect
+        displayedTranslation = if (preferredLanguage == "en") {
+            dua.translation
+        } else {
+            SharedTranslationService.translateFromEnglish(
+                text = dua.translation,
+                targetLang = preferredLanguage,
+                provider = SharedTranslationService.PROVIDER_AUTO,
+            )
+        }
+    }
     DisposableEffect(speechSynthesizer) {
         onDispose { speechSynthesizer.stop() }
     }
@@ -2440,7 +2470,9 @@ internal fun SharedDuaDetailScreen(
                                 listening = !listening
                                 val dua = (state as? DuaDetailState.Loaded)?.dua
                                 if (listening && dua != null) {
-                                    val started = speechSynthesizer.speak(text = dua.translation) {
+                                    val started = speechSynthesizer.speak(
+                                        text = displayedTranslation.ifBlank { dua.translation },
+                                    ) {
                                         listening = false
                                     }
                                     if (!started) listening = false
@@ -2520,11 +2552,14 @@ internal fun SharedDuaDetailScreen(
                             }
                         }
                     }
-                    if (dua.translation.isNotBlank()) {
+                    if (displayedTranslation.isNotBlank() || dua.translation.isNotBlank()) {
                         item {
-                            ReaderSection("Translation", MaterialTheme.colorScheme.tertiary) {
+                            ReaderSection(
+                                "Translation (${SharedTranslationService.displayName(preferredLanguage)})",
+                                MaterialTheme.colorScheme.tertiary,
+                            ) {
                                 Text(
-                                    dua.translation,
+                                    displayedTranslation.ifBlank { dua.translation },
                                     modifier = Modifier.fillMaxWidth(),
                                     style = MaterialTheme.typography.bodyLarge.copy(
                                         lineHeight = 26.sp,

@@ -89,7 +89,12 @@ def split_for(record: dict) -> str:
 
 def build(args: argparse.Namespace) -> dict:
     rng = random.Random(args.seed)
-    bank = json.loads(args.input.read_text(encoding="utf-8"))
+    text = args.input.read_text(encoding="utf-8").strip()
+    try:
+        bank = json.loads(text)
+    except json.JSONDecodeError:
+        # The translator emits JSONL (one translated record per line).
+        bank = [json.loads(line) for line in text.splitlines() if line.strip()]
     # Answer pool per (category, topic) supplies fourth distractors. Pools are
     # built from the SAME language fields each record will use.
     pool: dict[tuple, list[str]] = {}

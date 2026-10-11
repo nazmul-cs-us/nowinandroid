@@ -154,6 +154,8 @@ class QuranPlayerViewModel(
     fun playSurah(index: Int) {
         if (index < 0 || index >= QuranData.surahs.size) return
 
+        Log.d("QuranPlayDebug", "▶ playSurah($index) | service=${playbackService != null} | pending=$pendingPlaySurahIndex")
+
         // Clear any previous download error
         _downloadError.value = null
 
@@ -163,7 +165,17 @@ class QuranPlayerViewModel(
         val service = playbackService
         if (service == null) {
             pendingPlaySurahIndex = index
+            Log.d("QuranPlayDebug", "▶ service NULL, stored pending=$index")
         } else {
+            // Multiple ViewModel instances bind to the same singleton service
+            // and each overwrites onAudioNeedsDownload in onServiceConnected.
+            // Re-set it here so THIS instance always receives the callback for
+            // the surah it just asked to play.
+            service.onAudioNeedsDownload = { cdnKey, _ ->
+                Log.i("QuranPlayerViewModel", "Audio needs download: $cdnKey")
+                triggerOnDemandDownload(cdnKey)
+            }
+            Log.d("QuranPlayDebug", "▶ calling service.playSurah($index)")
             service.playSurah(index)
         }
     }

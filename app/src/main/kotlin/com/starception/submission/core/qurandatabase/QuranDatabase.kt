@@ -156,6 +156,25 @@ abstract class QuranDatabase : RoomDatabase() {
         }
 
         /**
+         * Recreate Room from the current bundled/CDN source on the next open.
+         * Room's createFromFile only runs when its managed copy does not exist,
+         * so a copy created before content download otherwise remains empty.
+         */
+        fun clearInstance(context: Context) {
+            synchronized(this) {
+                runCatching { dbInstance?.close() }
+                dbInstance = null
+                val managed = context.applicationContext.getDatabasePath(DATABASE_NAME)
+                listOf(
+                    managed,
+                    java.io.File(managed.absolutePath + "-wal"),
+                    java.io.File(managed.absolutePath + "-shm"),
+                ).forEach(java.io.File::delete)
+                android.util.Log.d("QuranDatabase", "🔄 Cleared managed Quran database")
+            }
+        }
+
+        /**
          * Convert SQL file to SQLite database
          * This function should be called to prepare the database file from quran.sql
          */

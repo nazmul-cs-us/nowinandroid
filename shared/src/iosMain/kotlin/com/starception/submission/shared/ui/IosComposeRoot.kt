@@ -106,6 +106,13 @@ private fun ContentSetupGate(
     content: @androidx.compose.runtime.Composable () -> Unit,
 ) {
     var setupState by remember { mutableStateOf<SetupGateState>(SetupGateState.Checking) }
+    var selectedLanguage by remember {
+        mutableStateOf(
+            com.starception.submission.shared.quran.QuranTranslationLanguage.fromCode(
+                store.preferredContentLanguage(),
+            ),
+        )
+    }
     LaunchedEffect(Unit) {
         if (store.contentSetupComplete()) {
             setupState = SetupGateState.Ready
@@ -153,17 +160,26 @@ private fun ContentSetupGate(
                 },
                 isDownloading = state.isDownloading || downloadStatus != null,
                 error = state.error,
+                selectedLanguage = selectedLanguage,
+                onLanguageSelected = { language ->
+                    selectedLanguage = language
+                    store.savePreferredContentLanguage(language.code)
+                },
                 onComplete = {
                     store.saveContentSetupComplete(true)
                     setupState = SetupGateState.Ready
                 },
                 onDownload = {
                     setupState = state.copy(isDownloading = true, error = null)
-                    coroutineScope.launch { downloadRequiredContent(state.keys) }
+                    coroutineScope.launch {
+                        downloadRequiredContent(state.keys, selectedLanguage)
+                    }
                 },
                 onRetry = {
                     setupState = state.copy(isDownloading = true, error = null)
-                    coroutineScope.launch { downloadRequiredContent(state.keys) }
+                    coroutineScope.launch {
+                        downloadRequiredContent(state.keys, selectedLanguage)
+                    }
                 },
                 onSkip = {
                     store.saveContentSetupComplete(true)
@@ -214,7 +230,10 @@ private suspend fun loadRequiredContentState(): SetupGateState =
         )
     }
 
-private suspend fun downloadRequiredContent(keys: List<String>) {
+private suspend fun downloadRequiredContent(
+    keys: List<String>,
+    language: com.starception.submission.shared.quran.QuranTranslationLanguage,
+) {
     val manifest = iosCloudAssets.loadManifest() ?: return
     keys.forEach { key ->
         iosCloudAssets.downloadCategory(key, manifest) { progress ->
@@ -226,6 +245,13 @@ private suspend fun downloadRequiredContent(keys: List<String>) {
             )
         }
     }
+    val translationKey = when (language) {
+        com.starception.submission.shared.quran.QuranTranslationLanguage.None -> null
+        com.starception.submission.shared.quran.QuranTranslationLanguage.Transliteration ->
+            "databases/quran/quran_transliteration.db"
+        else -> "databases/quran/quran_${language.code}.db"
+    }
+    translationKey?.let { iosCloudAssets.resolveAsset(it, manifest) }
     // The whole chain finished: clear the bus so the gate advances to Ready
     // (the settings' per-category downloads clear it themselves; this chain
     // is ours, so it clears it here).

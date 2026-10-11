@@ -22,9 +22,9 @@ options must contain exactly four short unique strings including answer exactly 
 must not contradict anything stated in the source. Never output Arabic, IDs, citations, rulings,
 or claims unsupported by the source. Prefer a simple explicit detail over interpretation.
 When the request provides a Knowledge area instead of a Source text, compose one natural
-question about that topic from the verified Dorar.net question bank in Arabic, with evidence
-copied equal to answer and four unique Arabic options including answer exactly once. In that
-mode never use English words in the question or options."""
+English question about that topic in the style of the verified Dorar.net question bank, with
+evidence copied equal to answer and four unique English options including answer exactly once.
+In that mode never use Arabic words in the question or options."""
 
 ANSWER_SYSTEM_PROMPT = """You answer the user's question from the supplied source.
 Use only the supplied source, never memory. Return one minified JSON object and nothing else.

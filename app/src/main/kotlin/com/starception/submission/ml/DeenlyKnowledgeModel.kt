@@ -196,21 +196,21 @@ class DeenlyKnowledgeModel(context: Context) {
         }
 
     companion object {
-        // deenly-question-v3: trained on the semantic contract plus REAL corpus
-        // records, so it quotes the actual source instead of regurgitating the
-        // synthetic examples the v2 release memorized.
-        const val MODEL_FILE_NAME = "deenly-question-v3-q4_k_m.gguf"
-        const val MODEL_SIZE_BYTES = 397_807_648L
+        // deenly-question-v5: trained on Qwen2.5-1.5B with the translated
+        // Dorar bank and grounded corpus. Generates richer questions with
+        // contextual evidence instead of bare answer copies.
+        const val MODEL_FILE_NAME = "deenly-question-v5-q4_k_m.gguf"
+        const val MODEL_SIZE_BYTES = 986_048_224L
         const val MODEL_SHA256 =
-            "b5366d1fd1016cbf406705984f09462bfae39ef89a499d74452d4499b2d14106"
+            "80535d590f1a690730530905fc83667fd2a4db72b7ba683afadc437107024455"
 
-        // The answering model (deenly-knowledge-v2). Every generated answer and
+        // The answering model (deenly-knowledge-v3, Qwen2.5-1.5B). Every generated answer and
         // evidence quote is validated as an exact span of the verified source
         // before display; failures fall back to the verbatim source card.
-        const val ANSWER_MODEL_FILE_NAME = "deenly-knowledge-v2-q4_k_m.gguf"
-        const val ANSWER_MODEL_SIZE_BYTES = 397_807_648L
+        const val ANSWER_MODEL_FILE_NAME = "deenly-knowledge-v3-q4_k_m.gguf"
+        const val ANSWER_MODEL_SIZE_BYTES = 986_048_224L
         const val ANSWER_MODEL_SHA256 =
-            "82a7a44c6c948969ab2303fb57d8e69995ae361744099edf79a785eac455a08f"
+            "d6e49d4aadca50b815a2a054c6facd22dccad9871561f146cb73dd6b5204aeee"
 
         private val DeenlyKnowledgeTask.modelFileName: String
             get() = when (this) {
@@ -338,6 +338,7 @@ citations, rulings, or claims unsupported by the source."""
                         evidence.isEmpty() || evidence.length > MAX_EVIDENCE_CHARS ||
                         answer !in verifiedSource || evidence !in verifiedSource || answer !in evidence ||
                         generatedText.any { it.containsArabic() } ||
+                        generatedText.any { it.containsPlaceholderTag() } ||
                         generatedText.any { text -> text.any(Char::isISOControl) }
                     ) return null
                     DeenlyKnowledgeDecision.GroundedQuestion(
@@ -442,6 +443,12 @@ citations, rulings, or claims unsupported by the source."""
                 character.code in 0x0750..0x077F ||
                 character.code in 0x08A0..0x08FF
         }
+
+        // The v4 topic mode occasionally leaks training placeholders such as
+        // "<opt1>" or "<English>" into otherwise valid JSON; those strings must
+        // never reach a quiz card, so treat them like any other bad output.
+        private fun String.containsPlaceholderTag(): Boolean =
+            contains("<opt", ignoreCase = true) || contains("<english", ignoreCase = true)
 
         private fun sha256(bytes: ByteArray): String =
             MessageDigest.getInstance("SHA-256").digest(bytes).toHex()

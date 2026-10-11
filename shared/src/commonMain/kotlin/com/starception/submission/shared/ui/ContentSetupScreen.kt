@@ -17,6 +17,7 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,12 +38,17 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.shared.quran.QuranTranslationLanguage
 import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveButton
 import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSurface
 import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveTextButton
@@ -69,11 +75,17 @@ fun ContentSetupScreen(
     overallProgress: Float,
     isDownloading: Boolean,
     error: String?,
+    selectedLanguage: QuranTranslationLanguage,
+    onLanguageSelected: (QuranTranslationLanguage) -> Unit,
     onComplete: () -> Unit,
     onDownload: () -> Unit,
     onRetry: () -> Unit,
     onSkip: () -> Unit,
 ) {
+    var showLanguages by rememberSaveable { mutableStateOf(false) }
+    val setupLanguages = QuranTranslationLanguage.entries.filter {
+        it != QuranTranslationLanguage.None && it != QuranTranslationLanguage.Transliteration
+    }
     AdaptiveSurface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -110,6 +122,73 @@ fun ContentSetupScreen(
             Spacer(Modifier.height(20.dp))
 
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item(key = "reading-language") {
+                    AdaptiveSurface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showLanguages = !showLanguages },
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "Reading language",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    "Used for Quran, Hadith and Dua translations",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(
+                                selectedLanguage.displayName,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                }
+                if (showLanguages) {
+                    items(setupLanguages, key = { "language-${it.code}" }) { language ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onLanguageSelected(language)
+                                    showLanguages = false
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (language == selectedLanguage) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerLow
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(language.displayName, style = MaterialTheme.typography.bodyMedium)
+                                if (language == selectedLanguage) {
+                                    Text(
+                                        "Selected",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 items(categories, key = { it.key }) { category ->
                     AdaptiveSurface(
                         shape = RoundedCornerShape(14.dp),

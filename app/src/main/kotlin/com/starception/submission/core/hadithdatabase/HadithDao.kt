@@ -18,6 +18,8 @@ package com.starception.submission.core.hadithdatabase
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -107,14 +109,17 @@ interface HadithDao {
         SELECT * FROM hadiths
         WHERE (:p0 = '' OR text_plain LIKE :p0 OR text_arabic LIKE :p0
             OR (:a0 <> '' AND (text_plain LIKE :a0 OR text_arabic LIKE :a0))
-            OR (:b0 <> '' AND (text_plain LIKE :b0 OR text_arabic LIKE :b0)))
+            OR (:b0 <> '' AND (text_plain LIKE :b0 OR text_arabic LIKE :b0))
+            OR (:c0 <> '' AND (text_plain LIKE :c0 OR text_arabic LIKE :c0)))
           AND (:p1 = '' OR text_plain LIKE :p1 OR text_arabic LIKE :p1
             OR (:a1 <> '' AND (text_plain LIKE :a1 OR text_arabic LIKE :a1))
-            OR (:b1 <> '' AND (text_plain LIKE :b1 OR text_arabic LIKE :b1)))
+            OR (:b1 <> '' AND (text_plain LIKE :b1 OR text_arabic LIKE :b1))
+            OR (:c1 <> '' AND (text_plain LIKE :c1 OR text_arabic LIKE :c1)))
           AND (:p2 = '' OR text_plain LIKE :p2 OR text_arabic LIKE :p2
             OR (:a2 <> '' AND (text_plain LIKE :a2 OR text_arabic LIKE :a2))
-            OR (:b2 <> '' AND (text_plain LIKE :b2 OR text_arabic LIKE :b2)))
-        ORDER BY id ASC
+            OR (:b2 <> '' AND (text_plain LIKE :b2 OR text_arabic LIKE :b2))
+            OR (:c2 <> '' AND (text_plain LIKE :c2 OR text_arabic LIKE :c2)))
+        ORDER BY LENGTH(text_plain) ASC
         LIMIT :limit
     """,
     )
@@ -122,12 +127,15 @@ interface HadithDao {
         p0: String,
         a0: String = "",
         b0: String = "",
+        c0: String = "",
         p1: String = "",
         a1: String = "",
         b1: String = "",
+        c1: String = "",
         p2: String = "",
         a2: String = "",
         b2: String = "",
+        c2: String = "",
         limit: Int = 20,
     ): List<HadithEntity>
 
@@ -136,4 +144,18 @@ interface HadithDao {
      */
     @Query("SELECT * FROM hadiths WHERE id BETWEEN :startId AND :endId ORDER BY id ASC")
     suspend fun getHadithsInRange(startId: Int, endId: Int): List<HadithEntity>
+
+    /**
+     * FTS5 bm25-ranked full-text search. When the collection database has a
+     * hadiths_fts index, this replaces LIKE scanning with proper IR ranking:
+     * short dense passages that match the query intent rank above long
+     * narrations that merely contain the literal tokens. Returns HadithEntity
+     * objects in bm25 relevance order (most relevant first).
+     */
+    @RawQuery(observedEntities = [HadithEntity::class])
+    suspend fun searchHadithsRanked(query: SupportSQLiteQuery): List<HadithEntity>
+
+    /** Whether the collection database has a hadiths_fts index. */
+    @Query("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'hadiths_fts'")
+    suspend fun hasFtsTable(): Int
 }

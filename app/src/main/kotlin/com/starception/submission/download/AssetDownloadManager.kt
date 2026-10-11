@@ -615,19 +615,19 @@ class AssetDownloadManager @Inject constructor(
 
         private const val NOW_NUDGE_CATEGORY = "model_now_nudge"
         private const val NOW_NUDGE_MODEL_KEY =
-            "models/now_nudge/deenly-question-v2-q4_k_m.gguf"
-        private const val NOW_NUDGE_MODEL_SIZE = 397_807_648L
+            "models/now_nudge/deenly-question-v5-q4_k_m.gguf"
+        private const val NOW_NUDGE_MODEL_SIZE = 986_048_224L
         private const val NOW_NUDGE_MODEL_SHA256 =
-            "a56a58a51c66fec1548ac32b72ce4b70c4608c24486f5b212fafcba03b5439de"
+            "80535d590f1a690730530905fc83667fd2a4db72b7ba683afadc437107024455"
 
         // The answering model; assembled from two verified CDN parts like the
         // question model (the authenticated uploader caps at 300 MiB).
         private const val NOW_NUDGE_KNOWLEDGE_CATEGORY = "model_now_nudge_knowledge"
         private const val NOW_NUDGE_KNOWLEDGE_MODEL_KEY =
-            "models/now_nudge/deenly-knowledge-v2-q4_k_m.gguf"
-        private const val NOW_NUDGE_KNOWLEDGE_MODEL_SIZE = 397_807_648L
+            "models/now_nudge/deenly-knowledge-v3-q4_k_m.gguf"
+        private const val NOW_NUDGE_KNOWLEDGE_MODEL_SIZE = 986_048_224L
         private const val NOW_NUDGE_KNOWLEDGE_MODEL_SHA256 =
-            "82a7a44c6c948969ab2303fb57d8e69995ae361744099edf79a785eac455a08f"
+            "d6e49d4aadca50b815a2a054c6facd22dccad9871561f146cb73dd6b5204aeee"
 
         private val PARTED_MODELS = listOf(
             PartedModelArtifact(
@@ -639,6 +639,8 @@ class AssetDownloadManager @Inject constructor(
                 partKeys = listOf(
                     "$NOW_NUDGE_MODEL_KEY.part-00",
                     "$NOW_NUDGE_MODEL_KEY.part-01",
+                    "$NOW_NUDGE_MODEL_KEY.part-02",
+                    "$NOW_NUDGE_MODEL_KEY.part-03",
                 ),
             ),
             PartedModelArtifact(
@@ -650,6 +652,8 @@ class AssetDownloadManager @Inject constructor(
                 partKeys = listOf(
                     "$NOW_NUDGE_KNOWLEDGE_MODEL_KEY.part-00",
                     "$NOW_NUDGE_KNOWLEDGE_MODEL_KEY.part-01",
+                    "$NOW_NUDGE_KNOWLEDGE_MODEL_KEY.part-02",
+                    "$NOW_NUDGE_KNOWLEDGE_MODEL_KEY.part-03",
                 ),
             ),
         )

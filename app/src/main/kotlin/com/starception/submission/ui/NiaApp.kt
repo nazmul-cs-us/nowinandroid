@@ -116,6 +116,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -805,6 +807,9 @@ private fun VoiceAssistantButton(
     onNavigationOccupationChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Window-space X of the small vertical voice button box; the quiz uses it
+    // to center itself with symmetric screen margins.
+    var voiceAnchorWindowX by remember { mutableFloatStateOf(0f) }
     val listeningBlend by animateFloatAsState(
         targetValue = if (listening) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
@@ -982,7 +987,17 @@ private fun VoiceAssistantButton(
         showNudge -> VoiceAssistantSurface.Nudge
         else -> VoiceAssistantSurface.Button
     }
-    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
+    val imeBottom = with(LocalDensity.current) { imeBottomPx.toDp() }
+    val imeVisible = imeBottomPx > 0
+    // Android already resizes the Compose window for part of the IME. Apply
+    // only the residual lift and bound it so the composer header never leaves
+    // the top of the screen on tall Samsung keyboards.
+    val composerImeLift = if (imeVisible) {
+        (imeBottom * 0.5f).coerceIn(96.dp, 180.dp)
+    } else {
+        8.dp
+    }
     LaunchedEffect(assistantSurface, verticalLayout) {
         // The destination pill expands into the vacated voice slot while any
         // expanded assistant surface occupies the button's slot — not only the
@@ -1030,7 +1045,20 @@ private fun VoiceAssistantButton(
         label = "assistantContainerColor",
     )
     SharedTransitionLayout(
-        modifier = if (verticalLayout) modifier.size(buttonSize) else modifier,
+        modifier = (
+            if (verticalLayout) modifier.size(buttonSize) else modifier
+            ).let { base ->
+                // The vertical quiz centers on the window; measuring the small
+                // button box's window position lets the overflow-anchored quiz
+                // compute an exact symmetric offset regardless of insets.
+                if (verticalLayout) {
+                    base.onGloballyPositioned { coordinates ->
+                        voiceAnchorWindowX = coordinates.positionInWindow().x
+                    }
+                } else {
+                    base
+                }
+            },
     ) {
         val voiceContainerState = rememberSharedContentState(
             key = "app-shell-voice-container",
@@ -1314,7 +1342,7 @@ private fun VoiceAssistantButton(
                             y = if (verticalLayout) {
                                 0.dp
                             } else {
-                                -buttonSize - if (imeVisible) 96.dp else 8.dp
+                                -buttonSize - composerImeLift
                             },
                         )
                         .sharedBounds(
@@ -1877,10 +1905,16 @@ private fun VoiceAssistantButton(
                 }
                 VoiceAssistantSurface.Quiz -> {
                     val configuration = LocalConfiguration.current
+                    // A centered dialog with symmetric 16dp screen margins,
+                    // matching the widget-like card proportions on tablets.
                     val quizWidth = minOf(
-                        320.dp,
-                        (configuration.screenWidthDp - if (verticalLayout) 104 else 32).dp,
+                        420.dp,
+                        (configuration.screenWidthDp - 32).dp,
                     )
+                    val anchorLeftDp = with(LocalDensity.current) {
+                        voiceAnchorWindowX.toDp()
+                    }
+                    val centeredOffsetX = (configuration.screenWidthDp.dp - quizWidth) / 2 - anchorLeftDp
                     Surface(
                         shape = RoundedCornerShape(containerCorner),
                         color = containerColor,
@@ -1896,7 +1930,7 @@ private fun VoiceAssistantButton(
                                 unbounded = true,
                             )
                             .offset(
-                                x = if (verticalLayout) buttonSize + 12.dp else 0.dp,
+                                x = if (verticalLayout) centeredOffsetX else 0.dp,
                                 y = if (verticalLayout) 0.dp else -buttonSize - 12.dp,
                             )
                             .sharedBounds(

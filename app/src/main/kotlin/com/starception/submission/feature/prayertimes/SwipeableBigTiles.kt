@@ -80,11 +80,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
@@ -154,6 +156,7 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
@@ -213,11 +216,15 @@ import com.starception.submission.core.images.resources.insight_qibla_foreground
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.images.resources.insight_suggestion
+import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
+import com.starception.submission.core.qurandatabase.QuranDatabase
 import com.starception.submission.core.qurandatabase.QuranRepository
+import com.starception.submission.core.qurandatabase.QuranTranslationRepository
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.download.AudioDownloadHelper
+import com.starception.submission.download.AssetRepository
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.feature.prayertimes.components.GlobePopupScreen
 import com.starception.submission.feature.prayertimes.components.rememberParallaxTilt
@@ -234,9 +241,12 @@ import com.starception.submission.feature.prayertimes.weather.prayerWeatherVisua
 import com.starception.submission.feature.prayertimes.weather.primaryPrayerWeatherVisual
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.QuranPlayerViewModel
+import com.starception.submission.feature.quran.Surah
 import com.starception.submission.feature.quran.dailyReading
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.widget.DailyReminder
+import com.starception.submission.widget.DailyReminderRepository
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.widget.PrayerPosterArtwork
@@ -330,6 +340,7 @@ private fun predictionHeroBrush(): Brush {
 @InstallIn(SingletonComponent::class)
 interface AudioDownloadHelperEntryPoint {
     fun audioDownloadHelper(): AudioDownloadHelper
+    fun assetRepository(): AssetRepository
 }
 
 /**
@@ -1259,7 +1270,7 @@ private fun prayerSkyPalette(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SwipeableBigTiles(
+internal fun SwipeableBigTiles(
     prayerTimes: DayPrayerTimes?,
     currentTime: LocalTime,
     locationService: EnhancedLocationService,
@@ -1300,6 +1311,9 @@ fun SwipeableBigTiles(
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
     isInteractionBlocked: Boolean = false,
     weatherThresholds: PrayerWeatherThresholds = PrayerWeatherThresholds(),
+    modelKnowledgeCandidate: NowNudgeKnowledgeCandidate? = null,
+    isModelKnowledgeLoading: Boolean = false,
+    onModelKnowledgeClick: (NowNudgeKnowledgeCandidate) -> Unit = {},
     onExpandedPageChange: ((Int?) -> Unit)? = null,
     collapseExpandedTileRequest: Int = 0,
 ) {
@@ -1422,8 +1436,19 @@ fun SwipeableBigTiles(
         }
     }
 
-    val nextPrayer = getNextPrayer() ?: getCurrentPrayer()
+    val currentPrayer = getCurrentPrayer()
+    val nextPrayer = getNextPrayer() ?: currentPrayer
     val nextPrayerName = nextPrayer?.first?.let(::getPrayerDisplayName) ?: "Prayer time"
+    // Today's Salah follows the obligatory-prayer window, not the helper's
+    // narrow 30-minute alert window (and never treats Sunrise as a prayer).
+    val currentPrayerLookupName = prayerTimes
+        ?.getActualPrayers(currentTime)
+        ?.firstOrNull { it.isCurrently }
+        ?.name
+        ?: currentPrayer?.first
+        ?: nextPrayer?.first
+        ?: "Prayer"
+    val currentPrayerDisplayName = getPrayerDisplayName(currentPrayerLookupName)
     val nextPrayerTime = nextPrayer?.first?.let(getPrayerTimeDisplay).orEmpty()
     val prayerTitle = if (nextPrayerTime.isNotBlank()) {
         "Your next prayer is $nextPrayerName at $nextPrayerTime"
@@ -1857,6 +1882,16 @@ fun SwipeableBigTiles(
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 onCompassClick()
                             },
+                            expandedLeadingContent = {
+                                PrayerTimelineExpandedStage(
+                                    prayers = listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha")
+                                        .map { prayer ->
+                                            getPrayerDisplayName(prayer) to getPrayerTimeDisplay(prayer)
+                                        },
+                                    nextPrayerName = nextPrayerName,
+                                    compactProgress = compactProgress,
+                                )
+                            },
                         )
 
                         1 -> InsightPreviewCard(
@@ -1917,6 +1952,13 @@ fun SwipeableBigTiles(
                                     }
                                     pendingPrayerUndo = null
                                 }
+                            },
+                            expandedLeadingContent = {
+                                SalahHadithExpandedStage(
+                                    prayerName = currentPrayerLookupName,
+                                    displayPrayerName = currentPrayerDisplayName,
+                                    compactProgress = compactProgress,
+                                )
                             },
                         )
 
@@ -1982,6 +2024,13 @@ fun SwipeableBigTiles(
                                     onSurahClick(dailySurah.number)
                                 }
                             },
+                            expandedLeadingContent = {
+                                EditorialQuranReadingStage(
+                                    surah = dailySurah,
+                                    playback = dailyReadingPlayback,
+                                    compactProgress = compactProgress,
+                                )
+                            },
                         )
 
                         3 -> InsightPreviewCard(
@@ -2008,21 +2057,42 @@ fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                             },
-                            directionalHintBearing = qiblaBearing,
-                            deviceHeadingDegrees = liveQiblaHeading,
+                            // The enlarged state already carries its own large
+                            // compass icon inside QiblaBearingExpandedStage;
+                            // the small header arrow is redundant up there.
+                            directionalHintBearing = if (isExpandedCard) null else qiblaBearing,
+                            deviceHeadingDegrees = if (isExpandedCard) null else liveQiblaHeading,
                             actionDescription = "Open Qibla compass",
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 showGlobePopup = true
                             },
+                            expandedLeadingContent = {
+                                QiblaBearingExpandedStage(
+                                    bearing = qiblaBearing,
+                                    heading = liveQiblaHeading,
+                                    compactProgress = compactProgress,
+                                )
+                            },
                         )
 
-                        else -> InsightPreviewCard(
+                        else -> {
+                            val groundedNudge = modelKnowledgeCandidate?.nudge
+                                ?.takeIf { isExpandedCard }
+                            InsightPreviewCard(
                             label = if (isDrivingMode) "Driving · Listen" else "AI suggested",
-                            title = displayedAiRecommendation.title,
-                            supportingText = displayedAiRecommendation.supportingText,
-                            footerText = displayedAiRecommendation.footerText,
+                            title = groundedNudge?.label ?: displayedAiRecommendation.title,
+                            supportingText = if (groundedNudge == null) {
+                                displayedAiRecommendation.supportingText
+                            } else {
+                                null
+                            },
+                            footerText = if (groundedNudge == null) {
+                                displayedAiRecommendation.footerText
+                            } else {
+                                "Tap to open the verified source"
+                            },
                             backgroundPainterRes = ImageRes.drawable.insight_suggestion,
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
@@ -2037,7 +2107,9 @@ fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                             },
-                            actionLabel = when (displayedAiRecommendation.target) {
+                            actionLabel = if (groundedNudge != null) {
+                                "Open source"
+                            } else when (displayedAiRecommendation.target) {
                                 is ContextualRecommendationTarget.Surah -> "Read"
                                 is ContextualRecommendationTarget.FortressDua -> "Open dua"
                                 is ContextualRecommendationTarget.Bukhari -> "Play book"
@@ -2045,11 +2117,32 @@ fun SwipeableBigTiles(
                                 ContextualRecommendationTarget.BukhariCollection -> "Feeling blessed"
                                 ContextualRecommendationTarget.ShamayelCollection -> "Feeling blessed"
                             },
-                            actionDescription = displayedAiRecommendation.actionDescription,
+                            actionDescription = if (groundedNudge != null) {
+                                "Open verified source"
+                            } else {
+                                displayedAiRecommendation.actionDescription
+                            },
+                            expandedLeadingContent = {
+                                RecommendationExpandedStage(
+                                    candidate = modelKnowledgeCandidate,
+                                    loading = isModelKnowledgeLoading,
+                                    fallbackLabel = when (displayedAiRecommendation.target) {
+                                        is ContextualRecommendationTarget.Surah -> "Quran reading"
+                                        is ContextualRecommendationTarget.FortressDua -> "Fortress dua"
+                                        is ContextualRecommendationTarget.Bukhari,
+                                        ContextualRecommendationTarget.BukhariCollection -> "Sahih al-Bukhari"
+                                        is ContextualRecommendationTarget.Shamayel,
+                                        ContextualRecommendationTarget.ShamayelCollection -> "Shama'il"
+                                    },
+                                    compactProgress = compactProgress,
+                                )
+                            },
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                when (val target = displayedAiRecommendation.target) {
+                                if (isExpandedCard && modelKnowledgeCandidate != null) {
+                                    onModelKnowledgeClick(modelKnowledgeCandidate)
+                                } else when (val target = displayedAiRecommendation.target) {
                                     is ContextualRecommendationTarget.Surah -> {
                                         onSurahClick(target.number)
                                     }
@@ -2076,6 +2169,7 @@ fun SwipeableBigTiles(
                                 }
                             },
                         )
+                        }
                     }
                 }
             }
@@ -2487,6 +2581,7 @@ private fun PrayerPosterInsightCard(
     actionIcon: ImageVector? = null,
     actionDescription: String,
     onClick: () -> Unit,
+    expandedLeadingContent: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -2560,6 +2655,7 @@ private fun PrayerPosterInsightCard(
             actionIcon = actionIcon,
             actionDescription = actionDescription,
             onClick = onClick,
+            expandedLeadingContent = expandedLeadingContent,
         )
     }
 }
@@ -2610,6 +2706,8 @@ private fun InsightPreviewCard(
     actionIcon: ImageVector? = null,
     actionDescription: String? = null,
     onClick: (() -> Unit)? = null,
+    // Editorial content joined to the bottom stack only while enlarged.
+    expandedLeadingContent: (@Composable () -> Unit)? = null,
 ) {
     var suppressClickUntilMs by remember { mutableLongStateOf(0L) }
     val hasPrayerContext = !supportingText.isNullOrBlank() ||
@@ -3272,7 +3370,7 @@ private fun InsightPreviewCard(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .graphicsLayer {
                         alpha = bottomContentReveal
                         translationY = (1f - bottomContentReveal) * 12.dp.toPx()
@@ -3281,9 +3379,26 @@ private fun InsightPreviewCard(
                         start = titleHorizontalPadding,
                         end = titleHorizontalPadding,
                         bottom = titleBottomPadding,
-                    ),
+                    )
+                    // A measured header zone keeps every expanded payload out
+                    // of the top controls. The weighted middle absorbs banner
+                    // compression; the metadata below retains natural height.
+                    .padding(top = tagInset + 44.dp),
                 verticalArrangement = Arrangement.spacedBy(contentSpacing),
             ) {
+                if (isExpanded && expandedLeadingContent != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        expandedLeadingContent()
+                    }
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+
                 if (prayerRecap.isNotEmpty()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -3688,6 +3803,1093 @@ private fun InsightPreviewCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+            }
+        }
+    }
+}
+
+private fun Int.toArabicIndic(): String = toString().map { c ->
+    when (c) {
+        '0' -> '٠'
+        '1' -> '١'
+        '2' -> '٢'
+        '3' -> '٣'
+        '4' -> '٤'
+        '5' -> '٥'
+        '6' -> '٦'
+        '7' -> '٧'
+        '8' -> '٨'
+        '9' -> '٩'
+        else -> c
+    }
+}.joinToString("")
+
+/**
+ * The Quran tile's enlarged reading stage: the daily surah's opening ayahs
+ * rendered in the reader's selected mushaf font, revealing line by line above
+ * the card's title. Only ever composed while the tile is enlarged.
+ */
+@Composable
+private fun QuranReadingExpandedStage(
+    surah: Surah,
+    playback: DailyReadingPlaybackState,
+) {
+    val context = LocalContext.current
+    val arabicFontFamily = remember(context) {
+        val selectedFont = context
+            .getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+            .getString("arabic_font", "pdms_saleem")
+            ?: "pdms_saleem"
+        when (selectedFont) {
+            "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+            "thabit" -> QuranFonts.Thabit
+            "uthmani_script" -> QuranFonts.UthmanicScript
+            "indopak_script" -> QuranFonts.IndoPakScript
+            else -> QuranFonts.PDMSSaleem
+        }
+    }
+    val repository = remember(context) { QuranRepository(context) }
+    var openingAyahs by remember(surah.number) { mutableStateOf<List<Ayah>>(emptyList()) }
+    LaunchedEffect(surah.number) {
+        openingAyahs = runCatching {
+            val resolved = repository.getSurahByNumber(surah.number)
+                ?: return@runCatching emptyList()
+            repository.getAyahsBySurahOnce(resolved.id).take(3)
+        }.getOrDefault(emptyList())
+    }
+    val isThisSurahPlaying = playback.isPlaying && playback.surahIndex == surah.number - 1
+
+    // The bismillah breathes with a slow glow instead of a hard shimmer, so
+    // the stage stays calm under the card's own ambient motion.
+    val bismillahGlow by rememberInfiniteTransition(label = "quranStageGlow")
+        .animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2_600, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "quranStageGlowPhase",
+        )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (surah.number != 1 && surah.number != 9) {
+            Text(
+                text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontFamily = arabicFontFamily,
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    letterSpacing = 0.sp,
+                ),
+                color = Color.White.copy(alpha = 0.78f + (0.22f * bismillahGlow)),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        openingAyahs.forEachIndexed { index, ayah ->
+            val entrance = remember { Animatable(0f) }
+            LaunchedEffect(ayah.id) {
+                delay(160L + (index * 150L))
+                entrance.animateTo(
+                    1f,
+                    tween(durationMillis = 480, easing = FastOutSlowInEasing),
+                )
+            }
+            Text(
+                text = ayah.text.trim(),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = arabicFontFamily,
+                    fontSize = 17.sp,
+                    lineHeight = 30.sp,
+                    letterSpacing = 0.sp,
+                ),
+                color = Color.White.copy(alpha = 0.95f),
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = entrance.value
+                        translationY = (1f - entrance.value) * 16.dp.toPx()
+                    },
+            )
+        }
+        if (openingAyahs.isEmpty()) {
+            // The database read is one short hop; park the space so the title
+            // does not shift when the ayahs land.
+            Spacer(modifier = Modifier.height(76.dp))
+        }
+        if (isThisSurahPlaying) {
+            NowPlayingEqualizerRow()
+        } else {
+            Text(
+                text = "Tap to keep reading ${surah.nameEnglish}",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.4.sp),
+                color = Color.White.copy(alpha = 0.62f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NowPlayingEqualizerRow() {
+    val phase by rememberInfiniteTransition(label = "quranStageEqualizer")
+        .animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 620, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "quranStageEqualizerPhase",
+        )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.graphicsLayer { alpha = 0.96f },
+    ) {
+        repeat(3) { bar ->
+            val offset = (bar * 0.33f) + (phase * 0.33f)
+            val wave = 0.5f + (0.5f * kotlin.math.sin((offset * 2f * Math.PI).toFloat()))
+            Box(
+                modifier = Modifier
+                    .size(width = 3.dp, height = (5f + (6f * wave)).dp)
+                    .background(color = HomeReferenceGold, shape = RoundedCornerShape(2.dp)),
+            )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = "Now playing",
+            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.4.sp),
+            color = HomeReferenceGold.copy(alpha = 0.92f),
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * The Prayer Now tile's enlarged stage: a live countdown ring that fills with
+ * the same window progress the card's linear indicator tracks, floating over
+ * the poster scene. Only composed while the tile is enlarged.
+ */
+@Composable
+private fun PrayerNowExpandedStage(
+    prayerName: String,
+    countdownText: String,
+    windowProgress: Float,
+) {
+    val sweep = remember { Animatable(0f) }
+    LaunchedEffect(windowProgress) {
+        delay(240)
+        sweep.animateTo(
+            windowProgress.coerceIn(0.02f, 1f),
+            tween(durationMillis = 760, easing = FastOutSlowInEasing),
+        )
+    }
+    val pulsePhase by rememberInfiniteTransition(label = "prayerStagePulse")
+        .animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1_400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "prayerStagePulsePhase",
+        )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Canvas(modifier = Modifier.size(96.dp)) {
+                val stroke = 5.dp.toPx()
+                val inset = stroke / 2 + 1.dp.toPx()
+                val arcSize = Size(size.width - (inset * 2), size.height - (inset * 2))
+                val topLeft = Offset(inset, inset)
+                drawArc(
+                    color = Color.White.copy(alpha = 0.20f),
+                    startAngle = -90f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        0f to HomeReferenceGold.copy(alpha = 0.55f),
+                        0.5f to HomeReferenceGold,
+                        1f to Color.White.copy(alpha = 0.9f),
+                    ),
+                    startAngle = -90f,
+                    sweepAngle = 360f * sweep.value,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+                // A glowing dot rides the progress head.
+                val angle = Math.toRadians((sweep.value * 360f - 90f).toDouble())
+                val radius = arcSize.minDimension / 2
+                val center = Offset(
+                    x = size.width / 2 + (radius * Math.cos(angle)).toFloat(),
+                    y = size.height / 2 + (radius * Math.sin(angle)).toFloat(),
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = (0.30f + (0.14f * pulsePhase))),
+                    radius = 7.dp.toPx(),
+                    center = center,
+                )
+                drawCircle(
+                    color = HomeReferenceGold,
+                    radius = 3.dp.toPx() * (1f + (0.18f * pulsePhase)),
+                    center = center,
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(1.dp),
+            ) {
+                Text(
+                    text = "NEXT PRAYER",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        letterSpacing = 1.4.sp,
+                    ),
+                    color = Color.White.copy(alpha = 0.66f),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+                Text(
+                    text = prayerName,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 17.sp,
+                        lineHeight = 21.sp,
+                        letterSpacing = 0.sp,
+                    ),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+                if (countdownText.isNotBlank()) {
+                    Text(
+                        text = countdownText,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontSize = 12.sp,
+                            lineHeight = 15.sp,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = HomeReferenceGold.copy(alpha = 0.95f),
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The Qibla tile's enlarged stage: a bearing dial whose needle sweeps to the
+ * Qibla direction once the tile is enlarged, with a live indicator when the
+ * device compass is feeding it. Only composed while the tile is enlarged.
+ */
+@Composable
+private fun QiblaExpandedStage(
+    bearing: Int?,
+    deviceHeading: Float?,
+) {
+    val resolvedBearing = bearing ?: return
+    val needle = remember { Animatable(0f) }
+    LaunchedEffect(resolvedBearing) {
+        delay(260)
+        needle.animateTo(
+            resolvedBearing.toFloat(),
+            tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        )
+    }
+    val livePulse by rememberInfiniteTransition(label = "qiblaStagePulse")
+        .animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1_500, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "qiblaStagePulsePhase",
+        )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Canvas(modifier = Modifier.size(118.dp)) {
+                val radius = size.minDimension / 2
+                val center = Offset(size.width / 2, size.height / 2)
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.14f),
+                    radius = radius,
+                    center = center,
+                    style = Stroke(width = 1.5.dp.toPx()),
+                )
+                // Twenty-four ticks; the cardinal points are longer and brighter.
+                repeat(24) { tick ->
+                    val angle = Math.toRadians((tick * 15f - 90f).toDouble())
+                    val cardinal = tick % 6 == 0
+                    val inner = radius - (if (cardinal) 12.dp.toPx() else 7.dp.toPx())
+                    val outer = radius - 3.dp.toPx()
+                    drawLine(
+                        color = Color.White.copy(alpha = if (cardinal) 0.62f else 0.30f),
+                        start = Offset(
+                            x = center.x + (inner * Math.cos(angle)).toFloat(),
+                            y = center.y + (inner * Math.sin(angle)).toFloat(),
+                        ),
+                        end = Offset(
+                            x = center.x + (outer * Math.cos(angle)).toFloat(),
+                            y = center.y + (outer * Math.sin(angle)).toFloat(),
+                        ),
+                        strokeWidth = (if (cardinal) 2.dp else 1.dp).toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                }
+                // The north pip anchors the dial.
+                drawCircle(
+                    color = HomeReferenceGold,
+                    radius = 2.5.dp.toPx(),
+                    center = Offset(center.x, center.y - radius + 14.dp.toPx()),
+                )
+                // The needle sweeps in from north to the Qibla bearing and
+                // holds there, breathing while the compass is live.
+                val needleAngle = Math.toRadians((needle.value - 90f).toDouble())
+                val needleLength = radius - 16.dp.toPx()
+                val tip = Offset(
+                    x = center.x + (needleLength * Math.cos(needleAngle)).toFloat(),
+                    y = center.y + (needleLength * Math.sin(needleAngle)).toFloat(),
+                )
+                drawLine(
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.0f), Color.White),
+                        start = center,
+                        end = tip,
+                    ),
+                    start = center,
+                    end = tip,
+                    strokeWidth = 2.5.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+                if (deviceHeading != null) {
+                    drawCircle(
+                        color = HomeReferenceGold.copy(alpha = 0.28f + (0.20f * livePulse)),
+                        radius = (4f + (2.5f * livePulse)).dp.toPx(),
+                        center = tip,
+                    )
+                }
+                drawCircle(
+                    color = HomeReferenceGold,
+                    radius = 3.dp.toPx(),
+                    center = tip,
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.9f),
+                    radius = 2.dp.toPx(),
+                    center = center,
+                )
+            }
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "$resolvedBearing°",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = 21.sp,
+                    lineHeight = 24.sp,
+                    letterSpacing = 0.sp,
+                ),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Text(
+                text = qiblaCardinalDirection(resolvedBearing),
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                    letterSpacing = 0.sp,
+                ),
+                color = HomeReferenceGold.copy(alpha = 0.95f),
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                modifier = Modifier
+                    .background(
+                        color = HomeReferenceGold.copy(alpha = 0.16f),
+                        shape = RoundedCornerShape(6.dp),
+                    )
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+            )
+            if (deviceHeading != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.graphicsLayer { alpha = 0.8f + (0.2f * livePulse) },
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .background(
+                                color = HomeReferenceGold,
+                                shape = CircleShape,
+                            )
+                            .graphicsLayer {
+                                scaleX = 1f + (0.35f * livePulse)
+                                scaleY = 1f + (0.35f * livePulse)
+                            },
+                    )
+                    Text(
+                        text = "LIVE",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 9.sp,
+                            lineHeight = 11.sp,
+                            letterSpacing = 1.1.sp,
+                        ),
+                        color = HomeReferenceGold.copy(alpha = 0.9f),
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A quiet manuscript panel that advances through the surah's opening ayahs. */
+@Composable
+private fun EditorialQuranReadingStage(
+    surah: Surah,
+    playback: DailyReadingPlaybackState,
+    compactProgress: Float,
+) {
+    val context = LocalContext.current
+    val assetRepository = remember(context) {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            AudioDownloadHelperEntryPoint::class.java,
+        ).assetRepository()
+    }
+    val repository = remember(context, assetRepository) {
+        QuranRepository(context, assetRepository)
+    }
+    val arabicFontFamily = remember(context) {
+        when (
+            context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+                .getString("arabic_font", "pdms_saleem")
+        ) {
+            "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+            "thabit" -> QuranFonts.Thabit
+            "uthmani_script" -> QuranFonts.UthmanicScript
+            "indopak_script" -> QuranFonts.IndoPakScript
+            else -> QuranFonts.PDMSSaleem
+        }
+    }
+    var ayahs by remember(surah.number) { mutableStateOf<List<Ayah>>(emptyList()) }
+    var translations by remember(surah.number) { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    var activeAyahIndex by remember(surah.number) { mutableIntStateOf(0) }
+    LaunchedEffect(surah.number) {
+        suspend fun openingAyahs(source: QuranRepository): List<Ayah> {
+            val resolved = source.getSurahByNumber(surah.number) ?: return emptyList()
+            return source.getAyahsBySurahOnce(resolved.id)
+        }
+        ayahs = runCatching { openingAyahs(repository) }.getOrDefault(emptyList())
+        if (ayahs.isEmpty()) {
+            // Self-heal an empty Room copy created before quran.db finished
+            // downloading. The CDN source remains untouched; only Room's
+            // managed copy is recreated.
+            QuranDatabase.clearInstance(context)
+            val freshRepository = QuranRepository(context, assetRepository)
+            ayahs = runCatching { openingAyahs(freshRepository) }.getOrDefault(emptyList())
+        }
+        val quranPrefs = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+        val translationCode = quranPrefs.getString("quran_translation", "ar") ?: "ar"
+        val showTranslation = quranPrefs.getBoolean("show_translation", true)
+        translations = if (showTranslation && translationCode != "ar") {
+            runCatching {
+                QuranTranslationRepository(context, translationCode, assetRepository)
+                    .getAyahsBySurahNumber(surah.number)
+                    .associate { it.numberInSurah to it.text.trim() }
+            }.getOrDefault(emptyMap())
+        } else {
+            emptyMap()
+        }
+        activeAyahIndex = 0
+    }
+    LaunchedEffect(ayahs.size) {
+        if (ayahs.size > 1) {
+            while (true) {
+                delay(6_200L)
+                activeAyahIndex = (activeAyahIndex + 1) % ayahs.size
+            }
+        }
+    }
+
+    val activeAyah = ayahs.getOrNull(activeAyahIndex)
+    val isPlaying = playback.isPlaying && playback.surahIndex == surah.number - 1
+    val compression = compactProgress.coerceIn(0f, 1f)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.18f to Color.Black.copy(alpha = 0.10f),
+                    0.78f to Color.Black.copy(alpha = 0.42f),
+                    1f to Color.Black.copy(alpha = 0.12f),
+                ),
+                shape = RoundedCornerShape(22.dp),
+            ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 0.dp, vertical = (8f - (2f * compression)).dp),
+            verticalArrangement = Arrangement.spacedBy((6f - (2f * compression)).dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, end = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "SURAH ${surah.number} · ${surah.nameEnglish.uppercase()}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.5.sp,
+                        lineHeight = 12.sp,
+                        letterSpacing = 1.3.sp,
+                    ),
+                    color = Color.White.copy(alpha = 0.68f),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = if (isPlaying) "PLAYING" else "AYAH ${activeAyah?.numberInSurah ?: 1}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        letterSpacing = 0.8.sp,
+                    ),
+                    color = HomeReferenceGold.copy(alpha = 0.94f),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+            AnimatedContent(
+                targetState = activeAyah,
+                transitionSpec = {
+                    (fadeIn(tween(520)) + scaleIn(initialScale = 0.975f, animationSpec = tween(560))) togetherWith
+                        (fadeOut(tween(300)) + scaleOut(targetScale = 1.015f, animationSpec = tween(340)))
+                },
+                label = "expandedSurahAyah",
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) { ayah ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = ayah?.text?.trim().orEmpty().ifBlank { "Preparing today's passage…" },
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = arabicFontFamily,
+                            fontSize = if (ayah == null) {
+                                13.sp
+                            } else {
+                                (27f - (8f * compression)).sp
+                            },
+                            lineHeight = if (ayah == null) {
+                                18.sp
+                            } else {
+                                (41f - (12f * compression)).sp
+                            },
+                            letterSpacing = 0.sp,
+                        ),
+                        color = Color.White.copy(alpha = if (ayah == null) 0.58f else 0.98f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    ayah?.let { resolvedAyah ->
+                        translations[resolvedAyah.numberInSurah]
+                            ?.takeIf(String::isNotBlank)
+                            ?.let { translation ->
+                                Text(
+                                    text = translation,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontSize = (12f - compression).sp,
+                                        lineHeight = (17f - (2f * compression)).sp,
+                                        letterSpacing = 0.sp,
+                                    ),
+                                    color = Color.White.copy(alpha = 0.66f),
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                    }
+                }
+            }
+            if (compression < 0.55f && ayahs.size > 1) {
+                    LinearProgressIndicator(
+                        progress = { (activeAyahIndex + 1f) / ayahs.size },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            // Keep the track clear of the card's rounded clip;
+                            // without this the bottom edge cuts the bar.
+                            .padding(horizontal = 8.dp),
+                        color = HomeReferenceGold,
+                        trackColor = Color.White.copy(alpha = 0.18f),
+                        strokeCap = StrokeCap.Round,
+                    )
+            }
+        }
+    }
+}
+
+/** A sourced hadith selected for the next prayer, shown only in enlarged Salah. */
+@Composable
+private fun SalahHadithExpandedStage(
+    prayerName: String,
+    displayPrayerName: String,
+    compactProgress: Float,
+) {
+    val context = LocalContext.current
+    var reminder by remember(prayerName) { mutableStateOf<DailyReminder?>(null) }
+    LaunchedEffect(prayerName) {
+        reminder = DailyReminderRepository.loadPrayerHadith(context, prayerName)
+    }
+    val fallbackText = when (prayerName.lowercase()) {
+        "fajr", "asr" -> "Whoever prays the two cool prayers will enter Paradise."
+        "isha" -> "If they knew the reward of the night prayer, they would come to it even if they had to crawl."
+        else -> "Prayer in congregation is twenty-seven times superior to prayer offered alone."
+    }
+    val fallbackSource = when (prayerName.lowercase()) {
+        "fajr", "asr" -> "Sahih al-Bukhari · 574"
+        "isha" -> "Sahih al-Bukhari · 615"
+        else -> "Sahih al-Bukhari · 645"
+    }
+    val body = reminder?.text ?: fallbackText
+    val source = listOfNotNull(reminder?.sourceName, reminder?.sourceDetail)
+        .filter(String::isNotBlank)
+        .joinToString(" · ")
+        .ifBlank { fallbackSource }
+    val compression = compactProgress.coerceIn(0f, 1f)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.20f to Color.Black.copy(alpha = 0.12f),
+                    0.82f to Color.Black.copy(alpha = 0.44f),
+                    1f to Color.Black.copy(alpha = 0.14f),
+                ),
+                shape = RoundedCornerShape(22.dp),
+            ),
+    ) {
+        Text(
+            text = "“",
+            style = MaterialTheme.typography.displaySmall.copy(
+                fontSize = 44.sp,
+                lineHeight = 44.sp,
+            ),
+            color = HomeReferenceGold.copy(alpha = 0.28f),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 4.dp, top = 14.dp),
+        )
+        AnimatedContent(
+            targetState = body to source,
+            transitionSpec = {
+                (fadeIn(tween(500)) + scaleIn(initialScale = 0.98f, animationSpec = tween(540))) togetherWith
+                    (fadeOut(tween(280)) + scaleOut(targetScale = 1.01f, animationSpec = tween(320)))
+            },
+            label = "expandedPrayerHadith",
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize(),
+        ) { (hadithText, sourceText) ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                    start = 12.dp,
+                    end = 0.dp,
+                    top = (8f - (2f * compression)).dp,
+                    bottom = (7f - (2f * compression)).dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy((5f - (2f * compression)).dp),
+            ) {
+                Text(
+                    text = "HADITH FOR ${displayPrayerName.uppercase()}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.5.sp,
+                        lineHeight = 12.sp,
+                        letterSpacing = 1.2.sp,
+                    ),
+                    color = HomeReferenceGold.copy(alpha = 0.94f),
+                    fontWeight = FontWeight.Bold,
+                )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                // Scrollable so the full hadith is always
+                                // reachable — no truncation. Arrangement.Center
+                                // vertically centers short narrations while
+                                // long ones scroll naturally.
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                text = hadithText,
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontSize = (17.5f - (4f * compression)).sp,
+                                    lineHeight = (25f - (6f * compression)).sp,
+                                    letterSpacing = (-0.1).sp,
+                                ),
+                                color = Color.White.copy(alpha = 0.98f),
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                if (compression < 0.50f) {
+                    Text(
+                        text = sourceText,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 9.5.sp,
+                            lineHeight = 12.sp,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = Color.White.copy(alpha = 0.56f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrayerTimelineExpandedStage(
+    prayers: List<Pair<String, String>>,
+    nextPrayerName: String,
+    compactProgress: Float,
+) {
+    val compression = compactProgress.coerceIn(0f, 1f)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.35f to Color.Black.copy(alpha = 0.14f),
+                    1f to Color.Black.copy(alpha = 0.40f),
+                ),
+            )
+            .padding(horizontal = 2.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = "TODAY'S PRAYER LINE",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 9.5.sp,
+                lineHeight = 12.sp,
+                letterSpacing = 1.2.sp,
+            ),
+            color = Color.White.copy(alpha = 0.68f),
+            fontWeight = FontWeight.Bold,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            prayers.forEach { (name, time) ->
+                val highlighted = name.equals(nextPrayerName, ignoreCase = true)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    modifier = Modifier.widthIn(min = 48.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(if (highlighted) 8.dp else 5.dp)
+                            .background(
+                                if (highlighted) HomeReferenceGold else Color.White.copy(alpha = 0.30f),
+                                CircleShape,
+                            ),
+                    )
+                    Text(
+                        text = name,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = (10f - compression).sp,
+                            lineHeight = 12.sp,
+                        ),
+                        color = if (highlighted) HomeReferenceGold else Color.White.copy(alpha = 0.72f),
+                        fontWeight = if (highlighted) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                    if (compression < 0.5f) {
+                        Text(
+                            text = time,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontSize = 11.sp,
+                                lineHeight = 13.sp,
+                            ),
+                            color = Color.White.copy(alpha = if (highlighted) 0.96f else 0.58f),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QiblaBearingExpandedStage(
+    bearing: Int?,
+    heading: Float?,
+    compactProgress: Float,
+) {
+    val compression = compactProgress.coerceIn(0f, 1f)
+    val relativeTurn = if (bearing != null && heading != null) {
+        shortestAngleDelta(heading, bearing.toFloat())
+    } else {
+        null
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = 0.44f),
+                ),
+            )
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "DIRECTION TO MAKKAH",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.5.sp,
+                    lineHeight = 12.sp,
+                    letterSpacing = 1.2.sp,
+                ),
+                color = Color.White.copy(alpha = 0.64f),
+                fontWeight = FontWeight.Bold,
+            )
+            if (heading != null) {
+                Text(
+                    text = "LIVE",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        letterSpacing = 1.sp,
+                    ),
+                    color = HomeReferenceGold,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size((54f - (10f * compression)).dp)
+                    .background(Color.Black.copy(alpha = 0.26f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Navigation,
+                    contentDescription = null,
+                    tint = HomeReferenceGold,
+                    modifier = Modifier
+                        .size((30f - (5f * compression)).dp)
+                        .rotate(relativeTurn ?: 0f),
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = bearing?.let { "$it°" } ?: "—",
+                    style = MaterialTheme.typography.displaySmall.copy(
+                        fontSize = (40f - (8f * compression)).sp,
+                        lineHeight = (43f - (8f * compression)).sp,
+                    ),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                )
+                bearing?.let {
+                    Text(
+                        text = qiblaCardinalDirection(it),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.70f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        Text(
+            text = when {
+                relativeTurn == null -> "Open the live compass to align"
+                kotlin.math.abs(relativeTurn) < 8f -> "You are facing Makkah"
+                relativeTurn > 0f -> "Turn ${kotlin.math.abs(relativeTurn).roundToInt()}° clockwise"
+                else -> "Turn ${kotlin.math.abs(relativeTurn).roundToInt()}° counter-clockwise"
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = if (relativeTurn != null && kotlin.math.abs(relativeTurn) < 8f) {
+                HomeReferenceGold
+            } else {
+                Color.White.copy(alpha = 0.70f)
+            },
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun RecommendationExpandedStage(
+    candidate: NowNudgeKnowledgeCandidate?,
+    loading: Boolean,
+    fallbackLabel: String,
+    compactProgress: Float,
+) {
+    val compression = compactProgress.coerceIn(0f, 1f)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                Brush.horizontalGradient(
+                    0f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = 0.40f),
+                ),
+            )
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        AnimatedContent(
+            targetState = if (loading) "loading" else candidate?.nudge?.id ?: "fallback",
+            transitionSpec = { fadeIn(tween(420)) togetherWith fadeOut(tween(220)) },
+            label = "expandedKnowledgeSuggestion",
+        ) { state ->
+            if (state == "loading") {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    CircularProgressIndicator(
+                        color = HomeReferenceGold,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Text(
+                        text = "Reading your downloaded sources…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.72f),
+                    )
+                }
+            } else {
+                val nudge = candidate?.nudge
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "✦",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = HomeReferenceGold,
+                        )
+                        Text(
+                            text = nudge?.sourceLabel?.takeIf(String::isNotBlank)
+                                ?: "GROUNDED SUGGESTION",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 9.5.sp,
+                                letterSpacing = 1.1.sp,
+                            ),
+                            color = Color.White.copy(alpha = 0.64f),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                text = nudge?.supportingText?.takeIf(String::isNotBlank)
+                                    ?: nudge?.label?.takeIf(String::isNotBlank)
+                                    ?: "A verified $fallbackLabel selected for this moment",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontSize = (17f - (3f * compression)).sp,
+                                    lineHeight = (23f - (4f * compression)).sp,
+                                ),
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                }
             }
         }
     }

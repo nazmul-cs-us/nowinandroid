@@ -29,6 +29,7 @@ import com.starception.submission.core.model.deenly.IslamicQuizQuestion
 import com.starception.submission.core.model.deenly.rankDeenlyNudges
 import com.starception.submission.core.qurandatabase.QuranTranslationRepository
 import com.starception.submission.download.AssetRepository
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.starception.submission.ml.DeenlyKnowledgeDecision
 import com.starception.submission.ml.DeenlyKnowledgeModel
 import com.starception.submission.ml.DeenlyKnowledgeTask
@@ -198,19 +199,53 @@ internal class NowNudgeKnowledgeProvider(
             sourceTextSha256 = source.sourceText.sha256(),
         )
         if (task == DeenlyKnowledgeTask.ANSWER) {
+            rankedSources.take(14).forEach { ranked ->
+                android.util.Log.i(
+                    "NowNudgeAnswer",
+                    "cand=${ranked.source.id} overlap=${ranked.source.queryMatch(query)} " +
+                        "score=${ranked.score} len=${ranked.sourceTextLength}",
+                )
+            }
+            // A typed question is answered best by the source that actually
+            // overlaps the question's terms; the general ranker score cannot
+            // tell a matching narration from the daily rotation. Within a tier
+            // the CONCISE source goes first: the answering model only ever
+            // sees a passage's opening, so a one-sentence hadith extracts far
+            // better than a 14k-char narration.
+            val overlapOrdered = rankedSources
+                .sortedWith(
+                    compareByDescending<RankedKnowledgeSource> {
+                        it.source.queryMatch(query)
+                    }.thenBy { it.sourceTextLength }
+                        .thenByDescending { it.score },
+                )
+            // Stratified coverage: literal full-overlap matches go first, but
+            // the strongest PARTIAL matches always keep their own attempts.
+            // Lexical overlap cannot tell "liked the food" (etiquette) from
+            // "loved halwa and honey" (the actual answer, which never says
+            // "food"); reserving partial-match slots is what guarantees the
+            // answer family is tried instead of four near-miss literal hits.
+            val topOverlap = overlapOrdered.firstOrNull()?.source?.queryMatch(query) ?: 0f
+            val fullMatches = overlapOrdered
+                .filter { it.source.queryMatch(query) >= topOverlap - 0.01f }
+                .take(ANSWER_SOURCE_ATTEMPTS)
+            val partialMatches = overlapOrdered
+                .filter { it.source.queryMatch(query) < topOverlap - 0.01f }
+                .take(ANSWER_PARTIAL_ATTEMPTS)
+            val answerAttempts = fullMatches + partialMatches
+            android.util.Log.i(
+                "NowNudgeAnswer",
+                "attempts=" + answerAttempts.joinToString {
+                    "${it.source.id}(${it.source.queryMatch(query)})"
+                },
+            )
             return answerFromSources(
                 date = date,
                 // The answering model quotes short passages reliably (92% on
                 // concise sources) and degrades on long ones. Keep the ranked
                 // relevance order first and use brevity only as a tie-breaker,
                 // so a more relevant hadith beats a short generic ayah.
-                sources = rankedSources
-                    .take(ANSWER_CANDIDATE_WINDOW)
-                    .sortedWith(
-                        compareByDescending<RankedKnowledgeSource> { it.score }
-                            .thenBy { it.sourceTextLength },
-                    )
-                    .take(ANSWER_SOURCE_ATTEMPTS),
+                sources = answerAttempts,
                 userQuestion = query.orEmpty(),
                 fallback = {
                     buildCandidate(
@@ -497,7 +532,8 @@ internal class NowNudgeKnowledgeProvider(
         // Hadith collection; ranking happens after retrieval, so the cap only
         // bounds how many verified sources are worth ranking at all.
         private const val QUERY_SEARCH_LIMIT = 32
-        private const val ANSWER_SOURCE_ATTEMPTS = 3
+        private const val ANSWER_SOURCE_ATTEMPTS = 4
+        private const val ANSWER_PARTIAL_ATTEMPTS = 2
         private const val ANSWER_CANDIDATE_WINDOW = 8
         private const val MINUTES_FOR_FULL_FRESHNESS = 24f * 60f
     }
@@ -646,6 +682,14 @@ private val QUERY_SYNONYMS = mapOf(
     "prayer" to listOf("pray", "salah", "worship"),
     "favorite" to listOf("loved", "preferred", "liked", "best"),
     "favourite" to listOf("loved", "preferred", "liked", "best"),
+    // The narrations name him "Allah's Messenger" and "Allah's Apostle";
+    // a typed "prophet" must match those phrasings when scoring overlap.
+    "prophet" to listOf("messenger", "apostle", "rasulullah"),
+    "messenger" to listOf("prophet", "apostle", "rasulullah"),
+    "apostle" to listOf("prophet", "messenger", "rasulullah"),
+    "muhammad" to listOf("prophet", "messenger", "rasulullah"),
+    "food" to listOf("eat", "drink", "meal"),
+    "drink" to listOf("food", "eat"),
 )
 
 /**
@@ -659,6 +703,17 @@ private val CORPUS_SEARCH_SYNONYMS = mapOf(
     "favourite" to listOf("loved", "liked"),
     "love" to listOf("liked", "beloved"),
     "hate" to listOf("disliked", "detested"),
+    // The collections name him "Allah's Messenger", "Allah's Apostle" and —
+    // throughout Shama'il and the translated narrations — "Rasulullah".
+    // All three phrasings must match a typed "prophet".
+    "prophet" to listOf("messenger", "apostle", "rasulullah"),
+    "messenger" to listOf("prophet", "apostle", "rasulullah"),
+    "apostle" to listOf("prophet", "messenger", "rasulullah"),
+    "muhammad" to listOf("prophet", "messenger", "rasulullah"),
+    // Narrations about food rarely say "food": they say the Prophet "used to
+    // eat" gourd, "drink" honey, or was offered a meal.
+    "food" to listOf("eat", "drink", "meal"),
+    "drink" to listOf("food", "eat"),
 )
 
 /**
@@ -674,13 +729,18 @@ private fun stemSearchToken(token: String): String = when {
 private val QUERY_STOP_WORDS = setOf(
     "about",
     "does",
+    "did",
     "from",
     "have",
+    "had",
+    "has",
     "please",
     "tell",
     "that",
     "the",
     "this",
+    "was",
+    "were",
     "what",
     "when",
     "where",
@@ -828,11 +888,13 @@ private class AndroidGroundedKnowledgeSourceLoader(
         val primary: String,
         val firstAlternative: String = "",
         val secondAlternative: String = "",
+        val thirdAlternative: String = "",
     ) {
         constructor(token: String) : this(
             primary = "%$token%",
             firstAlternative = CORPUS_SEARCH_SYNONYMS[token]?.getOrNull(0)?.let { "%$it%" }.orEmpty(),
             secondAlternative = CORPUS_SEARCH_SYNONYMS[token]?.getOrNull(1)?.let { "%$it%" }.orEmpty(),
+            thirdAlternative = CORPUS_SEARCH_SYNONYMS[token]?.getOrNull(2)?.let { "%$it%" }.orEmpty(),
         )
     }
 
@@ -872,7 +934,36 @@ private class AndroidGroundedKnowledgeSourceLoader(
 
         for (plan in plans) {
             val results = searchCorpora(plan, limit)
-            if (results.isNotEmpty()) return results.take(limit)
+            // The strict plan can crowd out the real answer: "prophet favourite
+            // food" matches food-etiquette narrations on all three tokens while
+            // "Rasulullah loved halwa and honey" never says "food". Merge the
+            // two most specific pair plans into the strict results (marked so
+            // answer-source selection can give them their own attempts) and let
+            // ranking see both families instead of stopping at the first hit.
+            if (results.isNotEmpty()) {
+                val merged = if (plan.size == 3) {
+                    val strictIds = results.map(GroundedKnowledgeSource::id).toSet()
+                    val pairA = runCatching {
+                        searchCorpora(listOf(slots[0], slots[1]), limit)
+                    }.getOrDefault(emptyList())
+                    val pairB = runCatching {
+                        searchCorpora(listOf(slots[1], slots[2]), limit)
+                    }.getOrDefault(emptyList())
+                    val pairOnly = (pairA + pairB)
+                        .distinctBy(GroundedKnowledgeSource::id)
+                        .filter { it.id !in strictIds }
+                    (results + pairOnly).distinctBy(GroundedKnowledgeSource::id)
+                } else {
+                    results
+                }
+                android.util.Log.i(
+                    "NowNudgeSearch",
+                    "plan=${plan.map { it.primary }} hits=${results.size} " +
+                        "merged=${merged.size} " +
+                        "ids=${merged.take(48).joinToString { it.id }}",
+                )
+                return merged.take(limit)
+            }
         }
         return emptyList()
     }
@@ -883,6 +974,30 @@ private class AndroidGroundedKnowledgeSourceLoader(
     ): List<GroundedKnowledgeSource> {
         val results = mutableListOf<GroundedKnowledgeSource>()
         val slot = { index: Int -> slots.getOrElse(index) { SearchSlot("") } }
+
+        /**
+         * Build an FTS5 MATCH query from the SearchSlot token groups.
+         * Each slot becomes an OR group of prefix-matched terms; groups are
+         * AND'ed together. bm25() then ranks results by inverse document
+         * frequency × term frequency ÷ length — short dense passages win.
+         */
+        fun buildFtsMatchQuery(slots: List<SearchSlot>): String {
+            return slots.mapNotNull { searchSlot ->
+                val terms = listOfNotNull(
+                    searchSlot.primary.removeSurrounding("%").takeIf { it.isNotBlank() },
+                    searchSlot.firstAlternative.removeSurrounding("%").takeIf { it.isNotBlank() },
+                    searchSlot.secondAlternative.removeSurrounding("%").takeIf { it.isNotBlank() },
+                    searchSlot.thirdAlternative.removeSurrounding("%").takeIf { it.isNotBlank() },
+                )
+                    .filter { it.length >= 2 }
+                    .distinct()
+                when {
+                    terms.isEmpty() -> null
+                    terms.size == 1 -> "\"${terms[0]}*\""
+                    else -> "(" + terms.joinToString(" OR ") { "\"$it*\"" } + ")"
+                }
+            }.joinToString(" AND ")
+        }
 
         // Fortress of the Muslim invocations (primary tokens only).
         runCatching {
@@ -935,32 +1050,61 @@ private class AndroidGroundedKnowledgeSourceLoader(
             )
         }
 
-        // Every downloaded Hadith collection, capped per collection so one large
-        // collection cannot crowd out the rest before ranking runs.
+        // Every downloaded Hadith collection, ranked by FTS5 bm25 when the
+        // index exists, with the LIKE multi-token fallback for databases
+        // that lack the FTS index (e.g. Shama'il).
         HADITH_COLLECTIONS.forEach { collection ->
             if (!HadithDatabase.isDatabaseAvailable(appContext, collection.databaseFile)) {
                 return@forEach
             }
             runCatching {
-                val hits = HadithDatabase
+                val dao = HadithDatabase
                     .getInstance(appContext, collection.databaseFile, assetRepository)
                     .hadithDao()
-                    .searchHadithsMultiTokenAny(
-                        p0 = slot(0).primary,
-                        a0 = slot(0).firstAlternative,
-                        b0 = slot(0).secondAlternative,
-                        p1 = slot(1).primary,
-                        a1 = slot(1).firstAlternative,
-                        b1 = slot(1).secondAlternative,
-                        p2 = slot(2).primary,
-                        a2 = slot(2).firstAlternative,
-                        b2 = slot(2).secondAlternative,
-                        limit = HADITH_SEARCH_LIMIT_PER_COLLECTION,
-                    )
                 val metadata = HadithDatabase.getCollectionMetadata(
                     appContext,
                     collection.databaseFile,
                 )
+                val hits = if (runCatching { dao.hasFtsTable() }.getOrDefault(0) > 0) {
+                    // FTS5 bm25 ranking: short, dense passages that match
+                    // the query intent naturally rise above long narrations
+                    // that merely contain the literal tokens. "Rasulullah
+                    // loved halwa and honey" (198 chars) outscores a 4,000
+                    // -char hadith that incidentally mentions food.
+                    val ftsQuery = buildFtsMatchQuery(slots)
+                    if (ftsQuery.isNotBlank()) {
+                        dao.searchHadithsRanked(
+                            SimpleSQLiteQuery(
+                                """
+                                SELECT h.* FROM hadiths h
+                                JOIN hadiths_fts ON hadiths_fts.rowid = h.id
+                                WHERE hadiths_fts MATCH ?
+                                ORDER BY bm25(hadiths_fts)
+                                LIMIT ?
+                                """,
+                                arrayOf(ftsQuery, HADITH_SEARCH_LIMIT_PER_COLLECTION),
+                            ),
+                        )
+                    } else {
+                        emptyList()
+                    }
+                } else {
+                    dao.searchHadithsMultiTokenAny(
+                        p0 = slot(0).primary,
+                        a0 = slot(0).firstAlternative,
+                        b0 = slot(0).secondAlternative,
+                        c0 = slot(0).thirdAlternative,
+                        p1 = slot(1).primary,
+                        a1 = slot(1).firstAlternative,
+                        b1 = slot(1).secondAlternative,
+                        c1 = slot(1).thirdAlternative,
+                        p2 = slot(2).primary,
+                        a2 = slot(2).firstAlternative,
+                        b2 = slot(2).secondAlternative,
+                        c2 = slot(2).thirdAlternative,
+                        limit = HADITH_SEARCH_LIMIT_PER_COLLECTION,
+                    )
+                }
                 hits.mapNotNull { hit ->
                     mapHadithToGroundedSource(collection, hit.id, metadata)
                 }
@@ -1039,14 +1183,13 @@ private class AndroidGroundedKnowledgeSourceLoader(
             hadithRepository.getHadith(collection.databaseFile, hadithId)
         }.getOrNull() ?: return null
 
-        val bukhari = if (collection.databaseFile == BUKHARI_DATABASE) {
-            bukhariTranslations.loadTranslations()
-            bukhariTranslations.getTranslation(hadithId)
-        } else {
-            null
-        }
+        // The legacy Bukhari translation JSON numbers hadiths per volume ("Volume 5,
+        // Book 58, Number 242"), which collides across books and does not match the
+        // database's sunnah-style ids at all — requiring it silently dropped every
+        // Bukhari hit above id 895. The database's own text_plain is the curated
+        // English translation, so map sources straight from it like every other
+        // collection.
         val sourceText = when (collection.databaseFile) {
-            BUKHARI_DATABASE -> bukhari?.englishText
             SHAMAYEL_DATABASE -> hadith.englishText
             else -> hadith.englishText ?: hadith.textPlain
         }?.takeIf(String::isEnglishGroundedText) ?: return null
@@ -1055,17 +1198,11 @@ private class AndroidGroundedKnowledgeSourceLoader(
             ?.takeIf(String::isNotBlank)
             ?: collection.displayName
         val topic = when (collection.databaseFile) {
-            BUKHARI_DATABASE -> bukhari?.bookName
-                ?: BukhariBooks.findByHadithId(hadithId)?.nameEnglish
+            BUKHARI_DATABASE -> BukhariBooks.findByHadithId(hadithId)?.nameEnglish
             SHAMAYEL_DATABASE -> ShamayelBooks.findByHadithId(hadithId)?.nameEnglish
             else -> displayName
         }?.takeIf(String::isNotBlank) ?: displayName
-        val reference = if (bukhari != null) {
-            "Sahih al-Bukhari, Volume ${bukhari.volumeNumber}, " +
-                "Book ${bukhari.bookNumber}, Hadith ${bukhari.hadithNumber}"
-        } else {
-            "$displayName $hadithId"
-        }
+        val reference = "$displayName $hadithId"
         return GroundedKnowledgeSource(
             id = "${collection.databaseFile.removeSuffix(".db")}-$hadithId",
             collection = collection.modelCollection,
@@ -1096,7 +1233,11 @@ private class AndroidGroundedKnowledgeSourceLoader(
         const val HADITH_PROBE_STEP = 37
         const val DUA_SEARCH_LIMIT = 8
         const val QURAN_SEARCH_LIMIT = 4
-        const val HADITH_SEARCH_LIMIT_PER_COLLECTION = 2
+        // Multi-token queries match few narrations per collection, but the
+        // grounded-source mapper drops many raw hits, and the answering model
+        // only sees a passage's opening. Return a generous shortest-first set
+        // so ranking, not the SQL window, decides what reaches the model.
+        const val HADITH_SEARCH_LIMIT_PER_COLLECTION = 48
 
         val QURAN_REFERENCES = listOf(
             QuranReference(1, 4),

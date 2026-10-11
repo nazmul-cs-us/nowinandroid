@@ -51,11 +51,24 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
     /** Selected Quran translation language code (see [QuranTranslationLanguage]). */
     fun quranTranslationLanguage(): String =
         store.getString(QURAN_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank)
-            ?: QuranTranslationLanguage.English.code
+            ?: preferredContentLanguage()
 
     fun saveQuranTranslationLanguage(code: String) {
         store.putString(QURAN_TRANSLATION_LANGUAGE, code)
     }
+
+    /** One first-run reading language shared by Quran, Hadith and Dua. */
+    fun preferredContentLanguage(): String =
+        store.getString(CONTENT_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank)
+            ?: QuranTranslationLanguage.English.code
+
+    fun savePreferredContentLanguage(code: String) {
+        store.putString(CONTENT_TRANSLATION_LANGUAGE, code)
+        saveQuranTranslationLanguage(code)
+        saveHadithTranslationLanguage(code)
+    }
+
+    fun duaTranslationLanguage(): String = preferredContentLanguage()
 
     fun quranArabicFont(): String =
         store.getString(QURAN_ARABIC_FONT)?.takeUnless(String::isNullOrBlank)
@@ -116,7 +129,8 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
     }
 
     fun hadithTranslationLanguage(): String =
-        store.getString(HADITH_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank) ?: "en"
+        store.getString(HADITH_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank)
+            ?: preferredContentLanguage()
 
     fun saveHadithTranslationLanguage(code: String) {
         store.putString(HADITH_TRANSLATION_LANGUAGE, code)
@@ -411,6 +425,7 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val QURAN_TEXT_ALIGNMENT = "shared_quran_text_alignment"
         private const val QURAN_SHOW_TRANSLATION = "shared_quran_show_translation"
         private const val QURAN_MUSHAF_MODE = "shared_quran_mushaf_mode"
+        private const val CONTENT_TRANSLATION_LANGUAGE = "shared_content_translation_language"
         private const val QURAN_TAJWEED_ENABLED = "shared_quran_tajweed_enabled"
         private const val QURAN_AUTOPLAY_PENDING = "shared_quran_autoplay_pending"
         private const val CONTENT_SETUP_COMPLETE = "shared_content_setup_complete"

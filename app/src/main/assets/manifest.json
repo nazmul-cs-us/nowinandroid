@@ -80,13 +80,13 @@
       "required": false
     },
     "model_now_nudge": {
-      "total_size": 397807648,
-      "file_count": 2,
+      "total_size": 986048224,
+      "file_count": 4,
       "required": false
     },
     "model_now_nudge_knowledge": {
-      "total_size": 397807648,
-      "file_count": 2,
+      "total_size": 986048224,
+      "file_count": 4,
       "required": false
     },
     "model_asr": {
@@ -4709,30 +4709,6 @@
       "size": 5006,
       "sha256": "fd2ded4050a55d2b1578870ba8697d02371980217806b7558bd0a5cc60f3ba53",
       "category": "model_kws",
-      "required": false
-    },
-    "models/now_nudge/deenly-question-v2-q4_k_m.gguf.part-00": {
-      "size": 198903824,
-      "sha256": "b3594ae9894f7f90ac6191f4c9918f1997b8b1e0e658bddb647206720d6529d1",
-      "category": "model_now_nudge",
-      "required": false
-    },
-    "models/now_nudge/deenly-question-v2-q4_k_m.gguf.part-01": {
-      "size": 198903824,
-      "sha256": "00eef233c4a8ed415bcdc4c1cdfa3e920b9ec6da59b790cf2347a0cd0fb769ab",
-      "category": "model_now_nudge",
-      "required": false
-    },
-    "models/now_nudge/deenly-knowledge-v2-q4_k_m.gguf.part-00": {
-      "size": 198903824,
-      "sha256": "1ccf6823e49300e71de097170d943a938cba6fd1aac1eff8a13f45cec4ee1ffa",
-      "category": "model_now_nudge_knowledge",
-      "required": false
-    },
-    "models/now_nudge/deenly-knowledge-v2-q4_k_m.gguf.part-01": {
-      "size": 198903824,
-      "sha256": "f00375fe127220675b6f8489f1fc7e4a61caf5dd4219ddcdfa2d53c186b00664",
-      "category": "model_now_nudge_knowledge",
       "required": false
     },
     "models/whisper/filters_vocab_en.bin": {
@@ -41732,9 +41708,57 @@
       "required": true
     },
     "json/islamic_quiz_bank.json": {
-      "size": 2929767,
-      "sha256": "922af206ee44409f9b88f1e964d3d4c43af8590d4078e0342079248a731a3ce9",
+      "size": 1989774,
+      "sha256": "9645a28e4ed604e812a7ece077a7c28e18c651d4025b0bd55a88ab591bdbc92e",
       "category": "json_data",
+      "required": false
+    },
+    "models/now_nudge/deenly-knowledge-v3-q4_k_m.gguf.part-00": {
+      "size": 246512056,
+      "sha256": "e82fd0d05947c2e89f39f16fd5a8868fb6eb97236a86a260c825774f4b5aba37",
+      "category": "model_now_nudge_knowledge",
+      "required": false
+    },
+    "models/now_nudge/deenly-knowledge-v3-q4_k_m.gguf.part-01": {
+      "size": 246512056,
+      "sha256": "3ec57326b432913e16eb8529d3a82b539c843da55180db730a5614926ce090f0",
+      "category": "model_now_nudge_knowledge",
+      "required": false
+    },
+    "models/now_nudge/deenly-knowledge-v3-q4_k_m.gguf.part-02": {
+      "size": 246512056,
+      "sha256": "9ee58f0e65c27ffb6a5e620830cb45b8fb75922f54f915a6ee1af054869a38d2",
+      "category": "model_now_nudge_knowledge",
+      "required": false
+    },
+    "models/now_nudge/deenly-knowledge-v3-q4_k_m.gguf.part-03": {
+      "size": 246512056,
+      "sha256": "9c65ca3b9be74be2cd4937e8ad7c70cabbfad94ece106d12ee2f387b13f06e7b",
+      "category": "model_now_nudge_knowledge",
+      "required": false
+    },
+    "models/now_nudge/deenly-question-v5-q4_k_m.gguf.part-00": {
+      "size": 246512056,
+      "sha256": "5764f7d9d7a011ec95c182279e11cb6611e932411b6444ed69f5ce6ba95c2c6c",
+      "category": "model_now_nudge",
+      "required": false
+    },
+    "models/now_nudge/deenly-question-v5-q4_k_m.gguf.part-01": {
+      "size": 246512056,
+      "sha256": "ad7eeb689ccd8cd0290241e0be82fbc1b8da7203b07a125566cdaa064e7c4bea",
+      "category": "model_now_nudge",
+      "required": false
+    },
+    "models/now_nudge/deenly-question-v5-q4_k_m.gguf.part-02": {
+      "size": 246512056,
+      "sha256": "1d8f16e5d45acd29892add18c19e119b840b600a149f00edefcef40f31544ea8",
+      "category": "model_now_nudge",
+      "required": false
+    },
+    "models/now_nudge/deenly-question-v5-q4_k_m.gguf.part-03": {
+      "size": 246512056,
+      "sha256": "70263a7ed07da4fd66529654fe780e237d322f1a9d8b9d7caff6b34715963e24",
+      "category": "model_now_nudge",
       "required": false
     }
   }

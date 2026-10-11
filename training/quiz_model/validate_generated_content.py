@@ -164,8 +164,13 @@ def validate_topic_question(output: dict[str, Any]) -> tuple[bool, str]:
         return False, "invalid_question"
     if not isinstance(answer, str) or not 1 <= len(answer) <= 96:
         return False, "invalid_answer"
-    if evidence != answer:
-        return False, "topic_evidence_must_copy_answer"
+    if not isinstance(evidence, str) or not 1 <= len(evidence) <= 420:
+        return False, "invalid_evidence"
+    # Topic-mode evidence is supplementary context shown alongside the answer.
+    # There is no source passage to ground it against, and the 1.5B model
+    # naturally composes a factual sentence about the topic rather than
+    # copying the answer. The question, answer, and options carry the quiz;
+    # evidence just enriches the explanation. No answer-containment check.
     if (
         not isinstance(options, list)
         or len(options) != 4

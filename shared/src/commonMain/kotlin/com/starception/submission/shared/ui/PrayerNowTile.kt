@@ -19,6 +19,7 @@ package com.starception.submission.shared.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -88,6 +89,7 @@ fun PrayerNowTile(
     tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
 ) {
     val isNight = nowMinute < sunriseMinute || nowMinute >= maghribMinute ||
         (nowMinute == 0 && (phase == PrayerSkyPhase.Fajr || phase == PrayerSkyPhase.Isha))
@@ -120,7 +122,16 @@ fun PrayerNowTile(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
-                .clickable(onClick = onClick),
+                .then(
+                    if (onLongClick != null) {
+                        Modifier.combinedClickable(
+                            onClick = onClick,
+                            onLongClick = onLongClick,
+                        )
+                    } else {
+                        Modifier.clickable(onClick = onClick)
+                    },
+                ),
         ) {
         Image(
             painter = painterResource(

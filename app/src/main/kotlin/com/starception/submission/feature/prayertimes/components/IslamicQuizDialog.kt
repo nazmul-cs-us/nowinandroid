@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -41,12 +42,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,12 +59,34 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.android.material.card.MaterialCardView
 import com.starception.submission.core.designsystem.component.NiaButton
 import com.starception.submission.core.model.deenly.IslamicQuizBank
 import com.starception.submission.core.model.deenly.IslamicQuizDifficulty
 import com.starception.submission.core.model.deenly.IslamicQuizQuestion
+import com.starception.submission.core.duadatabase.DuaRepository
+import com.starception.submission.download.AssetRepository
+import com.starception.submission.feature.prayertimes.NowNudgeKnowledgeProvider
 import com.starception.submission.feature.prayertimes.quiz.IslamicQuizRepository
-import com.google.android.material.card.MaterialCardView
+import com.starception.submission.ml.DeenlyKnowledgeTask
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import java.time.LocalDate
+
+/** Questions per quiz round. */
+private const val QUIZ_ROUND_QUESTIONS = 10
+
+/** Round slots the on-device model may claim with a generated question. */
+private val MODEL_QUESTION_SLOTS = listOf(2, 5, 8)
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface QuizKnowledgeEntryPoint {
+    fun assetRepository(): AssetRepository
+    fun duaRepository(): DuaRepository
+}
 
 @Composable
 fun IslamicQuizDialog(
@@ -89,14 +112,61 @@ fun IslamicQuizContent(
         value = (listOfNotNull(featuredQuestion) + IslamicQuizRepository(quizContext).loadQuestions())
             .distinctBy(IslamicQuizQuestion::id)
     }
+    // The starter questions only bridge composition until the repository pool
+    // lands; the round itself waits for the real shuffled pool so the user's
+    // first questions come from the bank instead of the same four starters.
+    val poolReady = questions.size > initialQuestions.size
+    var roundQuestions by remember(questions) {
+        mutableStateOf(questions.take(QUIZ_ROUND_QUESTIONS))
+    }
+    LaunchedEffect(poolReady, questions.size) {
+        if (poolReady) {
+            android.util.Log.i(
+                "IslamicQuiz",
+                "round ready: pool=${questions.size} round=${roundQuestions.size} " +
+                    "first=${roundQuestions.firstOrNull()?.id}",
+            )
+        }
+    }
     var questionIndex by remember { mutableIntStateOf(0) }
     var selectedOption by remember { mutableStateOf<Int?>(null) }
     var answerSubmitted by remember { mutableStateOf(false) }
     var score by remember { mutableIntStateOf(0) }
-    val question = questions[questionIndex]
+    // The on-device model composes up to three extra questions from verified
+    // Quran/hadith sources while the round runs. Each lands in its reserved
+    // slot only while the player has not reached that question yet; a slow or
+    // invalid generation leaves the bank question in place.
+    LaunchedEffect(poolReady) {
+        if (!poolReady) return@LaunchedEffect
+        val entryPoint = EntryPointAccessors.fromApplication(
+            quizContext.applicationContext,
+            QuizKnowledgeEntryPoint::class.java,
+        )
+        val provider = NowNudgeKnowledgeProvider.create(
+            context = quizContext,
+            assetRepository = entryPoint.assetRepository(),
+            duaRepository = entryPoint.duaRepository(),
+        )
+        MODEL_QUESTION_SLOTS.forEachIndexed { slotIndex, slot ->
+            val candidate = runCatching {
+                provider.load(
+                    date = LocalDate.now(),
+                    variation = slotIndex,
+                    task = DeenlyKnowledgeTask.QUESTION,
+                )
+            }.getOrNull()
+            val modelQuestion = candidate?.quizQuestion ?: return@forEachIndexed
+            if (questionIndex < slot && slot < roundQuestions.size) {
+                roundQuestions = roundQuestions.toMutableList().also { round ->
+                    round[slot] = modelQuestion
+                }
+            }
+        }
+    }
+    val question = roundQuestions[questionIndex.coerceIn(0, roundQuestions.lastIndex)]
     val answered = answerSubmitted
     val isCorrect = selectedOption == question.correctOption
-    val isLastQuestion = questionIndex == questions.lastIndex
+    val isLastQuestion = questionIndex >= roundQuestions.lastIndex
     // A small spring bump every time the score grows.
     val scoreBump = remember { androidx.compose.animation.core.Animatable(1f) }
     LaunchedEffect(score) {
@@ -168,13 +238,17 @@ fun IslamicQuizContent(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "Question ${questionIndex + 1} of ${questions.size}",
+                    text = if (poolReady) {
+                        "Question ${questionIndex + 1} of ${roundQuestions.size}"
+                    } else {
+                        "Preparing today's questions…"
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.SemiBold,
                 )
                 val animatedProgress by animateFloatAsState(
-                    targetValue = (questionIndex + 1f) / questions.size,
+                    targetValue = (questionIndex + 1f) / roundQuestions.size,
                     animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
                     label = "quizProgress",
                 )
@@ -187,6 +261,29 @@ fun IslamicQuizContent(
             }
         }
 
+        if (!poolReady) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(16.dp),
+                tonalElevation = 1.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 36.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    Text(
+                        text = "Preparing today's questions…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else {
         val questionIsArabic = question.prompt.isArabicText()
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -262,6 +359,7 @@ fun IslamicQuizContent(
                     )
                 }
             }
+        }
         }
         AnimatedVisibility(
             visible = answered,
