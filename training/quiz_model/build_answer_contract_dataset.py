@@ -76,6 +76,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--corpus-unanswered-target", type=int, default=160)
     parser.add_argument("--contract-unanswered-per-kind", type=int, default=3)
     parser.add_argument("--max-source-chars", type=int, default=700)
+    parser.add_argument(
+        "--preference-adversarial",
+        action="store_true",
+        help=(
+            "Add the curated preference pairs: etiquette narrations that mention "
+            "food without stating a preference are asked preference questions "
+            "and must answer 'unanswered', while narrations that state a "
+            "preference directly ('Rasulullah loved halwa and honey') answer "
+            "with the preference span. Both sides are verified against the "
+            "direct-preference check at build time."
+        ),
+    )
     parser.add_argument("--seed", type=int, default=20261007)
     return parser.parse_args()
 
@@ -124,7 +136,9 @@ def topic_for(sentence: str) -> tuple[str, str] | None:
 def sentence_spans(text: str) -> list[tuple[int, int]]:
     """Character spans of every sentence-like segment in [text]."""
     spans = []
-    for match in re.finditer(r"[^.!?]+[.!?]+(?=\s|[\"'\u201d])|[^.!?]+$", text):
+    # The lookahead accepts end-of-string so a passage ending on a closing
+    # quote and period still yields its final sentence instead of none.
+    for match in re.finditer(r"[^.!?]+[.!?]+(?=\s|[\"'\u201d]|$)|[^.!?]+$", text):
         segment = match.span()
         stripped = text[segment[0] : segment[1]].strip()
         if stripped:
@@ -527,6 +541,246 @@ def corpus_records(
     return answered_records + unanswered_records
 
 
+PREFERENCE_QUESTION_TEMPLATES = (
+    "What did the Prophet love to eat?",
+    "What was the Prophet's favourite food?",
+    "What food did the Messenger of Allah like most?",
+)
+
+# Narrations that mention food WITHOUT stating a preference ("never criticized
+# any food ... if he liked the food"). Asked for a preference, the only honest
+# answer is unanswered.
+PREFERENCE_NEGATIVE_PASSAGES = (
+    ("sahih_bukhari.db", 5195),
+    ("sahih_bukhari.db", 3414),
+)
+
+# Narrations that state a preference directly, with the exact answer span the
+# model must quote.
+PREFERENCE_POSITIVE_PASSAGES = (
+    ("shamayele_tirmidhi_complete.db", 121, "halwa and honey"),
+    ("shamayele_tirmidhi_complete.db", 118, "gourd"),
+    ("shamayele_tirmidhi_complete.db", 126, "dhiraa (forequarter of a goat or sheep)"),
+    ("sahih_bukhari.db", 5219, "gourd"),
+)
+
+DIRECT_PREFERENCE_VERBS = (
+    "loved",
+    "loves",
+    "liked",
+    "likes",
+    "preferred",
+    "prefers",
+    "favourite",
+    "favorite",
+)
+
+PREFERENCE_CONDITIONAL_MARKERS = (
+    "never",
+    " not",
+    "if ",
+    "unless",
+    "without",
+    "whether",
+    "even",
+)
+
+
+def contains_direct_preference_statement(text: str) -> bool:
+    """Mirrors the app's direct-preference detector: a preference verb outside
+    conditional, negated, or passive constructions."""
+    lower = text.lower()
+    for verb in DIRECT_PREFERENCE_VERBS:
+        index = lower.find(verb)
+        while index >= 0:
+            prefix = lower[max(0, index - 28) : index]
+            after = lower[index + len(verb) :]
+            if not after.startswith(" by ") and not any(
+                marker in prefix for marker in PREFERENCE_CONDITIONAL_MARKERS
+            ):
+                return True
+            index = lower.find(verb, index + 1)
+    return False
+
+
+def collection_display_and_slug(path: Path) -> tuple[str, str]:
+    """Same collection identity derivation as [passage_corpus]."""
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        if "metadata" in tables:
+            metadata = dict(connection.execute("SELECT key, value FROM metadata"))
+            display_name = (
+                metadata.get("name_english") or metadata.get("name") or path.stem
+            )
+        else:
+            display_name = path.stem
+    finally:
+        connection.close()
+    display_name = " ".join(str(display_name).split())
+    slug = display_name.lower().replace(" ", "_")
+    return display_name, slug
+
+
+def preference_passages(hadith_paths: list[Path]) -> dict[tuple[str, int], dict]:
+    """Fetch the curated preference hadiths verbatim from the passed databases."""
+    wanted: dict[str, list[int]] = {}
+    for name, hadith_id in PREFERENCE_NEGATIVE_PASSAGES:
+        wanted.setdefault(name, []).append(hadith_id)
+    for name, hadith_id, _ in PREFERENCE_POSITIVE_PASSAGES:
+        wanted.setdefault(name, []).append(hadith_id)
+    by_file = {path.name: path for path in hadith_paths if path.is_file()}
+    passages: dict[tuple[str, int], dict] = {}
+    for name, ids in sorted(wanted.items()):
+        path = by_file.get(name)
+        if path is None:
+            raise ValueError(
+                f"The preference pairs need {name}; pass it with --hadith-db"
+            )
+        display_name, slug = collection_display_and_slug(path)
+        connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            for hadith_id in ids:
+                if "hadith_details" in tables:
+                    row = connection.execute(
+                        """
+                        SELECT CASE
+                            WHEN TRIM(d.english_text) <> '' THEN d.english_text
+                            ELSE h.text_plain
+                        END
+                        FROM hadith_details d
+                        JOIN hadiths h ON h.id = d.hadith_id
+                        WHERE d.hadith_id = ?
+                        """,
+                        (hadith_id,),
+                    ).fetchone()
+                else:
+                    row = connection.execute(
+                        "SELECT text_plain FROM hadiths WHERE id = ?",
+                        (hadith_id,),
+                    ).fetchone()
+                if row is None or not row[0] or not is_clean_english(row[0]):
+                    raise ValueError(
+                        f"Preference passage {name} {hadith_id} is missing or "
+                        "not clean English"
+                    )
+                passages[(name, hadith_id)] = {
+                    "collection": slug,
+                    "reference": f"{display_name} {hadith_id}",
+                    "topic": display_name,
+                    "text": row[0],
+                }
+        finally:
+            connection.close()
+    return passages
+
+
+def preference_evidence(source_text: str, answer: str) -> str | None:
+    """The shortest sentence holding the answer, preferring the sentence whose
+    preference verb introduces it. Always a contiguous source span."""
+    best: str | None = None
+    for span_start, span_end in sentence_spans(source_text):
+        sentence = source_text[span_start:span_end].strip()
+        if answer not in sentence:
+            continue
+        if best is None or contains_direct_preference_statement(sentence):
+            best = sentence
+        if best is not None and contains_direct_preference_statement(sentence):
+            break
+    if best is None:
+        return None
+    answer_end = best.find(answer) + len(answer)
+    evidence_cut = min(len(best), max(answer_end, 110))
+    evidence = best[:evidence_cut]
+    if evidence_cut < len(best):
+        evidence = evidence.rstrip(" ,;:")
+        evidence = evidence[:answer_end] if len(evidence) < answer_end else evidence
+        boundary = evidence.rsplit(" ", 1)
+        if len(boundary) > 1 and len(boundary[0]) >= answer_end:
+            evidence = boundary[0]
+    if answer not in evidence or evidence not in source_text:
+        return None
+    return evidence
+
+
+def preference_adversarial_records(hadith_paths: list[Path]) -> list[dict]:
+    """Curated preference pairs, both sides verified at build time.
+
+    The incident these fix: asked "the Prophet's favourite food", the model
+    quoted an etiquette narration ("he used to eat if he liked the food")
+    because lexical overlap cannot tell behavior-with-food from a stated
+    preference. The negatives teach abstention on exactly that family; the
+    positives keep the model quoting real preference spans, so abstention
+    never becomes over-eager.
+    """
+    passages = preference_passages(hadith_paths)
+    records: list[dict] = []
+
+    for name, hadith_id in PREFERENCE_NEGATIVE_PASSAGES:
+        passage = passages[(name, hadith_id)]
+        source_text = bound_source(passage["text"], 700)
+        if contains_direct_preference_statement(source_text):
+            raise ValueError(
+                f"Negative passage {passage['reference']} states a preference"
+            )
+        for question in PREFERENCE_QUESTION_TEMPLATES:
+            records.append(
+                build_record(
+                    record_id=(f"answer-preference-negative-{len(records):04d}"),
+                    collection=passage["collection"],
+                    reference=passage["reference"],
+                    topic=passage["topic"],
+                    source_text=source_text,
+                    question=question,
+                    payload={"contentType": "unanswered", "answer": "", "evidence": ""},
+                )
+            )
+
+    for name, hadith_id, answer in PREFERENCE_POSITIVE_PASSAGES:
+        passage = passages[(name, hadith_id)]
+        source_text = bound_source(passage["text"], 700)
+        if not contains_direct_preference_statement(source_text):
+            raise ValueError(
+                f"Positive passage {passage['reference']} does not state a preference"
+            )
+        answer_text = " ".join(answer.split())
+        if answer_text not in source_text or contains_arabic(answer_text):
+            raise ValueError(
+                f"Curated answer for {passage['reference']} is not a source span"
+            )
+        for question in PREFERENCE_QUESTION_TEMPLATES[:2]:
+            evidence = preference_evidence(source_text, answer_text)
+            if evidence is None:
+                raise ValueError(f"No evidence sentence for {passage['reference']}")
+            records.append(
+                build_record(
+                    record_id=(f"answer-preference-positive-{len(records):04d}"),
+                    collection=passage["collection"],
+                    reference=passage["reference"],
+                    topic=passage["topic"],
+                    source_text=source_text,
+                    question=question,
+                    payload={
+                        "contentType": "answer",
+                        "answer": answer_text,
+                        "evidence": evidence,
+                    },
+                )
+            )
+    return records
+
+
 def validate_record(record: dict) -> None:
     if record["sourceTextSha256"] != sha256(record["sourceText"]):
         raise ValueError(f"Source hash mismatch for {record['id']}")
@@ -570,8 +824,13 @@ def build(args: argparse.Namespace) -> dict:
         unanswered_target=0,
         max_source_chars=args.max_source_chars,
     )
+    preference = (
+        preference_adversarial_records(args.hadith_db)
+        if args.preference_adversarial
+        else []
+    )
 
-    records = contract + contract_unanswered + corpus
+    records = contract + contract_unanswered + corpus + preference
     ids = [record["id"] for record in records]
     if len(ids) != len(set(ids)):
         raise ValueError("Answer dataset ids are not unique")
@@ -602,6 +861,7 @@ def build(args: argparse.Namespace) -> dict:
         "religiousFactsAdded": False,
         "runtimeKnowledgePolicy": "verified_source_envelope_only",
         "answerPolicy": "exact_contiguous_source_spans_or_unanswered",
+        "preferenceAdversarial": args.preference_adversarial,
         "counts": {split: len(items) for split, items in splits.items()},
         "countsByContentType": content_types,
         "corpusPassagesAvailable": len(passages),

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
-  "total_size": 8785280795,
+  "total_size": 8567881499,
   "total_files": 6928,
   "categories": {
     "json_data": {
@@ -278,8 +278,8 @@
       "required": false
     },
     "databases/hadith/muwatta_malik.db": {
-      "size": 28508160,
-      "sha256": "0dd509625a996071412a012a19e986d3b2773b2972e84f2912c9885f32b25824",
+      "size": 4333568,
+      "sha256": "f5617af83205ea6fc3d0bf7c6d87457453a3ccf98fd6c1d63a21aa2b1b61728c",
       "category": "hadith_muwatta_malik",
       "required": false
     },
@@ -290,8 +290,8 @@
       "required": false
     },
     "databases/hadith/sahih_muslim.db": {
-      "size": 54992896,
-      "sha256": "91d3becf453d142401ffc93d73db6332f145b8df0208f065ea591629e5f57e92",
+      "size": 14721024,
+      "sha256": "85371d2fb0f74edc6b355a1d93a4387412ba41146802f369ceb39c11db1e5918",
       "category": "hadith_sahih_muslim",
       "required": false
     },
@@ -302,8 +302,8 @@
       "required": false
     },
     "databases/hadith/sunan_abu_dawud.db": {
-      "size": 61448192,
-      "sha256": "8b673877b4e4d33ed72fdf869d1bb6f8c0e787422135db6acb6305490a46b563",
+      "size": 10268672,
+      "sha256": "3597c9acec966cf02d1f55e575c14abbe91febcd48fd253a6aa8d120fc221934",
       "category": "hadith_sunan_abu_dawud",
       "required": false
     },
@@ -314,20 +314,20 @@
       "required": false
     },
     "databases/hadith/sunan_ibn_majah.db": {
-      "size": 26853376,
-      "sha256": "bfe3e6cefabeb95accaca227a731c6e8322e9030c7182f6400a07db027603a7d",
+      "size": 7208960,
+      "sha256": "d9e4a4a0b8889b0c91babadc8919593e863466ba5fa6777963c854760fdc48dd",
       "category": "hadith_sunan_ibn_majah",
       "required": false
     },
     "databases/hadith/sunan_nasai.db": {
-      "size": 31748096,
-      "sha256": "4d89a4b52130b74759d5301daa65fe12d3b52a62a08881aaa907bdf93ef89af2",
+      "size": 10055680,
+      "sha256": "d6c9844c6c26aa9a9351bab88f1699826ee45d10a16b99ec44433c154c56e4fe",
       "category": "hadith_sunan_nasai",
       "required": false
     },
     "databases/hadith/sunan_tirmidhi.db": {
-      "size": 70643712,
-      "sha256": "df725d03ecc5522562306fc06d7db372d41260872ebf6f460f308ad1afb040ee",
+      "size": 10207232,
+      "sha256": "3100054ab782636b728ab011ceaea368398551f9771429b293b854e598b394e5",
       "category": "hadith_sunan_tirmidhi",
       "required": false
     },
