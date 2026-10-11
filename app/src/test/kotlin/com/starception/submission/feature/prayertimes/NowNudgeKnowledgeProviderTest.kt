@@ -401,6 +401,318 @@ class NowNudgeKnowledgeProviderTest {
         )
     }
 
+    // Fixtures reproduce the "prophet favourite food?" incident: a Bukhari
+    // food-etiquette narration matches every query token, while the Shama'il
+    // characteristics corpus holds the narrations that state the preference.
+
+    private val foodQuestion = "prophet favourite food?"
+
+    private val etiquetteHadith = GroundedKnowledgeSource(
+        id = "sahih_bukhari-5195",
+        collection = "sahih_al_bukhari",
+        reference = "Sahih al-Bukhari 5195",
+        topic = "Foods",
+        sourceText = "Narrated Abu Huraira: The Prophet (ﷺ) never criticized any food " +
+            "(he was invited to) but he used to eat if he liked the food, and leave it " +
+            "if he disliked it.",
+        target = NowNudgeKnowledgeTarget.Hadith(
+            collectionName = "Sahih al-Bukhari",
+            databaseFile = "sahih_bukhari.db",
+            hadithNumber = 5195,
+        ),
+    )
+
+    private val shamayelPreferenceHadith = GroundedKnowledgeSource(
+        id = "shamayele_tirmidhi_complete-121",
+        collection = "shama'il_at_tirmidhi",
+        reference = "Shama'il At-Tirmidhi 121",
+        topic = "What Rasulullah Sallallahu 'Alayhi Wasallam ate and drank",
+        sourceText = "'Ayeshah Radiyallahu 'Anha says: \"Rasulullah SaIlallahu " +
+            "'Alayhi Wasallam loved halwa and honey\".",
+        target = NowNudgeKnowledgeTarget.Hadith(
+            collectionName = "Shama'il At-Tirmidhi",
+            databaseFile = "shamayele_tirmidhi_complete.db",
+            hadithNumber = 121,
+        ),
+    )
+
+    // The same preference family exists in Bukhari: "I have loved to eat gourd
+    // since I saw Allah's Messenger eating it" (Bukhari 5219). Preference
+    // narrations from ANY collection compete for the first attempts.
+    private val bukhariPreferenceHadith = GroundedKnowledgeSource(
+        id = "sahih_bukhari-5219",
+        collection = "sahih_al_bukhari",
+        reference = "Sahih al-Bukhari 5219",
+        topic = "Foods",
+        sourceText = "Narrated Anas: Allah's Messenger (ﷺ) went to (the house of) " +
+            "his slave tailor, and he was offered (a dish of) gourd of which he " +
+            "started eating. I have loved to eat gourd since I saw Allah's " +
+            "Messenger (ﷺ) eating it.",
+        target = NowNudgeKnowledgeTarget.Hadith(
+            collectionName = "Sahih al-Bukhari",
+            databaseFile = "sahih_bukhari.db",
+            hadithNumber = 5219,
+        ),
+    )
+
+    // A Shama'il source that only mentions the Prophet: matches one term of
+    // the food question, so it must NOT be promoted over real matches.
+    private val weakShamayelHadith = GroundedKnowledgeSource(
+        id = "shamayele_tirmidhi_complete-160",
+        collection = "shama'il_at_tirmidhi",
+        reference = "Shama'il At-Tirmidhi 160",
+        topic = "The Prophet's character",
+        sourceText = "Rasulullah Sallallahu 'Alayhi Wasallam was the most " +
+            "truthful of people.",
+        target = NowNudgeKnowledgeTarget.Hadith(
+            collectionName = "Shama'il At-Tirmidhi",
+            databaseFile = "shamayele_tirmidhi_complete.db",
+            hadithNumber = 160,
+        ),
+    )
+
+    private fun ranked(source: GroundedKnowledgeSource, score: Float = 0.5f) =
+        RankedKnowledgeSource(source = source, score = score)
+
+    @Test
+    fun prophetAttributeQuestionDetection() {
+        assertTrue(isProphetAttributeQuestion(foodQuestion))
+        assertTrue(isProphetAttributeQuestion("What did the Messenger eat?"))
+        assertTrue(isProphetAttributeQuestion("How did the Prophet pray?"))
+        // Teachings and duas route through the general hadith, Quran, and
+        // Fortress order, not the Prophet's-person path.
+        assertFalse(isProphetAttributeQuestion("what did the Prophet say about patience?"))
+        assertFalse(isProphetAttributeQuestion("Prophet's dua for travel"))
+        assertFalse(isProphetAttributeQuestion("what to say before eating"))
+        assertFalse(isProphetAttributeQuestion(null))
+    }
+
+    @Test
+    fun directPreferenceStatementsExcludeConditionalEtiquette() {
+        assertTrue(containsDirectPreferenceStatement(shamayelPreferenceHadith.sourceText))
+        assertTrue(containsDirectPreferenceStatement(bukhariPreferenceHadith.sourceText))
+        assertFalse(containsDirectPreferenceStatement(etiquetteHadith.sourceText))
+        // "disliked X" is itself a (negative) preference statement.
+        assertTrue(containsDirectPreferenceStatement("He disliked bitter food."))
+    }
+
+    @Test
+    fun preferenceQuestionsTryDirectPreferenceSourcesFromAnyCollectionFirst() {
+        // The pipeline hands attempts in overlap order: full-overlap sources
+        // (etiquette, Bukhari's gourd narration) before the partial-overlap
+        // Shama'il narration.
+        val attempts = listOf(
+            ranked(etiquetteHadith),
+            ranked(bukhariPreferenceHadith),
+            ranked(shamayelPreferenceHadith),
+        )
+        val ordered = orderAnswerAttempts(attempts, foodQuestion)
+
+        // Both preference narrations front the etiquette hadith, keeping their
+        // overlap order: Bukhari's gourd narration (full overlap) first, then
+        // Shama'il's halwa-and-honey narration.
+        assertEquals(bukhariPreferenceHadith.id, ordered[0].source.id)
+        assertEquals(shamayelPreferenceHadith.id, ordered[1].source.id)
+        assertEquals(etiquetteHadith.id, ordered[2].source.id)
+    }
+
+    @Test
+    fun weakMatchesAreNotPromotedByPreferenceAlone() {
+        val attempts = listOf(
+            ranked(etiquetteHadith),
+            ranked(weakShamayelHadith),
+        )
+        val ordered = orderAnswerAttempts(attempts, foodQuestion)
+
+        // The weak Shama'il match carries only one of the question's terms;
+        // the full-overlap etiquette hadith keeps the first attempt.
+        assertEquals(etiquetteHadith.id, ordered.first().source.id)
+    }
+
+    @Test
+    fun nonProphetQuestionsKeepTheOverlapOrder() {
+        val attempts = listOf(
+            ranked(etiquetteHadith),
+            ranked(shamayelPreferenceHadith),
+            ranked(bukhariPreferenceHadith),
+        )
+        val ordered = orderAnswerAttempts(attempts, "what to say before eating")
+
+        assertEquals(etiquetteHadith.id, ordered.first().source.id)
+    }
+
+    @Test
+    fun compactPreferenceSpansScoreAboveVerboseEtiquetteQuotes() {
+        val honeyAnswer = groundedAnswerQuality(
+            answer = "honey",
+            evidence = "'Ayeshah Radiyallahu 'Anha says: \"Rasulullah SaIlallahu " +
+                "'Alayhi Wasallam loved halwa and honey\".",
+            source = shamayelPreferenceHadith,
+            query = foodQuestion,
+        )
+        val etiquetteAnswer = groundedAnswerQuality(
+            answer = "but he used to eat if he liked the food",
+            evidence = "The Prophet (ﷺ) never criticized any food (he was invited to) " +
+                "but he used to eat if he liked the food",
+            source = etiquetteHadith,
+            query = foodQuestion,
+        )
+
+        assertTrue(honeyAnswer >= GOOD_ANSWER_SCORE)
+        assertTrue(etiquetteAnswer < GOOD_ANSWER_SCORE)
+        assertTrue(honeyAnswer > etiquetteAnswer)
+    }
+
+    @Test
+    fun preferenceAdjacencyRequiresTheVerbBeforeTheAnswerSpan() {
+        assertTrue(
+            isPreferenceAdjacentAnswer(
+                answer = "honey",
+                evidence = "Rasulullah Sallallahu 'Alayhi Wasallam loved halwa and honey",
+            ),
+        )
+        assertFalse(
+            isPreferenceAdjacentAnswer(
+                answer = "but he used to eat if he liked the food",
+                evidence = "The Prophet never criticized any food (he was invited to) " +
+                    "but he used to eat if he liked the food",
+            ),
+        )
+        // "he used to eat if he liked the food": the conditional clause
+        // follows a preference verb but is etiquette, not a stated favourite.
+        assertFalse(
+            isPreferenceAdjacentAnswer(
+                answer = "if he liked the food",
+                evidence = "he used to eat if he liked the food, and leave it if he disliked it",
+            ),
+        )
+    }
+
+    @Test
+    fun etiquetteQuoteDoesNotStopTheAnswerSearch() = runBlocking {
+        val requestedReferences = mutableListOf<String>()
+        val provider = NowNudgeKnowledgeProvider(
+            sourceLoader = object : GroundedKnowledgeSourceLoader {
+                override suspend fun load(date: LocalDate, variation: Int): GroundedKnowledgeSource? = null
+
+                override suspend fun search(
+                    query: String,
+                    limit: Int,
+                ): List<GroundedKnowledgeSource> = listOf(etiquetteHadith, shamayelPreferenceHadith)
+            },
+            decisionGenerator = KnowledgeDecisionGenerator { _, envelope ->
+                requestedReferences += envelope.reference
+                when (envelope.reference) {
+                    shamayelPreferenceHadith.reference ->
+                        DeenlyKnowledgeDecision.GroundedAnswer(
+                            answer = "honey",
+                            evidence = "'Ayeshah Radiyallahu 'Anha says: \"Rasulullah " +
+                                "SaIlallahu 'Alayhi Wasallam loved halwa and honey\".",
+                        )
+                    else ->
+                        DeenlyKnowledgeDecision.GroundedAnswer(
+                            answer = "but he used to eat if he liked the food",
+                            evidence = "The Prophet (ﷺ) never criticized any food " +
+                                "(he was invited to) but he used to eat if he liked the food",
+                        )
+                }
+            },
+        )
+
+        val candidate = provider.load(
+            date = date,
+            query = foodQuestion,
+            task = DeenlyKnowledgeTask.ANSWER,
+        )!!
+
+        // The Shama'il preference narration is tried first, so its answer wins
+        // even though the etiquette hadith would also have grounded.
+        assertEquals(shamayelPreferenceHadith.reference, requestedReferences.first())
+        assertEquals(shamayelPreferenceHadith.reference, candidate.nudge.sourceLabel)
+        assertTrue(candidate.nudge.supportingText!!.startsWith("\u201Choney\u201D"))
+    }
+
+    @Test
+    fun lowQualityGroundedAnswerStillPresentsWhenNothingBetterGrounds() = runBlocking {
+        val provider = NowNudgeKnowledgeProvider(
+            sourceLoader = object : GroundedKnowledgeSourceLoader {
+                override suspend fun load(date: LocalDate, variation: Int): GroundedKnowledgeSource? = null
+
+                override suspend fun search(
+                    query: String,
+                    limit: Int,
+                ): List<GroundedKnowledgeSource> = listOf(etiquetteHadith)
+            },
+            decisionGenerator = KnowledgeDecisionGenerator { _, _ ->
+                DeenlyKnowledgeDecision.GroundedAnswer(
+                    answer = "but he used to eat if he liked the food",
+                    evidence = "The Prophet (ﷺ) never criticized any food (he was invited to) " +
+                        "but he used to eat if he liked the food",
+                )
+            },
+        )
+
+        val candidate = provider.load(
+            date = date,
+            query = foodQuestion,
+            task = DeenlyKnowledgeTask.ANSWER,
+        )!!
+
+        // Never worse than before: a grounded answer beats the fallback card.
+        assertEquals(etiquetteHadith.reference, candidate.nudge.sourceLabel)
+        assertTrue(
+            candidate.nudge.supportingText!!.startsWith(
+                "\u201Cbut he used to eat if he liked the food\u201D",
+            ),
+        )
+    }
+
+    @Test
+    fun compactConditionalSpansDoNotStopThePreferenceSearch() = runBlocking {
+        // "if he liked the food" is a compact, span-valid quote from the
+        // etiquette narration — but it answers nothing. It must not trigger
+        // the early stop; every attempt keeps running and the best grounded
+        // answer is still presented.
+        val etiquetteVariant = etiquetteHadith.copy(
+            id = "sahih_bukhari-5243",
+            reference = "Sahih al-Bukhari 5243",
+            target = NowNudgeKnowledgeTarget.Hadith(
+                collectionName = "Sahih al-Bukhari",
+                databaseFile = "sahih_bukhari.db",
+                hadithNumber = 5243,
+            ),
+        )
+        val invocations = mutableListOf<String>()
+        val provider = NowNudgeKnowledgeProvider(
+            sourceLoader = object : GroundedKnowledgeSourceLoader {
+                override suspend fun load(date: LocalDate, variation: Int): GroundedKnowledgeSource? = null
+
+                override suspend fun search(
+                    query: String,
+                    limit: Int,
+                ): List<GroundedKnowledgeSource> = listOf(etiquetteHadith, etiquetteVariant)
+            },
+            decisionGenerator = KnowledgeDecisionGenerator { _, envelope ->
+                invocations += envelope.reference
+                DeenlyKnowledgeDecision.GroundedAnswer(
+                    answer = "if he liked the food",
+                    evidence = "he used to eat if he liked the food, and leave it " +
+                        "if he disliked it",
+                )
+            },
+        )
+
+        val candidate = provider.load(
+            date = date,
+            query = foodQuestion,
+            task = DeenlyKnowledgeTask.ANSWER,
+        )!!
+
+        // Both sources were tried (no early stop on the conditional span).
+        assertEquals(2, invocations.size)
+        assertTrue(candidate.nudge.supportingText!!.startsWith("\u201Cif he liked the food\u201D"))
+    }
+
     private fun String.sha256(): String = MessageDigest.getInstance("SHA-256")
         .digest(toByteArray())
         .joinToString(separator = "") { "%02x".format(it) }

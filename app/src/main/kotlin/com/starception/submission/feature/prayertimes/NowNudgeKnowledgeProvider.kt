@@ -212,11 +212,29 @@ internal class NowNudgeKnowledgeProvider(
             // the CONCISE source goes first: the answering model only ever
             // sees a passage's opening, so a one-sentence hadith extracts far
             // better than a 14k-char narration.
+            //
+            // For Prophet-attribute questions, sources that STATE a
+            // preference directly ("The food the Messenger of Allah liked
+            // best was tharid") outrank the overlap tiers entirely: the
+            // shortest full-overlap sources are usually food-etiquette
+            // narrations ("never criticized any food ... if he liked it"),
+            // and letting them win the length tie-breaker fills every
+            // attempt slot before the real preference narrations are tried.
+            val preferenceQuestion = isProphetAttributeQuestion(query)
             val overlapOrdered = rankedSources
                 .sortedWith(
-                    compareByDescending<RankedKnowledgeSource> {
-                        it.source.queryMatch(query)
-                    }.thenBy { it.sourceTextLength }
+                    compareByDescending<RankedKnowledgeSource> { ranked ->
+                        if (
+                            preferenceQuestion &&
+                            containsDirectPreferenceStatement(ranked.source.sourceText) &&
+                            ranked.source.queryMatch(query) >= DIRECT_PREFERENCE_PROMOTION_MIN_OVERLAP
+                        ) {
+                            1
+                        } else {
+                            0
+                        }
+                    }.thenByDescending { it.source.queryMatch(query) }
+                        .thenBy { it.sourceTextLength }
                         .thenByDescending { it.score },
                 )
             // Stratified coverage: literal full-overlap matches go first, but
@@ -232,7 +250,11 @@ internal class NowNudgeKnowledgeProvider(
             val partialMatches = overlapOrdered
                 .filter { it.source.queryMatch(query) < topOverlap - 0.01f }
                 .take(ANSWER_PARTIAL_ATTEMPTS)
-            val answerAttempts = fullMatches + partialMatches
+            // Prophet-attribute questions ("the Prophet's favourite food") try
+            // sources that state preferences directly — from any hadith
+            // collection — before narrations that merely match the query
+            // tokens.
+            val answerAttempts = orderAnswerAttempts(fullMatches + partialMatches, query)
             android.util.Log.i(
                 "NowNudgeAnswer",
                 "attempts=" + answerAttempts.joinToString {
@@ -286,12 +308,16 @@ internal class NowNudgeKnowledgeProvider(
     }
 
     /**
-     * Answers the typed question from the highest-ranked retrieved sources.
+     * Answers the typed question from the ordered retrieved sources.
      *
      * Each attempt hands the model one immutable source and accepts only an exact
-     * quote. An honest "unanswered" or any validation failure moves to the next
-     * source; when every attempt is exhausted the caller falls back to the
-     * verbatim source card so the user always sees a grounded result.
+     * quote. A low-quality grounded answer (a verbose clause grasped from a
+     * merely token-matching source) does NOT stop the search: the turn keeps
+     * trying and remembers the best answer by [groundedAnswerQuality]. A good
+     * answer — a compact span that a preference verb directly introduces — stops
+     * immediately so the turn still costs one model run in the common case.
+     * When every attempt is exhausted without a grounded answer the caller falls
+     * back to the verbatim source card so the user always sees a grounded result.
      */
     private suspend fun answerFromSources(
         date: LocalDate,
@@ -301,7 +327,10 @@ internal class NowNudgeKnowledgeProvider(
     ): NowNudgeKnowledgeCandidate? {
         val question = userQuestion.trim()
         if (question.isEmpty()) return fallback()
-        sources.forEach { ranked ->
+        var bestRanked: RankedKnowledgeSource? = null
+        var bestDecision: DeenlyKnowledgeDecision.GroundedAnswer? = null
+        var bestScore = Float.NEGATIVE_INFINITY
+        for (ranked in sources) {
             val source = ranked.source
             val decision = decisionGenerator.generate(
                 task = DeenlyKnowledgeTask.ANSWER,
@@ -315,15 +344,50 @@ internal class NowNudgeKnowledgeProvider(
                 ),
             )
             if (decision is DeenlyKnowledgeDecision.GroundedAnswer) {
-                return buildAnswerCandidate(
-                    date = date,
+                val score = groundedAnswerQuality(
+                    answer = decision.answer,
+                    evidence = decision.evidence,
                     source = source,
-                    decision = decision,
-                    rankingScore = ranked.score,
+                    query = question,
                 )
+                android.util.Log.i(
+                    "NowNudgeAnswer",
+                    "grounded=${source.id} score=$score answer=${decision.answer.take(48)}",
+                )
+                if (score > bestScore) {
+                    bestScore = score
+                    bestRanked = ranked
+                    bestDecision = decision
+                }
+                // A compact span alone is not enough for a preference
+                // question: "if he liked it" quotes cleanly from an etiquette
+                // narration while answering nothing. The early stop requires
+                // a preference verb to introduce the answer span; anything
+                // else keeps the turn searching for a source that actually
+                // states the preference.
+                val earlyStopWorthy = score >= GOOD_ANSWER_SCORE &&
+                    (
+                        !isProphetAttributeQuestion(question) ||
+                            isPreferenceAdjacentAnswer(decision.answer, decision.evidence)
+                        )
+                if (earlyStopWorthy) {
+                    return buildAnswerCandidate(
+                        date = date,
+                        source = source,
+                        decision = decision,
+                        rankingScore = ranked.score,
+                    )
+                }
             }
         }
-        return fallback()
+        val ranked = bestRanked ?: return fallback()
+        val decision = bestDecision ?: return fallback()
+        return buildAnswerCandidate(
+            date = date,
+            source = ranked.source,
+            decision = decision,
+            rankingScore = ranked.score,
+        )
     }
 
     fun recordImpression(
@@ -389,13 +453,6 @@ internal class NowNudgeKnowledgeProvider(
                 RankedKnowledgeSource(source = source, score = ranked.score)
             }
         }
-    }
-
-    private data class RankedKnowledgeSource(
-        val source: GroundedKnowledgeSource,
-        val score: Float,
-    ) {
-        val sourceTextLength: Int get() = source.sourceText.length
     }
 
     companion object {
@@ -672,6 +729,203 @@ private fun GroundedKnowledgeSource.queryMatch(query: String?): Float {
     }
     return if (totalWeight <= 0f) 0f else matchedWeight / totalWeight
 }
+
+/** One retrieved source with its ranker score. */
+internal data class RankedKnowledgeSource(
+    val source: GroundedKnowledgeSource,
+    val score: Float,
+) {
+    val sourceTextLength: Int get() = source.sourceText.length
+}
+/**
+ * True when the question asks about the Prophet's person — his preferences,
+ * food, appearance, dress, or habits. Only these attribute-intent questions
+ * route through the Shama'il characteristics corpus; questions about what the
+ * Prophet *said* or *taught* ("say about patience", "dua for travel") keep the
+ * general hadith, Quran, and Fortress order, so answers keep coming from every
+ * source instead of always Shama'il.
+ */
+internal fun isProphetAttributeQuestion(query: String?): Boolean {
+    val terms = query
+        ?.lowercase()
+        ?.split(Regex("[^a-z0-9]+"))
+        .orEmpty()
+        .filter { it.length >= 3 }
+    if (terms.none { it in PROPHET_QUESTION_TERMS }) return false
+    return terms.any { it in PROPHET_ATTRIBUTE_INTENT_TERMS }
+}
+
+private val PROPHET_QUESTION_TERMS = setOf(
+    "prophet",
+    "messenger",
+    "apostle",
+    "muhammad",
+    "rasulullah",
+)
+
+/** Words that signal a question about the Prophet's own person, not his teachings. */
+private val PROPHET_ATTRIBUTE_INTENT_TERMS = setOf(
+    "how",
+    // preferences and favourites
+    "favourite", "favourites", "favorite", "favorites", "prefer", "prefers",
+    "preferred", "preference", "love", "loves", "loved", "like", "likes", "liked",
+    // food and drink
+    "food", "foods", "eat", "eats", "eating", "ate", "meal", "meals",
+    "drink", "drinks", "drinking", "drank",
+    // appearance and dress
+    "wear", "wears", "wore", "wearing", "dress", "dressed", "clothes", "clothing",
+    "appearance", "look", "looks", "looked", "height", "hair", "beard", "face",
+    // daily habits and personal worship practice
+    "walk", "walked", "walking", "sleep", "sleeps", "slept", "habit", "habits",
+    "routine", "daily", "pray", "prays", "prayed", "prayer", "prayers",
+)
+
+/**
+ * True when the source states a preference directly — "Rasulullah loved halwa
+ * and honey", "I have loved to eat gourd" — from ANY collection. Conditional
+ * or negated constructions ("he used to eat if he liked the food", "never
+ * criticized any food") are deliberately excluded: they describe behavior with
+ * food, not what was loved.
+ */
+internal fun containsDirectPreferenceStatement(text: String): Boolean {
+    val lower = text.lowercase()
+    for (verb in DIRECT_PREFERENCE_VERBS) {
+        var index = lower.indexOf(verb)
+        while (index >= 0) {
+            val prefixStart = (index - PREFERENCE_CONDITIONAL_WINDOW_CHARS).coerceAtLeast(0)
+            val prefix = lower.substring(prefixStart, index)
+            val after = lower.substring(index + verb.length)
+            val isPassive = after.startsWith(" by ")
+            if (!isPassive && PREFERENCE_CONDITIONAL_MARKERS.none(prefix::contains)) {
+                return true
+            }
+            index = lower.indexOf(verb, index + 1)
+        }
+    }
+    return false
+}
+
+private val DIRECT_PREFERENCE_VERBS = listOf(
+    "loved",
+    "loves",
+    "liked",
+    "likes",
+    "preferred",
+    "prefers",
+    "favourite",
+    "favorite",
+)
+
+private val PREFERENCE_CONDITIONAL_MARKERS = listOf(
+    "never",
+    " not",
+    "if ",
+    "unless",
+    "without",
+    "whether",
+    "even",
+)
+
+private const val PREFERENCE_CONDITIONAL_WINDOW_CHARS = 28
+
+/**
+ * Re-orders the answer attempts for the typed question. Prophet-attribute
+ * questions lift every source that states a preference DIRECTLY — from any of
+ * the hadith collections, not just Shama'il — above sources that merely match
+ * the query tokens, so "the Prophet's favourite food" tries Bukhari's
+ * "I have loved to eat gourd" and Shama'il's "loved halwa and honey" before
+ * the food-etiquette narrations that only mention food incidentally.
+ * Weak matches stay in their overlap position: a promotion must still carry
+ * at least half of the question's terms.
+ */
+internal fun orderAnswerAttempts(
+    attempts: List<RankedKnowledgeSource>,
+    query: String?,
+): List<RankedKnowledgeSource> {
+    if (!isProphetAttributeQuestion(query)) return attempts
+    return attempts.sortedByDescending { ranked ->
+        if (
+            containsDirectPreferenceStatement(ranked.source.sourceText) &&
+            ranked.source.queryMatch(query) >= DIRECT_PREFERENCE_PROMOTION_MIN_OVERLAP
+        ) {
+            1
+        } else {
+            0
+        }
+    }
+}
+
+/**
+ * Deterministic quality score for one accepted grounded answer. A compact
+ * entity-like span ("honey") that a preference verb directly introduces beats
+ * a verbose clause quote ("but he used to eat if he liked the food") grasped
+ * from a merely token-matching source; a source that states a preference
+ * directly adds its own signal, from any collection.
+ */
+internal fun groundedAnswerQuality(
+    answer: String,
+    evidence: String,
+    source: GroundedKnowledgeSource,
+    query: String?,
+): Float {
+    val preferenceSourceBonus = if (containsDirectPreferenceStatement(source.sourceText)) {
+        DIRECT_PREFERENCE_SOURCE_BONUS
+    } else {
+        0f
+    }
+    return answerCompactness(answer) +
+        (if (isPreferenceAdjacentAnswer(answer, evidence)) PREFERENCE_ADJACENCY_BONUS else 0f) +
+        preferenceSourceBonus +
+        source.queryMatch(query)
+}
+
+/** Short entity-like answers quote cleanly; long verbal clauses read as grasping. */
+internal fun answerCompactness(answer: String): Float {
+    val words = answer.trim().split(Regex("\\s+")).count { it.isNotBlank() }
+    return when {
+        words <= 2 -> 1f
+        words <= 4 -> 0.6f
+        else -> 0f
+    }
+}
+
+/** True when a preference verb directly precedes the answer span in the evidence. */
+internal fun isPreferenceAdjacentAnswer(answer: String, evidence: String): Boolean {
+    val trimmed = answer.trim()
+    if (trimmed.isEmpty()) return false
+    val lowered = trimmed.lowercase()
+    // A conditional clause ("if he liked the food") is not a preference
+    // object: "he used to eat if he liked the food" is etiquette, not a
+    // stated favourite, so the clause must not read as verb-introduced.
+    if (PREFERENCE_CONDITIONAL_MARKERS.any(lowered::contains) ||
+        PREFERENCE_VERBS.any(lowered::contains)
+    ) {
+        return false
+    }
+    val answerStart = evidence.indexOf(trimmed)
+    if (answerStart <= 0) return false
+    val windowStart = (answerStart - PREFERENCE_WINDOW_CHARS).coerceAtLeast(0)
+    val prefix = evidence.substring(windowStart, answerStart).lowercase()
+    return PREFERENCE_VERBS.any(prefix::contains)
+}
+
+/** Answers at or above this score stop the attempt loop immediately. */
+internal const val GOOD_ANSWER_SCORE = 1.6f
+
+private const val PREFERENCE_WINDOW_CHARS = 48
+private const val PREFERENCE_ADJACENCY_BONUS = 0.6f
+private const val DIRECT_PREFERENCE_SOURCE_BONUS = 0.4f
+private const val DIRECT_PREFERENCE_PROMOTION_MIN_OVERLAP = 0.5f
+private val PREFERENCE_VERBS = listOf(
+    "loved",
+    "liked",
+    "loves",
+    "likes",
+    "preferred",
+    "prefers",
+    "used to eat",
+    "used to drink",
+)
 
 private val QUERY_SYNONYMS = mapOf(
     "dua" to listOf("supplication", "invoke", "call upon", "prayer"),
