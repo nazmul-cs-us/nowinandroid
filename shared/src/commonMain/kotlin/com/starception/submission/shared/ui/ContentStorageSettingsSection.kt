@@ -430,6 +430,8 @@ internal fun storageCategoryDisplayName(category: String): String = when (catego
     "model_asr" -> "Speech Recognition"
     "model_whisper" -> "Whisper STT Engine"
     "model_kws" -> "Keyword Detection"
+    "model_now_nudge" -> "Now Nudge Question Model"
+    "model_now_nudge_knowledge" -> "Now Nudge Knowledge Model"
     "bukhari_audio_bn" -> "Bukhari Audio (Bengali)"
     "fortress_audio_arabic" -> "Fortress Dua Audio (Arabic)"
     "quran_audio_arabic" -> "Quran Audio (Arabic)"
@@ -450,6 +452,8 @@ internal fun storageCategoryDescription(category: String): String = when (catego
     "model_asr" -> "On-device speech-to-text engine"
     "model_whisper" -> "Offline English transcription"
     "model_kws" -> "Offline yes/no detection"
+    "model_now_nudge" -> "Creates source-grounded questions locally without sending content off-device"
+    "model_now_nudge_knowledge" -> "Answers your questions from the downloaded Quran and Hadith, entirely on-device"
     "bukhari_audio_bn" -> "Sahih Bukhari narration in Bengali"
     "fortress_audio_arabic" -> "Fortress of the Muslim recitations"
     "quran_audio_arabic" -> "Arabic Quran recitation"
@@ -464,6 +468,7 @@ private fun storageCategoryGroup(category: String): String = when {
     category.startsWith("quran_audio_") || category.endsWith("_audio_bn") ||
         category.startsWith("fortress_audio_") -> "Audio Recitations"
     category.startsWith("model_tts_") -> "Text-to-Speech"
+    category == "model_now_nudge" || category == "model_now_nudge_knowledge" -> "On-device AI"
     category.startsWith("model_") -> "Voice Recognition"
     else -> "App Data"
 }
@@ -473,8 +478,9 @@ private fun storageGroupOrder(group: String): Int = when (group) {
     "Hadith Collections" -> 1
     "Audio Recitations" -> 2
     "Text-to-Speech" -> 3
-    "Voice Recognition" -> 4
-    "App Data" -> 5
+    "On-device AI" -> 4
+    "Voice Recognition" -> 5
+    "App Data" -> 6
     else -> 6
 }
 
