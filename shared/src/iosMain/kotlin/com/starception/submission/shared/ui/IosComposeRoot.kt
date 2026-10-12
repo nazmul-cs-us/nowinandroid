@@ -398,6 +398,13 @@ private fun createPrayerTimesViewController(
                 ?.substringAfter('=')
                 ?.toIntOrNull()
         }
+        // Lock-screen and Control Center controls for the detached hadith
+        // narration queue; installing is idempotent so every tab's
+        // composition can call it.
+        remember {
+            com.starception.submission.shared.voice.NarrationNowPlaying.install()
+            true
+        }
         val nudgePreview = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--preview-deenly-nudge" }
         }

@@ -23,8 +23,8 @@ import platform.AVFAudio.AVAudioEngine
 import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryPlayAndRecord
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
-import platform.AVFAudio.AVAudioSessionModeMeasurement
 import platform.AVFAudio.AVSpeechBoundary
+import platform.AVFAudio.AVAudioSessionModeMeasurement
 import platform.AVFAudio.AVSpeechSynthesisVoice
 import platform.AVFAudio.AVSpeechSynthesizer
 import platform.AVFAudio.AVSpeechSynthesizerDelegateProtocol
@@ -213,6 +213,24 @@ actual class PlatformSpeechSynthesizer actual constructor() {
             synthesizer.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
         }
         AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
+    }
+
+    actual fun pause() {
+        // Pausing keeps the utterance alive so resume() continues from the
+        // same spot; the audio session must stay active for background
+        // narration to survive the pause.
+        if (synthesizer.speaking && !synthesizer.paused) {
+            synthesizer.pauseSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
+        }
+    }
+
+    actual fun resume() {
+        if (synthesizer.paused) {
+            val session = AVAudioSession.sharedInstance()
+            session.setCategory(AVAudioSessionCategoryPlayback, error = null)
+            session.setActive(true, withOptions = 0u, error = null)
+            synthesizer.continueSpeaking()
+        }
     }
 
     private fun complete(error: String?) {

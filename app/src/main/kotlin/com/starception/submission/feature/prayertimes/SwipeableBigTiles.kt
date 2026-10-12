@@ -32,8 +32,8 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.SystemClock
-import android.provider.Settings
 import android.util.Log
+import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -59,6 +59,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -84,6 +85,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -162,8 +164,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -171,6 +175,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -206,6 +211,7 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
+import com.starception.submission.R
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.duadatabase.Dua
@@ -265,9 +271,12 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import kotlin.math.cos
+import kotlin.math.sin
 import android.view.accessibility.AccessibilityManager as AndroidAccessibilityManager
 import androidx.compose.ui.graphics.lerp as lerpColor
 import com.starception.submission.core.images.resources.Res as ImageRes
+import com.starception.submission.ui.VoiceNudgeSparkles
 import kotlinx.datetime.LocalDate as KotlinLocalDate
 import org.jetbrains.compose.resources.painterResource as composePainterResource
 
@@ -1892,6 +1901,7 @@ internal fun SwipeableBigTiles(
                                     compactProgress = compactProgress,
                                 )
                             },
+                            expandedContentHorizontalBleed = 10.dp,
                         )
 
                         1 -> InsightPreviewCard(
@@ -1960,6 +1970,8 @@ internal fun SwipeableBigTiles(
                                     compactProgress = compactProgress,
                                 )
                             },
+                            expandedContentHorizontalBleed = 10.dp,
+                            disableCardGesturesWhenExpanded = true,
                         )
 
                         2 -> InsightPreviewCard(
@@ -2031,23 +2043,49 @@ internal fun SwipeableBigTiles(
                                     compactProgress = compactProgress,
                                 )
                             },
+                            expandedContentHorizontalBleed = 10.dp,
                         )
 
                         3 -> InsightPreviewCard(
                             label = "Qibla",
-                            title = qiblaBearing?.let { "$it° toward Makkah" }
-                                ?: "Direction to Makkah",
-                            supportingText = qiblaBearing?.let(::qiblaCardinalDirection),
-                            footerText = "Open the live compass and 3D globe",
+                            // Expanded mode carries its full hierarchy inside the
+                            // live instrument. Repeating the bearing and action
+                            // below it made the card look like two stacked widgets.
+                            title = if (isExpandedCard) {
+                                ""
+                            } else {
+                                qiblaBearing?.let { "$it° toward Makkah" }
+                                    ?: "Direction to Makkah"
+                            },
+                            supportingText = if (isExpandedCard) {
+                                null
+                            } else {
+                                qiblaBearing?.let(::qiblaCardinalDirection)
+                            },
+                            footerText = if (isExpandedCard) {
+                                null
+                            } else {
+                                "Open the live compass and 3D globe"
+                            },
                             backgroundPainterRes = ImageRes.drawable.insight_qibla_background,
-                            foregroundPainterRes = ImageRes.drawable.insight_qibla_foreground_v2,
+                            // The compact scene uses the antique compass as its
+                            // subject. Expanded mode supplies a live direction
+                            // instrument, so retaining both creates two competing
+                            // compasses in the same focal area.
+                            foregroundPainterRes = if (isExpandedCard) {
+                                null
+                            } else {
+                                ImageRes.drawable.insight_qibla_foreground_v2
+                            },
                             // Keep the compass present without dominating the Qibla scene.
                             foregroundBaseScale = 0.75f,
                             foregroundOffsetFraction = Offset(0.025f, 0.11f),
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
-                            skyTintStrength = livePrayerSkyPalette.strength * 0.54f,
-                            sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.68f,
+                            skyTintStrength = livePrayerSkyPalette.strength *
+                                if (isExpandedCard) 0.28f else 0.54f,
+                            sceneDarkness = livePrayerSkyPalette.sceneDarkness *
+                                if (isExpandedCard) 0.24f else 0.68f,
                             compactProgress = compactProgress,
                             expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = isExpandedCard,
@@ -2075,6 +2113,7 @@ internal fun SwipeableBigTiles(
                                     compactProgress = compactProgress,
                                 )
                             },
+                            expandedContentHorizontalBleed = 10.dp,
                         )
 
                         else -> {
@@ -2082,18 +2121,29 @@ internal fun SwipeableBigTiles(
                                 ?.takeIf { isExpandedCard }
                             InsightPreviewCard(
                             label = if (isDrivingMode) "Driving · Listen" else "AI suggested",
-                            title = groundedNudge?.label ?: displayedAiRecommendation.title,
-                            supportingText = if (groundedNudge == null) {
+                            // The expanded source panel replaces the compact
+                            // recommendation summary. Rendering both caused the
+                            // "Feeling blessed" summary to collide with the panel.
+                            title = if (isExpandedCard) {
+                                ""
+                            } else {
+                                displayedAiRecommendation.title
+                            },
+                            supportingText = if (!isExpandedCard && groundedNudge == null) {
                                 displayedAiRecommendation.supportingText
                             } else {
                                 null
                             },
-                            footerText = if (groundedNudge == null) {
+                            footerText = if (isExpandedCard) {
+                                null
+                            } else if (groundedNudge == null) {
                                 displayedAiRecommendation.footerText
                             } else {
                                 "Tap to open the verified source"
                             },
                             backgroundPainterRes = ImageRes.drawable.insight_suggestion,
+                            backgroundBaseScale = 1.28f,
+                            backgroundHorizontalBias = 0.13f,
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.50f,
@@ -2137,6 +2187,8 @@ internal fun SwipeableBigTiles(
                                     compactProgress = compactProgress,
                                 )
                             },
+                            expandedContentHorizontalBleed = 10.dp,
+                            disableCardGesturesWhenExpanded = true,
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -2582,6 +2634,10 @@ private fun PrayerPosterInsightCard(
     actionDescription: String,
     onClick: () -> Unit,
     expandedLeadingContent: (@Composable () -> Unit)? = null,
+    expandedContentHorizontalBleed: Dp = 0.dp,
+    // A nested scrollable payload owns touch while enlarged; otherwise the
+    // card's long-press detector flashes before the scroll takes control.
+    disableCardGesturesWhenExpanded: Boolean = false,
 ) {
     val context = LocalContext.current
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -2656,6 +2712,8 @@ private fun PrayerPosterInsightCard(
             actionDescription = actionDescription,
             onClick = onClick,
             expandedLeadingContent = expandedLeadingContent,
+            expandedContentHorizontalBleed = expandedContentHorizontalBleed,
+            disableCardGesturesWhenExpanded = disableCardGesturesWhenExpanded,
         )
     }
 }
@@ -2666,6 +2724,8 @@ private fun InsightPreviewCard(
     title: String,
     backgroundPainterRes: DrawableResource? = null,
     backgroundBitmap: ImageBitmap? = null,
+    backgroundBaseScale: Float = 1.065f,
+    backgroundHorizontalBias: Float = 0f,
     groundPainterRes: DrawableResource? = null,
     groundFadeStartFraction: Float = 0.68f,
     foregroundPainterRes: DrawableResource? = null,
@@ -2708,8 +2768,16 @@ private fun InsightPreviewCard(
     onClick: (() -> Unit)? = null,
     // Editorial content joined to the bottom stack only while enlarged.
     expandedLeadingContent: (@Composable () -> Unit)? = null,
+    // Expanded editorial panels may reclaim part of the metadata footer's
+    // horizontal inset without changing the footer alignment itself.
+    expandedContentHorizontalBleed: Dp = 0.dp,
+    // A nested scrollable payload owns touch while enlarged; otherwise the
+    // card's long-press detector flashes before the scroll takes control.
+    disableCardGesturesWhenExpanded: Boolean = false,
 ) {
     var suppressClickUntilMs by remember { mutableLongStateOf(0L) }
+    val cardInteractionSource = remember { MutableInteractionSource() }
+    val cardIndication = LocalIndication.current
     val hasPrayerContext = !supportingText.isNullOrBlank() ||
         !statusText.isNullOrBlank() ||
         !statusMetaText.isNullOrBlank() ||
@@ -2779,6 +2847,25 @@ private fun InsightPreviewCard(
         ),
         label = "insightBottomContentReveal",
     )
+    // The card size uses a spring and can jump on its first measured frame.
+    // Expanded editorial content gets a separate tween: it is composed at
+    // alpha 0, waits one frame for layout, then enters smoothly. Remembering
+    // by isExpanded gives collapse an immediate layer-free state.
+    val expandedContentEntrance = remember(isExpanded) {
+        Animatable(if (isExpanded) 0f else 1f)
+    }
+    LaunchedEffect(isExpanded, expandedContentEntrance) {
+        if (isExpanded) {
+            delay(50L)
+            expandedContentEntrance.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = 360,
+                    easing = FastOutSlowInEasing,
+                ),
+            )
+        }
+    }
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -2795,7 +2882,10 @@ private fun InsightPreviewCard(
             .clip(shape)
             .then(
                 when {
-                    onLongPress != null -> Modifier.combinedClickable(
+                    onLongPress != null && !(isExpanded && disableCardGesturesWhenExpanded) ->
+                        Modifier.combinedClickable(
+                        interactionSource = cardInteractionSource,
+                        indication = if (isExpanded) null else cardIndication,
                         onClick = {
                             if (SystemClock.uptimeMillis() >= suppressClickUntilMs) {
                                 onClick?.invoke()
@@ -2828,10 +2918,13 @@ private fun InsightPreviewCard(
             val cardMaxWidth = maxWidth
             val tagInset = (11f - (5f * compactProgress) + (3f * expansionProgress)).dp
             val labelFontSize = (11f - (3f * compactProgress) + expansionProgress).sp
-            val titleFontSize = (17f - (5f * compactProgress) + (3f * expansionProgress)).sp
-            val titleLineHeight = (22f - (8f * compactProgress) + (4f * expansionProgress)).sp
+            // Enlarged cards prioritize their Surah/Hadith payload over the
+            // repeated metadata footer. Keep the resting card unchanged, but
+            // make the expanded footer denser and wider so it wraps less.
+            val titleFontSize = (17f - (5f * compactProgress) + expansionProgress).sp
+            val titleLineHeight = (22f - (8f * compactProgress)).sp
             val defaultHorizontalPadding = (
-                22f - (10f * compactProgress) + (4f * expansionProgress)
+                22f - (10f * compactProgress) - (4f * expansionProgress)
                 ).dp
             val titleHorizontalPadding = if (hasPrayerContext && maxWidth < 240.dp) {
                 // A half-width insight card cannot afford desktop-like 22dp side
@@ -2841,12 +2934,12 @@ private fun InsightPreviewCard(
             } else {
                 defaultHorizontalPadding
             }
-            val titleBottomPadding = (16f - (7f * compactProgress) + (4f * expansionProgress)).dp
-            val contentSpacing = (7f - (4f * compactProgress) + (2f * expansionProgress)).dp
-            val supportingFontSize = (13f - (3f * compactProgress) + (2f * expansionProgress)).sp
-            val supportingLineHeight = (17f - (4f * compactProgress) + (3f * expansionProgress)).sp
-            val footerFontSize = (12f - (3f * compactProgress) + expansionProgress).sp
-            val footerLineHeight = (16f - (4f * compactProgress) + (2f * expansionProgress)).sp
+            val titleBottomPadding = (16f - (7f * compactProgress) - (4f * expansionProgress)).dp
+            val contentSpacing = (7f - (4f * compactProgress) - (2f * expansionProgress)).dp
+            val supportingFontSize = (13f - (3f * compactProgress)).sp
+            val supportingLineHeight = (17f - (4f * compactProgress) - expansionProgress).sp
+            val footerFontSize = (12f - (3f * compactProgress) - expansionProgress).sp
+            val footerLineHeight = (16f - (4f * compactProgress) - (2f * expansionProgress)).sp
             val recapIndicatorSize = (24f - (7f * compactProgress)).dp
             val recapFontSize = (11f - (3f * compactProgress)).sp
             val requestedHeroAccent = MaterialTheme.colorScheme.primaryContainer
@@ -2911,8 +3004,9 @@ private fun InsightPreviewCard(
                             // static while swiping past it.
                             val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
                             val restingMotion = ambientMotion * focusedMotionStrength
-                            val imageScale = 1.065f + (restingMotion * 0.006f)
-                            val requestedTranslationX = -pageOffset * 18.dp.toPx()
+                            val imageScale = backgroundBaseScale + (restingMotion * 0.006f)
+                            val requestedTranslationX =
+                                (backgroundHorizontalBias * size.width) - pageOffset * 18.dp.toPx()
                             val maxCoveredHorizontalShift = (
                                 (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
                                 ).coerceAtLeast(0f)
@@ -2944,8 +3038,9 @@ private fun InsightPreviewCard(
                                 // animated-image decoding or causing a loop-boundary jump.
                                 val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
                                 val restingMotion = ambientMotion * focusedMotionStrength
-                                val imageScale = 1.065f + (restingMotion * 0.006f)
-                                val requestedTranslationX = -pageOffset * 18.dp.toPx()
+                                val imageScale = backgroundBaseScale + (restingMotion * 0.006f)
+                                val requestedTranslationX =
+                                    (backgroundHorizontalBias * size.width) - pageOffset * 18.dp.toPx()
                                 val maxCoveredHorizontalShift = (
                                     (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
                                     ).coerceAtLeast(0f)
@@ -3371,10 +3466,28 @@ private fun InsightPreviewCard(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxSize()
-                    .graphicsLayer {
-                        alpha = bottomContentReveal
-                        translationY = (1f - bottomContentReveal) * 12.dp.toPx()
-                    }
+                    // A scrolling descendant inside a persistent alpha layer
+                    // flickers on Samsung's hardware renderer. Keep the layer
+                    // only for the independent entrance tween, then remove it
+                    // at 100% so scrolling remains layer-free.
+                    .then(
+                        if (isExpanded) {
+                            if (expandedContentEntrance.value < 0.999f) {
+                                Modifier.graphicsLayer {
+                                    val reveal = expandedContentEntrance.value.coerceIn(0f, 1f)
+                                    alpha = reveal
+                                    translationY = (1f - reveal) * 10.dp.toPx()
+                                }
+                            } else {
+                                Modifier
+                            }
+                        } else {
+                            Modifier.graphicsLayer {
+                                alpha = bottomContentReveal
+                                translationY = (1f - bottomContentReveal) * 12.dp.toPx()
+                            }
+                        },
+                    )
                     .padding(
                         start = titleHorizontalPadding,
                         end = titleHorizontalPadding,
@@ -3389,7 +3502,10 @@ private fun InsightPreviewCard(
                 if (isExpanded && expandedLeadingContent != null) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .requiredWidth(
+                                cardMaxWidth - (titleHorizontalPadding * 2) +
+                                    (expandedContentHorizontalBleed * 2),
+                            )
                             .weight(1f),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -3514,18 +3630,20 @@ private fun InsightPreviewCard(
                     }
                 }
 
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = titleFontSize,
-                        lineHeight = titleLineHeight,
-                        letterSpacing = (-0.2).sp,
-                    ),
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = if (hasPrayerContext) 2 else 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                title.takeIf { it.isNotBlank() }?.let { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = titleFontSize,
+                            lineHeight = titleLineHeight,
+                            letterSpacing = (-0.2).sp,
+                        ),
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = if (hasPrayerContext) 2 else 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
 
                 supportingText?.takeIf { it.isNotBlank() }?.let { text ->
                     Text(
@@ -4503,6 +4621,33 @@ private fun SalahHadithExpandedStage(
         .joinToString(" · ")
         .ifBlank { fallbackSource }
     val compression = compactProgress.coerceIn(0f, 1f)
+    // Kept outside AnimatedContent so touch scrolling never recreates the
+    // scrollable subtree. Long narrations auto-scroll after a short reading
+    // pause; a user drag cancels the animation through ScrollState's mutator.
+    val hadithScrollState = rememberScrollState()
+    var hadithUserInteracted by remember(body, source) { mutableStateOf(false) }
+    LaunchedEffect(body, source, hadithUserInteracted) {
+        if (hadithUserInteracted) return@LaunchedEffect
+        hadithScrollState.scrollTo(0)
+        repeat(20) {
+            if (hadithScrollState.maxValue > 0) return@repeat
+            delay(100)
+        }
+        if (hadithScrollState.maxValue <= 0) return@LaunchedEffect
+        delay(3_000L)
+        // The user has already taken control during the reading pause.
+        if (hadithScrollState.value != 0 || hadithScrollState.isScrollInProgress) {
+            return@LaunchedEffect
+        }
+        // Editorial reading pace: roughly 35 ms per pixel, bounded so short
+        // overflow never rushes and very long narrations still complete.
+        val durationMillis = (hadithScrollState.maxValue * 35)
+            .coerceIn(8_000, 30_000)
+        hadithScrollState.animateScrollTo(
+            value = hadithScrollState.maxValue,
+            animationSpec = tween(durationMillis, easing = LinearEasing),
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -4529,77 +4674,83 @@ private fun SalahHadithExpandedStage(
                 .align(Alignment.TopStart)
                 .padding(start = 4.dp, top = 14.dp),
         )
-        AnimatedContent(
-            targetState = body to source,
-            transitionSpec = {
-                (fadeIn(tween(500)) + scaleIn(initialScale = 0.98f, animationSpec = tween(540))) togetherWith
-                    (fadeOut(tween(280)) + scaleOut(targetScale = 1.01f, animationSpec = tween(320)))
-            },
-            label = "expandedPrayerHadith",
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize(),
-        ) { (hadithText, sourceText) ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
+        // Deliberately static: animating this subtree recreated/cross-faded the
+        // vertical scroll content when it was touched, which looked like a
+        // flash. Only the text and scroll offset change now.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
                     start = 12.dp,
                     end = 0.dp,
                     top = (8f - (2f * compression)).dp,
                     bottom = (7f - (2f * compression)).dp,
                 ),
-                verticalArrangement = Arrangement.spacedBy((5f - (2f * compression)).dp),
+            verticalArrangement = Arrangement.spacedBy((5f - (2f * compression)).dp),
+        ) {
+            Text(
+                text = "HADITH FOR ${displayPrayerName.uppercase()}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.5.sp,
+                    lineHeight = 12.sp,
+                    letterSpacing = 1.2.sp,
+                ),
+                color = HomeReferenceGold.copy(alpha = 0.94f),
+                fontWeight = FontWeight.Bold,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Observe the first touch at the Initial pass without
+                        // consuming it: verticalScroll receives the gesture,
+                        // while auto-scroll is cancelled immediately.
+                        .pointerInput(body, source) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (event.changes.any { it.pressed && !it.previousPressed }) {
+                                        hadithUserInteracted = true
+                                    }
+                                }
+                            }
+                        }
+                        // No overscroll/stretch effect: hitting either edge
+                        // must not flash or scale the Hadith panel.
+                        .verticalScroll(
+                            state = hadithScrollState,
+                            overscrollEffect = null,
+                        ),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = body,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontSize = (17.5f - (4f * compression)).sp,
+                            lineHeight = (25f - (6f * compression)).sp,
+                            letterSpacing = (-0.1).sp,
+                        ),
+                        color = Color.White.copy(alpha = 0.98f),
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+            if (compression < 0.50f) {
                 Text(
-                    text = "HADITH FOR ${displayPrayerName.uppercase()}",
+                    text = source,
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 9.5.sp,
                         lineHeight = 12.sp,
-                        letterSpacing = 1.2.sp,
+                        letterSpacing = 0.sp,
                     ),
-                    color = HomeReferenceGold.copy(alpha = 0.94f),
-                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.56f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                // Scrollable so the full hadith is always
-                                // reachable — no truncation. Arrangement.Center
-                                // vertically centers short narrations while
-                                // long ones scroll naturally.
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Text(
-                                text = hadithText,
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontSize = (17.5f - (4f * compression)).sp,
-                                    lineHeight = (25f - (6f * compression)).sp,
-                                    letterSpacing = (-0.1).sp,
-                                ),
-                                color = Color.White.copy(alpha = 0.98f),
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
-                    }
-                if (compression < 0.50f) {
-                    Text(
-                        text = sourceText,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 9.5.sp,
-                            lineHeight = 12.sp,
-                            letterSpacing = 0.sp,
-                        ),
-                        color = Color.White.copy(alpha = 0.56f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
             }
         }
     }
@@ -4689,109 +4840,593 @@ private fun QiblaBearingExpandedStage(
     heading: Float?,
     compactProgress: Float,
 ) {
+    val view = LocalView.current
     val compression = compactProgress.coerceIn(0f, 1f)
+    val latestHeading by rememberUpdatedState(heading)
+    var animatedHeading by remember { mutableFloatStateOf(heading ?: 0f) }
+    LaunchedEffect(heading != null) {
+        animatedHeading = latestHeading ?: return@LaunchedEffect
+        var previousFrameNanos = withFrameNanos { it }
+        while (true) {
+            withFrameNanos { frameNanos ->
+                val elapsedSeconds = ((frameNanos - previousFrameNanos) / 1_000_000_000f)
+                    .coerceIn(0f, 0.05f)
+                previousFrameNanos = frameNanos
+                val target = latestHeading ?: return@withFrameNanos
+                val delta = shortestAngleDelta(animatedHeading, target)
+                if (kotlin.math.abs(delta) > 0.02f) {
+                    // Frame-paced exponential interpolation stays smooth when
+                    // the sensor target changes many times during one turn.
+                    val response = if (kotlin.math.abs(delta) > 35f) 10f else 7f
+                    val blend = 1f - kotlin.math.exp(-response * elapsedSeconds)
+                    animatedHeading = normalizeDegrees(animatedHeading + (delta * blend))
+                }
+            }
+        }
+    }
+    // Every moving element derives from one heading. Independent springs made
+    // the rose and destination briefly disagree while both chased sensor data.
     val relativeTurn = if (bearing != null && heading != null) {
-        shortestAngleDelta(heading, bearing.toFloat())
+        shortestAngleDelta(animatedHeading, bearing.toFloat())
     } else {
         null
     }
-    Column(
+    val animatedTurn = relativeTurn ?: 0f
+    val alignmentThreshold = 6f
+    val isAligned = relativeTurn != null && kotlin.math.abs(relativeTurn) < alignmentThreshold
+    val livePulse by rememberInfiniteTransition(label = "expandedQiblaPulse").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1_400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "expandedQiblaPulsePhase",
+    )
+    val radarSweep by rememberInfiniteTransition(label = "expandedQiblaRadarSweep").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(5_500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "expandedQiblaRadarSweepAngle",
+    )
+    LaunchedEffect(isAligned) {
+        if (isAligned) {
+            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        }
+    }
+    val turnDegrees = relativeTurn?.let { kotlin.math.abs(it).roundToInt() }
+    val turnInstruction = when {
+        relativeTurn == null -> "Finding your direction"
+        isAligned -> "You are facing the Qibla"
+        relativeTurn > 0f -> "Turn $turnDegrees° right"
+        else -> "Turn $turnDegrees° left"
+    }
+    val directionSummary = bearing?.let { qiblaCardinalDirection(it) }
+        ?.substringBefore(" from your location")
+    val qiblaColors = MaterialTheme.colorScheme
+    val qiblaSurface = qiblaColors.surfaceContainerHigh
+    val qiblaForeground = qiblaColors.onSurface
+    val qiblaAccent = qiblaColors.primary
+    val qiblaShadow = qiblaColors.scrim
+    val density = LocalDensity.current
+    val radarWidth = (286f - (34f * compression)).dp
+    val radarHeight = (174f - (22f * compression)).dp
+    val radarRadiusXPx = with(density) {
+        ((122f - (17f * compression)).dp).toPx()
+    }
+    val radarRadiusYPx = with(density) {
+        ((53f - (11f * compression)).dp).toPx()
+    }
+    val radarCenterOffsetYPx = with(density) { 11.dp.toPx() }
+    val glassBackdrop = rememberLayerBackdrop {
+        drawRect(qiblaSurface)
+        drawContent()
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(24.dp))
             .background(
                 Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = 0.44f),
+                    colorStops = arrayOf(
+                        0f to Color.Transparent,
+                        0.14f to qiblaSurface.copy(alpha = 0.38f),
+                        0.68f to qiblaSurface.copy(alpha = 0.72f),
+                        1f to qiblaSurface.copy(alpha = 0.28f),
+                    ),
                 ),
             )
-            .padding(horizontal = 4.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to Color.Transparent,
+                        0.20f to qiblaForeground.copy(alpha = 0.12f),
+                        0.58f to qiblaAccent.copy(alpha = 0.18f + (0.06f * livePulse)),
+                        0.90f to qiblaForeground.copy(alpha = 0.08f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+                shape = RoundedCornerShape(24.dp),
+            )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "DIRECTION TO MAKKAH",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.5.sp,
-                    lineHeight = 12.sp,
-                    letterSpacing = 1.2.sp,
-                ),
-                color = Color.White.copy(alpha = 0.64f),
-                fontWeight = FontWeight.Bold,
-            )
-            if (heading != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
-                    text = "LIVE",
+                    text = "Direction to Makkah",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = qiblaForeground,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = listOfNotNull(
+                        bearing?.let { "$it°" },
+                        directionSummary,
+                    ).joinToString("  ·  ").ifBlank { "Using your location" },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = qiblaForeground.copy(alpha = 0.60f),
+                )
+            }
+            if (heading != null) {
+                Row(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .drawBackdrop(
+                            backdrop = glassBackdrop,
+                            shape = { CircleShape },
+                            effects = {
+                                vibrancy()
+                                lens(
+                                    with(density) { 8.dp.toPx() },
+                                    with(density) { 14.dp.toPx() },
+                                )
+                            },
+                        )
+                        .background(qiblaForeground.copy(alpha = 0.045f))
+                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .graphicsLayer {
+                                scaleX = 1f + (0.35f * livePulse)
+                                scaleY = 1f + (0.35f * livePulse)
+                            }
+                            .background(qiblaAccent, CircleShape),
+                    )
+                    Text(
+                        text = if (isAligned) "Aligned" else "Live",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                        ),
+                        color = qiblaForeground.copy(alpha = 0.88f),
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(top = 8.dp)
+                .width(radarWidth)
+                .height(radarHeight),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .semantics {
+                        contentDescription = if (isAligned) {
+                            "Aligned with Qibla"
+                        } else {
+                            "Qibla compass, ${relativeTurn?.roundToInt() ?: 0} degrees to turn"
+                        }
+                    },
+            ) {
+                val destinationAccent = qiblaAccent
+                val radarCenter = Offset(center.x, center.y + 11.dp.toPx())
+                val radiusX = (size.width / 2f) - 21.dp.toPx()
+                val radiusY = (size.height / 2f) - 34.dp.toPx()
+                val radarTopLeft = Offset(
+                    radarCenter.x - radiusX,
+                    radarCenter.y - radiusY,
+                )
+                val radarSize = Size(radiusX * 2f, radiusY * 2f)
+
+                repeat(2) { index ->
+                    val expansion = (8f + (index * 8f)).dp.toPx()
+                    drawArc(
+                        color = qiblaForeground.copy(alpha = if (index == 0) 0.08f else 0.04f),
+                        startAngle = 198f,
+                        sweepAngle = 144f,
+                        useCenter = false,
+                        topLeft = Offset(
+                            radarCenter.x - radiusX - expansion,
+                            radarCenter.y - radiusY - (expansion * 0.28f),
+                        ),
+                        size = Size(
+                            (radiusX + expansion) * 2f,
+                            (radiusY + (expansion * 0.28f)) * 2f,
+                        ),
+                        style = Stroke(width = 0.8.dp.toPx()),
+                    )
+                }
+                drawOval(
+                    color = qiblaShadow.copy(alpha = 0.28f),
+                    topLeft = radarTopLeft + Offset(0f, 7.dp.toPx()),
+                    size = radarSize,
+                )
+                drawOval(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            qiblaSurface.copy(alpha = 0.64f),
+                            qiblaSurface.copy(alpha = 0.88f),
+                        ),
+                        startY = radarTopLeft.y,
+                        endY = radarTopLeft.y + radarSize.height,
+                    ),
+                    topLeft = radarTopLeft,
+                    size = radarSize,
+                )
+                drawOval(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            destinationAccent.copy(alpha = if (isAligned) 0.15f else 0.06f),
+                            Color.Transparent,
+                        ),
+                        center = radarCenter,
+                        radius = radiusX,
+                    ),
+                    topLeft = radarTopLeft,
+                    size = radarSize,
+                )
+                drawArc(
+                    color = qiblaForeground.copy(alpha = 0.20f),
+                    startAngle = 202f,
+                    sweepAngle = 136f,
+                    useCenter = false,
+                    topLeft = radarTopLeft,
+                    size = radarSize,
+                    style = Stroke(width = 0.8.dp.toPx()),
+                )
+                listOf(1f, 0.62f, 0.30f).forEachIndexed { index, scale ->
+                    drawOval(
+                        color = qiblaForeground.copy(alpha = if (index == 0) 0.22f else 0.10f),
+                        topLeft = Offset(
+                            radarCenter.x - (radiusX * scale),
+                            radarCenter.y - (radiusY * scale),
+                        ),
+                        size = Size(radiusX * 2f * scale, radiusY * 2f * scale),
+                        style = Stroke(width = if (index == 0) 1.2.dp.toPx() else 0.8.dp.toPx()),
+                    )
+                }
+                val headingCone = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y - (radiusY * 0.72f))
+                    lineTo(radarCenter.x - 13.dp.toPx(), radarCenter.y + 5.dp.toPx())
+                    quadraticTo(
+                        radarCenter.x,
+                        radarCenter.y + 10.dp.toPx(),
+                        radarCenter.x + 13.dp.toPx(),
+                        radarCenter.y + 5.dp.toPx(),
+                    )
+                    close()
+                }
+                drawPath(
+                    path = headingCone,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            qiblaForeground.copy(alpha = 0.13f),
+                            qiblaForeground.copy(alpha = 0.01f),
+                        ),
+                        startY = radarCenter.y - radiusY,
+                        endY = radarCenter.y + 10.dp.toPx(),
+                    ),
+                )
+                repeat(4) { index ->
+                    val angle = Math.toRadians((index * 90f - animatedHeading).toDouble())
+                    drawLine(
+                        color = qiblaForeground.copy(alpha = 0.07f),
+                        start = radarCenter,
+                        end = Offset(
+                            radarCenter.x + cos(angle).toFloat() * radiusX,
+                            radarCenter.y + sin(angle).toFloat() * radiusY,
+                        ),
+                        strokeWidth = 0.7.dp.toPx(),
+                    )
+                }
+                drawArc(
+                    color = qiblaForeground.copy(alpha = 0.035f),
+                    startAngle = radarSweep,
+                    sweepAngle = 42f,
+                    useCenter = true,
+                    topLeft = radarTopLeft,
+                    size = radarSize,
+                )
+                if (relativeTurn != null) {
+                    drawArc(
+                        color = destinationAccent.copy(
+                            alpha = if (isAligned) 0.92f else 0.58f,
+                        ),
+                        startAngle = -90f,
+                        sweepAngle = if (isAligned) 360f else animatedTurn.coerceIn(-180f, 180f),
+                        useCenter = false,
+                        topLeft = radarTopLeft,
+                        size = radarSize,
+                        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
+                    )
+                }
+                repeat(48) { index ->
+                    val angle = Math.toRadians((index * 7.5f - animatedHeading - 90f).toDouble())
+                    val major = index % 6 == 0
+                    val x = cos(angle).toFloat()
+                    val y = sin(angle).toFloat()
+                    val outer = Offset(
+                        radarCenter.x + x * radiusX,
+                        radarCenter.y + y * radiusY,
+                    )
+                    val innerScale = if (major) 0.90f else 0.95f
+                    val inner = Offset(
+                        radarCenter.x + x * radiusX * innerScale,
+                        radarCenter.y + y * radiusY * innerScale,
+                    )
+                    drawLine(
+                        color = qiblaForeground.copy(alpha = if (major) 0.68f else 0.28f),
+                        start = inner,
+                        end = outer,
+                        strokeWidth = if (major) 1.4.dp.toPx() else 0.7.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                }
+                // A quieter inner bezel rotates against the compass rose. The
+                // opposed movement adds mechanical depth without adding labels
+                // that compete with the primary cardinal ring.
+                repeat(30) { index ->
+                    val angle = Math.toRadians(
+                        (index * 12f + (animatedHeading * 0.42f) - 90f).toDouble(),
+                    )
+                    val x = cos(angle).toFloat()
+                    val y = sin(angle).toFloat()
+                    val outer = Offset(
+                        radarCenter.x + (x * radiusX * 0.70f),
+                        radarCenter.y + (y * radiusY * 0.67f),
+                    )
+                    val inner = Offset(
+                        radarCenter.x + (x * radiusX * 0.65f),
+                        radarCenter.y + (y * radiusY * 0.62f),
+                    )
+                    drawLine(
+                        color = if (index % 5 == 0) {
+                            destinationAccent.copy(alpha = 0.32f)
+                        } else {
+                            qiblaForeground.copy(alpha = 0.11f)
+                        },
+                        start = inner,
+                        end = outer,
+                        strokeWidth = if (index % 5 == 0) 1.dp.toPx() else 0.55.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                }
+                val qiblaAngle = Math.toRadians((animatedTurn - 90f).toDouble())
+                val qiblaBase = Offset(
+                    x = radarCenter.x + cos(qiblaAngle).toFloat() * radiusX * 0.72f,
+                    y = radarCenter.y + sin(qiblaAngle).toFloat() * radiusY * 0.72f,
+                )
+                val routeNormal = Offset(
+                    x = -sin(qiblaAngle).toFloat(),
+                    y = cos(qiblaAngle).toFloat(),
+                )
+                val routeCorridor = Path().apply {
+                    moveTo(
+                        radarCenter.x + (routeNormal.x * 3.dp.toPx()),
+                        radarCenter.y + (routeNormal.y * 3.dp.toPx()),
+                    )
+                    lineTo(
+                        qiblaBase.x + (routeNormal.x * 9.dp.toPx()),
+                        qiblaBase.y + (routeNormal.y * 4.dp.toPx()),
+                    )
+                    lineTo(
+                        qiblaBase.x - (routeNormal.x * 9.dp.toPx()),
+                        qiblaBase.y - (routeNormal.y * 4.dp.toPx()),
+                    )
+                    lineTo(
+                        radarCenter.x - (routeNormal.x * 3.dp.toPx()),
+                        radarCenter.y - (routeNormal.y * 3.dp.toPx()),
+                    )
+                    close()
+                }
+                drawPath(
+                    path = routeCorridor,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            destinationAccent.copy(alpha = 0.16f),
+                        ),
+                        start = radarCenter,
+                        end = qiblaBase,
+                    ),
+                )
+                drawLine(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            qiblaForeground.copy(alpha = 0.36f),
+                            destinationAccent,
+                        ),
+                        start = radarCenter,
+                        end = qiblaBase,
+                    ),
+                    start = radarCenter,
+                    end = qiblaBase,
+                    strokeWidth = 2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+                drawCircle(
+                    color = destinationAccent.copy(alpha = 0.12f + (0.08f * livePulse)),
+                    radius = 12.dp.toPx(),
+                    center = qiblaBase,
+                )
+                drawCircle(
+                    color = destinationAccent,
+                    radius = 3.dp.toPx(),
+                    center = qiblaBase,
+                )
+                drawCircle(
+                    color = qiblaForeground.copy(alpha = 0.18f),
+                    radius = 7.dp.toPx(),
+                    center = radarCenter,
+                )
+                val userArrow = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y - 7.dp.toPx())
+                    lineTo(radarCenter.x - 4.5.dp.toPx(), radarCenter.y + 5.dp.toPx())
+                    lineTo(radarCenter.x, radarCenter.y + 2.dp.toPx())
+                    lineTo(radarCenter.x + 4.5.dp.toPx(), radarCenter.y + 5.dp.toPx())
+                    close()
+                }
+                drawPath(path = userArrow, color = qiblaForeground)
+
+                val headingMarker = Path().apply {
+                    moveTo(radarCenter.x, radarTopLeft.y - 7.dp.toPx())
+                    lineTo(radarCenter.x - 4.dp.toPx(), radarTopLeft.y - 13.dp.toPx())
+                    lineTo(radarCenter.x + 4.dp.toPx(), radarTopLeft.y - 13.dp.toPx())
+                    close()
+                }
+                drawPath(
+                    path = headingMarker,
+                    color = qiblaAccent,
+                )
+            }
+
+            // Keep glyphs in their own cached layers. Drawing text directly
+            // into Canvas at changing fractional coordinates made it shimmer
+            // as Android re-rasterized each glyph on every sensor frame.
+            listOf("N", "E", "S", "W").forEachIndexed { index, label ->
+                Text(
+                    text = label,
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 9.sp,
-                        letterSpacing = 1.sp,
+                        lineHeight = 10.sp,
                     ),
-                    color = HomeReferenceGold,
+                    color = if (label == "N") {
+                        qiblaAccent
+                    } else {
+                        qiblaForeground.copy(alpha = 0.62f)
+                    },
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.graphicsLayer {
+                        val angle = Math.toRadians(
+                            (index * 90f - animatedHeading - 90f).toDouble(),
+                        )
+                        translationX = cos(angle).toFloat() * radarRadiusXPx * 0.79f
+                        translationY = radarCenterOffsetYPx +
+                            (sin(angle).toFloat() * radarRadiusYPx * 0.76f)
+                    },
+                )
+            }
+            if (relativeTurn != null) {
+                Image(
+                    painter = painterResource(R.drawable.ic_kaaba_marker),
+                    contentDescription = "Kaaba direction",
+                    modifier = Modifier
+                        .size(width = 24.dp, height = 32.dp)
+                        .graphicsLayer {
+                            val angle = Math.toRadians((animatedTurn - 90f).toDouble())
+                            translationX = cos(angle).toFloat() * radarRadiusXPx * 0.72f
+                            translationY = radarCenterOffsetYPx +
+                                (sin(angle).toFloat() * radarRadiusYPx * 0.72f) -
+                                with(density) { 7.dp.toPx() }
+                        },
+                )
+                Text(
+                    text = "KAABA",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 8.sp,
+                        lineHeight = 9.sp,
+                        letterSpacing = 1.1.sp,
+                    ),
+                    color = qiblaAccent,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.graphicsLayer {
+                        val angle = Math.toRadians((animatedTurn - 90f).toDouble())
+                        translationX = cos(angle).toFloat() * radarRadiusXPx * 0.72f
+                        translationY = radarCenterOffsetYPx +
+                            (sin(angle).toFloat() * radarRadiusYPx * 0.72f) -
+                            with(density) { 39.dp.toPx() }
+                    },
                 )
             }
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size((54f - (10f * compression)).dp)
-                    .background(Color.Black.copy(alpha = 0.26f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Navigation,
-                    contentDescription = null,
-                    tint = HomeReferenceGold,
-                    modifier = Modifier
-                        .size((30f - (5f * compression)).dp)
-                        .rotate(relativeTurn ?: 0f),
-                )
-            }
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
-                    text = bearing?.let { "$it°" } ?: "—",
-                    style = MaterialTheme.typography.displaySmall.copy(
-                        fontSize = (40f - (8f * compression)).sp,
-                        lineHeight = (43f - (8f * compression)).sp,
-                    ),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
+                    text = turnInstruction,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (isAligned) qiblaAccent else qiblaForeground,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                bearing?.let {
-                    Text(
-                        text = qiblaCardinalDirection(it),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.70f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                Text(
+                    text = heading?.let { "Phone heading ${animatedHeading.roundToInt()}°" }
+                        ?: "Open the compass for live guidance",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = qiblaForeground.copy(alpha = 0.56f),
+                    maxLines = 1,
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .drawBackdrop(
+                        backdrop = glassBackdrop,
+                        shape = { CircleShape },
+                        effects = {
+                            vibrancy()
+                            lens(
+                                with(density) { 8.dp.toPx() },
+                                with(density) { 14.dp.toPx() },
+                            )
+                        },
                     )
-                }
+                    .background(qiblaForeground.copy(alpha = 0.045f))
+                    .padding(horizontal = 11.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "3D globe",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = qiblaForeground.copy(alpha = 0.84f),
+                    fontWeight = FontWeight.Medium,
+                )
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Open live Qibla globe",
+                    tint = qiblaForeground.copy(alpha = 0.76f),
+                    modifier = Modifier.size(15.dp),
+                )
             }
         }
-        Text(
-            text = when {
-                relativeTurn == null -> "Open the live compass to align"
-                kotlin.math.abs(relativeTurn) < 8f -> "You are facing Makkah"
-                relativeTurn > 0f -> "Turn ${kotlin.math.abs(relativeTurn).roundToInt()}° clockwise"
-                else -> "Turn ${kotlin.math.abs(relativeTurn).roundToInt()}° counter-clockwise"
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = if (relativeTurn != null && kotlin.math.abs(relativeTurn) < 8f) {
-                HomeReferenceGold
-            } else {
-                Color.White.copy(alpha = 0.70f)
-            },
-            fontWeight = FontWeight.Medium,
-        )
     }
 }
 
@@ -4803,25 +5438,25 @@ private fun RecommendationExpandedStage(
     compactProgress: Float,
 ) {
     val compression = compactProgress.coerceIn(0f, 1f)
+    val aiScrollState = rememberScrollState()
     Box(
         modifier = Modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(22.dp))
             .background(
-                Brush.horizontalGradient(
+                // A right-heavy scrim merged with the doorway in the artwork
+                // and looked like a dark block extending below the action pill.
+                Brush.verticalGradient(
                     0f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = 0.40f),
+                    1f to Color.Black.copy(alpha = 0.28f),
                 ),
             )
             .padding(horizontal = 4.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        AnimatedContent(
-            targetState = if (loading) "loading" else candidate?.nudge?.id ?: "fallback",
-            transitionSpec = { fadeIn(tween(420)) togetherWith fadeOut(tween(220)) },
-            label = "expandedKnowledgeSuggestion",
-        ) { state ->
-            if (state == "loading") {
+        // A static state switch avoids recreating and cross-fading the scroll
+        // subtree when the user touches it.
+        if (loading) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(9.dp),
@@ -4837,7 +5472,10 @@ private fun RecommendationExpandedStage(
                         color = Color.White.copy(alpha = 0.72f),
                     )
                 }
-            } else {
+                PreparingKnowledgeFooter(
+                    modifier = Modifier.align(Alignment.BottomStart),
+                )
+        } else {
                 val nudge = candidate?.nudge
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -4853,8 +5491,7 @@ private fun RecommendationExpandedStage(
                             color = HomeReferenceGold,
                         )
                         Text(
-                            text = nudge?.sourceLabel?.takeIf(String::isNotBlank)
-                                ?: "GROUNDED SUGGESTION",
+                            text = "GROUNDED SUGGESTION",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 9.5.sp,
                                 letterSpacing = 1.1.sp,
@@ -4873,24 +5510,154 @@ private fun RecommendationExpandedStage(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.Center,
+                                // Edge stretch was remeasuring this small
+                                // overflow range, which looked like a flicker.
+                                // Keep the viewport geometry fixed.
+                                .verticalScroll(
+                                    state = aiScrollState,
+                                    overscrollEffect = null,
+                                )
+                                .padding(vertical = 3.dp),
+                            verticalArrangement = Arrangement.Top,
                         ) {
                             Text(
                                 text = nudge?.supportingText?.takeIf(String::isNotBlank)
                                     ?: nudge?.label?.takeIf(String::isNotBlank)
                                     ?: "A verified $fallbackLabel selected for this moment",
                                 style = MaterialTheme.typography.titleMedium.copy(
-                                    fontSize = (17f - (3f * compression)).sp,
-                                    lineHeight = (23f - (4f * compression)).sp,
+                                    // This is source text, not another headline.
+                                    fontSize = (15.5f - (2.5f * compression)).sp,
+                                    lineHeight = (20.5f - (3.5f * compression)).sp,
                                 ),
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium,
                             )
                         }
+                        if (aiScrollState.canScrollBackward) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .height(18.dp)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.48f),
+                                                Color.Transparent,
+                                            ),
+                                        ),
+                                    ),
+                            )
+                        }
+                        if (aiScrollState.canScrollForward) {
+                            // Long sourced passages remain fully scrollable, but
+                            // the fade prevents a clipped baseline from reading as
+                            // accidental truncation at the fixed footer boundary.
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .height(28.dp)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Transparent,
+                                                Color.Black.copy(alpha = 0.58f),
+                                            ),
+                                        ),
+                                    ),
+                            )
+                        }
+                    }
+                    if (nudge != null) {
+                        val groundedNudge = nudge
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                text = groundedNudge.label,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontSize = (11.5f - compression).sp,
+                                    lineHeight = (14f - compression).sp,
+                                ),
+                                color = Color.White.copy(alpha = 0.88f),
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            groundedNudge.sourceLabel
+                                ?.takeIf(String::isNotBlank)
+                                ?.let { sourceLabel ->
+                                    Text(
+                                        text = sourceLabel,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.5.sp,
+                                            lineHeight = 12.sp,
+                                        ),
+                                        color = HomeReferenceGold.copy(alpha = 0.88f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                        }
+                    } else {
+                        PreparingKnowledgeFooter()
                     }
                 }
-            }
+        }
+    }
+}
+
+@Composable
+private fun PreparingKnowledgeFooter(modifier: Modifier = Modifier) {
+    val progressSteps = remember {
+        listOf(
+            "Checking Sahih al-Bukhari…",
+            "Checking Sahih Muslim…",
+            "Checking Jami' at-Tirmidhi…",
+            "Checking Shama'il at-Tirmidhi…",
+            "Comparing relevance for this moment…",
+        )
+    }
+    var progressStep by remember { mutableIntStateOf(0) }
+    LaunchedEffect(progressSteps) {
+        while (true) {
+            delay(1_100L)
+            progressStep = (progressStep + 1) % progressSteps.size
+        }
+    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        VoiceNudgeSparkles(
+            color = HomeReferenceGold,
+            morph = 1f,
+            modifier = Modifier.size(24.dp),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                text = "Finding a verified Hadith for you…",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                ),
+                color = Color.White.copy(alpha = 0.88f),
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = progressSteps[progressStep],
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.5.sp,
+                    lineHeight = 12.sp,
+                ),
+                color = Color.White.copy(alpha = 0.58f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -4988,17 +5755,24 @@ private fun rememberLiveCompassHeading(
         var lastUpdateAt = 0L
 
         fun publishHeading(rawMagneticHeading: Float) {
-            val now = System.currentTimeMillis()
-            if (now - lastUpdateAt < 50L) return
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastUpdateAt < 32L) return
 
             val correctedHeading = normalizeDegrees(rawMagneticHeading + magneticDeclination)
             val previous = lastPublishedHeading
             val nextHeading = if (previous == null) {
                 correctedHeading
             } else {
-                normalizeDegrees(previous + shortestAngleDelta(previous, correctedHeading) * 0.24f)
+                val delta = shortestAngleDelta(previous, correctedHeading)
+                val filterStrength = when {
+                    kotlin.math.abs(delta) > 45f -> 0.46f
+                    kotlin.math.abs(delta) > 12f -> 0.32f
+                    kotlin.math.abs(delta) > 3f -> 0.20f
+                    else -> 0.10f
+                }
+                normalizeDegrees(previous + (delta * filterStrength))
             }
-            if (previous == null || kotlin.math.abs(shortestAngleDelta(previous, nextHeading)) >= 0.35f) {
+            if (previous == null || kotlin.math.abs(shortestAngleDelta(previous, nextHeading)) >= 0.08f) {
                 lastPublishedHeading = nextHeading
                 heading = nextHeading
             }
@@ -5039,15 +5813,17 @@ private fun rememberLiveCompassHeading(
         }
 
         when {
-            orientationSensor != null -> sensorManager.registerListener(
-                listener,
-                orientationSensor,
-                SensorManager.SENSOR_DELAY_UI,
-            )
-
+            // Prefer the fused rotation vector. TYPE_ORIENTATION is deprecated
+            // and visibly noisier on modern Samsung devices.
             rotationVectorSensor != null -> sensorManager.registerListener(
                 listener,
                 rotationVectorSensor,
+                SensorManager.SENSOR_DELAY_GAME,
+            )
+
+            orientationSensor != null -> sensorManager.registerListener(
+                listener,
+                orientationSensor,
                 SensorManager.SENSOR_DELAY_UI,
             )
 

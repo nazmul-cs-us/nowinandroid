@@ -268,10 +268,17 @@ internal fun TruckHomeDashboard(
                     Surface(
                         onClick = {
                             quranPlayer.stop()
+                            com.starception.submission.shared.media.QuranPlaybackBus.clear()
                             if (isReadingAudio) {
                                 isReadingAudio = false
                             } else {
                                 isReadingAudio = quranPlayer.play(quranAudioUrl(readingSurah.number))
+                                if (isReadingAudio) {
+                                    com.starception.submission.shared.media.QuranPlaybackBus.startSurah(
+                                        player = quranPlayer,
+                                        surahNumber = readingSurah.number,
+                                    )
+                                }
                             }
                         },
                         shape = CircleShape,
@@ -287,6 +294,7 @@ internal fun TruckHomeDashboard(
                 },
                 onHeaderClick = {
                     quranPlayer.stop()
+                    com.starception.submission.shared.media.QuranPlaybackBus.clear()
                     isReadingAudio = false
                     onOpenQuran(readingSurah.number)
                 },

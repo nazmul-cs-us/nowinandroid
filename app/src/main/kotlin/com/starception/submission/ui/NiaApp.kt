@@ -2050,7 +2050,7 @@ private fun NudgePreviewThumbnail(
 }
 
 @Composable
-private fun VoiceNudgeSparkles(
+internal fun VoiceNudgeSparkles(
     color: Color,
     morph: Float,
     modifier: Modifier = Modifier,

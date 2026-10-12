@@ -461,6 +461,9 @@ internal fun QuranDetailScreen(
         if (store.quranAutoplayPending()) {
             store.saveQuranAutoplayPending(false)
             playing = player.play(quranAudioUrl(number))
+                            if (playing) {
+                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
+                            }
             showAudioPlayer = playing
         }
     }
@@ -477,7 +480,6 @@ internal fun QuranDetailScreen(
     var tafseerSelectedBook by remember { mutableStateOf(0) }
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
     val repository = remember { createQuranVerseRepository() }
-    DisposableEffect(player) { onDispose { player.stop() } }
     LaunchedEffect(number, loadAttempt) {
         ayahState = QuranAyahState.Loading
         ayahState = try {
@@ -559,6 +561,9 @@ internal fun QuranDetailScreen(
             playing = false
         } else {
             playing = player.play(quranAudioUrl(number))
+                            if (playing) {
+                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
+                            }
             if (playing) showAudioPlayer = true
         }
     }
@@ -718,6 +723,9 @@ internal fun QuranDetailScreen(
                                     playing = false
                                 } else {
                                     playing = player.play(quranAudioUrl(number))
+                            if (playing) {
+                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
+                            }
                                     if (playing) showAudioPlayer = true
                                 }
                             },
@@ -906,6 +914,9 @@ internal fun QuranDetailScreen(
                                             playing = false
                                         } else {
                                             playing = player.play(quranAudioUrl(number))
+                            if (playing) {
+                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
+                            }
                                             if (playing) showAudioPlayer = true
                                         }
                                     },
@@ -941,6 +952,9 @@ internal fun QuranDetailScreen(
                                             playing = false
                                         } else {
                                             playing = player.play(quranAudioUrl(number))
+                            if (playing) {
+                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
+                            }
                                             if (playing) showAudioPlayer = true
                                         }
                                     },
@@ -1474,9 +1488,6 @@ internal fun FortressChapterScreen(
         }
     }
     var playingId by remember { mutableStateOf<Int?>(null) }
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        onDispose { player.stop() }
-    }
     ImmersiveDetailScaffold(onBack = onBack, header = {
         Box(Modifier.fillMaxWidth().height(190.dp)) {
             NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
@@ -1529,7 +1540,14 @@ internal fun FortressChapterScreen(
                                 playingId = null
                             } else if (invocation.audioUrl.isNotBlank()) {
                                 player.stop()
-                                player.play(invocation.audioUrl)
+                                com.starception.submission.shared.media.QuranPlaybackBus.clear()
+                                if (player.play(invocation.audioUrl)) {
+                                    com.starception.submission.shared.media.QuranPlaybackBus.startFortress(
+                                        player = player,
+                                        audioUrl = invocation.audioUrl,
+                                        title = invocation.description,
+                                    )
+                                }
                                 playingId = invocation.id
                             }
                         },
@@ -2835,11 +2853,14 @@ internal fun BukhariHadithDetailScreen(
         label = "Reading settings",
         trailingText = QuranArabicFonts.displayName(selectedArabicFont),
     ) { showReadingSettings = true }
-    // Play-all queue: narrates from the current hadith to the end of the
-    // book, auto-advancing the pager as each narration finishes — the shared
-    // counterpart of the Android hadith playlist.
-    var queueIndex by remember { mutableStateOf<Int?>(null) }
-    val speechSynthesizer = remember { PlatformSpeechSynthesizer() }
+    // Play-all queue: the detached NarrationQueue narrates from the current
+    // hadith to the end of the book — the shared counterpart of Android's
+    // MediaSession playlist. It keeps speaking after this screen is gone and
+    // the lock-screen controls follow it; the pager only follows along while
+    // the screen is visible.
+    val narration by com.starception.submission.shared.voice.NarrationQueue.state.collectAsState()
+    val narrationBookId = book?.id
+    val narrationOnThisBook = narration.bookId != null && narration.bookId == narrationBookId
     when (val current = state) {
         HadithsState.Loading -> SharedDetailScaffold(title = "Sahih al-Bukhari", onBack = onBack) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -2855,57 +2876,15 @@ internal fun BukhariHadithDetailScreen(
             val pagerState = androidx.compose.foundation.pager.rememberPagerState(
                 initialPage = initialIndex,
             ) { hadiths.size }
-            // Drives the queue: scrolls to the queued hadith, narrates it,
-            // then enqueues the next one. A null index or a stop cancels.
-            LaunchedEffect(queueIndex) {
-                val index = queueIndex ?: return@LaunchedEffect
-                if (index >= hadiths.size) {
-                    queueIndex = null
-                    listening = false
-                    return@LaunchedEffect
-                }
-                pagerState.animateScrollToPage(index)
-                listening = true
-                val sourceText = hadiths[index].english
-                val utterance = if (translationLanguage == "en") {
-                    sourceText
-                } else {
-                    SharedTranslationService.translateFromEnglish(
-                        text = sourceText,
-                        targetLang = translationLanguage,
-                        provider = translationProvider,
-                    )
-                }
-                if (utterance.isBlank()) {
-                    queueIndex = index + 1
-                    return@LaunchedEffect
-                }
-                val started = speechSynthesizer.speak(
-                    text = utterance,
-                    language = hadithNarrationLanguage(translationLanguage),
-                ) { error ->
-                    if (error == null && queueIndex == index) {
-                        queueIndex = index + 1
-                    } else if (error != null) {
-                        queueIndex = null
-                        listening = false
+            // The pager follows the detached queue while this screen is
+            // visible; manual swipes are not fought, the next hadith simply
+            // scrolls back in.
+            LaunchedEffect(narration.hadithId) {
+                if (narrationOnThisBook && narration.hadithId != null) {
+                    val index = hadiths.indexOfFirst { it.id == narration.hadithId }
+                    if (index >= 0 && pagerState.currentPage != index) {
+                        pagerState.animateScrollToPage(index)
                     }
-                }
-                if (!started) {
-                    queueIndex = null
-                    listening = false
-                }
-            }
-            // Stop narration when the user swipes to another hadith manually.
-            LaunchedEffect(pagerState.currentPage) {
-                if (queueIndex == null) {
-                    speechSynthesizer.stop()
-                    listening = false
-                }
-            }
-            androidx.compose.runtime.DisposableEffect(speechSynthesizer) {
-                onDispose {
-                    speechSynthesizer.stop()
                 }
             }
             val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
@@ -2955,40 +2934,47 @@ internal fun BukhariHadithDetailScreen(
                 translationProvider = providers[(providers.indexOf(translationProvider) + 1) % providers.size]
                 store.saveHadithTranslationProvider(translationProvider)
             }
+            val listeningToThisHadith =
+                narrationOnThisBook && narration.hadithId == currentHadith.id
             val listenAction = DetailAction(
                 id = "listen",
-                label = if (listening && queueIndex == null) "Stop narration" else "Listen (TTS)",
-                selected = listening && queueIndex == null,
+                label = if (listeningToThisHadith) "Stop narration" else "Listen (TTS)",
+                selected = listeningToThisHadith,
             ) {
-                if (listening && queueIndex == null) {
-                    speechSynthesizer.stop()
-                    listening = false
+                if (listeningToThisHadith) {
+                    com.starception.submission.shared.voice.NarrationQueue.stop()
                 } else {
-                    queueIndex = null
-                    speechSynthesizer.stop()
-                    listening = speechSynthesizer.speak(
-                        text = narrationText,
-                        language = hadithNarrationLanguage(translationLanguage),
-                    ) { listening = false }
+                    com.starception.submission.shared.voice.NarrationQueue.narrateSingle(
+                        collection = com.starception.submission.shared.voice.NarrationQueue.Collection.BUKHARI,
+                        bookId = narrationBookId ?: 0,
+                        hadithId = currentHadith.id,
+                        language = translationLanguage,
+                        provider = translationProvider,
+                    )
                 }
             }
+            val queueRunning = narrationOnThisBook && narration.queueSize > 1
             val playAllAction = DetailAction(
                 id = "play_all",
-                label = if (queueIndex != null) "Stop queue" else "Play all from here",
-                selected = queueIndex != null,
-                trailingText = if (queueIndex != null) {
-                    "${(queueIndex ?: 0) + 1}/${hadiths.size}"
+                label = if (queueRunning) "Stop queue" else "Play all from here",
+                selected = queueRunning,
+                trailingText = if (queueRunning) {
+                    "${narration.index + 1}/${narration.queueSize}"
                 } else {
                     "${hadiths.size - pagerState.currentPage} left"
                 },
             ) {
-                if (queueIndex != null) {
-                    speechSynthesizer.stop()
-                    queueIndex = null
-                    listening = false
+                if (queueRunning) {
+                    com.starception.submission.shared.voice.NarrationQueue.stop()
                 } else {
-                    speechSynthesizer.stop()
-                    queueIndex = pagerState.currentPage
+                    com.starception.submission.shared.voice.NarrationQueue.startQueue(
+                        collection = com.starception.submission.shared.voice.NarrationQueue.Collection.BUKHARI,
+                        bookId = narrationBookId ?: 0,
+                        hadithIds = hadiths.map { it.id },
+                        startIndex = pagerState.currentPage,
+                        language = translationLanguage,
+                        provider = translationProvider,
+                    )
                 }
             }
             Box(Modifier.fillMaxSize()) {
@@ -3026,18 +3012,19 @@ internal fun BukhariHadithDetailScreen(
                         arabicFont = selectedArabicFont,
                         arabicFontSize = arabicFontSize,
                         textAlignment = textAlignment,
-                        listening = listening && index == pagerState.currentPage,
+                        listening = narrationOnThisBook &&
+                            narration.hadithId == hadiths[index].id,
                         onListeningChange = { enabled ->
                             if (enabled) {
-                                queueIndex = null
-                                speechSynthesizer.stop()
-                                listening = speechSynthesizer.speak(
-                                    text = narrationText,
-                                    language = hadithNarrationLanguage(translationLanguage),
-                                ) { listening = false }
-                            } else {
-                                speechSynthesizer.stop()
-                                listening = false
+                                com.starception.submission.shared.voice.NarrationQueue.narrateSingle(
+                                    collection = com.starception.submission.shared.voice.NarrationQueue.Collection.SHAMAYEL,
+                                    bookId = book?.id ?: 0,
+                                    hadithId = hadiths[index].id,
+                                    language = translationLanguage,
+                                    provider = translationProvider,
+                                )
+                            } else if (narration.hadithId == hadiths[index].id) {
+                                com.starception.submission.shared.voice.NarrationQueue.stop()
                             }
                         },
                         translatedText = if (index == pagerState.currentPage) translatedText else null,
@@ -3329,57 +3316,19 @@ internal fun ShamayelHadithDetailScreen(
             val pagerState = androidx.compose.foundation.pager.rememberPagerState(
                 initialPage = initialIndex,
             ) { hadiths.size }
-            // Play-all queue — same mechanism as the Bukhari detail screen.
-            var queueIndex by remember { mutableStateOf<Int?>(null) }
-            val speechSynthesizer = remember { PlatformSpeechSynthesizer() }
-            LaunchedEffect(queueIndex) {
-                val index = queueIndex ?: return@LaunchedEffect
-                if (index >= hadiths.size) {
-                    queueIndex = null
-                    listening = false
-                    return@LaunchedEffect
-                }
-                pagerState.animateScrollToPage(index)
-                listening = true
-                val sourceText = hadiths[index].english
-                val utterance = if (translationLanguage == "en") {
-                    sourceText
-                } else {
-                    SharedTranslationService.translateFromEnglish(
-                        text = sourceText,
-                        targetLang = translationLanguage,
-                        provider = translationProvider,
-                    )
-                }
-                if (utterance.isBlank()) {
-                    queueIndex = index + 1
-                    return@LaunchedEffect
-                }
-                val started = speechSynthesizer.speak(
-                    text = utterance,
-                    language = hadithNarrationLanguage(translationLanguage),
-                ) { error ->
-                    if (error == null && queueIndex == index) {
-                        queueIndex = index + 1
-                    } else if (error != null) {
-                        queueIndex = null
-                        listening = false
+            // Play-all queue — the same detached NarrationQueue as the Bukhari
+            // detail screen, narrating the Shama'il corpus. It keeps speaking
+            // after this screen is gone and the lock-screen controls follow.
+            val narration by com.starception.submission.shared.voice.NarrationQueue.state.collectAsState()
+            val narrationOnThisBook =
+                narration.collection == com.starception.submission.shared.voice.NarrationQueue.Collection.SHAMAYEL &&
+                    narration.bookId != null && narration.bookId == book?.id
+            LaunchedEffect(narration.hadithId) {
+                if (narrationOnThisBook && narration.hadithId != null) {
+                    val index = hadiths.indexOfFirst { it.id == narration.hadithId }
+                    if (index >= 0 && pagerState.currentPage != index) {
+                        pagerState.animateScrollToPage(index)
                     }
-                }
-                if (!started) {
-                    queueIndex = null
-                    listening = false
-                }
-            }
-            LaunchedEffect(pagerState.currentPage) {
-                if (queueIndex == null) {
-                    speechSynthesizer.stop()
-                    listening = false
-                }
-            }
-            androidx.compose.runtime.DisposableEffect(speechSynthesizer) {
-                onDispose {
-                    speechSynthesizer.stop()
                 }
             }
             val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
@@ -3434,40 +3383,47 @@ internal fun ShamayelHadithDetailScreen(
                 label = "Reading settings",
                 trailingText = QuranArabicFonts.displayName(selectedArabicFont),
             ) { showReadingSettings = true }
+            val listeningToThisHadith =
+                narrationOnThisBook && narration.hadithId == currentHadith.id
             val listenAction = DetailAction(
                 id = "listen",
-                label = if (listening && queueIndex == null) "Stop narration" else "Listen (TTS)",
-                selected = listening && queueIndex == null,
+                label = if (listeningToThisHadith) "Stop narration" else "Listen (TTS)",
+                selected = listeningToThisHadith,
             ) {
-                if (listening && queueIndex == null) {
-                    speechSynthesizer.stop()
-                    listening = false
+                if (listeningToThisHadith) {
+                    com.starception.submission.shared.voice.NarrationQueue.stop()
                 } else {
-                    queueIndex = null
-                    speechSynthesizer.stop()
-                    listening = speechSynthesizer.speak(
-                        text = narrationText,
-                        language = hadithNarrationLanguage(translationLanguage),
-                    ) { listening = false }
+                    com.starception.submission.shared.voice.NarrationQueue.narrateSingle(
+                        collection = com.starception.submission.shared.voice.NarrationQueue.Collection.SHAMAYEL,
+                        bookId = book?.id ?: 0,
+                        hadithId = currentHadith.id,
+                        language = translationLanguage,
+                        provider = translationProvider,
+                    )
                 }
             }
+            val queueRunning = narrationOnThisBook && narration.queueSize > 1
             val playAllAction = DetailAction(
                 id = "play_all",
-                label = if (queueIndex != null) "Stop queue" else "Play all from here",
-                selected = queueIndex != null,
-                trailingText = if (queueIndex != null) {
-                    "${(queueIndex ?: 0) + 1}/${hadiths.size}"
+                label = if (queueRunning) "Stop queue" else "Play all from here",
+                selected = queueRunning,
+                trailingText = if (queueRunning) {
+                    "${narration.index + 1}/${narration.queueSize}"
                 } else {
                     "${hadiths.size - pagerState.currentPage} left"
                 },
             ) {
-                if (queueIndex != null) {
-                    speechSynthesizer.stop()
-                    queueIndex = null
-                    listening = false
+                if (queueRunning) {
+                    com.starception.submission.shared.voice.NarrationQueue.stop()
                 } else {
-                    speechSynthesizer.stop()
-                    queueIndex = pagerState.currentPage
+                    com.starception.submission.shared.voice.NarrationQueue.startQueue(
+                        collection = com.starception.submission.shared.voice.NarrationQueue.Collection.SHAMAYEL,
+                        bookId = book?.id ?: 0,
+                        hadithIds = hadiths.map { it.id },
+                        startIndex = pagerState.currentPage,
+                        language = translationLanguage,
+                        provider = translationProvider,
+                    )
                 }
             }
             Box(Modifier.fillMaxSize()) {
@@ -3505,18 +3461,19 @@ internal fun ShamayelHadithDetailScreen(
                         arabicFont = selectedArabicFont,
                         arabicFontSize = arabicFontSize,
                         textAlignment = textAlignment,
-                        listening = listening && index == pagerState.currentPage,
+                        listening = narrationOnThisBook &&
+                            narration.hadithId == hadiths[index].id,
                         onListeningChange = { enabled ->
                             if (enabled) {
-                                queueIndex = null
-                                speechSynthesizer.stop()
-                                listening = speechSynthesizer.speak(
-                                    text = narrationText,
-                                    language = hadithNarrationLanguage(translationLanguage),
-                                ) { listening = false }
-                            } else {
-                                speechSynthesizer.stop()
-                                listening = false
+                                com.starception.submission.shared.voice.NarrationQueue.narrateSingle(
+                                    collection = com.starception.submission.shared.voice.NarrationQueue.Collection.SHAMAYEL,
+                                    bookId = book?.id ?: 0,
+                                    hadithId = hadiths[index].id,
+                                    language = translationLanguage,
+                                    provider = translationProvider,
+                                )
+                            } else if (narration.hadithId == hadiths[index].id) {
+                                com.starception.submission.shared.voice.NarrationQueue.stop()
                             }
                         },
                         translatedText = if (index == pagerState.currentPage) translatedText else null,

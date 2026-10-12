@@ -1415,22 +1415,38 @@ fun PrayerTimesScreen(
 
     val latestExpandedKnowledgeContext by rememberUpdatedState(botKnowledgeRankingContext)
     val latestExpandedAppSituation by rememberUpdatedState(botAppSituation)
+    val expandedAiScope = rememberCoroutineScope()
     LaunchedEffect(expandedInsightPage, nudgeDay) {
         if (expandedInsightPage != 4) return@LaunchedEffect
+        if (expandedAiLoading || expandedAiCandidate != null) return@LaunchedEffect
         expandedAiLoading = true
-        expandedAiCandidate = runCatching {
-            nowNudgeKnowledgeProvider.load(
-                date = LocalDate.parse(nudgeDay),
-                variation = 64,
-                appSituation = latestExpandedAppSituation,
-                rankingContext = latestExpandedKnowledgeContext,
-                task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
-            )
-        }.getOrNull()
-        expandedAiCandidate?.let { candidate ->
-            nowNudgeKnowledgeProvider.recordImpression(candidate, LocalDate.parse(nudgeDay))
+        val requestDay = nudgeDay
+        val appSituation = latestExpandedAppSituation
+        val rankingContext = latestExpandedKnowledgeContext
+        // Launch from the screen's retained scope rather than this page-keyed
+        // effect. Swiping away no longer cancels and restarts the same model
+        // request; the result is ready when the user returns.
+        expandedAiScope.launch {
+            try {
+                expandedAiCandidate = runCatching {
+                    nowNudgeKnowledgeProvider.load(
+                        date = LocalDate.parse(requestDay),
+                        variation = 64,
+                        appSituation = appSituation,
+                        rankingContext = rankingContext,
+                        task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
+                    )
+                }.getOrNull()
+                expandedAiCandidate?.let { candidate ->
+                    nowNudgeKnowledgeProvider.recordImpression(
+                        candidate,
+                        LocalDate.parse(requestDay),
+                    )
+                }
+            } finally {
+                expandedAiLoading = false
+            }
         }
-        expandedAiLoading = false
     }
     val openExpandedAiCandidate: (NowNudgeKnowledgeCandidate) -> Unit = { candidate ->
         nowNudgeKnowledgeProvider.recordOpened(candidate)

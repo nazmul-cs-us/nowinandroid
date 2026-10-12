@@ -42,5 +42,9 @@ actual class PlatformSpeechSynthesizer actual constructor() {
         return false
     }
 
+    actual fun pause() = Unit
+
+    actual fun resume() = Unit
+
     actual fun stop() = Unit
 }

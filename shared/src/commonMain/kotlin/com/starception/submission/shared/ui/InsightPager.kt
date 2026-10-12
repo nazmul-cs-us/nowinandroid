@@ -220,11 +220,9 @@ fun InsightPager(
     val autoAdvanceProgress = remember { Animatable(0f) }
     val headingProvider = remember { HeadingProvider() }
     var heading by remember { mutableStateOf(HeadingReading()) }
-    DisposableEffect(quranPlayer) {
-        onDispose { quranPlayer.stop() }
-    }
     LaunchedEffect(today) {
         quranPlayer.stop()
+        com.starception.submission.shared.media.QuranPlaybackBus.clear()
         isReadingAudio = false
     }
     LaunchedEffect(pagerState.settledPage) {
@@ -484,6 +482,7 @@ fun InsightPager(
                                 },
                                 onClick = {
                                     quranPlayer.stop()
+                                    com.starception.submission.shared.media.QuranPlaybackBus.clear()
                                     isReadingAudio = false
                                     onOpenQuran(surah.number)
                                 },

@@ -60,4 +60,6 @@ expect class PlatformSpeechSynthesizer() {
         onComplete: (String?) -> Unit = {},
     ): Boolean
     fun stop()
+    fun pause()
+    fun resume()
 }

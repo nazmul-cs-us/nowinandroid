@@ -189,7 +189,10 @@ fun SharedNavHost(
         }
     }
     DisposableEffect(quranPlayer) {
-        onDispose { quranPlayer.stop() }
+        onDispose {
+            quranPlayer.stop()
+            com.starception.submission.shared.media.QuranPlaybackBus.clear()
+        }
     }
     val openTopic: (Int) -> Unit = { id ->
         navController.navigate(TopicRoute(id)) { launchSingleTop = true }

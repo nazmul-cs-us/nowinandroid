@@ -175,6 +175,11 @@ targets:
         # ProMotion displays at their full refresh rate.
         CADisableMinimumFrameDurationOnPhone: true
         NSSupportsLiveActivities: true
+        # Quran and Fortress recitations keep playing with the app in the
+        # background or the screen locked: the shared player runs an
+        # AVAudioSession in the playback category.
+        UIBackgroundModes:
+          - audio
         # Empty by default. Set PRAYER_PUSH_BACKEND_URL externally to enable the
         # credential-free token snapshot uploader.
         PrayerPushBackendURL: $(PRAYER_PUSH_BACKEND_URL)

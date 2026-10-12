@@ -221,6 +221,7 @@ fun PrayerTimesScreen(
     var activeAdhanVolume by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val contentStore = remember { SharedContentStore() }
     val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
+    val playback by com.starception.submission.shared.media.QuranPlaybackBus.state.collectAsState()
     val isOnline by com.starception.submission.shared.connectivity.appConnectivity.isOnline.collectAsState()
     val homeCanvas = screenCanvasBrush()
     val nextPrayerState = remember(day, notifications) {
@@ -311,6 +312,67 @@ fun PrayerTimesScreen(
         }
     }
 
+    // The playing-item row in the pull-to-sync strip — the shared
+    // counterpart of Android's MediaMiniBar: title, playing/paused state,
+    // a play-pause toggle, and a progress sweep along the strip. Tapping the
+    // title opens the playing surah.
+    val mediaBar = playback?.let { playing ->
+        com.starception.submission.feature.prayertimes.wobble.SyncBarRow(
+            isVisible = true,
+            progress = if (playing.durationSeconds > 0f) {
+                (playing.positionSeconds / playing.durationSeconds).coerceIn(0f, 1f)
+            } else {
+                0f
+            },
+        ) { statusText ->
+            val stripColor = MaterialTheme.colorScheme.onPrimaryContainer
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .let { body ->
+                            val surahNumber = playing.surahNumber
+                            if (surahNumber != null) {
+                                body.clickable { onOpenQuran(surahNumber) }
+                            } else {
+                                body
+                            }
+                        },
+                ) {
+                    Text(
+                        text = playing.title,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = stripColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = if (playing.playing) "Playing" else "Paused",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = stripColor.copy(alpha = 0.7f),
+                        maxLines = 1,
+                    )
+                }
+                Text(
+                    text = if (playing.playing) "❚❚" else "▶",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = stripColor,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable {
+                            com.starception.submission.shared.media.QuranPlaybackBus.toggle()
+                        }
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
+        }
+    }
     PullToSyncContainer(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
@@ -322,6 +384,7 @@ fun PrayerTimesScreen(
             val percent = ((downloadStatus?.progress ?: 0f) * 100).toInt()
             "$label $percent%"
         }.orEmpty(),
+        mediaBar = mediaBar,
         modifier = modifier.fillMaxSize(),
     ) { syncState ->
         Surface(
