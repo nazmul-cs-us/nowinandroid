@@ -403,10 +403,27 @@ private fun createPrayerTimesViewController(
         // composition can call it.
         remember {
             com.starception.submission.shared.voice.NarrationNowPlaying.install()
+            com.starception.submission.shared.assets.installDeenlyModelDownloadHook()
             true
         }
         val nudgePreview = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--preview-deenly-nudge" }
+        }
+        // UI-testing hook: start with a given insight tile already in its
+        // enlarged Android-parity stage, e.g. --expand-insight=3.
+        val expandInsight = remember {
+            NSProcessInfo.processInfo.arguments
+                .mapNotNull { it as? String }
+                .firstOrNull { it.startsWith("--expand-insight=") }
+                ?.substringAfter('=')
+                ?.toIntOrNull()
+                ?.takeIf { it in 0..4 }
+        }
+        val showAllPrayers = remember {
+            NSProcessInfo.processInfo.arguments.any { it == "--show-all-prayers" }
+        }
+        val showSyncBanner = remember {
+            NSProcessInfo.processInfo.arguments.any { it == "--show-sync-banner" }
         }
 
         var location by remember { mutableStateOf(locationStore.location()) }
@@ -415,9 +432,16 @@ private fun createPrayerTimesViewController(
         var temperature by remember { mutableStateOf<Double?>(null) }
         var refreshRequest by remember { mutableStateOf(0) }
         var isRefreshing by remember { mutableStateOf(false) }
-        var syncResultText by remember { mutableStateOf<String?>(null) }
+        var syncResultText by remember {
+            mutableStateOf<String?>(if (showSyncBanner) "Prayer times updated" else null)
+        }
         var now by remember { mutableStateOf(Clock.System.now()) }
         var themeSettings by remember { mutableStateOf(appearanceStore.settings()) }
+        LaunchedEffect(appearanceStore) {
+            appearanceStore.changes.collect {
+                themeSettings = appearanceStore.settings()
+            }
+        }
         var travelDuaSettings by remember { mutableStateOf(audioStore.travelDua()) }
         var isTravelDuaPlaying by remember { mutableStateOf(false) }
         var recognitionMode by remember { mutableStateOf(audioStore.recognitionMode()) }
@@ -756,6 +780,9 @@ private fun createPrayerTimesViewController(
                     typography = sharedTypography(),
                 ) { it() }
             },
+            cupertino = { content ->
+                AppCupertinoTheme(useDarkTheme, content)
+            },
         ) {
             // Apple's controls show a soft dim under the finger — never
             // Material's rectangular ripple. The ripple is disabled and every
@@ -842,11 +869,13 @@ private fun createPrayerTimesViewController(
                         } else {
                             null
                         },
-                        onNudgeChanged = { nudge ->
-                            NowNudgeBus.updateAmbient(nudge)
-                        },
-                        externalNudgeActionRequests = NowNudgeBus.actionRequests,
-                    )
+                         onNudgeChanged = { nudge ->
+                             NowNudgeBus.updateAmbient(nudge)
+                         },
+                         externalNudgeActionRequests = NowNudgeBus.actionRequests,
+                          initialExpandedInsight = expandInsight,
+                          initialShowAllPrayers = showAllPrayers,
+                      )
                 },
                 prayerDay = day,
                 notifications = notificationPrefs,

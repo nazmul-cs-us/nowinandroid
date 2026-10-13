@@ -212,6 +212,19 @@ class DeenlyKnowledgeModel(context: Context) {
         const val ANSWER_MODEL_SHA256 =
             "d6e49d4aadca50b815a2a054c6facd22dccad9871561f146cb73dd6b5204aeee"
 
+        /**
+         * Whether the GGUF required by [task] has been downloaded and is complete.
+         * UI uses this to offer the CDN download instead of silently falling back
+         * to the deterministic content bank; inference still re-verifies the SHA.
+         */
+        fun isModelDownloaded(context: Context, task: DeenlyKnowledgeTask): Boolean {
+            val file = File(
+                context.applicationContext.filesDir,
+                "cdn_assets/models/now_nudge/${task.modelFileName}",
+            )
+            return file.isFile && file.length() == task.modelSizeBytes
+        }
+
         private val DeenlyKnowledgeTask.modelFileName: String
             get() = when (this) {
                 DeenlyKnowledgeTask.ANSWER -> ANSWER_MODEL_FILE_NAME

@@ -17,11 +17,6 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -29,6 +24,12 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,10 +45,10 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
@@ -57,13 +58,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -75,13 +81,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -104,13 +116,15 @@ import com.starception.submission.feature.quran.dailyReading
 import com.starception.submission.feature.quran.subtitle
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.shared.SharedPrayerDay
+import com.starception.submission.shared.SharedPrayerSlot
 import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.audio.quranAudioUrl
-import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.content.CONTEXTUAL_DUA_CHAPTER_IDS
 import com.starception.submission.shared.content.ContextualRecommendation
-import com.starception.submission.shared.content.createSharedFortressRepository
+import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.content.contextualRecommendation
+import com.starception.submission.shared.content.createSharedFortressRepository
+import com.starception.submission.shared.ml.DeenlyKnowledgeRuntime
 import com.starception.submission.shared.qibla.HeadingProvider
 import com.starception.submission.shared.qibla.HeadingReading
 import com.starception.submission.shared.qibla.qiblaBearing
@@ -120,18 +134,19 @@ import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.salah.FARD_PRAYERS
 import com.starception.submission.shared.salah.SalahProgress
-import io.github.alexzhirkevich.cupertino.CupertinoSliderNative
 import io.github.alexzhirkevich.cupertino.CupertinoSurface
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.time.Clock
 
 /**
  * The swipeable insight tiles at the top of the home page.
@@ -160,18 +175,71 @@ fun InsightPager(
     tileHeight: Dp = 220.dp,
     fullWidthPage: Boolean = false,
     maxPageWidth: Dp? = null,
+    initialExpandedPage: Int? = null,
+    collapseExpanded: Boolean = false,
+    onExpandedPageChange: (Int?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val pageCount = 5
-    val middleLoopStart = pageCount
-    val pagerState = rememberPagerState(
-        initialPage = middleLoopStart,
-        pageCount = { pageCount * 3 },
+    val primaryPageCount = 5
+    val hadithDetailPage = 5
+    val readingDetailPage = 6
+    val expandedPages = listOf(0, 1, hadithDetailPage, 2, readingDetailPage, 3, 4)
+    var expandedLogicalPage by rememberSaveable { mutableStateOf<Int?>(initialExpandedPage) }
+    var lastExpandedLogicalPage by rememberSaveable {
+        mutableIntStateOf(initialExpandedPage ?: 0)
+    }
+    val collapsedPages = remember { List(primaryPageCount) { it } }
+    val collapsedPagerState = rememberPagerState(
+        initialPage = primaryPageCount,
+        pageCount = { primaryPageCount * 3 },
     )
+    val expandedPagerState = rememberPagerState(
+        initialPage = expandedPages.size + expandedPages.indexOf(initialExpandedPage).coerceAtLeast(0),
+        pageCount = { expandedPages.size * 3 },
+    )
+    val isExpanded = expandedLogicalPage != null
+    val visiblePages = if (isExpanded) expandedPages else collapsedPages
+    val pageCount = visiblePages.size
+    val middleLoopStart = pageCount
+    // Each page topology owns a fixed physical pager. Reusing one state while
+    // changing 5-page modulo mapping to 7 pages could reinterpret a stale page
+    // as a different source insight during expansion.
+    val pagerState = if (isExpanded) expandedPagerState else collapsedPagerState
     val pagerScope = rememberCoroutineScope()
-    var expandedLogicalPage by rememberSaveable { mutableStateOf<Int?>(null) }
+    var expandedPagerReady by remember { mutableStateOf(false) }
+    LaunchedEffect(collapseExpanded) {
+        if (collapseExpanded) expandedLogicalPage = null
+    }
+    LaunchedEffect(expandedLogicalPage) {
+        expandedLogicalPage?.let { lastExpandedLogicalPage = it }
+        onExpandedPageChange(expandedLogicalPage)
+    }
+    LaunchedEffect(isExpanded) {
+        expandedPagerReady = false
+        val sourcePage = expandedLogicalPage ?: lastExpandedLogicalPage
+        val targetIndex = if (isExpanded) expandedPages.indexOf(sourcePage) else sourcePage
+        pagerState.scrollToPage(pageCount + targetIndex.coerceAtLeast(0))
+        expandedPagerReady = isExpanded
+    }
+    val expansionProgress by animateFloatAsState(
+        targetValue = if (expandedLogicalPage != null) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = 250f,
+        ),
+        label = "insightExpansionProgress",
+    )
     val effectiveTileHeight by animateDpAsState(
-        targetValue = if (expandedLogicalPage != null) tileHeight + 92.dp else tileHeight,
+        targetValue = if (expandedLogicalPage != null) {
+            // Android's expansion budget: the tile grows by exactly the space
+            // the schedule frees (one 96dp row + 8dp gap) with the remaining
+            // row staying at its normal 96dp height, so every control below
+            // keeps its resting placement and the location card cannot drift
+            // into the floating navigation pill.
+            tileHeight + 104.dp
+        } else {
+            tileHeight
+        },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow,
@@ -235,7 +303,17 @@ fun InsightPager(
             }
         }
     }
-    val qiblaPageVisible = pagerState.settledPage % pageCount == 3
+    LaunchedEffect(pagerState.settledPage, expandedLogicalPage, expandedPagerReady) {
+        if (expandedLogicalPage != null && expandedPagerReady) {
+            val visiblePage = visiblePages[pagerState.settledPage % pageCount]
+            expandedLogicalPage = when (visiblePage) {
+                hadithDetailPage -> 1
+                readingDetailPage -> 2
+                else -> visiblePage
+            }
+        }
+    }
+    val qiblaPageVisible = visiblePages[pagerState.settledPage % pageCount] == 3
     DisposableEffect(headingProvider, qiblaPageVisible) {
         if (qiblaPageVisible) headingProvider.start { heading = it }
         onDispose { headingProvider.stop() }
@@ -277,8 +355,11 @@ fun InsightPager(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(if (maxPageWidth != null) 0.dp else 6.dp),
             ) {
-                repeat(pageCount) { index ->
-                    val selected = pagerState.currentPage % pageCount == index
+                repeat(primaryPageCount) { index ->
+                    val currentVisiblePage = visiblePages[pagerState.currentPage % pageCount]
+                    val selected = currentVisiblePage == index ||
+                        (currentVisiblePage == hadithDetailPage && index == 1) ||
+                        (currentVisiblePage == readingDetailPage && index == 2)
                     val indicatorWidth = if (selected) 26.dp else 6.dp
                     Box(
                         modifier = Modifier
@@ -290,14 +371,15 @@ fun InsightPager(
                                 },
                             )
                             .semantics {
-                                contentDescription = "Insight ${index + 1} of $pageCount"
+                                contentDescription = "Insight ${index + 1} of $primaryPageCount"
                                 this.selected = selected
                             }
                             .clickable(role = Role.Tab) {
                                 pagerScope.launch {
-                                    val currentLogicalPage = pagerState.currentPage % pageCount
+                                    val targetVisibleIndex = visiblePages.indexOf(index)
+                                    val currentVisibleIndex = pagerState.currentPage % pageCount
                                     pagerState.animateScrollToPage(
-                                        pagerState.currentPage + (index - currentLogicalPage),
+                                        pagerState.currentPage + (targetVisibleIndex - currentVisibleIndex),
                                     )
                                 }
                             },
@@ -333,44 +415,64 @@ fun InsightPager(
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             // Keep Android's card aspect ratio. Partial-width pages leave a
             // neighboring card visible; a two-pane hero can consume its column.
+            // The spring may briefly overshoot, but pager spacing and padding
+            // must remain non-negative.
+            val layoutExpansionProgress = expansionProgress.coerceIn(0f, 1f)
             val boundedPageWidth = maxPageWidth?.let { minOf(maxWidth, it) } ?: maxWidth
-            val pageWidth = if (fullWidthPage || expandedLogicalPage != null) {
+            val restingPageWidth = if (fullWidthPage) {
                 boundedPageWidth
             } else {
                 (effectiveTileHeight * (250f / 288f))
                     .coerceAtMost(minOf(maxWidth * 0.64f, boundedPageWidth))
                     .coerceAtLeast(140.dp)
             }
+            val pageWidth = restingPageWidth +
+                ((boundedPageWidth - restingPageWidth) * layoutExpansionProgress)
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(pageWidth),
-                pageSpacing = 14.dp,
+                pageSpacing = 14.dp * (1f - layoutExpansionProgress),
                 contentPadding = PaddingValues(
-                    end = if (fullWidthPage || expandedLogicalPage != null) 0.dp else 18.dp,
+                    end = if (fullWidthPage) 0.dp else 18.dp * (1f - layoutExpansionProgress),
                 ),
                 beyondViewportPageCount = 1,
                 modifier = Modifier.fillMaxWidth().height(effectiveTileHeight),
             ) { page ->
-                val logicalPage = page % pageCount
-                val isExpanded = expandedLogicalPage == logicalPage
+                val logicalPage = visiblePages[page % pageCount]
+                val sourceLogicalPage = when (logicalPage) {
+                    hadithDetailPage -> 1
+                    readingDetailPage -> 2
+                    else -> logicalPage
+                }
+                val isExpanded = expandedLogicalPage == sourceLogicalPage
                 val onLongClick = {
-                    expandedLogicalPage = if (isExpanded) null else logicalPage
+                    expandedLogicalPage = if (isExpanded) null else sourceLogicalPage
+                }
+                // Keep the page offset observable at the pager level. The iOS
+                // graphics layer does not consistently invalidate when the
+                // pager state is read through a nested callback, so deriving
+                // it here makes every artwork layer follow the live drag.
+                val pageOffset by remember(pagerState, page) {
+                    derivedStateOf {
+                        ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                            .coerceIn(-1f, 1f)
+                    }
                 }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            val pageOffset = abs(
-                                (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction,
-                            ).coerceIn(0f, 1f)
-                            val focus = 1f - pageOffset
-                            scaleX = 0.97f + (0.03f * focus)
-                            scaleY = 0.97f + (0.03f * focus)
-                            alpha = 0.9f + (0.1f * focus)
+                            val focus = 1f - abs(pageOffset)
+                            val restingScale = 0.97f + (0.03f * focus)
+                            val restingAlpha = 0.9f + (0.1f * focus)
+                            scaleX = restingScale + ((1f - restingScale) * expansionProgress)
+                            scaleY = restingScale + ((1f - restingScale) * expansionProgress)
+                            alpha = restingAlpha + ((1f - restingAlpha) * expansionProgress)
                         },
                 ) {
                     when (logicalPage) {
                         0 -> PrayerNowTile(
+                            backgroundPageOffset = { pageOffset },
                             phase = day.skyPhase,
                             weather = day.skyWeather,
                             headline = day.heroHeadline(notifications),
@@ -388,15 +490,28 @@ fun InsightPager(
                                 ?.let { it.hour * 60 + it.minute }
                                 ?: 1_080,
                             tileHeight = effectiveTileHeight,
+                            isExpanded = isExpanded,
                             onClick = onOpenQibla,
                             onLongClick = onLongClick,
+                            expandedContent = if (isExpanded) {
+                                {
+                                    ExpandedPrayerLine(
+                                        nextPrayerName = day.nextPrayer,
+                                        slots = day.slots,
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                         )
 
                         1 -> ArtworkTile(
+                            backgroundPageOffset = { pageOffset },
                             artwork = Res.drawable.insight_prayer_background,
                             foreground = Res.drawable.insight_prayer_foreground,
-                            foregroundScale = 0.88f,
+                            foregroundScale = 0.84f,
                             foregroundOffsetYFraction = 0.08f,
+                            isExpanded = isExpanded,
                             label = "Today's salah",
                             title = when (salah.completedCount) {
                                 FARD_PRAYERS.size -> "All prayers complete"
@@ -423,6 +538,25 @@ fun InsightPager(
                             )
                         }
 
+                        hadithDetailPage -> ArtworkTile(
+                            backgroundPageOffset = { pageOffset },
+                            artwork = Res.drawable.insight_prayer_background,
+                            foreground = Res.drawable.insight_prayer_foreground,
+                            foregroundScale = 0.84f,
+                            foregroundOffsetYFraction = 0.08f,
+                            isExpanded = true,
+                            label = "Today's salah",
+                            title = "Prayer guidance",
+                            subtitle = salah.nextUnprayed ?: "Salah",
+                            tileHeight = effectiveTileHeight,
+                            onLongClick = onLongClick,
+                        ) {
+                            ExpandedSalahHadith(
+                                nextPrayer = salah.nextUnprayed,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+
                         2 -> {
                             // Android's home reading tile: the day's fixed
                             // suggestion with a play control and a progress
@@ -438,10 +572,12 @@ fun InsightPager(
                                 }
                             }
                             ArtworkTile(
+                                backgroundPageOffset = { pageOffset },
                                 artwork = Res.drawable.insight_quran_background,
                                 foreground = Res.drawable.insight_quran_foreground_v2,
                                 foregroundScale = 0.74f,
                                 foregroundOffsetYFraction = 0.09f,
+                                isExpanded = isExpanded,
                                 label = "Today's reading",
                                 title = surah.nameEnglish,
                                 subtitle = surah.nameArabic,
@@ -487,13 +623,7 @@ fun InsightPager(
                                     onOpenQuran(surah.number)
                                 },
                                 content = {
-                                    if (isExpanded) {
-                                        ExpandedReadingPreview(
-                                            surahNumber = surah.number,
-                                            surahName = surah.nameEnglish,
-                                            isPlaying = isReadingAudio,
-                                        )
-                                    } else if (isReadingAudio && duration > 0f) {
+                                    if (isReadingAudio && duration > 0f) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier
@@ -505,12 +635,17 @@ fun InsightPager(
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = Color.White,
                                             )
-                                            CupertinoSliderNative(
+                                            Slider(
                                                 value = (position / duration).coerceIn(0f, 1f),
                                                 onValueChange = { fraction ->
                                                     position = fraction * duration
                                                     quranPlayer.seekTo(position)
                                                 },
+                                                colors = SliderDefaults.colors(
+                                                    thumbColor = Color.White,
+                                                    activeTrackColor = Color.White,
+                                                    inactiveTrackColor = Color.White.copy(alpha = 0.38f),
+                                                ),
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .padding(horizontal = 8.dp),
@@ -524,6 +659,35 @@ fun InsightPager(
                                     }
                                 },
                             )
+                        }
+
+                        readingDetailPage -> {
+                            val surah = dailyReading(today)
+                            ArtworkTile(
+                                backgroundPageOffset = { pageOffset },
+                                artwork = Res.drawable.insight_quran_background,
+                                foreground = Res.drawable.insight_quran_foreground_v2,
+                                foregroundScale = 0.74f,
+                                foregroundOffsetYFraction = 0.09f,
+                                isExpanded = true,
+                                label = "Today's reading",
+                                title = surah.nameEnglish,
+                                subtitle = surah.nameArabic,
+                                tileHeight = effectiveTileHeight,
+                                onLongClick = onLongClick,
+                                onClick = {
+                                    quranPlayer.stop()
+                                    com.starception.submission.shared.media.QuranPlaybackBus.clear()
+                                    isReadingAudio = false
+                                    onOpenQuran(surah.number)
+                                },
+                            ) {
+                                ExpandedReadingPreview(
+                                    surahNumber = surah.number,
+                                    surahName = surah.nameEnglish,
+                                    isPlaying = isReadingAudio,
+                                )
+                            }
                         }
 
                         3 -> {
@@ -551,76 +715,180 @@ fun InsightPager(
                                 label = "liveQiblaDirection",
                             )
                             ArtworkTile(
+                                backgroundPageOffset = { pageOffset },
                                 artwork = Res.drawable.insight_qibla_background,
-                                foreground = Res.drawable.insight_qibla_foreground_v2,
+                                foreground = if (isExpanded) {
+                                    null
+                                } else {
+                                    Res.drawable.insight_qibla_foreground_v2
+                                },
                                 foregroundScale = 0.75f,
                                 foregroundOffsetXFraction = 0.025f,
                                 foregroundOffsetYFraction = 0.11f,
+                                isExpanded = isExpanded,
                                 label = "Qibla",
-                                title = "$qiblaBearing° toward Makkah",
-                                subtitle = qiblaCardinalDirection(qiblaBearing),
-                                footerText = "Open the live compass and 3D globe",
+                                title = if (isExpanded) "" else "$qiblaBearing° toward Makkah",
+                                subtitle = if (isExpanded) "" else qiblaCardinalDirection(qiblaBearing),
+                                footerText = if (isExpanded) null else "Open the live compass and 3D globe",
                                 tileHeight = effectiveTileHeight,
                                 onClick = onOpenQibla,
                                 onLongClick = onLongClick,
-                                topEndContent = {
-                                    Box {
-                                         CupertinoSurface(
-                                             onClick = onOpenQibla,
-                                             shape = CircleShape,
-                                             color = Color.Black.copy(alpha = 0.35f),
-                                             contentColor = Color.White,
-                                             modifier = Modifier.size(40.dp),
-                                         ) {
-                                             Box(
-                                                 modifier = Modifier.fillMaxSize(),
-                                                 contentAlignment = Alignment.Center,
-                                             ) {
-                                                 // A navigation-style needle holding the
-                                                 // bearing against the rotating heading.
-                                                 androidx.compose.foundation.Canvas(
-                                                     modifier = Modifier
-                                                         .size(20.dp)
-                                                         .rotate(arrowRotation),
-                                                 ) {
-                                                     val w = size.width
-                                                     val h = size.height
-                                                     val arrow = Path().apply {
-                                                         moveTo(w / 2f, 0f)
-                                                         lineTo(w * 0.92f, h)
-                                                         lineTo(w / 2f, h * 0.78f)
-                                                         lineTo(w * 0.08f, h)
-                                                         close()
-                                                     }
-                                                     drawPath(arrow, Color.White)
-                                                 }
-                                             }
-                                         }
+                                content = if (isExpanded) {
+                                    {
+                                        ExpandedQiblaRadar(
+                                            bearing = qiblaBearing,
+                                            headingDegrees = heading.headingDegrees?.toFloat(),
+                                            needleRotation = arrowRotation,
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                                topEndContent = if (isExpanded) {
+                                    null
+                                } else {
+                                    {
+                                        Box {
+                                            CupertinoSurface(
+                                                onClick = onOpenQibla,
+                                                shape = CircleShape,
+                                                color = Color.Black.copy(alpha = 0.35f),
+                                                contentColor = Color.White,
+                                                modifier = Modifier.size(40.dp),
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    // A navigation-style needle holding the
+                                                    // bearing against the rotating heading.
+                                                    androidx.compose.foundation.Canvas(
+                                                        modifier = Modifier
+                                                            .size(20.dp)
+                                                            .rotate(arrowRotation),
+                                                    ) {
+                                                        val w = size.width
+                                                        val h = size.height
+                                                        val arrow = Path().apply {
+                                                            moveTo(w / 2f, 0f)
+                                                            lineTo(w * 0.92f, h)
+                                                            lineTo(w / 2f, h * 0.78f)
+                                                            lineTo(w * 0.08f, h)
+                                                            close()
+                                                        }
+                                                        drawPath(arrow, Color.White)
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 },
                             )
                         }
 
-                        else -> ArtworkTile(
-                            artwork = Res.drawable.insight_suggestion,
-                            label = "AI suggested",
-                            title = recommendation.title,
-                            subtitle = recommendation.supportingText,
-                            footerText = recommendation.footerText,
-                            tileHeight = effectiveTileHeight,
-                            onLongClick = onLongClick,
-                            onClick = {
-                                when (val target = recommendation.target) {
-                                    is ContextualRecommendation.Target.Surah -> onOpenQuran(target.number)
-                                    is ContextualRecommendation.Target.FortressDua ->
-                                        onOpenFortressChapter(target.chapterId)
-                                    is ContextualRecommendation.Target.Bukhari ->
-                                        onOpenBukhariBook(target.bookId)
-                                    is ContextualRecommendation.Target.Shamayel ->
-                                        onOpenShamayelBook(target.bookId)
+                        else -> {
+                            val surah = dailyReading(today)
+                            // Android's RecommendationExpandedStage: the
+                            // enlarged state shows the model-generated
+                            // grounded suggestion over the day's reading,
+                            // falling back to the deterministic card when
+                            // the GGUF is missing or its output is rejected.
+                            // The model download is owned by the runtime, so
+                            // it survives leaving this tile.
+                            var modelCard by remember(today) {
+                                mutableStateOf<DeenlyKnowledgeCard?>(null)
+                            }
+                            var modelLoading by remember(today) { mutableStateOf(false) }
+                            var modelMissing by remember(today) { mutableStateOf(false) }
+                            val downloadProgress by DeenlyKnowledgeRuntime.downloadProgress.collectAsState()
+                            val downloadCompleted by DeenlyKnowledgeRuntime.downloadCompleted.collectAsState()
+
+                            LaunchedEffect(isExpanded, today, downloadCompleted) {
+                                modelCard = null
+                                modelLoading = false
+                                modelMissing = false
+                                if (!isExpanded) return@LaunchedEffect
+                                val runtime = DeenlyKnowledgeRuntime
+                                if (!runtime.isKnowledgeModelAvailable()) {
+                                    modelMissing = true
+                                    return@LaunchedEffect
                                 }
-                            },
-                        )
+                                modelLoading = true
+                                modelCard = runCatching {
+                                    val store = SharedContentStore()
+                                    val translationLanguage = QuranTranslationLanguage.fromCode(
+                                        store.quranTranslationLanguage(),
+                                    )
+                                    val verses = createQuranVerseRepository()
+                                        .getVersesBySurah(surah.number, translationLanguage)
+                                        .take(3)
+                                    val sourceText = verses
+                                        .mapNotNull { it.translation.takeIf(String::isNotBlank) }
+                                        .joinToString(" ")
+                                        .ifBlank { return@runCatching null }
+                                    val title = runtime.generateKnowledgeTitle(
+                                        collection = "Holy Quran",
+                                        reference = "Surah ${surah.number} · ${surah.nameEnglish}",
+                                        topic = "Daily reading",
+                                        appSituation = null,
+                                        sourceText = sourceText,
+                                    ) ?: return@runCatching null
+                                    DeenlyKnowledgeCard(title = title, sourceText = sourceText)
+                                }.getOrNull()
+                                modelLoading = false
+                            }
+
+                            ArtworkTile(
+                                backgroundPageOffset = { pageOffset },
+                                artwork = Res.drawable.insight_suggestion,
+                                isExpanded = isExpanded,
+                                label = "AI suggested",
+                                title = if (isExpanded && modelCard != null) "" else recommendation.title,
+                                subtitle = if (isExpanded) "" else recommendation.supportingText,
+                                footerText = if (isExpanded) null else recommendation.footerText,
+                                tileHeight = effectiveTileHeight,
+                                onLongClick = onLongClick,
+                                content = if (isExpanded) {
+                                    {
+                                        when {
+                                            modelLoading -> ModelSuggestionLoading()
+                                            modelCard != null -> ModelSuggestionStage(
+                                                card = modelCard,
+                                                onOpen = { onOpenQuran(surah.number) },
+                                            )
+                                            modelMissing -> MissingModelDownloadCard(
+                                                downloading = downloadProgress != null,
+                                                downloadFraction = downloadProgress ?: 0f,
+                                                onDownload = {
+                                                    DeenlyKnowledgeRuntime.startModelDownload()
+                                                },
+                                            )
+                                            else -> ExpandedSuggestion(
+                                                supportingText = recommendation.supportingText,
+                                                footerText = recommendation.footerText,
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    null
+                                },
+                                onClick = {
+                                    if (isExpanded && modelCard != null) {
+                                        onOpenQuran(surah.number)
+                                    } else {
+                                        when (val target = recommendation.target) {
+                                            is ContextualRecommendation.Target.Surah -> onOpenQuran(target.number)
+                                            is ContextualRecommendation.Target.FortressDua ->
+                                                onOpenFortressChapter(target.chapterId)
+                                            is ContextualRecommendation.Target.Bukhari ->
+                                                onOpenBukhariBook(target.bookId)
+                                            is ContextualRecommendation.Target.Shamayel ->
+                                                onOpenShamayelBook(target.bookId)
+                                        }
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -748,6 +1016,7 @@ private fun ExpandedReadingPreview(
     surahNumber: Int,
     surahName: String,
     isPlaying: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val store = remember { SharedContentStore() }
     val mushafMode = remember { store.quranMushafMode() }
@@ -775,15 +1044,15 @@ private fun ExpandedReadingPreview(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 112.dp, max = 132.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .fillMaxSize()
+            .clip(RoundedCornerShape(22.dp))
             .background(Color.Black.copy(alpha = 0.38f))
             .border(
                 width = 1.dp,
                 color = Color.White.copy(alpha = 0.14f),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(22.dp),
             )
             .padding(horizontal = 14.dp, vertical = 11.dp),
     ) {
@@ -897,6 +1166,574 @@ private fun ExpandedReadingPreview(
     }
 }
 
+/**
+ * Android's PrayerTimelineExpandedStage, lean: the day's five prayers with
+ * the next one highlighted in the reference gold.
+ */
+@Composable
+private fun ExpandedPrayerLine(
+    nextPrayerName: String?,
+    slots: List<SharedPrayerSlot>,
+) {
+    val prayers = slots.filter { it.name in FARD_PRAYERS }
+    if (prayers.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.Black.copy(alpha = 0.36f))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(18.dp),
+            )
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Text(
+            text = "TODAY'S PRAYER LINE",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 9.5.sp,
+                lineHeight = 12.sp,
+                letterSpacing = 1.2.sp,
+            ),
+            color = Color.White.copy(alpha = 0.68f),
+            fontWeight = FontWeight.Bold,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            prayers.forEach { slot ->
+                val highlighted = slot.name.equals(nextPrayerName, ignoreCase = true)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    modifier = Modifier.widthIn(min = 44.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(if (highlighted) 8.dp else 5.dp)
+                            .background(
+                                if (highlighted) ReadingPreviewGold else Color.White.copy(alpha = 0.30f),
+                                CircleShape,
+                            ),
+                    )
+                    Text(
+                        text = slot.name,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            lineHeight = 12.sp,
+                        ),
+                        color = if (highlighted) ReadingPreviewGold else Color.White.copy(alpha = 0.72f),
+                        fontWeight = if (highlighted) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = formatTileClock(slot.hour, slot.minute),
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 13.sp,
+                        ),
+                        color = Color.White.copy(alpha = if (highlighted) 0.96f else 0.58f),
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Degrees to radians for the radar drawing, common to all platforms. */
+private fun radians(degrees: Double): Double = degrees * PI / 180.0
+
+/** 12-hour clock label, matching the Android dial's formatting. */
+private fun formatTileClock(hour: Int, minute: Int): String {
+    val suffix = if (hour < 12) "AM" else "PM"
+    val h = ((hour + 11) % 12) + 1
+    return "$h:${minute.toString().padStart(2, '0')} $suffix"
+}
+
+/**
+ * Android's SalahHadithExpandedStage, lean: the staged fallback narration for
+ * the next unprayed prayer with its source reference.
+ */
+@Composable
+private fun ExpandedSalahHadith(
+    nextPrayer: String?,
+    modifier: Modifier = Modifier,
+) {
+    val displayName = nextPrayer?.replaceFirstChar { it.uppercase() } ?: "Salah"
+    val (text, source) = when (nextPrayer?.lowercase()) {
+        "fajr", "asr" ->
+            "Whoever prays the two cool prayers will enter Paradise." to "Sahih al-Bukhari · 574"
+        "isha" ->
+            "If they knew the reward of the night prayer, they would come to it " +
+                "even if they had to crawl." to "Sahih al-Bukhari · 615"
+        else ->
+            "Prayer in congregation is twenty-seven times superior to prayer " +
+                "offered alone." to "Sahih al-Bukhari · 645"
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color.Black.copy(alpha = 0.36f))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(22.dp),
+            )
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "\u201C",
+                style = MaterialTheme.typography.titleLarge,
+                color = ReadingPreviewGold.copy(alpha = 0.55f),
+                modifier = Modifier.padding(end = 6.dp),
+            )
+            Text(
+                text = "HADITH FOR ${displayName.uppercase()}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.5.sp,
+                    lineHeight = 12.sp,
+                    letterSpacing = 1.2.sp,
+                ),
+                color = ReadingPreviewGold,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+            ),
+            color = Color.White.copy(alpha = 0.92f),
+            maxLines = 5,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = source,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+            ),
+            color = Color.White.copy(alpha = 0.55f),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * Lean port of Android's QiblaBearingExpandedStage: a perspective radar with
+ * the rotating rose, a faceted needle holding the bearing, and turn guidance.
+ */
+@Composable
+private fun ExpandedQiblaRadar(
+    bearing: Int,
+    headingDegrees: Float?,
+    needleRotation: Float?,
+    modifier: Modifier = Modifier,
+) {
+    val turn = headingDegrees?.let { shortestBearingDelta(it, bearing.toFloat()) }
+    val instruction = when {
+        turn == null -> "Open the live compass for turn guidance"
+        abs(turn) < 6f -> "You are facing the Qibla"
+        turn > 0f -> "Turn ${abs(turn).roundToInt()}° right"
+        else -> "Turn ${abs(turn).roundToInt()}° left"
+    }
+    Column(
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .clip(RoundedCornerShape(22.dp))
+                .background(Color.Black.copy(alpha = 0.36f))
+                .border(
+                    width = 1.dp,
+                    color = Color.White.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(22.dp),
+                ),
+        ) {
+            val density = LocalDensity.current
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val centerX = size.width / 2f
+                val centerY = size.height / 2f
+                val radiusX = (size.width / 2f) - 18.dp.toPx()
+                val radiusY = (size.height / 2f) - 12.dp.toPx()
+
+                // Perspective depth rings.
+                listOf(1f, 0.62f, 0.30f).forEachIndexed { index, scale ->
+                    drawOval(
+                        color = Color.White.copy(alpha = if (index == 0) 0.22f else 0.10f),
+                        topLeft = Offset(centerX - radiusX * scale, centerY - radiusY * scale),
+                        size = Size(radiusX * 2f * scale, radiusY * 2f * scale),
+                        style = Stroke(width = if (index == 0) 1.2.dp.toPx() else 0.8.dp.toPx()),
+                    )
+                }
+
+                // The rose rotates against the live heading.
+                val roseHeading = headingDegrees ?: 0f
+                repeat(48) { index ->
+                    val rotated = radians(
+                        (index * 7.5f - roseHeading - 90f).toDouble(),
+                    )
+                    val rx = cos(rotated).toFloat()
+                    val ry = sin(rotated).toFloat()
+                    val major = index % 6 == 0
+                    drawLine(
+                        color = Color.White.copy(alpha = if (major) 0.55f else 0.22f),
+                        start = Offset(
+                            centerX + rx * radiusX * (if (major) 0.88f else 0.93f),
+                            centerY + ry * radiusY * (if (major) 0.88f else 0.93f),
+                        ),
+                        end = Offset(
+                            centerX + rx * radiusX,
+                            centerY + ry * radiusY,
+                        ),
+                        strokeWidth = if (major) 1.3.dp.toPx() else 0.7.dp.toPx(),
+                    )
+                }
+
+                // Faceted needle: gold point at the bearing, white
+                // counterweight behind the center, pivoting with the heading.
+                val needleAngle = radians(
+                    ((needleRotation ?: bearing.toFloat()) - 90f).toDouble(),
+                )
+                val dirX = kotlin.math.cos(needleAngle).toFloat()
+                val dirY = kotlin.math.sin(needleAngle).toFloat()
+                val normalX = -dirY
+                val normalY = dirX
+                val tipX = centerX + dirX * radiusX * 0.72f
+                val tipY = centerY + dirY * radiusY * 0.72f
+                val tailX = centerX - dirX * radiusX * 0.40f
+                val tailY = centerY - dirY * radiusY * 0.40f
+                val pointHalf = 4.dp.toPx()
+                val tailHalf = 3.dp.toPx()
+                val goldPoint = Path().apply {
+                    moveTo(centerX + normalX * pointHalf, centerY + normalY * pointHalf)
+                    lineTo(tipX, tipY)
+                    lineTo(centerX - normalX * pointHalf, centerY - normalY * pointHalf)
+                    close()
+                }
+                drawPath(goldPoint, ReadingPreviewGold)
+                val counterweight = Path().apply {
+                    moveTo(centerX + normalX * tailHalf, centerY + normalY * tailHalf)
+                    lineTo(tailX, tailY)
+                    lineTo(centerX - normalX * tailHalf, centerY - normalY * tailHalf)
+                    close()
+                }
+                drawPath(counterweight, Color.White.copy(alpha = 0.86f))
+                drawCircle(Color.White.copy(alpha = 0.30f), radius = 1.8.dp.toPx(), center = Offset(centerX, centerY))
+            }
+
+            // Cardinal labels orbit the rose; keep them their own layers so
+            // they stay crisp while the heading changes every frame.
+            listOf("N", "E", "S", "W").forEachIndexed { index, label ->
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        lineHeight = 10.sp,
+                    ),
+                    color = if (label == "N") {
+                        ReadingPreviewGold
+                    } else {
+                        Color.White.copy(alpha = 0.62f)
+                    },
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .graphicsLayer {
+                            val angle = radians(
+                                (index * 90f - (headingDegrees ?: 0f) - 90f).toDouble(),
+                            )
+                            translationX = cos(angle).toFloat() *
+                                (maxWidth.toPx() / 2f - 22.dp.toPx()) * 0.92f
+                            translationY = sin(angle).toFloat() *
+                                (maxHeight.toPx() / 2f - 16.dp.toPx()) * 0.92f
+                        },
+                )
+            }
+        }
+        Text(
+            text = instruction,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontSize = 12.sp,
+                lineHeight = 15.sp,
+            ),
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = headingDegrees
+                    ?.let { "Heading ${it.roundToInt()}°" }
+                    ?: "$bearing° to Makkah",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.60f),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/**
+ * Android's RecommendationExpandedStage, lean: the full grounded suggestion
+ * with the reference header and the verified-source hint.
+ */
+@Composable
+private fun ExpandedSuggestion(
+    supportingText: String,
+    footerText: String?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "✦",
+                style = MaterialTheme.typography.titleLarge,
+                color = ReadingPreviewGold,
+            )
+            Text(
+                text = "GROUNDED SUGGESTION",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.5.sp,
+                    lineHeight = 11.sp,
+                    letterSpacing = 1.1.sp,
+                ),
+                color = Color.White.copy(alpha = 0.64f),
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+        }
+        Text(
+            text = supportingText,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+            ),
+            color = Color.White,
+            fontWeight = FontWeight.Medium,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis,
+        )
+        footerText?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                ),
+                color = Color.White.copy(alpha = 0.66f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            text = "Tap to open the verified source",
+            style = MaterialTheme.typography.labelSmall,
+            color = ReadingPreviewGold,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+    }
+}
+
+/** The model-generated grounded suggestion shown by the enlarged AI tile. */
+private data class DeenlyKnowledgeCard(
+    val title: String,
+    val sourceText: String,
+)
+
+/** Android's RecommendationExpandedStage loading beat. */
+@Composable
+private fun ModelSuggestionLoading() {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        CircularProgressIndicator(
+            color = ReadingPreviewGold,
+            strokeWidth = 2.dp,
+            modifier = Modifier.size(24.dp),
+        )
+        Text(
+            text = "Reading your downloaded sources…",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.72f),
+        )
+    }
+}
+
+/** The grounded card: the model's title over the exact source text. */
+@Composable
+private fun ModelSuggestionStage(
+    card: DeenlyKnowledgeCard?,
+    onOpen: () -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.semantics {
+            contentDescription = "Model-generated suggestion"
+        },
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "✦",
+                style = MaterialTheme.typography.titleLarge,
+                color = ReadingPreviewGold,
+            )
+            Text(
+                text = "GROUNDED SUGGESTION",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.5.sp,
+                    lineHeight = 11.sp,
+                    letterSpacing = 1.1.sp,
+                ),
+                color = Color.White.copy(alpha = 0.64f),
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+        }
+        Text(
+            text = card?.title.orEmpty(),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = 15.5.sp,
+                lineHeight = 20.5.sp,
+            ),
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = card?.sourceText.orEmpty(),
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+            ),
+            color = Color.White.copy(alpha = 0.84f),
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = "Tap to open the verified source",
+            style = MaterialTheme.typography.labelSmall,
+            color = ReadingPreviewGold,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.clickable(onClick = onOpen),
+        )
+    }
+}
+
+/**
+ * The missing-model download prompt, the iOS counterpart of Android's
+ * MissingContentCard for the model_now_nudge category: the shared CDN
+ * downloader fetches the GGUF, then the tile regenerates.
+ */
+@Composable
+private fun MissingModelDownloadCard(
+    downloading: Boolean,
+    downloadFraction: Float,
+    onDownload: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.Black.copy(alpha = 0.36f))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(18.dp),
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "On-device AI model",
+            style = MaterialTheme.typography.titleSmall,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "Creates source-grounded suggestions locally without " +
+                "sending content off-device.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.66f),
+        )
+        if (downloading) {
+            LinearProgressIndicator(
+                progress = { downloadFraction },
+                color = ReadingPreviewGold,
+                trackColor = Color.White.copy(alpha = 0.18f),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "Downloading… ${(downloadFraction * 100).roundToInt()}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.6f),
+            )
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "940 MB",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.6f),
+                )
+                CupertinoSurface(
+                    onClick = onDownload,
+                    shape = RoundedCornerShape(14.dp),
+                    color = ReadingPreviewGold,
+                    contentColor = Color.Black,
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = "Download",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** Cupertino rendering of Android's artwork insight card. */
 @Composable
 private fun ArtworkTile(
@@ -905,6 +1742,8 @@ private fun ArtworkTile(
     foregroundScale: Float = 1f,
     foregroundOffsetXFraction: Float = 0f,
     foregroundOffsetYFraction: Float = 0f,
+    backgroundPageOffset: () -> Float = { 0f },
+    isExpanded: Boolean,
     label: String,
     title: String,
     subtitle: String,
@@ -916,14 +1755,39 @@ private fun ArtworkTile(
     onLongClick: (() -> Unit)? = null,
     content: @Composable (() -> Unit)? = null,
 ) {
-    val shape = RoundedCornerShape(26.dp)
+    // Android's backgroundBaseScale: headroom so the counter-scrolling
+    // artwork never reveals the card's edge mid-swipe.
+    val backgroundBaseScale = 1.065f
+    val cornerRadius by animateDpAsState(
+        targetValue = if (isExpanded) 32.dp else 26.dp,
+        animationSpec = tween(360),
+        label = "insightCornerRadius",
+    )
+    val shadowElevation by animateDpAsState(
+        targetValue = if (isExpanded) 10.dp else 6.dp,
+        animationSpec = tween(360),
+        label = "insightShadowElevation",
+    )
+    var revealExpandedContent by remember(isExpanded) { mutableStateOf(!isExpanded) }
+    LaunchedEffect(isExpanded) {
+        if (isExpanded) {
+            kotlinx.coroutines.delay(50L)
+            revealExpandedContent = true
+        }
+    }
+    val expandedContentEntrance by animateFloatAsState(
+        targetValue = if (revealExpandedContent) 1f else 0f,
+        animationSpec = tween(durationMillis = 360),
+        label = "expandedContentEntrance",
+    )
+    val shape = RoundedCornerShape(cornerRadius)
     CupertinoSurface(
         modifier = modifier
             .fillMaxWidth()
             .height(tileHeight),
         shape = shape,
         color = Color(0xFF635A56),
-        shadowElevation = 6.dp,
+        shadowElevation = shadowElevation,
     ) {
         Box(
             modifier = Modifier
@@ -940,28 +1804,52 @@ private fun ArtworkTile(
                     },
                 ),
         ) {
-        Image(
-            painter = painterResource(artwork),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
-        foreground?.let { foregroundArtwork ->
             Image(
-                painter = painterResource(foregroundArtwork),
+                painter = painterResource(artwork),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                alignment = Alignment.BottomCenter,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        scaleX = foregroundScale
-                        scaleY = foregroundScale
-                        translationX = size.width * foregroundOffsetXFraction
-                        translationY = size.height * foregroundOffsetYFraction
+                        // Android's InsightPreviewCard parallax: the artwork
+                        // counter-scrolls 18dp per page-fraction, scaled up and
+                        // clamped so the card's edge never shows mid-swipe.
+                        val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                        val maxCoveredHorizontalShift = (
+                            (size.width * (backgroundBaseScale - 1f) / 2f) - 1.dp.toPx()
+                            ).coerceAtLeast(0f)
+                        scaleX = backgroundBaseScale
+                        scaleY = backgroundBaseScale
+                        translationX = (-pageOffset * 18.dp.toPx()).coerceIn(
+                            -maxCoveredHorizontalShift,
+                            maxCoveredHorizontalShift,
+                        )
                     },
             )
-        }
+            foreground?.let { foregroundArtwork ->
+                Image(
+                    painter = painterResource(foregroundArtwork),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.BottomCenter,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // Match Android's slight foreground overscan so the
+                            // subject remains covered while it counter-scrolls.
+                            val renderedForegroundScale = 1.025f * foregroundScale
+                            scaleX = renderedForegroundScale
+                            scaleY = renderedForegroundScale
+                            // The foreground counter-scrolls at a slower rate
+                            // than the background — the rate difference is what
+                            // reads as depth while swiping (Android: 6dp vs 18dp).
+                            val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                            translationX = (size.width * foregroundOffsetXFraction) -
+                                (pageOffset * 6.dp.toPx())
+                            translationY = size.height * foregroundOffsetYFraction
+                        },
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1001,65 +1889,123 @@ private fun ArtworkTile(
                     )
                 }
             }
-        topEndContent?.let { trailing ->
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 11.dp, end = 11.dp),
-            ) {
-                trailing()
+            topEndContent?.let { trailing ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 11.dp, end = 11.dp),
+                ) {
+                    trailing()
+                }
+            }
+            if (isExpanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 18.dp, top = 62.dp, end = 18.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    content?.let { expandedContent ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .graphicsLayer {
+                                    alpha = expandedContentEntrance
+                                    translationY = (1f - expandedContentEntrance) * 10.dp.toPx()
+                                    compositingStrategy = CompositingStrategy.Offscreen
+                                }
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(
+                                        brush = Brush.verticalGradient(
+                                            0f to Color.Transparent,
+                                            1f to Color.Black,
+                                            endY = 28.dp.toPx(),
+                                        ),
+                                        blendMode = BlendMode.DstIn,
+                                    )
+                                },
+                        ) {
+                            expandedContent()
+                        }
+                    }
+                    ArtworkTileMetadata(
+                        title = title,
+                        subtitle = subtitle,
+                        footerText = footerText,
+                        expanded = true,
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(start = 22.dp, end = 22.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    content?.invoke()
+                    ArtworkTileMetadata(
+                        title = title,
+                        subtitle = subtitle,
+                        footerText = footerText,
+                        expanded = false,
+                    )
+                }
             }
         }
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(start = 22.dp, end = 22.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            content?.invoke()
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 17.sp,
-                    lineHeight = 22.sp,
-                    letterSpacing = (-0.2).sp,
-                ),
-                fontWeight = FontWeight.Medium,
-                color = Color.White,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (subtitle.isNotEmpty()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 13.sp,
-                        lineHeight = 17.sp,
-                        letterSpacing = 0.sp,
-                    ),
-                    color = Color.White.copy(alpha = 0.88f),
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (footerText != null) {
-                Text(
-                    text = footerText,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        letterSpacing = 0.sp,
-                    ),
-                    color = Color.White.copy(alpha = 0.78f),
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        }
+    }
+}
+
+@Composable
+private fun ArtworkTileMetadata(
+    title: String,
+    subtitle: String,
+    footerText: String?,
+    expanded: Boolean,
+) {
+    if (title.isNotEmpty()) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = (if (expanded) 18 else 17).sp,
+                lineHeight = 22.sp,
+                letterSpacing = (-0.2).sp,
+            ),
+            fontWeight = FontWeight.Medium,
+            color = Color.White,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    if (subtitle.isNotEmpty()) {
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 13.sp,
+                lineHeight = if (expanded) 16.sp else 17.sp,
+                letterSpacing = 0.sp,
+            ),
+            color = Color.White.copy(alpha = 0.88f),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    if (footerText != null) {
+        Text(
+            text = footerText,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontSize = if (expanded) 11.sp else 12.sp,
+                lineHeight = if (expanded) 14.sp else 16.sp,
+                letterSpacing = 0.sp,
+            ),
+            color = Color.White.copy(alpha = 0.78f),
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

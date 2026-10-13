@@ -38,6 +38,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 struct iOSApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("ios_dark_theme_config") private var savedDarkTheme = "FOLLOW_SYSTEM"
+
+    private var appPreferredColorScheme: ColorScheme? {
+        if savedDarkTheme == "LIGHT" {
+            return .light
+        }
+        if savedDarkTheme == "DARK" {
+            return .dark
+        }
+        return nil
+    }
 
     init() {
         // Proves the framework is linked and shared code executes, before any UI
@@ -56,6 +67,7 @@ struct iOSApp: App {
                         .ignoresSafeArea(.container)
                 }
             }
+                .preferredColorScheme(appPreferredColorScheme)
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
                         PrayerNotificationCoordinator.shared.refresh()

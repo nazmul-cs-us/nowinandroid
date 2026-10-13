@@ -252,6 +252,12 @@ targets:
         product: sherpa-onnx
       - package: Swift3D
         product: Swift3D
+      # The Deenly GGUF runner, built from llama.cpp v0.6.0 with
+      # tools/build_llama_xcframework.sh (same release as Android's
+      # libdeenly_completion.so). The in-process runner service uses the
+      # llama C API to generate the on-device suggestions.
+      - framework: Frameworks/llama.xcframework
+        embed: true
       - target: PrayerLiveActivityExtension
         embed: true
       - target: PrayerWidgetExtension

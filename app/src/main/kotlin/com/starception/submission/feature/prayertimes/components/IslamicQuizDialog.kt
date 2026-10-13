@@ -131,12 +131,15 @@ fun IslamicQuizContent(
     var questionIndex by remember { mutableIntStateOf(0) }
     var selectedOption by remember { mutableStateOf<Int?>(null) }
     var answerSubmitted by remember { mutableStateOf(false) }
-    var score by remember { mutableIntStateOf(0) }
+    var score by remember { mutableStateOf(0) }
+    // Bumped when the Now Nudge GGUF finishes downloading so the model
+    // question slots are regenerated instead of staying on bank questions.
+    var modelReloadTrigger by remember { mutableStateOf(0) }
     // The on-device model composes up to three extra questions from verified
     // Quran/hadith sources while the round runs. Each lands in its reserved
     // slot only while the player has not reached that question yet; a slow or
     // invalid generation leaves the bank question in place.
-    LaunchedEffect(poolReady) {
+    LaunchedEffect(poolReady, modelReloadTrigger) {
         if (!poolReady) return@LaunchedEffect
         val entryPoint = EntryPointAccessors.fromApplication(
             quizContext.applicationContext,
@@ -446,6 +449,14 @@ fun IslamicQuizContent(
                 )
             }
         }
+
+        // Model-composed questions need the Now Nudge GGUF; when it was never
+        // downloaded, offer the download instead of silently staying on the
+        // question bank for the whole round.
+        com.starception.submission.download.MissingAiModelCards(
+            tasks = setOf(DeenlyKnowledgeTask.QUESTION),
+            onDownloadComplete = { modelReloadTrigger++ },
+        )
     }
 }
 

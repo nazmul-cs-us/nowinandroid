@@ -206,8 +206,14 @@ fun PrayerTimesScreen(
     nudgeOverride: com.starception.submission.core.model.deenly.DeenlyNudge? = null,
     onNudgeChanged: (com.starception.submission.core.model.deenly.DeenlyNudge?) -> Unit = {},
     externalNudgeActionRequests: kotlinx.coroutines.flow.Flow<com.starception.submission.core.model.deenly.DeenlyNudge>? = null,
+    initialExpandedInsight: Int? = null,
+    initialShowAllPrayers: Boolean = false,
 ) {
-    var showAllPrayers by remember { mutableStateOf(false) }
+    var showAllPrayers by remember { mutableStateOf(initialShowAllPrayers) }
+    var expandedInsightPage by remember { mutableStateOf<Int?>(initialExpandedInsight) }
+    LaunchedEffect(expandedInsightPage) {
+        if (expandedInsightPage != null) showAllPrayers = false
+    }
     var isTuningSchedule by remember { mutableStateOf(false) }
     var showIslamicQuiz by remember { mutableStateOf(false) }
     // Inline search + profile sheet — the Android pattern: both open in
@@ -380,10 +386,9 @@ fun PrayerTimesScreen(
         isOffline = !isOnline,
         prayerAlertState = nextPrayerState,
         downloadProgress = downloadStatus?.progress ?: 0f,
-        downloadLabel = downloadStatus?.label?.let { label ->
-            val percent = ((downloadStatus?.progress ?: 0f) * 100).toInt()
-            "$label $percent%"
-        }.orEmpty(),
+        // The sync strip renders its own "$label  $pct%"; appending the
+        // percent here printed it twice.
+        downloadLabel = downloadStatus?.label.orEmpty(),
         mediaBar = mediaBar,
         modifier = modifier.fillMaxSize(),
     ) { syncState ->
@@ -415,11 +420,19 @@ fun PrayerTimesScreen(
                     // height just scales up so pages stay proportionate.
                     (layoutHeight * 0.34f).coerceIn(320.dp, 400.dp)
                 } else {
-                    // Use the idle space above navigation for a taller card, then
-                    // yield that space as the sync strip opens. Never go below the
-                    // height at which the header/footer can remain on one line.
-                    (layoutHeight - 627.dp - syncState.heldContentInsetTop)
-                        .coerceIn(220.dp, 280.dp)
+                    // Breakpoints use the uncompressed height. A persistent
+                    // banner only displaces content by its height BEYOND the
+                    // status inset it absorbs (heldContentInsetNetTop), so the
+                    // flexible tile shrinks by exactly that displacement —
+                    // the rows, location, and bottom clearance stay pinned,
+                    // leaving no dead gap above the navigation pill. The
+                    // transient finger pull translates the sheet rigidly, so
+                    // its full amount is absorbed here too.
+                    (
+                        (layoutHeight - 627.dp).coerceIn(220.dp, 280.dp) -
+                            syncState.heldContentInsetNetTop -
+                            syncState.transientContentOffsetY
+                        ).coerceAtLeast(180.dp)
                 }
                 // Measured two-pane sizing: both panes share the height below
                 // the search header (~150dp of status bar, header, paddings).
@@ -509,6 +522,7 @@ fun PrayerTimesScreen(
                                 ) {
                                     item {
                                         InsightPager(
+                                            initialExpandedPage = initialExpandedInsight,
                                             onOpenFortressChapter = onOpenFortressChapter,
                                             onOpenBukhariBook = onOpenBukhariBook,
                                             onOpenShamayelBook = onOpenShamayelBook,
@@ -577,6 +591,7 @@ fun PrayerTimesScreen(
                                         // an 8dp gap above the artwork.
                                         val heroTile = (maxHeight - 42.dp).coerceAtLeast(220.dp)
                                         InsightPager(
+                                            initialExpandedPage = initialExpandedInsight,
                                             onOpenFortressChapter = onOpenFortressChapter,
                                             onOpenBukhariBook = onOpenBukhariBook,
                                             onOpenShamayelBook = onOpenShamayelBook,
@@ -629,77 +644,96 @@ fun PrayerTimesScreen(
                                 Spacer(Modifier.height(88.dp))
                             }
                         } else {
-                            // The pager and schedule scroll together on a phone so the
-                            // artwork never leaves only a couple of prayer rows visible.
-                            LazyColumn(
+                            // Match Android's fixed phone viewport. An enlarged
+                            // insight borrows space from the schedule instead of
+                            // making the entire home page scroll.
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(bottom = 112.dp),
                             ) {
-                                item {
-                                    InsightPager(
-                                        onOpenFortressChapter = onOpenFortressChapter,
-                                        onOpenBukhariBook = onOpenBukhariBook,
-                                        onOpenShamayelBook = onOpenShamayelBook,
-                                        day = day,
+                                InsightPager(
+                                    initialExpandedPage = initialExpandedInsight,
+                                    collapseExpanded = showAllPrayers,
+                                    onExpandedPageChange = { expandedInsightPage = it },
+                                    onOpenFortressChapter = onOpenFortressChapter,
+                                    onOpenBukhariBook = onOpenBukhariBook,
+                                    onOpenShamayelBook = onOpenShamayelBook,
+                                    day = day,
+                                    placeName = placeName,
+                                    salah = salah,
+                                    onTogglePrayer = onTogglePrayer,
+                                    today = today,
+                                    latitude = latitude,
+                                    longitude = longitude,
+                                    quranPlayer = quranPlayer,
+                                    onOpenQuran = onOpenQuran,
+                                    onOpenQibla = onOpenQibla,
+                                    onOpenRecommendation = onOpenRecommendation,
+                                    notifications = notifications,
+                                    tileHeight = portraitInsightHeight,
+                                )
+                                PrayerScheduleSection(
+                                    day = day,
+                                    offsets = offsets,
+                                    showAllPrayers = showAllPrayers,
+                                    onToggleExpanded = { showAllPrayers = !showAllPrayers },
+                                    onAdjustPrayer = onAdjustPrayer,
+                                    onTogglePrayerAdhan = onTogglePrayerAdhan,
+                                    onAdhanVolumeChange = onAdhanVolumeChange,
+                                    onOpenAdhanVolume = { name, volume -> activeAdhanVolume = name to volume },
+                                    isTuning = isTuningSchedule,
+                                    onToggleTuning = { isTuningSchedule = !isTuningSchedule },
+                                    notifications = notifications,
+                                    onTogglePrayerNotification = onTogglePrayerNotification,
+                                    showExpandControl = true,
+                                    compact = showAllPrayers || expandedInsightPage != null,
+                                    // Android's expansion budget: the tile grows
+                                    // by exactly the space the schedule frees
+                                    // (one 96dp row + 8dp gap), while the
+                                    // remaining row stays at its normal 96dp
+                                    // height — the footer/location keep their
+                                    // resting placement. The Arabic prayer name
+                                    // rides in the extra breathing room.
+                                    cardMinHeight = when {
+                                        expandedInsightPage != null -> 96.dp
+                                        showAllPrayers -> 84.dp
+                                        else -> null
+                                    },
+                                    collapsedRows = if (expandedInsightPage != null) 1 else 2,
+                                    showFooterLocationPin = showAllPrayers,
+                                    onFooterLocationClick = { showAllPrayers = false },
+                                )
+                                // Android keeps the location card in normal flow
+                                // directly beneath the schedule; no weighted spacer
+                                // exists between them, so it never drifts to the
+                                // bottom and leaves a hole above.
+                                AnimatedVisibility(
+                                    visible = !showAllPrayers,
+                                    enter = expandVertically(
+                                        animationSpec = tween(
+                                            durationMillis = 840,
+                                            easing = FastOutSlowInEasing,
+                                        ),
+                                    ) + fadeIn(animationSpec = tween(durationMillis = 280)),
+                                    exit = shrinkVertically(
+                                        animationSpec = tween(
+                                            durationMillis = 680,
+                                            easing = FastOutSlowInEasing,
+                                        ),
+                                    ) + fadeOut(animationSpec = tween(durationMillis = 180)),
+                                ) {
+                                    LocationWeatherRow(
                                         placeName = placeName,
-                                        salah = salah,
-                                        onTogglePrayer = onTogglePrayer,
-                                        today = today,
-                                        latitude = latitude,
-                                        longitude = longitude,
-                                        quranPlayer = quranPlayer,
-                                        onOpenQuran = onOpenQuran,
-                                        onOpenQibla = onOpenQibla,
-                                        onOpenRecommendation = onOpenRecommendation,
-                                        notifications = notifications,
-                                        tileHeight = portraitInsightHeight,
+                                        temperatureCelsius = day.temperatureCelsius,
+                                        conditionLabel = day.conditionLabel,
+                                        isLocating = isLocating,
+                                        compact = false,
+                                        onRefresh = onRefresh,
                                     )
                                 }
-                                item {
-                                    PrayerScheduleSection(
-                                        day = day,
-                                        offsets = offsets,
-                                        showAllPrayers = showAllPrayers,
-                                        onToggleExpanded = { showAllPrayers = !showAllPrayers },
-                                        onAdjustPrayer = onAdjustPrayer,
-                                        onTogglePrayerAdhan = onTogglePrayerAdhan,
-                                        onAdhanVolumeChange = onAdhanVolumeChange,
- onOpenAdhanVolume = { name, volume -> activeAdhanVolume = name to volume },
-                                        isTuning = isTuningSchedule,
-                                        onToggleTuning = { isTuningSchedule = !isTuningSchedule },
-                                        notifications = notifications,
-                                        onTogglePrayerNotification = onTogglePrayerNotification,
-                                        showExpandControl = true,
-                                        compact = showAllPrayers,
-                                        cardMinHeight = if (showAllPrayers) 88.dp else null,
-                                    )
-                                }
-                                item {
-                                    AnimatedVisibility(
-                                        visible = !showAllPrayers,
-                                        enter = expandVertically(
-                                            animationSpec = tween(
-                                                durationMillis = 840,
-                                                easing = FastOutSlowInEasing,
-                                            ),
-                                        ) + fadeIn(animationSpec = tween(durationMillis = 280)),
-                                        exit = shrinkVertically(
-                                            animationSpec = tween(
-                                                durationMillis = 680,
-                                                easing = FastOutSlowInEasing,
-                                            ),
-                                        ) + fadeOut(animationSpec = tween(durationMillis = 180)),
-                                    ) {
-                                        LocationWeatherRow(
-                                            placeName = placeName,
-                                            temperatureCelsius = day.temperatureCelsius,
-                                            conditionLabel = day.conditionLabel,
-                                            isLocating = isLocating,
-                                            compact = false,
-                                            onRefresh = onRefresh,
-                                        )
-                                    }
-                                }
+                                // Fixed bottom navigation clearance in every state,
+                                // matching Android's constant FloatingNavClearance.
+                                Spacer(Modifier.height(48.dp))
                             }
                         }
                     }
@@ -934,12 +968,53 @@ private fun PrayerHomeHeader(
                 }
             },
             cupertino = {
-                io.github.alexzhirkevich.cupertino.CupertinoSearchBarNative(
-                    placeholder = searchTerm?.let { "Search '$it'" } ?: "Search",
-                    onSearchClick = onOpenSearch,
-                    onVoiceClick = onVoiceTap,
-                    modifier = Modifier.weight(1f),
-                )
+                // Keep the search surface in the shared theme. The native
+                // Cupertino search control can retain a light UIKit backing
+                // view when the app forces dark mode.
+                Surface(
+                    onClick = onOpenSearch,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            start = 16.dp,
+                            end = if (onVoiceTap != null) 6.dp else 16.dp,
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = NiaIcons.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (onVoiceTap != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .clickable(onClick = onVoiceTap),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Mic,
+                                    contentDescription = "Voice search",
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
+                }
             },
         )
         IconTapTarget(
@@ -1333,6 +1408,9 @@ private fun PrayerScheduleSection(
     compact: Boolean,
     columns: Int = 2,
     cardMinHeight: Dp? = null,
+    collapsedRows: Int = 2,
+    showFooterLocationPin: Boolean = false,
+    onFooterLocationClick: (() -> Unit)? = null,
 ) {
     var revealedCard by remember { mutableStateOf<RevealedPrayerCard?>(null) }
 
@@ -1437,7 +1515,7 @@ private fun PrayerScheduleSection(
         val prayerRows = day.dashboardSlots().chunked(columns.coerceIn(1, 2))
         // The first four prayers always stay visible; the rest sit behind the
         // Show All control, regardless of how many cards each row holds.
-        val alwaysVisibleRows = (4 + columns - 1) / columns
+        val alwaysVisibleRows = collapsedRows.coerceIn(1, prayerRows.size)
         prayerRows.take(alwaysVisibleRows).forEach { pair ->
             PrayerCardRow(
                 slots = pair,
@@ -1483,9 +1561,7 @@ private fun PrayerScheduleSection(
             }
         }
         if (showExpandControl) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(40.dp),
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().height(40.dp)) {
                 TextButton(
                     onClick = onToggleExpanded,
                     modifier = Modifier.align(Alignment.Center).height(32.dp),
@@ -1502,7 +1578,7 @@ private fun PrayerScheduleSection(
                     Text(if (showAllPrayers) "Show Less" else "Show All Prayers")
                 }
                 androidx.compose.animation.AnimatedContent(
-                    targetState = showAllPrayers,
+                    targetState = showFooterLocationPin,
                     modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
                     transitionSpec = {
                         fadeIn(tween(280)) + scaleIn(
@@ -1514,12 +1590,9 @@ private fun PrayerScheduleSection(
                         )
                     },
                     label = "locationPinMorph",
-                ) { expanded ->
-                    if (expanded) {
-                        LocationPinButton(
-                            onClick = onToggleExpanded,
-                            modifier = Modifier.offset(y = (-10).dp),
-                        )
+                ) { visible ->
+                    if (visible) {
+                        LocationPinButton(onClick = onFooterLocationClick ?: onToggleExpanded)
                     } else {
                         Spacer(Modifier.size(40.dp))
                     }
@@ -1881,7 +1954,10 @@ private fun PrayerCard(
                             }
                         }
                     }
-                    if (!compact && slot.localName.isNotEmpty()) {
+                    // The Arabic/local prayer name rides under the English
+                    // label in every card size — the compact 96dp expanded
+                    // row and the 84dp Show All row both have room for it.
+                    if (slot.localName.isNotEmpty()) {
                         Text(
                             text = slot.localName,
                             style = MaterialTheme.typography.bodySmall,
@@ -2094,7 +2170,9 @@ private fun LocationWeatherRow(
 ) {
     if (compact) {
         Box(
-            modifier = modifier.fillMaxWidth().heightIn(min = 40.dp),
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(min = 40.dp),
             contentAlignment = Alignment.CenterEnd,
         ) {
             LocationPinButton(onClick = onRefresh)
@@ -2125,14 +2203,13 @@ private fun LocationWeatherRow(
             }
         },
         cupertino = {
-            val colors = CupertinoTheme.colorScheme
             CupertinoSurface(
                 onClick = onRefresh,
                 modifier = modifier.fillMaxWidth().heightIn(min = 58.dp),
                 shape = RoundedCornerShape(16.dp),
-                color = colors.secondarySystemGroupedBackground,
-                contentColor = colors.label,
-                border = BorderStroke(0.5.dp, colors.separator),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 LocationWeatherContent(
                     placeTitle = placeTitle,
@@ -2140,7 +2217,7 @@ private fun LocationWeatherRow(
                     temperatureCelsius = temperatureCelsius,
                     conditionLabel = conditionLabel,
                     isLocating = isLocating,
-                    cupertino = true,
+                    cupertino = false,
                 )
             }
         },

@@ -16,6 +16,8 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -39,12 +41,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,9 +94,12 @@ fun PrayerNowTile(
     sunriseMinute: Int = 390,
     maghribMinute: Int = 1_080,
     tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
+    isExpanded: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
+    expandedContent: (@Composable () -> Unit)? = null,
+    backgroundPageOffset: () -> Float = { 0f },
 ) {
     val isNight = nowMinute < sunriseMinute || nowMinute >= maghribMinute ||
         (nowMinute == 0 && (phase == PrayerSkyPhase.Fajr || phase == PrayerSkyPhase.Isha))
@@ -109,14 +119,24 @@ fun PrayerNowTile(
             .coerceIn(0f, 1f)
     }
     val sceneAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = 0.40f)
-    val shape = RoundedCornerShape(26.dp)
+    val cornerRadius by animateDpAsState(
+        targetValue = if (isExpanded) 32.dp else 26.dp,
+        animationSpec = tween(360),
+        label = "prayerNowCornerRadius",
+    )
+    val shadowElevation by animateDpAsState(
+        targetValue = if (isExpanded) 10.dp else 6.dp,
+        animationSpec = tween(360),
+        label = "prayerNowShadowElevation",
+    )
+    val shape = RoundedCornerShape(cornerRadius)
     CupertinoSurface(
         modifier = modifier
             .fillMaxWidth()
             .height(tileHeight),
         shape = shape,
         color = Color(0xFF635A56),
-        shadowElevation = 6.dp,
+        shadowElevation = shadowElevation,
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -132,6 +152,37 @@ fun PrayerNowTile(
                         Modifier.clickable(onClick = onClick)
                     },
                 ),
+        ) {
+        // Match Android's full east-to-west cycle, but anchor the zenith to the
+        // mountain ridge so a taller iOS card cannot lift the body out of the scene.
+        val altitude = sin(cycleProgress * PI).toFloat().coerceAtLeast(0f)
+        val celestialX = maxWidth * (0.17f + 0.66f * cycleProgress)
+        val horizonY = maxHeight * 0.60f
+        val heightZenithY = maxHeight * if (isNight) 0.17f else 0.15f
+        val ridgeZenithY = horizonY - maxWidth * if (isNight) 0.26f else 0.28f
+        val zenithY = maxOf(heightZenithY, ridgeZenithY)
+        val celestialY = horizonY - (horizonY - zenithY) * altitude
+        val bodySize = minOf(maxWidth, maxHeight) * if (isNight) 0.119f else 0.104f
+        val glowSize = bodySize * if (isNight) 2.35f else 3f
+        // The whole scene — poster, mosque lights, and the celestial body —
+        // counter-scrolls as one layer, matching Android's Prayer Now
+        // counter-scroll depth so the sky does not feel static mid-swipe.
+        val sceneBaseScale = 1.14f
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                    val maxCoveredHorizontalShift = (
+                        (size.width * (sceneBaseScale - 1f) / 2f) - 1.dp.toPx()
+                        ).coerceAtLeast(0f)
+                    scaleX = sceneBaseScale
+                    scaleY = sceneBaseScale
+                    translationX = (-pageOffset * 18.dp.toPx()).coerceIn(
+                        -maxCoveredHorizontalShift,
+                        maxCoveredHorizontalShift,
+                    )
+                },
         ) {
         Image(
             painter = painterResource(
@@ -153,17 +204,6 @@ fun PrayerNowTile(
             )
         }
 
-        // Match Android's full east-to-west cycle, but anchor the zenith to the
-        // mountain ridge so a taller iOS card cannot lift the body out of the scene.
-        val altitude = sin(cycleProgress * PI).toFloat().coerceAtLeast(0f)
-        val celestialX = maxWidth * (0.17f + 0.66f * cycleProgress)
-        val horizonY = maxHeight * 0.60f
-        val heightZenithY = maxHeight * if (isNight) 0.17f else 0.15f
-        val ridgeZenithY = horizonY - maxWidth * if (isNight) 0.26f else 0.28f
-        val zenithY = maxOf(heightZenithY, ridgeZenithY)
-        val celestialY = horizonY - (horizonY - zenithY) * altitude
-        val bodySize = minOf(maxWidth, maxHeight) * if (isNight) 0.119f else 0.104f
-        val glowSize = bodySize * if (isNight) 2.35f else 3f
         Box(
             modifier = Modifier
                 .offset(x = celestialX - glowSize / 2, y = celestialY - glowSize / 2)
@@ -199,6 +239,7 @@ fun PrayerNowTile(
                 .size(bodySize)
                 .clip(CircleShape),
         )
+        }
 
         // The artwork is bright at the horizon, so the text needs its own
         // contrast rather than relying on the image being dark enough.
@@ -256,12 +297,43 @@ fun PrayerNowTile(
         }
 
         Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(start = 22.dp, end = 22.dp, bottom = 16.dp),
+            modifier = if (isExpanded) {
+                Modifier
+                    .fillMaxSize()
+                    .padding(start = 18.dp, top = 62.dp, end = 18.dp, bottom = 12.dp)
+            } else {
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(start = 22.dp, end = 22.dp, bottom = 16.dp)
+            },
             verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
+            expandedContent?.let { content ->
+                Box(
+                    modifier = if (isExpanded) {
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        0f to Color.Transparent,
+                                        1f to Color.Black,
+                                        endY = 28.dp.toPx(),
+                                    ),
+                                    blendMode = BlendMode.DstIn,
+                                )
+                            }
+                    } else {
+                        Modifier.fillMaxWidth()
+                    },
+                ) {
+                    content()
+                }
+            }
             Text(
                 text = headline,
                 fontSize = 17.sp,

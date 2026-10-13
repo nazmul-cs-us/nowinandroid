@@ -94,6 +94,8 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -2179,11 +2181,18 @@ private fun SettingsSwitchRow(
             },
             modifier = Modifier.weight(1f),
         )
-        io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSwitch(
+        Switch(
             checked = checked,
             onCheckedChange = { enabled ->
                 if (available || !enabled) onCheckedChange(enabled)
             },
+            enabled = available,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.surface,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.surface,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+            ),
         )
     }
 }
@@ -5681,12 +5690,43 @@ private fun SharedUnifiedHeaderRow(
                 }
             },
             cupertino = {
-                io.github.alexzhirkevich.cupertino.CupertinoSearchBarNative(
-                    placeholder = "Search",
-                    onSearchClick = searchController::open,
-                    onVoiceClick = { searchController.openVoice() },
-                    modifier = Modifier.weight(1f),
-                )
+                // Avoid a UIKit search field retaining its light backing view
+                // when the app's appearance is explicitly dark.
+                Surface(
+                    onClick = searchController::open,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = NiaIcons.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "Search Quran, Hadith and more",
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconTapTarget(
+                            icon = androidx.compose.material.icons.Icons.Filled.Mic,
+                            contentDescription = "Voice search",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            visualSize = 36.dp,
+                            iconSize = 20.dp,
+                            showBackground = false,
+                            onClick = { searchController.openVoice() },
+                        )
+                    }
+                }
             },
         )
         IconTapTarget(

@@ -13,7 +13,9 @@ import UIKit
 /// in Kotlin. Anything decided here would be a decision Android could not share.
 struct ComposePrayerTimesView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
-        IosComposeRootKt.PrayerTimesViewController(
+        // The Deenly GGUF inference service the shared suggestion flows call.
+        DeenlyKnowledgeRuntime.shared.service = DeenlyKnowledgeServiceImpl.shared
+        return IosComposeRootKt.PrayerTimesViewController(
             sherpaService: SherpaSpeechService.shared,
             salahTfliteService: SalahTfliteServiceImpl(),
             salah3DService: SalahScene3DHost()
@@ -31,7 +33,9 @@ struct ComposePrayerTimesTabView: UIViewControllerRepresentable {
     let onSelectTab: (Int) -> Void
 
     func makeUIViewController(context: Context) -> UIViewController {
-        IosComposeRootKt.PrayerTimesTabViewController(
+        // The Deenly GGUF inference service the shared suggestion flows call.
+        DeenlyKnowledgeRuntime.shared.service = DeenlyKnowledgeServiceImpl.shared
+        return IosComposeRootKt.PrayerTimesTabViewController(
             sherpaService: SherpaSpeechService.shared,
             salahTfliteService: SalahTfliteServiceImpl(),
             salah3DService: SalahScene3DHost(),
@@ -110,8 +114,11 @@ final class NowNudgeBotModel: ObservableObject {
     @Published var thinkingVerbRotation: [String] = []
     @Published var composerSuggestions: [String] = []
 
-    private var requestedNudgeId: String?
-    private var revealedNudgeId: String?
+    // @Published: the reveal task writes these off the turn flow, and the
+    // surfaces recompute from them — without the publish the thinking pill
+    // never re-renders into the revealed card.
+    @Published private var requestedNudgeId: String?
+    @Published private var revealedNudgeId: String?
     private var revealTask: Task<Void, Never>?
     private var thinkingTask: Task<Void, Never>?
     private var renderedHoldTask: Task<Void, Never>?
@@ -173,8 +180,9 @@ final class NowNudgeBotModel: ObservableObject {
         IosComposeRootKt.StopObservingDeenlyNudge()
     }
 
-    func requestSuggestion() {
-        guard surface == .button, !busGenerating else { return }
+    func requestAmbientSuggestion() {
+        guard !busGenerating else { return }
+        composerOpen = false
         IosComposeRootKt.RequestDeenlyNudgeSuggestion(prompt: nil)
     }
 
@@ -292,21 +300,18 @@ final class NowNudgeBotModel: ObservableObject {
     }
 }
 
-/// The bot layer: one morphing surface at a time, anchored bottom-trailing
-/// above the native tab bar — the same slot Android's app-shell bot occupies.
+/// The bot layer: the transient bot surfaces (composer, thinking pill,
+/// nudge card) anchored bottom-trailing above the native tab bar. The idle
+/// affordance is the tab bar's trailing Voice item — the slot Android's
+/// app-shell bar gives its voice button.
 @available(iOS 26.0, *)
 private struct NowNudgeBotLayer: View {
     @ObservedObject var model: NowNudgeBotModel
     @Environment(\.colorScheme) private var colorScheme
     @Namespace private var containerNamespace
-    @State private var pullDistance: CGFloat = 0
-    @State private var lastHapticStep = 0
-    @State private var activationHapticSent = false
     @State private var glowPulse = false
 
     private let buttonSize: CGFloat = 60
-    private let pullThreshold: CGFloat = 40
-    private let pullHapticStepDistance: CGFloat = 12
 
     private var nudgeGradient: LinearGradient {
         if colorScheme == .dark {
@@ -340,8 +345,7 @@ private struct NowNudgeBotLayer: View {
         ZStack(alignment: .bottomTrailing) {
             switch model.surface {
             case .button:
-                botButton
-                    .transition(.opacity)
+                EmptyView()
             case .composer:
                 composerCard
                     .offset(y: -(buttonSize + 8))
@@ -362,69 +366,6 @@ private struct NowNudgeBotLayer: View {
                 glowPulse = true
             }
         }
-    }
-
-    // MARK: Button
-
-    private var botButton: some View {
-        let isDark = colorScheme == .dark
-        let container = isDark ? Color(red: 0.94, green: 0.94, blue: 0.96) : Color(.label)
-        let content = isDark ? Color(red: 0.10, green: 0.10, blue: 0.12) : Color(.systemBackground)
-        return Circle()
-            .fill(container)
-            .frame(width: buttonSize, height: buttonSize)
-            .shadow(color: .black.opacity(0.14), radius: 4, y: 2)
-            .overlay(
-                VoiceNudgeBarsGlyph(generating: false, color: content)
-                    .frame(width: 30, height: 30)
-            )
-            .offset(y: pullDistance * 0.24)
-            .onTapGesture { model.openComposer() }
-            .onLongPressGesture(minimumDuration: 0.5, maximumDistance: 12) {
-                model.requestSuggestion()
-            }
-            .gesture(
-                DragGesture(minimumDistance: 14)
-                    .onChanged { value in
-                        guard model.surface == .button, !model.busGenerating else { return }
-                        let dragY = max(0, value.translation.height)
-                        pullDistance = min(dragY, pullThreshold)
-                        let step = Int(dragY / pullHapticStepDistance)
-                        if step > lastHapticStep && dragY < pullThreshold {
-                            lastHapticStep = step
-                            model.pullHapticStep()
-                        }
-                        if !activationHapticSent && dragY >= pullThreshold {
-                            activationHapticSent = true
-                            model.pullActivationHaptic()
-                        }
-                    }
-                    .onEnded { value in
-                        defer {
-                            pullDistance = 0
-                            lastHapticStep = 0
-                            activationHapticSent = false
-                        }
-                        guard model.surface == .button, !model.busGenerating else { return }
-                        if value.translation.height >= pullThreshold {
-                            model.requestSuggestion()
-                        }
-                    }
-            )
-            .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier("nowNudgeBot")
-            .accessibilityLabel(botAccessibilityLabel)
-            .matchedGeometryEffect(id: "voiceContainer", in: containerNamespace)
-    }
-
-    private var botAccessibilityLabel: String {
-        if model.showNudge {
-            return model.presented?.label ?? ""
-        }
-        if model.isGeneratingNudge {
-            return "Generating suggestion"
-        }
-        return "Now Nudge. Tap to type, long press for a suggestion"
     }
 
     // MARK: Composer
@@ -562,9 +503,26 @@ private struct ComposerSurface: View {
                 .accessibilityLabel("Send question")
             }
 
-            if typedQuestion.isEmpty && !model.composerSuggestions.isEmpty {
+            if typedQuestion.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
+                        // The ambient-nudge summon the retired floating circle's
+                        // long-press used to provide.
+                        Button {
+                            model.requestAmbientSuggestion()
+                        } label: {
+                            Label("Surprise me", systemImage: "sparkles")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule().fill(Color.accentColor.opacity(0.12))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("surpriseMeChip")
                         ForEach(model.composerSuggestions, id: \.self) { suggestion in
                             Button {
                                 typedQuestion = suggestion
@@ -675,6 +633,7 @@ private struct NudgeCardSurface: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: onAction)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("nowNudgeCard")
         .accessibilityLabel(
             [payload?.label, payload?.supportingText, payload?.sourceLabel]
                 .compactMap(\.self)
@@ -757,6 +716,7 @@ extension String {
 struct NativePrayerTabsView: View {
     @State private var selectedTab = 0
     @State private var morePath: [Int] = []
+    @State private var lastSelectedTab = 0
     @StateObject private var bot = NowNudgeBotModel()
 
     var body: some View {
@@ -764,14 +724,19 @@ struct NativePrayerTabsView: View {
             Tab("Home", systemImage: "house", value: 0) {
                 tabContent(0)
             }
-            Tab("For you", systemImage: "shippingbox", value: 1) {
-                tabContent(1)
-            }
             Tab("Saved", systemImage: "bookmark", value: 2) {
                 tabContent(2)
             }
+            Tab("Interests", systemImage: "square.grid.2x2", value: 4) {
+                tabContent(4)
+            }
             Tab("More", systemImage: "ellipsis", value: 5) {
                 MorePrayerTabsView(path: $morePath, onSelectTab: selectContentTab)
+            }
+            Tab(value: 6, role: .search) {
+                Color.clear
+            } label: {
+                Label("Voice", systemImage: bot.isGeneratingNudge ? "sparkles" : "waveform")
             }
         }
         .tabBarMinimizeBehavior(.automatic)
@@ -779,13 +744,29 @@ struct NativePrayerTabsView: View {
         .overlay(alignment: .bottomTrailing) {
             NowNudgeBotLayer(model: bot)
                 .padding(.trailing, 16)
-                .padding(.bottom, 62)
+                .padding(.bottom, 0)
         }
         .onAppear {
             bot.start()
         }
         .onDisappear {
             bot.stop()
+        }
+        .onChange(of: selectedTab) { _, newValue in
+            if newValue == 6 {
+                if bot.showNudge {
+                    bot.performNudgeAction()
+                } else if !bot.isGeneratingNudge {
+                    bot.openComposer()
+                }
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    selectedTab = lastSelectedTab
+                }
+            } else {
+                lastSelectedTab = newValue
+            }
         }
     }
 
@@ -795,9 +776,14 @@ struct NativePrayerTabsView: View {
     }
 
     private func selectContentTab(_ index: Int) {
-        if index < 3 {
-            selectedTab = index
-        } else {
+        switch index {
+        case 0:
+            selectedTab = 0
+        case 2:
+            selectedTab = 2
+        case 4:
+            selectedTab = 4
+        default:
             morePath = [index]
             selectedTab = 5
         }
@@ -972,11 +958,11 @@ private struct MorePrayerTabsView: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
+                NavigationLink(value: 1) {
+                    Label("For you", systemImage: "shippingbox")
+                }
                 NavigationLink(value: 3) {
                     Label("Course", systemImage: "play.rectangle")
-                }
-                NavigationLink(value: 4) {
-                    Label("Interests", systemImage: "square.grid.2x2")
                 }
             }
             .navigationTitle("More")

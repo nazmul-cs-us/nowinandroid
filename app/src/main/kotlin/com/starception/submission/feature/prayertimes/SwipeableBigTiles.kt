@@ -1323,6 +1323,7 @@ internal fun SwipeableBigTiles(
     modelKnowledgeCandidate: NowNudgeKnowledgeCandidate? = null,
     isModelKnowledgeLoading: Boolean = false,
     onModelKnowledgeClick: (NowNudgeKnowledgeCandidate) -> Unit = {},
+    onModelKnowledgeDownloadComplete: () -> Unit = {},
     onExpandedPageChange: ((Int?) -> Unit)? = null,
     collapseExpandedTileRequest: Int = 0,
 ) {
@@ -2185,6 +2186,7 @@ internal fun SwipeableBigTiles(
                                         ContextualRecommendationTarget.ShamayelCollection -> "Shama'il"
                                     },
                                     compactProgress = compactProgress,
+                                    onModelDownloadComplete = onModelKnowledgeDownloadComplete,
                                 )
                             },
                             expandedContentHorizontalBleed = 10.dp,
@@ -4907,8 +4909,14 @@ private fun QiblaBearingExpandedStage(
     val directionSummary = bearing?.let { qiblaCardinalDirection(it) }
         ?.substringBefore(" from your location")
     val qiblaColors = MaterialTheme.colorScheme
-    val qiblaSurface = qiblaColors.surfaceContainerHigh
-    val qiblaForeground = qiblaColors.onSurface
+    val appSurface = qiblaColors.surfaceContainerHigh
+    val useInverseGlass = appSurface.luminance() > 0.5f
+    val qiblaSurface = if (useInverseGlass) qiblaColors.inverseSurface else appSurface
+    val qiblaForeground = if (useInverseGlass) {
+        qiblaColors.inverseOnSurface
+    } else {
+        qiblaColors.onSurface
+    }
     val qiblaAccent = qiblaColors.primary
     val qiblaShadow = qiblaColors.scrim
     val density = LocalDensity.current
@@ -5223,80 +5231,97 @@ private fun QiblaBearingExpandedStage(
                 }
                 val qiblaAngle = Math.toRadians((animatedTurn - 90f).toDouble())
                 val qiblaBase = Offset(
-                    x = radarCenter.x + cos(qiblaAngle).toFloat() * radiusX * 0.72f,
-                    y = radarCenter.y + sin(qiblaAngle).toFloat() * radiusY * 0.72f,
+                    x = radarCenter.x + cos(qiblaAngle).toFloat() * radiusX * 0.64f,
+                    y = radarCenter.y + sin(qiblaAngle).toFloat() * radiusY * 0.64f,
                 )
+                val routeDelta = qiblaBase - radarCenter
+                val perspectiveScale = radiusY / radiusX
+                // Build the needle in compass-plane coordinates, then flatten
+                // its lateral axis by the same perspective used by the radar.
                 val routeNormal = Offset(
                     x = -sin(qiblaAngle).toFloat(),
-                    y = cos(qiblaAngle).toFloat(),
+                    y = cos(qiblaAngle).toFloat() * perspectiveScale,
                 )
-                val routeCorridor = Path().apply {
+                val counterTip = Offset(
+                    x = radarCenter.x - (routeDelta.x * 0.62f),
+                    y = radarCenter.y - (routeDelta.y * 0.62f),
+                )
+                val handShadowOffset = 1.5.dp.toPx() * perspectiveScale
+                val handShadow = Path().apply {
                     moveTo(
-                        radarCenter.x + (routeNormal.x * 3.dp.toPx()),
-                        radarCenter.y + (routeNormal.y * 3.dp.toPx()),
+                        radarCenter.x + (routeNormal.x * 7.dp.toPx()),
+                        radarCenter.y + (routeNormal.y * 7.dp.toPx()) + handShadowOffset,
                     )
+                    lineTo(qiblaBase.x, qiblaBase.y + handShadowOffset)
                     lineTo(
-                        qiblaBase.x + (routeNormal.x * 9.dp.toPx()),
-                        qiblaBase.y + (routeNormal.y * 4.dp.toPx()),
+                        radarCenter.x - (routeNormal.x * 7.dp.toPx()),
+                        radarCenter.y - (routeNormal.y * 7.dp.toPx()) + handShadowOffset,
                     )
+                    lineTo(counterTip.x, counterTip.y + handShadowOffset)
+                    close()
+                }
+                drawPath(
+                    path = handShadow,
+                    color = qiblaShadow.copy(alpha = 0.34f),
+                )
+                val qiblaLeftFacet = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y)
                     lineTo(
-                        qiblaBase.x - (routeNormal.x * 9.dp.toPx()),
-                        qiblaBase.y - (routeNormal.y * 4.dp.toPx()),
+                        radarCenter.x + (routeNormal.x * 5.5.dp.toPx()),
+                        radarCenter.y + (routeNormal.y * 5.5.dp.toPx()),
                     )
+                    lineTo(qiblaBase.x, qiblaBase.y)
+                    close()
+                }
+                drawPath(
+                    path = qiblaLeftFacet,
+                    color = destinationAccent,
+                )
+                val qiblaRightFacet = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y)
+                    lineTo(qiblaBase.x, qiblaBase.y)
                     lineTo(
-                        radarCenter.x - (routeNormal.x * 3.dp.toPx()),
-                        radarCenter.y - (routeNormal.y * 3.dp.toPx()),
+                        radarCenter.x - (routeNormal.x * 5.5.dp.toPx()),
+                        radarCenter.y - (routeNormal.y * 5.5.dp.toPx()),
                     )
                     close()
                 }
                 drawPath(
-                    path = routeCorridor,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            destinationAccent.copy(alpha = 0.16f),
-                        ),
-                        start = radarCenter,
-                        end = qiblaBase,
-                    ),
+                    path = qiblaRightFacet,
+                    color = destinationAccent.copy(alpha = 0.68f),
                 )
-                drawLine(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            qiblaForeground.copy(alpha = 0.36f),
-                            destinationAccent,
-                        ),
-                        start = radarCenter,
-                        end = qiblaBase,
-                    ),
-                    start = radarCenter,
-                    end = qiblaBase,
-                    strokeWidth = 2.dp.toPx(),
-                    cap = StrokeCap.Round,
+                val counterLeftFacet = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y)
+                    lineTo(
+                        radarCenter.x + (routeNormal.x * 5.5.dp.toPx()),
+                        radarCenter.y + (routeNormal.y * 5.5.dp.toPx()),
+                    )
+                    lineTo(counterTip.x, counterTip.y)
+                    close()
+                }
+                drawPath(
+                    path = counterLeftFacet,
+                    color = qiblaForeground.copy(alpha = 0.92f),
+                )
+                val counterRightFacet = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y)
+                    lineTo(counterTip.x, counterTip.y)
+                    lineTo(
+                        radarCenter.x - (routeNormal.x * 5.5.dp.toPx()),
+                        radarCenter.y - (routeNormal.y * 5.5.dp.toPx()),
+                    )
+                    close()
+                }
+                drawPath(
+                    path = counterRightFacet,
+                    color = qiblaForeground.copy(alpha = 0.56f),
                 )
                 drawCircle(
                     color = destinationAccent.copy(alpha = 0.12f + (0.08f * livePulse)),
                     radius = 12.dp.toPx(),
                     center = qiblaBase,
                 )
-                drawCircle(
-                    color = destinationAccent,
-                    radius = 3.dp.toPx(),
-                    center = qiblaBase,
-                )
-                drawCircle(
-                    color = qiblaForeground.copy(alpha = 0.18f),
-                    radius = 7.dp.toPx(),
-                    center = radarCenter,
-                )
-                val userArrow = Path().apply {
-                    moveTo(radarCenter.x, radarCenter.y - 7.dp.toPx())
-                    lineTo(radarCenter.x - 4.5.dp.toPx(), radarCenter.y + 5.dp.toPx())
-                    lineTo(radarCenter.x, radarCenter.y + 2.dp.toPx())
-                    lineTo(radarCenter.x + 4.5.dp.toPx(), radarCenter.y + 5.dp.toPx())
-                    close()
-                }
-                drawPath(path = userArrow, color = qiblaForeground)
+                drawCircle(color = qiblaSurface, radius = 2.2.dp.toPx(), center = radarCenter)
 
                 val headingMarker = Path().apply {
                     moveTo(radarCenter.x, radarTopLeft.y - 7.dp.toPx())
@@ -5337,34 +5362,21 @@ private fun QiblaBearingExpandedStage(
                 )
             }
             if (relativeTurn != null) {
-                Image(
-                    painter = painterResource(R.drawable.ic_kaaba_marker),
-                    contentDescription = "Kaaba direction",
-                    modifier = Modifier
-                        .size(width = 24.dp, height = 32.dp)
-                        .graphicsLayer {
-                            val angle = Math.toRadians((animatedTurn - 90f).toDouble())
-                            translationX = cos(angle).toFloat() * radarRadiusXPx * 0.72f
-                            translationY = radarCenterOffsetYPx +
-                                (sin(angle).toFloat() * radarRadiusYPx * 0.72f) -
-                                with(density) { 7.dp.toPx() }
-                        },
-                )
                 Text(
                     text = "KAABA",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 8.sp,
-                        lineHeight = 9.sp,
+                        fontSize = 9.sp,
+                        lineHeight = 10.sp,
                         letterSpacing = 1.1.sp,
                     ),
                     color = qiblaAccent,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.graphicsLayer {
                         val angle = Math.toRadians((animatedTurn - 90f).toDouble())
-                        translationX = cos(angle).toFloat() * radarRadiusXPx * 0.72f
+                        translationX = cos(angle).toFloat() * radarRadiusXPx * 0.64f
                         translationY = radarCenterOffsetYPx +
-                            (sin(angle).toFloat() * radarRadiusYPx * 0.72f) -
-                            with(density) { 39.dp.toPx() }
+                            (sin(angle).toFloat() * radarRadiusYPx * 0.64f) -
+                            with(density) { 41.dp.toPx() }
                     },
                 )
             }
@@ -5436,6 +5448,7 @@ private fun RecommendationExpandedStage(
     loading: Boolean,
     fallbackLabel: String,
     compactProgress: Float,
+    onModelDownloadComplete: () -> Unit = {},
 ) {
     val compression = compactProgress.coerceIn(0f, 1f)
     val aiScrollState = rememberScrollState()
@@ -5532,6 +5545,17 @@ private fun RecommendationExpandedStage(
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium,
                             )
+                            if (nudge == null) {
+                                // No model-composed card is available; when the Now
+                                // Nudge GGUF itself was never downloaded, offer its
+                                // download instead of leaving only the fallback.
+                                com.starception.submission.download.MissingAiModelCards(
+                                    tasks = setOf(
+                                        com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
+                                    ),
+                                    onDownloadComplete = onModelDownloadComplete,
+                                )
+                            }
                         }
                         if (aiScrollState.canScrollBackward) {
                             Box(

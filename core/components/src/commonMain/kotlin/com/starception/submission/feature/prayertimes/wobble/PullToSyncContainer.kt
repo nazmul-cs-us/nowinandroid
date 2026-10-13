@@ -135,6 +135,16 @@ class SyncContainerState(
     val wobbleIntensity: Float = 0f,
     val heldContentInsetTop: Dp = 0.dp,
     /**
+     * The held banner inset minus the status-bar portion it absorbs. The hold
+     * padding consumes window insets, so while the banner is opening it first
+     * reclaims the space the content's status padding already reserved and
+     * only then displaces content. Flexible sections that shrink to absorb a
+     * persistent banner must subtract THIS value — subtracting
+     * [heldContentInsetTop] over-shrinks them and leaves a dead gap above
+     * the bottom chrome.
+     */
+    val heldContentInsetNetTop: Dp = 0.dp,
+    /**
      * The rigid sheet translation of the in-progress finger drag, beyond the
      * held banner inset. Sheets that want their bottom edge to stay pinned
      * above floating chrome (Home's navigation pill) subtract this from a
@@ -523,6 +533,13 @@ fun PullToSyncContainer(
     val activeStatus = statuses.getOrNull(activeStatusIndex)
 
     val heldContentInsetTop = (refreshingOffset.value * maxRevealDpForBanners).dp
+    // The hold padding consumes window insets, so the content's own status
+    // padding is absorbed while the banner is up. The DISPLACEMENT content
+    // actually experiences is the held inset minus that reclaimed portion —
+    // zero while the banner is still shorter than the status inset, then the
+    // banner's own height beyond it.
+    val heldContentInsetNetTop = (heldContentInsetTop - bannerTopInsetDp)
+        .coerceAtLeast(0.dp)
     // The transient finger-drag portion of the reveal, applied to the sheet as
     // a rigid translation in the placement phase. Exposed so adaptive content
     // can hand this displacement to a flexible section instead of its bottom.
@@ -540,6 +557,7 @@ fun PullToSyncContainer(
         maxDragDistance = maxDragDistance,
         wobbleIntensity = wobbleIntensity,
         heldContentInsetTop = heldContentInsetTop,
+        heldContentInsetNetTop = heldContentInsetNetTop,
         transientContentOffsetY = transientContentOffsetY,
         pullModifier = Modifier.nestedScroll(nestedScrollConnection),
     )

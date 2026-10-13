@@ -21,6 +21,8 @@ import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.settings.ThemeSettingsState
 import com.starception.submission.shared.storage.KeyValueStore
 import com.starception.submission.shared.storage.platformKeyValueStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 class UserAppearanceSettings(private val store: KeyValueStore = platformKeyValueStore()) {
 
@@ -35,15 +37,23 @@ class UserAppearanceSettings(private val store: KeyValueStore = platformKeyValue
     )
 
     fun saveBrand(brand: ThemeBrand) {
-        if (brand != ThemeBrand.CUSTOM) store.putString(KEY_BRAND, brand.name)
+        if (brand != ThemeBrand.CUSTOM) {
+            store.putString(KEY_BRAND, brand.name)
+            appearanceRevision.value += 1
+        }
     }
 
     fun saveDarkTheme(config: DarkThemeConfig) {
         store.putString(KEY_DARK_MODE, config.name)
+        appearanceRevision.value += 1
     }
+
+    val changes: StateFlow<Int>
+        get() = appearanceRevision
 
     private companion object {
         const val KEY_BRAND = "ios_theme_brand"
         const val KEY_DARK_MODE = "ios_dark_theme_config"
+        val appearanceRevision = MutableStateFlow(0)
     }
 }

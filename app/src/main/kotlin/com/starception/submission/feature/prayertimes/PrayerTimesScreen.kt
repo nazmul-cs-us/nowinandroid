@@ -1230,6 +1230,7 @@ fun PrayerTimesScreen(
         mutableStateOf<NowNudgeKnowledgeCandidate?>(null)
     }
     var expandedAiLoading by remember { mutableStateOf(false) }
+    var aiModelDownloadTick by remember { mutableStateOf(0) }
     var botSourceVariation by rememberSaveable(nudgeDay) { mutableIntStateOf(0) }
     val nudgePreferences = remember(screenContext) {
         screenContext.getSharedPreferences("deenly_nudge", Context.MODE_PRIVATE)
@@ -1416,7 +1417,7 @@ fun PrayerTimesScreen(
     val latestExpandedKnowledgeContext by rememberUpdatedState(botKnowledgeRankingContext)
     val latestExpandedAppSituation by rememberUpdatedState(botAppSituation)
     val expandedAiScope = rememberCoroutineScope()
-    LaunchedEffect(expandedInsightPage, nudgeDay) {
+    LaunchedEffect(expandedInsightPage, nudgeDay, aiModelDownloadTick) {
         if (expandedInsightPage != 4) return@LaunchedEffect
         if (expandedAiLoading || expandedAiCandidate != null) return@LaunchedEffect
         expandedAiLoading = true
@@ -3523,9 +3524,16 @@ fun PrayerTimesScreen(
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
                                                  compactForExpandedPrayers = false,
-                                                 modelKnowledgeCandidate = expandedAiCandidate,
-                                                 isModelKnowledgeLoading = expandedAiLoading,
-                                                 onModelKnowledgeClick = openExpandedAiCandidate,
+                                                  modelKnowledgeCandidate = expandedAiCandidate,
+                                                  isModelKnowledgeLoading = expandedAiLoading,
+                                                  onModelKnowledgeClick = openExpandedAiCandidate,
+                                                  onModelKnowledgeDownloadComplete = {
+                                                      // The Now Nudge GGUF finished
+                                                      // downloading; regenerate the
+                                                      // expanded AI suggestion.
+                                                      expandedAiCandidate = null
+                                                      aiModelDownloadTick++
+                                                  },
                                                  onExpandedPageChange = { expandedPage ->
                                                      insightTileExpanded = expandedPage != null
                                                      expandedInsightPage = expandedPage
