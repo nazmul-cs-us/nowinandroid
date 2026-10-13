@@ -425,6 +425,17 @@ private fun createPrayerTimesViewController(
         val showSyncBanner = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--show-sync-banner" }
         }
+        // UI-testing hook: schedule a synthetic adhan-backed prayer
+        // notification that fires N seconds after launch, e.g.
+        // --simulate-adhan=75. The real schedule publisher stays silent for
+        // the whole launch so it cannot clobber the simulated payload.
+        val simulateAdhanSeconds = remember {
+            NSProcessInfo.processInfo.arguments
+                .mapNotNull { it as? String }
+                .firstOrNull { it.startsWith("--simulate-adhan=") }
+                ?.substringAfter('=')
+                ?.toLongOrNull()
+        }
 
         var location by remember { mutableStateOf(locationStore.location()) }
         var resolved by remember { mutableStateOf(false) }
@@ -749,17 +760,29 @@ private fun createPrayerTimesViewController(
             localNow.hour,
             localNow.minute,
         ) {
-            IosPrayerSchedulePublisher.publish(
-                locationName = place.placeName,
-                startDate = today,
-                latitude = place.latitude,
-                longitude = place.longitude,
-                timeZoneOffset = place.timeZoneOffset,
-                countryCode = place.countryCode,
-                defaults = country,
-                settings = prayerSettings,
-                preferences = notificationPrefs,
-            )
+            if (simulateAdhanSeconds == null) {
+                IosPrayerSchedulePublisher.publish(
+                    locationName = place.placeName,
+                    startDate = today,
+                    latitude = place.latitude,
+                    longitude = place.longitude,
+                    timeZoneOffset = place.timeZoneOffset,
+                    countryCode = place.countryCode,
+                    defaults = country,
+                    settings = prayerSettings,
+                    preferences = notificationPrefs,
+                )
+            }
+        }
+
+        // Adhan simulation: wait for the notification coordinator to start,
+        // then publish the synthetic one-prayer schedule it should schedule.
+        LaunchedEffect(simulateAdhanSeconds) {
+            simulateAdhanSeconds?.let { seconds ->
+                kotlinx.coroutines.delay(3000)
+                com.starception.submission.shared.notifications.IosPrayerSchedulePublisher
+                    .publishSimulated(fireInSeconds = seconds)
+            }
         }
 
         val useDarkTheme = when (themeSettings.darkThemeConfig) {

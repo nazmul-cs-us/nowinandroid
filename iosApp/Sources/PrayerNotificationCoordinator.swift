@@ -1,4 +1,5 @@
 import ActivityKit
+import AVFoundation
 import Foundation
 import UserNotifications
 
@@ -38,6 +39,7 @@ private struct PrayerEntry: Decodable {
     let activeMinutes: Int
     let adhanEnabled: Bool?
     let adhanVolume: Int?
+    let localName: String?
 }
 
 private struct DatedPrayer {
@@ -116,6 +118,14 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
     }
 
     private func datedPrayers(from payload: PrayerSchedulePayload) -> [DatedPrayer] {
+        allDatedPrayers(from: payload)
+            .filter { $0.entry.enabled && $0.date > Date() }
+    }
+
+    /// Every dated prayer in the published schedule, unfiltered — the Live
+    /// Activity needs yesterday's/earlier prayers to find the segment start
+    /// for its approach progress bar.
+    private func allDatedPrayers(from payload: PrayerSchedulePayload) -> [DatedPrayer] {
         let timeZone = scheduleTimeZone(for: payload)
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
@@ -135,8 +145,49 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
                 return DatedPrayer(entry: prayer, date: date)
             }
         }
-        .filter { $0.entry.enabled && $0.date > Date() }
         .sorted { $0.date < $1.date }
+    }
+
+    private static let liveActivityTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    /// The Android-parity Live Activity state: prayer name, its Arabic name,
+    /// the wall-clock time, the inter-prayer segment for the approach bar,
+    /// and today's full schedule strip.
+    private func liveActivityState(
+        payload: PrayerSchedulePayload,
+        next: DatedPrayer
+    ) -> PrayerActivityAttributes.ContentState {
+        let timeZone = scheduleTimeZone(for: payload)
+        let formatter = Self.liveActivityTimeFormatter.copy() as! DateFormatter
+        formatter.timeZone = timeZone
+
+        let all = allDatedPrayers(from: payload)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let today = all.filter { calendar.isDate($0.date, inSameDayAs: next.date) }
+        let times = today.map { prayer in
+            PrayerActivityAttributes.PrayerTime(
+                name: prayer.entry.name,
+                arabic: prayer.entry.localName ?? "",
+                time: formatter.string(from: prayer.date),
+                isNext: prayer.date == next.date
+            )
+        }
+        return PrayerActivityAttributes.ContentState(
+            prayerName: next.entry.name,
+            prayerArabicName: next.entry.localName ?? "",
+            prayerTime: formatter.string(from: next.date),
+            prayerDate: next.date,
+            previousPrayerDate: all.last(where: { $0.date < next.date })?.date,
+            activeUntil: next.date.addingTimeInterval(
+                TimeInterval(60 * next.entry.activeMinutes)
+            ),
+            times: times
+        )
     }
 
     private func replaceNotifications(
@@ -207,6 +258,12 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
                 }
                 if let fileName {
                     content.sound = UNNotificationSound(named: UNNotificationSoundName(fileName))
+                    // Foreground presentation reads these to play the adhan
+                    // through AVAudioPlayer: the simulator never plays
+                    // notification sounds, and in-app playback scales the
+                    // volume continuously instead of jumping between the
+                    // five pre-baked files.
+                    content.userInfo = ["adhan": true, "adhanVolume": volume]
                 }
             } else if payload.soundEnabled {
                 content.sound = .default
@@ -272,12 +329,8 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         // whole request (ActivityInput error 0). Filtered-next guarantees
         // next.date > now, so anchoring staleness at the prayer time is safe;
         // the prayer window stays in the content state for the widget.
-        let state = PrayerActivityAttributes.ContentState(
-            prayerName: next.entry.name,
-            prayerDate: next.date,
-            activeUntil: next.date.addingTimeInterval(TimeInterval(60 * next.entry.activeMinutes))
-        )
         guard next.date > Date() else { return }
+        let state = liveActivityState(payload: payload, next: next)
         Task { [weak self] in
             if let activity = Activity<PrayerActivityAttributes>.activities.first {
                 await Self.update(activity, state: state)
@@ -477,8 +530,42 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        // Prayer START with the adhan attached: play the audio in-app rather
+        // than through the notification sound — the simulator never plays
+        // notification sounds, and AVAudioPlayer honors the stored per-prayer
+        // volume continuously instead of picking a pre-scaled file.
+        if notification.request.identifier.hasSuffix(".start"),
+           notification.request.content.userInfo["adhan"] as? Bool == true {
+            let volume = notification.request.content.userInfo["adhanVolume"] as? Int ?? 100
+            playAdhan(volumePercent: volume)
+            // No .sound: the adhan itself IS the sound; adding the default
+            // notification sound would talk over it.
+            return [.banner, .list]
+        }
+        return [.banner, .list, .sound]
     }
+
+    /// Foreground adhan playback on the bundled full-scale audio, scaled by
+    /// the per-prayer percent. Ambient session semantics keep the hardware
+    /// mute switch in charge, matching notification-sound behavior.
+    private func playAdhan(volumePercent: Int) {
+        guard volumePercent > 0,
+              let url = Bundle.main.url(
+                forResource: "short_adhan",
+                withExtension: "caf"
+              ) else { return }
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.volume = Float(min(max(volumePercent, 0), 100)) / 100
+            player.prepareToPlay()
+            player.play()
+            adhanPlayer = player
+        } catch {
+            NSLog("Adhan playback failed: %@", error.localizedDescription)
+        }
+    }
+
+    private var adhanPlayer: AVAudioPlayer?
 
     private static let identifierDateFormatter: DateFormatter = {
         let formatter = DateFormatter()

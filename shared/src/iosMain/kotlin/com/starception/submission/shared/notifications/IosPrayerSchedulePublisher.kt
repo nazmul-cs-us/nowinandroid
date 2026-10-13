@@ -22,12 +22,15 @@ import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.shared.PrayerSchedule
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import platform.Foundation.NSUserDefaults
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
 private const val PAYLOAD_KEY = "ios_prayer_schedule_payload"
 private const val APP_GROUP = "group.com.starception.submission"
@@ -78,6 +81,7 @@ internal object IosPrayerSchedulePublisher {
                             activeMinutes = preferences.getGoToMosqueDurationForPrayer(slot.name),
                             adhanEnabled = preferences.isAdhanEnabledForPrayer(slot.name),
                             adhanVolume = preferences.getAdhanVolumeForPrayer(slot.name),
+                            localName = slot.localName,
                         )
                     },
             )
@@ -95,6 +99,62 @@ internal object IosPrayerSchedulePublisher {
         NSUserDefaults.standardUserDefaults.setObject(encoded, forKey = PAYLOAD_KEY)
         // The home-screen widget reads the same payload through the app
         // group container (extensions cannot see the app's own defaults).
+        NSUserDefaults(suiteName = APP_GROUP)?.let { groupDefaults ->
+            groupDefaults.setObject(encoded, forKey = PAYLOAD_KEY)
+        }
+    }
+
+    /**
+     * UI-testing hook: publishes a one-prayer schedule whose start
+     * notification fires [fireInSeconds] from now with the bundled adhan
+     * sound attached, proving end-to-end delivery (including with the app
+     * terminated — local UNCalendarNotificationTrigger requests live in the
+     * system's notification center, not the process).
+     */
+    fun publishSimulated(fireInSeconds: Long, adhanVolume: Int = 100) {
+        val zone = TimeZone.currentSystemDefault()
+        val now = Clock.System.now()
+        var fireAt = now + fireInSeconds.seconds
+        // UNCalendarNotificationTrigger matches whole minutes; a fire time in
+        // the same minute as "now" is already past and never triggers.
+        val hourMinuteNow = now.toLocalDateTime(zone).let { it.hour to it.minute }
+        if (fireAt.toLocalDateTime(zone).let { it.hour to it.minute } == hourMinuteNow) {
+            fireAt += 60.seconds
+        }
+        val localFire = fireAt.toLocalDateTime(zone)
+        val localNow = now.toLocalDateTime(zone)
+        // Offset hours from the difference between local wall time and UTC.
+        val utcFire = fireAt.toLocalDateTime(kotlinx.datetime.TimeZone.UTC)
+        val offsetSeconds = (
+            (localFire.hour - utcFire.hour) * 3600 +
+                (localFire.minute - utcFire.minute) * 60
+            )
+        val payload = IosPrayerPayload(
+            generatedAtEpochMilliseconds = now.toEpochMilliseconds(),
+            locationName = "Adhan test",
+            timeZoneOffset = offsetSeconds / 3600.0,
+            notificationsEnabled = true,
+            soundEnabled = true,
+            days = listOf(
+                IosPrayerDay(
+                    date = localFire.date.toString(),
+                    prayers = listOf(
+                        IosPrayerEntry(
+                            name = "Asr",
+                            hour = localFire.hour,
+                            minute = localFire.minute,
+                            enabled = true,
+                            priorMinutes = 0,
+                            activeMinutes = 15,
+                            adhanEnabled = true,
+                            adhanVolume = adhanVolume,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val encoded = json.encodeToString(payload)
+        NSUserDefaults.standardUserDefaults.setObject(encoded, forKey = PAYLOAD_KEY)
         NSUserDefaults(suiteName = APP_GROUP)?.let { groupDefaults ->
             groupDefaults.setObject(encoded, forKey = PAYLOAD_KEY)
         }
@@ -130,4 +190,6 @@ private data class IosPrayerEntry(
     // adhan audio instead of the default sound.
     val adhanEnabled: Boolean = false,
     val adhanVolume: Int = 5,
+    // Local-language (Arabic by default) prayer name for the Live Activity.
+    val localName: String = "",
 )
