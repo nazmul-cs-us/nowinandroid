@@ -21,10 +21,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
+import androidx.navigation.NavDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -243,6 +254,52 @@ fun SharedNavHost(
                     else -> PrayerTimesRoute
                 },
             modifier = Modifier,
+            // iOS navigation choreography: bottom-tab switches crossfade
+            // quickly, while every detail screen performs a
+            // UINavigationController-style horizontal push — the incoming
+            // page slides in from the trailing edge on a no-bounce spring
+            // (interruptible mid-flight), the outgoing page recedes a third
+            // of the width with a gentle fade. Pop reverses the move.
+            enterTransition = {
+                if (isTabSwitch(targetState)) {
+                    fadeIn(tween(220))
+                } else {
+                    slideInHorizontally(
+                        animationSpec = iosPushSpring(),
+                        initialOffsetX = { it },
+                    ) + fadeIn(tween(200))
+                }
+            },
+            exitTransition = {
+                if (isTabSwitch(initialState)) {
+                    fadeOut(tween(160))
+                } else {
+                    slideOutHorizontally(
+                        animationSpec = iosPushSpring(),
+                        targetOffsetX = { -it / 3 },
+                    ) + fadeOut(tween(320))
+                }
+            },
+            popEnterTransition = {
+                if (isTabSwitch(targetState)) {
+                    fadeIn(tween(220))
+                } else {
+                    slideInHorizontally(
+                        animationSpec = iosPushSpring(),
+                        initialOffsetX = { -it / 3 },
+                    ) + fadeIn(tween(200))
+                }
+            },
+            popExitTransition = {
+                if (isTabSwitch(targetState)) {
+                    fadeOut(tween(160))
+                } else {
+                    slideOutHorizontally(
+                        animationSpec = iosPushSpring(),
+                        targetOffsetX = { it },
+                    ) + fadeOut(tween(320))
+                }
+            },
         ) {
             composable<PrayerTimesRoute> {
                 CompositionLocalProvider(LocalQuranAudioPlayer provides quranPlayer) {
@@ -267,13 +324,31 @@ fun SharedNavHost(
                 }
             }
             composable<PrayerSettingsRoute> {
-                // popBackStack rather than navigate(home): navigating would push a
-                // second copy of the home screen and leave settings on the stack,
-                // so the system back gesture would return to it.
-                settings(
-                    { navController.popBackStack() },
-                    { navController.navigate(SalahTrainingRoute) },
-                )
+                // Settings hosts the Content & Storage downloads, so the
+                // app-level sync strip carries the download banner here too —
+                // the same ContentDownloadBus feed the home strip shows.
+                // Download-only mode: the pull gesture stays disabled so the
+                // settings scrollables are untouched.
+                val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus
+                    .state.collectAsState()
+                com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer(
+                    isRefreshing = globalRefreshing,
+                    onRefresh = { },
+                    syncResultText = globalSyncResultText,
+                    prayerAlertState = tabPrayerAlert
+                        ?: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
+                    downloadProgress = downloadStatus?.progress ?: 0f,
+                    downloadLabel = downloadStatus?.label.orEmpty(),
+                    enabled = false,
+                ) {
+                    // popBackStack rather than navigate(home): navigating would push a
+                    // second copy of the home screen and leave settings on the stack,
+                    // so the system back gesture would return to it.
+                    settings(
+                        { navController.popBackStack() },
+                        { navController.navigate(SalahTrainingRoute) },
+                    )
+                }
             }
             composable<ForYouRoute> {
                 ForYouScreen(
@@ -368,6 +443,7 @@ fun SharedNavHost(
                 FortressChapterScreen(
                     chapterId = route.id,
                     player = quranPlayer,
+                    store = contentStore,
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -549,3 +625,30 @@ fun SharedNavHost(
 
 private val SURAH_NEWS_ID_RANGE = 2001..2114
 private const val SURAH_NEWS_ID_OFFSET = 2000
+
+/**
+ * The bottom-bar destinations: switching between them is a quick tab
+ * crossfade, not a navigation push, matching UIKit tab semantics. Object
+ * routes resolve to their qualified class name as the route pattern.
+ */
+private val tabRouteNames = setOf(
+    PrayerTimesRoute::class.qualifiedName,
+    ForYouRoute::class.qualifiedName,
+    SavedRoute::class.qualifiedName,
+    CourseRoute::class.qualifiedName,
+    InterestsRoute::class.qualifiedName,
+)
+
+private fun isTabSwitch(state: NavBackStackEntry): Boolean =
+    state.destination.route in tabRouteNames
+
+/**
+ * The iOS push spring: critically damped with a ~450ms settle, so pushes
+ * feel decisive without bouncing, and an interrupted transition hands its
+ * velocity over mid-flight instead of restarting.
+ */
+private fun iosPushSpring(): androidx.compose.animation.core.FiniteAnimationSpec<androidx.compose.ui.unit.IntOffset> =
+    spring(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = 550f,
+    )

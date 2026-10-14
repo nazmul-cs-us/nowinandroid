@@ -46,7 +46,9 @@ class UserAudioSettings(private val store: KeyValueStore = platformKeyValueStore
 
     fun recognitionMode(): VoiceRecognitionMode = store.getString(KEY_RECOGNITION_MODE)
         ?.let { value -> VoiceRecognitionMode.entries.firstOrNull { it.name == value } }
-        ?: VoiceRecognitionMode.KEYWORDS
+        // Full-voice transcription is the default: the recognizer captures
+        // whole spoken phrases instead of only yes/no keywords.
+        ?: VoiceRecognitionMode.TRANSCRIPTION
 
     fun saveRecognitionMode(mode: VoiceRecognitionMode) {
         store.putString(KEY_RECOGNITION_MODE, mode.name)

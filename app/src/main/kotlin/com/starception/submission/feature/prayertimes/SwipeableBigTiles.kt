@@ -3958,7 +3958,7 @@ private fun QuranReadingExpandedStage(
     val arabicFontFamily = remember(context) {
         val selectedFont = context
             .getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
-            .getString("arabic_font", "pdms_saleem")
+            .getString("arabic_font", "indopak_script")
             ?: "pdms_saleem"
         when (selectedFont) {
             "noor_e_hidayat" -> QuranFonts.NoorEHidayat
@@ -4412,7 +4412,7 @@ private fun EditorialQuranReadingStage(
     val arabicFontFamily = remember(context) {
         when (
             context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
-                .getString("arabic_font", "pdms_saleem")
+                .getString("arabic_font", "indopak_script")
         ) {
             "noor_e_hidayat" -> QuranFonts.NoorEHidayat
             "thabit" -> QuranFonts.Thabit
@@ -7986,7 +7986,7 @@ private fun DailyStatsTile(
             // Get selected Arabic font from SharedPreferences
             val context = androidx.compose.ui.platform.LocalContext.current
             val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
-            val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+            val selectedFont = prefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
             val arabicFontFamily = when (selectedFont) {
                 "pdms_saleem" -> QuranFonts.PDMSSaleem
                 "noor_e_hidayat" -> QuranFonts.NoorEHidayat
@@ -8289,7 +8289,7 @@ private fun DailyStatsTile(
             // Get selected Arabic font from SharedPreferences for player view
             val context = androidx.compose.ui.platform.LocalContext.current
             val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
-            val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+            val selectedFont = prefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
             val arabicFontFamily = when (selectedFont) {
                 "pdms_saleem" -> QuranFonts.PDMSSaleem
                 "noor_e_hidayat" -> QuranFonts.NoorEHidayat

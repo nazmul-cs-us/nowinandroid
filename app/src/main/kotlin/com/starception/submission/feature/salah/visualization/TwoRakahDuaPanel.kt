@@ -110,7 +110,7 @@ fun TwoRakahDuaPanel(
     val context = LocalContext.current
     val selectedFont = remember(context) {
         context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
-            .getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+            .getString("arabic_font", "indopak_script") ?: "indopak_script"
     }
     val arabicFont = remember(selectedFont) { getArabicFontFamilyForDua(selectedFont) }
     val density = LocalDensity.current

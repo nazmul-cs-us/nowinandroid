@@ -18,7 +18,10 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -490,6 +493,7 @@ fun PrayerTimesScreen(
                             searchTerm = day.nextPrayer ?: day.currentPrayer,
                             onVoiceTap = { searchController?.openVoice() },
                             onShowProfile = { showProfileSheet = true },
+                            searchController = searchController,
                         )
                         if (showProfileSheet) {
                             HomeProfileSheet(
@@ -894,7 +898,41 @@ private fun PrayerHomeHeader(
     searchTerm: String?,
     onVoiceTap: (() -> Unit)? = null,
     onShowProfile: () -> Unit = {},
+    searchController: SharedSearchController? = null,
 ) {
+    // In-place voice capture: the mic keeps the user on this page — the pill
+    // hosts the listening wave, and the search page only opens when a final
+    // transcript arrives.
+    val inPlaceListening = searchController != null &&
+        searchController.voiceActive && !searchController.active
+    val pillListenProgress by animateFloatAsState(
+        targetValue = if (inPlaceListening) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.7f,
+            stiffness = Spring.StiffnessLow,
+        ),
+        label = "homeListenProgress",
+    )
+    val pillChromeAlpha = 1f - pillListenProgress
+    val pillMicTint = if (inPlaceListening) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        androidx.compose.ui.graphics.Color.Unspecified
+    }
+    val pillMicTap: () -> Unit = {
+        if (inPlaceListening) {
+            searchController?.stopVoice()
+        } else {
+            onVoiceTap?.invoke()
+        }
+    }
+    val pillSurfaceTap: () -> Unit = {
+        if (inPlaceListening) {
+            searchController?.stopVoice()
+        } else {
+            onOpenSearch()
+        }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -926,12 +964,13 @@ private fun PrayerHomeHeader(
         io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget(
             material = {
                 Surface(
-                    onClick = onOpenSearch,
+                    onClick = pillSurfaceTap,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ) {
+                    Box(propagateMinConstraints = true) {
                     Row(
                         modifier = Modifier.padding(start = 16.dp, end = if (onVoiceTap != null) 6.dp else 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -940,30 +979,46 @@ private fun PrayerHomeHeader(
                         Icon(
                             imageVector = NiaIcons.Search,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer { alpha = pillChromeAlpha },
                         )
                         Text(
                             text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .graphicsLayer { alpha = pillChromeAlpha },
                         )
                         if (onVoiceTap != null) {
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .clickable(onClick = onVoiceTap),
+                                    .clickable(onClick = pillMicTap),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Mic,
-                                    contentDescription = "Voice search",
+                                    contentDescription = if (inPlaceListening) {
+                                        "Stop voice search"
+                                    } else {
+                                        "Voice search"
+                                    },
+                                    tint = pillMicTint,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
+                    }
+                    // Android's VoiceWaveOverlay: while the capture runs in
+                    // place the chrome fades and the hill range rises here.
+                    VoiceWave(
+                        appearProgress = pillListenProgress,
+                        modifier = Modifier.matchParentSize(),
+                    )
                     }
                 }
             },
@@ -972,12 +1027,13 @@ private fun PrayerHomeHeader(
                 // Cupertino search control can retain a light UIKit backing
                 // view when the app forces dark mode.
                 Surface(
-                    onClick = onOpenSearch,
+                    onClick = pillSurfaceTap,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ) {
+                    Box(propagateMinConstraints = true) {
                     Row(
                         modifier = Modifier.padding(
                             start = 16.dp,
@@ -989,30 +1045,44 @@ private fun PrayerHomeHeader(
                         Icon(
                             imageVector = NiaIcons.Search,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer { alpha = pillChromeAlpha },
                         )
                         Text(
                             text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .graphicsLayer { alpha = pillChromeAlpha },
                         )
                         if (onVoiceTap != null) {
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .clickable(onClick = onVoiceTap),
+                                    .clickable(onClick = pillMicTap),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Mic,
-                                    contentDescription = "Voice search",
+                                    contentDescription = if (inPlaceListening) {
+                                        "Stop voice search"
+                                    } else {
+                                        "Voice search"
+                                    },
+                                    tint = pillMicTint,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
+                    }
+                    VoiceWave(
+                        appearProgress = pillListenProgress,
+                        modifier = Modifier.matchParentSize(),
+                    )
                     }
                 }
             },
@@ -1437,26 +1507,49 @@ private fun PrayerScheduleSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Surface(
-                onClick = {
-                    revealedCard = null
-                    onToggleTuning()
-                },
-                shape = CircleShape,
-                color = if (isTuning) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.primaryContainer
-                },
-                contentColor = if (isTuning) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                },
-                modifier = Modifier
-                    .widthIn(min = if (compact) 126.dp else 148.dp)
-                    .heightIn(min = if (compact) 40.dp else 44.dp),
-            ) {
+                // The button shrinks with the morph: "Done" is a short
+                // confirmation, so it collapses to a compact pill instead
+                // of wearing the wide "Tune schedule" footprint. A spring
+                // hands velocity over if the user toggles mid-flight, in
+                // step with the icon morph above.
+                // The button shrinks horizontally with the morph: "Done" is
+                // a short confirmation, so it collapses to a compact pill.
+                // The height stays identical in both states — a pill that
+                // also lost its height reads as a different control. The
+                // spring hands velocity over if the user toggles mid-flight.
+                val tuneButtonMinWidth by animateDpAsState(
+                    targetValue = when {
+                        isTuning -> 88.dp
+                        compact -> 126.dp
+                        else -> 148.dp
+                    },
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = 550f,
+                    ),
+                    label = "tuneButtonWidth",
+                )
+                val tuneButtonMinHeight = if (compact) 40.dp else 44.dp
+                Surface(
+                    onClick = {
+                        revealedCard = null
+                        onToggleTuning()
+                    },
+                    shape = CircleShape,
+                    color = if (isTuning) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    },
+                    contentColor = if (isTuning) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    },
+                    modifier = Modifier
+                        .widthIn(min = tuneButtonMinWidth)
+                        .heightIn(min = tuneButtonMinHeight),
+                ) {
                 Row(
                     modifier = Modifier.padding(horizontal = if (compact) 5.dp else 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 7.dp),
@@ -1504,11 +1597,33 @@ private fun PrayerScheduleSection(
                             )
                         }
                     }
-                    Text(
-                        text = if (isTuning) "Done" else "Tune schedule",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    // The label crossfades with the same fade+scale language
+                    // as the icon instead of hard-swapping mid-shrink.
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = isTuning,
+                        transitionSpec = {
+                            (
+                                fadeIn(tween(180)) +
+                                    scaleIn(
+                                        initialScale = 0.86f,
+                                        animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                    )
+                                ) togetherWith (
+                                fadeOut(tween(140)) +
+                                    scaleOut(
+                                        targetScale = 0.9f,
+                                        animationSpec = tween(170),
+                                    )
+                                )
+                        },
+                        label = "tuneScheduleLabelMorph",
+                    ) { tuning ->
+                        Text(
+                            text = if (tuning) "Done" else "Tune schedule",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
         }

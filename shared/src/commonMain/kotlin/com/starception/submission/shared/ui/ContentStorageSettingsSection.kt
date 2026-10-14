@@ -84,7 +84,8 @@ data class ContentStorageState(
 data class ContentStorageActions(
     val onRefresh: () -> Unit = {},
     val onDownloadCategory: (String) -> Unit = {},
-    val onCancelDownload: () -> Unit = {},
+    /** Cancels the named category's download; others keep running. */
+    val onCancelDownload: (String) -> Unit = {},
     val onDeleteCategory: (String) -> Unit = {},
 )
 
@@ -171,7 +172,10 @@ fun ContentStorageSettingsSection(
                     groupName = groupName,
                     categories = categories,
                     isExpanded = expandedGroups[groupName] ?: false,
-                    actionsEnabled = !state.isDownloading && !state.isLoading,
+                    // Downloads run concurrently per category: rows stay
+                    // actionable while others download. A row that is itself
+                    // downloading shows its own progress and Cancel instead.
+                    actionsEnabled = !state.isLoading,
                     onToggleExpanded = {
                         expandedGroups[groupName] = !(expandedGroups[groupName] ?: false)
                     },
@@ -192,7 +196,7 @@ private fun StorageGroupCard(
     actionsEnabled: Boolean,
     onToggleExpanded: () -> Unit,
     onDownloadCategory: (String) -> Unit,
-    onCancelDownload: () -> Unit,
+    onCancelDownload: (String) -> Unit,
     onDeleteCategory: (String) -> Unit,
 ) {
     val totalSize = categories.sumOf { it.totalSize }
@@ -286,7 +290,7 @@ private fun StorageGroupCard(
                             state = category,
                             actionsEnabled = actionsEnabled,
                             onDownload = { onDownloadCategory(category.categoryKey) },
-                            onCancel = onCancelDownload,
+                            onCancel = { onCancelDownload(category.categoryKey) },
                             onDelete = { onDeleteCategory(category.categoryKey) },
                         )
                     }

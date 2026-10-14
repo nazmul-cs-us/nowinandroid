@@ -51,6 +51,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.starception.submission.shared.quran.QuranArabicFonts
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.shared.content.SharedNewsResource
 import com.starception.submission.shared.content.SharedTopic
@@ -69,6 +71,14 @@ internal fun SharedNewsResourceCard(
     currentTopicId: Int? = null,
     compact: Boolean = false,
 ) {
+    // The Arabic preview line renders in the selected Quran typeface —
+    // the same reading preference the dedicated reader screens use.
+    // QuranArabicFonts.fontFamily is composable (it resolves font
+    // resources), so only the preference key is remembered here.
+    val arabicFont = androidx.compose.runtime.remember {
+        com.starception.submission.shared.content.SharedContentStore().quranArabicFont()
+    }
+    val arabicFontFamily = QuranArabicFonts.fontFamily(arabicFont)
     AdaptiveCard(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
@@ -134,11 +144,11 @@ internal fun SharedNewsResourceCard(
                         arabic,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.End,
-                        style = if (compact) {
+                        style = (if (compact) {
                             MaterialTheme.typography.headlineSmall
                         } else {
                             MaterialTheme.typography.headlineLarge
-                        },
+                        }).copy(fontFamily = arabicFontFamily),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -194,7 +204,12 @@ internal fun SharedNewsResourceCard(
 }
 
 @Composable
-internal fun SharedNewsDetailContent(news: SharedNewsResource) {
+internal fun SharedNewsDetailContent(
+    news: SharedNewsResource,
+    arabicFont: String = "",
+    arabicFontSize: Float = 24f,
+    textAlignment: String = "end",
+) {
     Text(news.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(8.dp))
     Text(
@@ -219,14 +234,41 @@ internal fun SharedNewsDetailContent(news: SharedNewsResource) {
                     )
                     Spacer(Modifier.height(8.dp))
                 }
+                val isArabic = title.equals("Arabic", ignoreCase = true)
                 Text(
                     body,
-                    style = if (title.equals("Arabic", ignoreCase = true)) {
+                    style = if (isArabic) {
                         MaterialTheme.typography.headlineSmall
                     } else {
                         MaterialTheme.typography.bodyLarge
                     },
-                    textAlign = if (title.equals("Arabic", ignoreCase = true)) TextAlign.End else TextAlign.Start,
+                    // The Arabic section of a hadith/dua/surah item renders in
+                    // the selected Quran typeface — the same reading settings
+                    // the dedicated reader screens use.
+                    fontFamily = if (isArabic && arabicFont.isNotBlank()) {
+                        QuranArabicFonts.fontFamily(arabicFont)
+                    } else {
+                        null
+                    },
+                    fontSize = if (isArabic && arabicFont.isNotBlank()) {
+                        arabicFontSize.sp
+                    } else {
+                        androidx.compose.ui.unit.TextUnit.Unspecified
+                    },
+                    lineHeight = if (isArabic && arabicFont.isNotBlank()) {
+                        (arabicFontSize * 1.65f).sp
+                    } else {
+                        androidx.compose.ui.unit.TextUnit.Unspecified
+                    },
+                    textAlign = if (isArabic) {
+                        when (textAlignment.lowercase()) {
+                            "center" -> TextAlign.Center
+                            "justify" -> TextAlign.Start
+                            else -> TextAlign.End
+                        }
+                    } else {
+                        TextAlign.Start
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

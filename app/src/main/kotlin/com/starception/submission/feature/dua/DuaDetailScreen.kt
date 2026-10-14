@@ -288,7 +288,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
     private val prefs: SharedPreferences = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
 
     private val _selectedArabicFont = MutableStateFlow(
-        prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem",
+        prefs.getString("arabic_font", "indopak_script") ?: "indopak_script",
     )
     val selectedArabicFont: StateFlow<String> = _selectedArabicFont.asStateFlow()
 
@@ -318,7 +318,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
             prefs.registerOnSharedPreferenceChangeListener { _, key ->
                 when (key) {
                     "arabic_font" -> {
-                        _selectedArabicFont.value = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+                        _selectedArabicFont.value = prefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
                     }
                     "quran_translation" -> {
                         val newTranslation = prefs.getString("quran_translation", "en") ?: "en"

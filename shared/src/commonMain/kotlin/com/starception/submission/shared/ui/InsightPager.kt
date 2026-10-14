@@ -18,9 +18,11 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -39,6 +41,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
@@ -92,7 +96,9 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -1043,25 +1049,49 @@ private fun ExpandedReadingPreview(
         }
     }
 
-    Box(
+    // The bismillah breathes with a slow glow instead of a hard shimmer, so
+    // the stage stays calm under the card's own ambient motion (Android's
+    // QuranReadingExpandedStage).
+    val bismillahGlow by androidx.compose.animation.core.rememberInfiniteTransition(
+        label = "quranStageGlow",
+    ).animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = tween(durationMillis = 2_600, easing = FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "quranStageGlowPhase",
+    )
+
+    // Android's reading stage is a plain centered column over the artwork —
+    // no glass card — with the bismillah above the opening ayahs.
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(7.dp),
         modifier = modifier
             .fillMaxWidth()
-            .fillMaxSize()
-            .clip(RoundedCornerShape(22.dp))
-            .background(Color.Black.copy(alpha = 0.38f))
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.14f),
-                shape = RoundedCornerShape(22.dp),
-            )
-            .padding(horizontal = 14.dp, vertical = 11.dp),
+            .fillMaxSize(),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Row(
+        if (surahNumber != 1 && surahNumber != 9) {
+            Text(
+                text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    letterSpacing = 0.sp,
+                ),
+                color = Color.White.copy(alpha = 0.78f + (0.22f * bismillahGlow)),
+                textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
                 Text(
                     text = "SURAH $surahNumber · ${surahName.uppercase()}",
                     style = MaterialTheme.typography.labelSmall.copy(
@@ -1164,7 +1194,6 @@ private fun ExpandedReadingPreview(
             }
         }
     }
-}
 
 /**
  * Android's PrayerTimelineExpandedStage, lean: the day's five prayers with
@@ -1256,8 +1285,11 @@ private fun formatTileClock(hour: Int, minute: Int): String {
 }
 
 /**
- * Android's SalahHadithExpandedStage, lean: the staged fallback narration for
- * the next unprayed prayer with its source reference.
+ * Android's SalahHadithExpandedStage: the staged fallback narration for the
+ * next unprayed prayer — a full-bleed gradient overlay (not a floating
+ * glass card), a giant quote glyph, the body at Android's 17.5sp reading
+ * size vertically centered in a scrollable area with the same editorial
+ * auto-scroll (3s reading pause, ~35ms per pixel, cancelled by touch).
  */
 @Composable
 private fun ExpandedSalahHadith(
@@ -1275,26 +1307,70 @@ private fun ExpandedSalahHadith(
             "Prayer in congregation is twenty-seven times superior to prayer " +
                 "offered alone." to "Sahih al-Bukhari · 645"
     }
-    Column(
+    // Kept outside AnimatedContent so touch scrolling never recreates the
+    // scrollable subtree, matching Android's structure.
+    val hadithScrollState = androidx.compose.foundation.rememberScrollState()
+    var hadithUserInteracted by remember(text, source) { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(text, source, hadithUserInteracted) {
+        if (hadithUserInteracted) return@LaunchedEffect
+        hadithScrollState.scrollTo(0)
+        repeat(20) {
+            if (hadithScrollState.maxValue > 0) return@repeat
+            kotlinx.coroutines.delay(100L)
+        }
+        if (hadithScrollState.maxValue <= 0) return@LaunchedEffect
+        kotlinx.coroutines.delay(3_000L)
+        // The user has already taken control during the reading pause.
+        if (hadithScrollState.value != 0 || hadithScrollState.isScrollInProgress) {
+            return@LaunchedEffect
+        }
+        // Editorial reading pace: roughly 35 ms per pixel, bounded so short
+        // overflow never rushes and very long narrations still complete.
+        val durationMillis = (hadithScrollState.maxValue * 35)
+            .coerceIn(8_000, 30_000)
+        hadithScrollState.animateScrollTo(
+            value = hadithScrollState.maxValue,
+            animationSpec = tween(durationMillis, easing = LinearEasing),
+        )
+    }
+
+    Box(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .clip(RoundedCornerShape(22.dp))
-            .background(Color.Black.copy(alpha = 0.36f))
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.14f),
+            .background(
+                brush = Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.20f to Color.Black.copy(alpha = 0.12f),
+                    0.82f to Color.Black.copy(alpha = 0.44f),
+                    1f to Color.Black.copy(alpha = 0.14f),
+                ),
                 shape = RoundedCornerShape(22.dp),
-            )
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            ),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "\u201C",
-                style = MaterialTheme.typography.titleLarge,
-                color = ReadingPreviewGold.copy(alpha = 0.55f),
-                modifier = Modifier.padding(end = 6.dp),
-            )
+        Text(
+            text = "\u201C",
+            style = MaterialTheme.typography.displaySmall.copy(
+                fontSize = 44.sp,
+                lineHeight = 44.sp,
+            ),
+            color = ReadingPreviewGold.copy(alpha = 0.28f),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 4.dp, top = 14.dp),
+        )
+        // Deliberately static subtree: only the text and scroll offset change.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    start = 12.dp,
+                    end = 0.dp,
+                    top = 8.dp,
+                    bottom = 7.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
             Text(
                 text = "HADITH FOR ${displayName.uppercase()}",
                 style = MaterialTheme.typography.labelSmall.copy(
@@ -1302,31 +1378,59 @@ private fun ExpandedSalahHadith(
                     lineHeight = 12.sp,
                     letterSpacing = 1.2.sp,
                 ),
-                color = ReadingPreviewGold,
+                color = ReadingPreviewGold.copy(alpha = 0.94f),
                 fontWeight = FontWeight.Bold,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Observe the first touch at the Initial pass without
+                        // consuming it: verticalScroll receives the gesture,
+                        // while auto-scroll is cancelled immediately.
+                        .pointerInput(text, source) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(
+                                        androidx.compose.ui.input.pointer.PointerEventPass.Initial,
+                                    )
+                                    if (event.changes.any { it.pressed && !it.previousPressed }) {
+                                        hadithUserInteracted = true
+                                    }
+                                }
+                            }
+                        }
+                        .verticalScroll(state = hadithScrollState),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 17.5.sp,
+                            lineHeight = 25.sp,
+                            letterSpacing = (-0.1).sp,
+                        ),
+                        color = Color.White.copy(alpha = 0.98f),
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+            Text(
+                text = source,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.5.sp,
+                    lineHeight = 12.sp,
+                    letterSpacing = 0.sp,
+                ),
+                color = Color.White.copy(alpha = 0.56f),
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-            ),
-            color = Color.White.copy(alpha = 0.92f),
-            maxLines = 5,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = source,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 10.sp,
-                lineHeight = 12.sp,
-            ),
-            color = Color.White.copy(alpha = 0.55f),
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-        )
     }
 }
 
@@ -1909,6 +2013,27 @@ private fun ArtworkTile(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                // Android's expandedContentHorizontalBleed: the
+                                // detail stage spans 10dp past the metadata's
+                                // inset on each side, so the reading text
+                                // measures wider than the title block below.
+                                // Compose padding must be non-negative, so the
+                                // bleed measures the child 20dp wider and
+                                // places it shifted — reporting the normal
+                                // width keeps the Column's layout intact.
+                                .layout { measurable, constraints ->
+                                    val bleed = 10.dp.roundToPx()
+                                    val placeable = measurable.measure(
+                                        constraints.copy(
+                                            minWidth = 0,
+                                            maxWidth = (constraints.maxWidth + bleed * 2)
+                                                .coerceAtLeast(constraints.minWidth),
+                                        ),
+                                    )
+                                    layout(constraints.maxWidth, placeable.height) {
+                                        placeable.placeRelative(-bleed, 0)
+                                    }
+                                }
                                 .weight(1f)
                                 .graphicsLayer {
                                     alpha = expandedContentEntrance
@@ -1926,6 +2051,9 @@ private fun ArtworkTile(
                                         blendMode = BlendMode.DstIn,
                                     )
                                 },
+                            // Android centers the expanded stage inside its
+                            // weighted zone instead of pinning it to the top.
+                            contentAlignment = Alignment.Center,
                         ) {
                             expandedContent()
                         }

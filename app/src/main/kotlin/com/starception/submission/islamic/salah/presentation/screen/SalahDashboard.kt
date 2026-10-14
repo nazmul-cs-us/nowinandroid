@@ -469,7 +469,7 @@ private fun LocationCard(location: com.starception.submission.prayer.model.Locat
     val context = androidx.compose.ui.platform.LocalContext.current
     val arabicFontFamily = if (containsArabic) {
         val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
-        val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+        val selectedFont = prefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
         getArabicFontFamilyForLocationCard(selectedFont)
     } else {
         null

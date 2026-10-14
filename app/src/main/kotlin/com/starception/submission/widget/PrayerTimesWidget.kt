@@ -1349,7 +1349,7 @@ internal fun arabicFontResourceFor(context: Context): Int = when (selectedArabic
 
 private fun selectedArabicFont(context: Context): String? = context
     .getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
-    .getString("arabic_font", "pdms_saleem")
+    .getString("arabic_font", "indopak_script")
 
 /**
  * The same context with night mode forced one way, for resolving a colour in both.

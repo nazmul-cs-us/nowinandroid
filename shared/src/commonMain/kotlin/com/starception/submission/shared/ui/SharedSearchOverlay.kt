@@ -16,6 +16,9 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -99,7 +103,9 @@ fun rememberSharedSearchController(
     val recognizer = remember { PlatformSpeechRecognizer() }
 
     fun startVoice() {
-        controller.active = true
+        // In-place capture: the search page does NOT open on the mic tap.
+        // The pill where the mic lives hosts the wave; the page only opens
+        // once a final transcript is ready to show results for.
         controller.voiceActive = true
         recognizer.start(VoiceRecognitionMode.TRANSCRIPTION) { event ->
             when (event) {
@@ -108,14 +114,22 @@ fun rememberSharedSearchController(
                 is SpeechRecognitionEvent.Result -> {
                     controller.query = event.text
                     controller.voiceActive = false
+                    // Only now does the search surface open, with results.
+                    controller.active = true
                 }
                 is SpeechRecognitionEvent.Error -> controller.voiceActive = false
             }
         }
     }
 
+    fun stopCapture() {
+        recognizer.stop()
+        controller.voiceActive = false
+    }
+
     // expose the voice entry points through the controller's tag
     controller.tag = { startVoice() }
+    controller.stopTag = { stopCapture() }
     LaunchedEffect(controller.active) {
         if (!controller.active) {
             recognizer.stop()
@@ -153,7 +167,14 @@ fun SharedSearchController.openVoice() {
     (tag as? () -> Unit)?.invoke()
 }
 
+/** Stops an in-place capture without opening anything. */
+fun SharedSearchController.stopVoice() {
+    (stopTag as? () -> Unit)?.invoke()
+}
+
 internal var SharedSearchController.tag: Any? by mutableStateOf(null)
+
+internal var SharedSearchController.stopTag: Any? by mutableStateOf(null)
 
 internal var SharedSearchController.destinations: SharedSearchDestinations? by mutableStateOf(null)
 
@@ -192,94 +213,124 @@ fun SharedSearchOverlay(controller: SharedSearchController, onOpenProfile: () ->
                     showBackground = false,
                     onClick = { controller.close() },
                 )
-                val focusRequester = remember { FocusRequester() }
-                LaunchedEffect(Unit) { focusRequester.requestFocus() }
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        .focusRequester(focusRequester),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(start = 16.dp, end = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = NiaIcons.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        BasicTextField(
-                            value = controller.query,
-                            onValueChange = { controller.query = it },
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface,
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            decorationBox = { innerField ->
-                                Box(Modifier.weight(1f)) {
-                                    if (controller.query.isEmpty()) {
-                                        Text(
-                                            "Search Quran, Hadith and more",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                    innerField()
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (controller.query.isNotEmpty()) {
-                            IconTapTarget(
-                                icon = Icons.Filled.Close,
-                                contentDescription = "Clear query",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                visualSize = 30.dp,
-                                iconSize = 20.dp,
-                                showBackground = false,
-                                onClick = { controller.query = "" },
-                            )
-                        }
-                        IconTapTarget(
-                            icon = Icons.Filled.Mic,
-                            contentDescription = if (controller.voiceActive) {
-                                "Stop voice search"
-                            } else {
-                                "Voice search"
-                            },
-                            tint = if (controller.voiceActive) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            visualSize = 30.dp,
-                            iconSize = 20.dp,
-                            showBackground = false,
-                            onClick = {
-                                if (controller.voiceActive) {
-                                    controller.voiceActive = false
-                                } else {
-                                    controller.openVoice()
-                                }
-                            },
-                        )
-                        if (controller.voiceActive) {
-                            Text(
-                                "Listening…",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                }
+                 val focusRequester = remember { FocusRequester() }
+                 LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                 // Android's listening transition: a light spring drives the
+                 // chrome fade and the voice wave rise inside the pill.
+                 val listenProgress by animateFloatAsState(
+                     targetValue = if (controller.voiceActive) 1f else 0f,
+                     animationSpec = spring(
+                         dampingRatio = 0.7f,
+                         stiffness = Spring.StiffnessLow,
+                     ),
+                     label = "listenProgress",
+                 )
+                 val chromeAlpha = 1f - listenProgress
+                 Surface(
+                     shape = CircleShape,
+                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                     modifier = Modifier
+                         .weight(1f)
+                         .heightIn(min = 48.dp)
+                         .focusRequester(focusRequester),
+                 ) {
+                     Box(propagateMinConstraints = true) {
+                     Row(
+                         modifier = Modifier.padding(start = 16.dp, end = 6.dp),
+                         horizontalArrangement = Arrangement.spacedBy(10.dp),
+                         verticalAlignment = Alignment.CenterVertically,
+                     ) {
+                         Icon(
+                             imageVector = NiaIcons.Search,
+                             contentDescription = null,
+                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                             modifier = Modifier
+                                 .size(20.dp)
+                                 .graphicsLayer { alpha = chromeAlpha },
+                         )
+                         BasicTextField(
+                             value = controller.query,
+                             onValueChange = { controller.query = it },
+                             singleLine = true,
+                             textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                 color = MaterialTheme.colorScheme.onSurface,
+                             ),
+                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                             decorationBox = { innerField ->
+                                 Box(
+                                     Modifier
+                                         .weight(1f)
+                                         .graphicsLayer { alpha = chromeAlpha },
+                                 ) {
+                                     if (controller.query.isEmpty()) {
+                                         Text(
+                                             "Search Quran, Hadith and more",
+                                             style = MaterialTheme.typography.bodyMedium,
+                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                             maxLines = 1,
+                                             overflow = TextOverflow.Ellipsis,
+                                         )
+                                     }
+                                     innerField()
+                                 }
+                             },
+                             modifier = Modifier
+                                 .weight(1f)
+                                 .graphicsLayer { alpha = chromeAlpha },
+                         )
+                         if (controller.query.isNotEmpty()) {
+                             IconTapTarget(
+                                 icon = Icons.Filled.Close,
+                                 contentDescription = "Clear query",
+                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                 visualSize = 30.dp,
+                                 iconSize = 20.dp,
+                                 showBackground = false,
+                                 onClick = { controller.query = "" },
+                             )
+                         }
+                         // The mic stays solid through the transition: it is
+                         // the stop control while the wave is on stage.
+                         IconTapTarget(
+                             icon = Icons.Filled.Mic,
+                             contentDescription = if (controller.voiceActive) {
+                                 "Stop voice search"
+                             } else {
+                                 "Voice search"
+                             },
+                             tint = if (controller.voiceActive) {
+                                 MaterialTheme.colorScheme.primary
+                             } else {
+                                 MaterialTheme.colorScheme.onSurfaceVariant
+                             },
+                             visualSize = 30.dp,
+                             iconSize = 20.dp,
+                             showBackground = false,
+                             onClick = {
+                                 if (controller.voiceActive) {
+                                     controller.stopVoice()
+                                 } else {
+                                     controller.openVoice()
+                                 }
+                             },
+                         )
+                         if (controller.voiceActive) {
+                             Text(
+                                 "Listening…",
+                                 style = MaterialTheme.typography.labelMedium,
+                                 color = MaterialTheme.colorScheme.primary,
+                                 modifier = Modifier.graphicsLayer { alpha = chromeAlpha },
+                             )
+                         }
+                     }
+                     // Android's VoiceWaveOverlay: the hill range rises from
+                     // below and fills the pill while the chrome fades out.
+                     VoiceWave(
+                         appearProgress = listenProgress,
+                         modifier = Modifier.matchParentSize(),
+                     )
+                     }
+                 }
             }
             Box(Modifier.weight(1f)) {
                 SearchSuggestionsOverlayContent(

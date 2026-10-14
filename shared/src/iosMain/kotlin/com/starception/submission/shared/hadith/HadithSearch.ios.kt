@@ -66,10 +66,44 @@ actual suspend fun searchEnglishHadithCollections(
     limit: Int,
 ): List<HadithSearchHit> {
     if (tokens.isEmpty()) return emptyList()
+    // Android's search recipe: each token expands into a slot with its
+    // corpus-synonym alternatives, plans run strictest first, and the strict
+    // three-token plan merges the two most-specific pair plans so preference
+    // narrations that lack one question term ("Rasulullah loved halwa and
+    // honey" never says "food") still reach answer ranking.
+    val slots = tokens.map(::hadithSearchSlotVariants)
+    val plans = buildHadithSearchPlans(slots)
+    for ((planIndex, plan) in plans.withIndex()) {
+        val results = searchAllCollections(plan, limit)
+        if (results.isNotEmpty()) {
+            val isStrictThreeTokenPlan = planIndex == 0 && plan.size == 3 && slots.size == 3
+            if (!isStrictThreeTokenPlan) return results
+            val strictIds = results.map(::hitKey).toSet()
+            val pairA = runCatching {
+                searchAllCollections(listOf(slots[0], slots[1]), limit)
+            }.getOrDefault(emptyList())
+            val pairB = runCatching {
+                searchAllCollections(listOf(slots[1], slots[2]), limit)
+            }.getOrDefault(emptyList())
+            val pairOnly = (pairA + pairB)
+                .distinctBy(::hitKey)
+                .filter { hitKey(it) !in strictIds }
+            return (results + pairOnly).distinctBy(::hitKey)
+        }
+    }
+    return emptyList()
+}
+
+private fun hitKey(hit: HadithSearchHit): String = "${hit.databaseFile}:${hit.hadithId}"
+
+private suspend fun searchAllCollections(
+    slots: List<List<String>>,
+    limit: Int,
+): List<HadithSearchHit> {
     val results = mutableListOf<HadithSearchHit>()
     for ((databaseFile, collectionName) in ENGLISH_HADITH_COLLECTIONS) {
         val hits = try {
-            searchCollection(databaseFile, collectionName, tokens, limit)
+            searchCollection(databaseFile, collectionName, slots, limit)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -86,7 +120,7 @@ actual suspend fun searchEnglishHadithCollections(
 private suspend fun searchCollection(
     databaseFile: String,
     collectionName: String,
-    tokens: List<String>,
+    slots: List<List<String>>,
     limit: Int,
 ): List<HadithSearchHit> = withContext(Dispatchers.Default) {
     val path = resolveDatabaseAsset(
@@ -94,10 +128,14 @@ private suspend fun searchCollection(
         remotePath = "databases/hadith/$databaseFile.db",
         cacheName = "$databaseFile.db",
     )
-    val tokenConditions = tokens.joinToString(" AND ") { "text_plain LIKE ?" }
+    // Each slot matches ANY of its variants (token + corpus synonyms); every
+    // slot must match — Android's searchHadithsMultiTokenAny.
+    val slotConditions = slots.joinToString(" AND ") { slot ->
+        "(" + slot.joinToString(" OR ") { "text_plain LIKE ?" } + ")"
+    }
     val sql = """
         SELECT id, text_plain FROM hadiths
-        WHERE TRIM(text_plain) <> '' AND $tokenConditions
+        WHERE TRIM(text_plain) <> '' AND $slotConditions
         ORDER BY LENGTH(text_plain) ASC
         LIMIT ?
     """.trimIndent()
@@ -115,16 +153,20 @@ private suspend fun searchCollection(
                 error("Unable to prepare $databaseFile search: ${database.value.errorMessage()}")
             }
             try {
-                tokens.forEachIndexed { index, token ->
-                    sqlite3_bind_text(
-                        statement.value,
-                        index + 1,
-                        "%$token%",
-                        -1,
-                        SQLITE_TRANSIENT,
-                    )
+                var bindIndex = 1
+                slots.forEach { slot ->
+                    slot.forEach { variant ->
+                        sqlite3_bind_text(
+                            statement.value,
+                            bindIndex,
+                            "%$variant%",
+                            -1,
+                            SQLITE_TRANSIENT,
+                        )
+                        bindIndex += 1
+                    }
                 }
-                sqlite3_bind_int(statement.value, tokens.size + 1, limit)
+                sqlite3_bind_int(statement.value, bindIndex, limit)
                 buildList {
                     while (true) {
                         when (sqlite3_step(statement.value)) {

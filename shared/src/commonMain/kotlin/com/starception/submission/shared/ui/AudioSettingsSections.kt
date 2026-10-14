@@ -158,10 +158,11 @@ fun VoiceRecognitionSettingsSection(
                     contentStorageState.retryCategoryKey == null ||
                         contentStorageState.retryCategoryKey == modelCategoryKey
                 },
-                actionsEnabled = !contentStorageState.isDownloading && !contentStorageState.isLoading,
+                actionsEnabled = !contentStorageState.isLoading &&
+                    !(modelState?.isDownloading ?: false),
                 onRefresh = contentStorageActions.onRefresh,
                 onDownload = { contentStorageActions.onDownloadCategory(modelCategoryKey) },
-                onCancel = contentStorageActions.onCancelDownload,
+                onCancel = { contentStorageActions.onCancelDownload(modelCategoryKey) },
                 onDelete = { contentStorageActions.onDeleteCategory(modelCategoryKey) },
             )
         }
@@ -380,10 +381,11 @@ fun NarrationSettingsSection(
                     contentStorageState.retryCategoryKey == null ||
                         contentStorageState.retryCategoryKey == modelCategoryKey
                 },
-                actionsEnabled = !contentStorageState.isDownloading && !contentStorageState.isLoading,
+                actionsEnabled = !contentStorageState.isLoading &&
+                    !(modelState?.isDownloading ?: false),
                 onRefresh = contentStorageActions.onRefresh,
                 onDownload = { contentStorageActions.onDownloadCategory(modelCategoryKey) },
-                onCancel = contentStorageActions.onCancelDownload,
+                onCancel = { contentStorageActions.onCancelDownload(modelCategoryKey) },
                 onDelete = { contentStorageActions.onDeleteCategory(modelCategoryKey) },
             )
         }

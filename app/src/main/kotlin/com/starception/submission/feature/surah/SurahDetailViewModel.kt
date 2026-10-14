@@ -68,7 +68,7 @@ class SurahDetailViewModel @Inject constructor(
     val currentTranslation: StateFlow<String> = _currentTranslation.asStateFlow()
 
     private val _selectedArabicFont = MutableStateFlow(
-        prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem",
+        prefs.getString("arabic_font", "indopak_script") ?: "indopak_script",
     )
     val selectedArabicFont: StateFlow<String> = _selectedArabicFont.asStateFlow()
 

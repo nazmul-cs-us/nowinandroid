@@ -235,14 +235,26 @@ private suspend fun downloadRequiredContent(
     language: com.starception.submission.shared.quran.QuranTranslationLanguage,
 ) {
     val manifest = iosCloudAssets.loadManifest() ?: return
-    keys.forEach { key ->
-        iosCloudAssets.downloadCategory(key, manifest) { progress ->
-            com.starception.submission.shared.assets.ContentDownloadBus.publish(
-                com.starception.submission.shared.assets.ContentDownloadStatus(
-                    label = storageCategoryDisplayName(key),
-                    progress = progress.fraction,
-                ),
-            )
+    // Network reads, file writes, and SHA-256 verification all run in the
+    // caller's context — the setup gate calls this from a Main-dispatched
+    // LaunchedEffect, so the whole chain must stay off Main (see
+    // downloadContentCategory for the same freeze).
+    withContext(Dispatchers.Default) {
+        keys.forEach { key ->
+            // Per-chunk progress coalesced to whole-percent steps; see
+            // ContentDownloadProgressThrottle.
+            val throttle = com.starception.submission.shared.assets
+                .ContentDownloadProgressThrottle()
+            iosCloudAssets.downloadCategory(key, manifest) { progress ->
+                if (throttle.shouldPublish(progress.fraction)) {
+                    com.starception.submission.shared.assets.ContentDownloadBus.publish(
+                        com.starception.submission.shared.assets.ContentDownloadStatus(
+                            label = storageCategoryDisplayName(key),
+                            progress = progress.fraction,
+                        ),
+                    )
+                }
+            }
         }
     }
     val translationKey = when (language) {
@@ -495,7 +507,15 @@ private fun createPrayerTimesViewController(
         var recognitionJob by remember { mutableStateOf<Job?>(null) }
         var automaticTravelDuaRequests by remember { mutableStateOf(0) }
         var contentStorageState by remember { mutableStateOf(ContentStorageState()) }
-        var contentDownloadJob by remember { mutableStateOf<Job?>(null) }
+        var contentDownloadJobs by remember {
+            mutableStateOf<Map<String, Job>>(emptyMap())
+        }
+        // The strip carries one banner: while several categories download
+        // concurrently it shows the most recently updated one, falling back
+        // to the remaining downloads as each finishes.
+        val activeDownloadStatuses = remember {
+            LinkedHashMap<String, com.starception.submission.shared.assets.ContentDownloadStatus>()
+        }
         var contentRefreshJob by remember { mutableStateOf<Job?>(null) }
         val travelDuaMonitor = remember {
             IosTravelDuaMonitor { automaticTravelDuaRequests += 1 }
@@ -552,7 +572,9 @@ private fun createPrayerTimesViewController(
         }
 
         fun downloadContentCategory(category: String) {
-            if (contentDownloadJob?.isActive == true) return
+            // Per-category single flight: one job per key, any number of
+            // categories concurrently.
+            if (contentDownloadJobs[category]?.isActive == true) return
             contentStorageState = contentStorageState.copy(
                 error = null,
                 categories = contentStorageState.categories.map {
@@ -569,28 +591,49 @@ private fun createPrayerTimesViewController(
                 try {
                     val manifest = iosCloudAssets.loadManifest()
                         ?: error("The Cloudflare asset manifest is unavailable")
-                    val result = iosCloudAssets.downloadCategory(category, manifest) { progress ->
-                        coroutineScope.launch(Dispatchers.Main) {
-                            if (contentDownloadJob === downloadJob && downloadJob.isActive) {
-                                contentStorageState = contentStorageState.copy(
-                                    categories = contentStorageState.categories.map {
-                                        if (it.categoryKey == category) {
-                                            it.copy(isDownloading = true, progress = progress.fraction)
-                                        } else {
-                                            it
-                                        }
-                                    },
-                                )
-                                // Feed the app-level pull-to-sync banner — the same
-                                // progress the Android strip shows on every screen.
-                                ContentDownloadBus.publish(
-                                    ContentDownloadStatus(
-                                        label = storageCategoryDisplayName(category),
-                                        progress = progress.fraction,
-                                        completedFiles = progress.completedFiles,
-                                        totalFiles = progress.totalFiles,
-                                    ),
-                                )
+                    // Per-chunk progress coalesced to whole-percent steps:
+                    // publishing each chunk flooded the main queue and froze
+                    // the UI on every collector's recomposition.
+                    val throttle = com.starception.submission.shared.assets
+                        .ContentDownloadProgressThrottle()
+                    // The CDN layer (network reads, file writes, and the pure
+                    // Kotlin SHA-256 verification of every part) runs in the
+                    // caller's context — rememberCoroutineScope is Main, and
+                    // a ~986 MB model category on the main dispatcher froze
+                    // the whole UI for the duration. Keep only suspension on
+                    // Main; the work belongs to the default dispatcher. The
+                    // progress callback hops back to Main itself.
+                    val result = withContext(Dispatchers.Default) {
+                        iosCloudAssets.downloadCategory(category, manifest) { progress ->
+                            if (throttle.shouldPublish(progress.fraction)) {
+                                coroutineScope.launch(Dispatchers.Main) {
+                                    if (contentDownloadJobs[category] === downloadJob && downloadJob.isActive) {
+                                        contentStorageState = contentStorageState.copy(
+                                            categories = contentStorageState.categories.map {
+                                                if (it.categoryKey == category) {
+                                                    it.copy(isDownloading = true, progress = progress.fraction)
+                                                } else {
+                                                    it
+                                                }
+                                            },
+                                        )
+                                        // Feed the app-level pull-to-sync banner — the same
+                                        // progress the Android strip shows on every screen.
+                                        // With concurrent downloads the banner carries the
+                                        // most recently updated category.
+                                        val status = ContentDownloadStatus(
+                                            label = storageCategoryDisplayName(category),
+                                            progress = progress.fraction,
+                                            completedFiles = progress.completedFiles,
+                                            totalFiles = progress.totalFiles,
+                                        )
+                                        activeDownloadStatuses.remove(category)
+                                        activeDownloadStatuses[category] = status
+                                        ContentDownloadBus.publish(
+                                            activeDownloadStatuses.values.lastOrNull() ?: status,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -602,24 +645,29 @@ private fun createPrayerTimesViewController(
                 } catch (error: Exception) {
                     message = error.message ?: "The content download failed"
                 } finally {
-                    if (contentDownloadJob === downloadJob) {
-                        ContentDownloadBus.publish(null)
+                    if (contentDownloadJobs[category] === downloadJob) {
+                        contentDownloadJobs = contentDownloadJobs - category
+                        activeDownloadStatuses.remove(category)
+                        // Another category may still be downloading: keep its
+                        // banner up instead of clearing the strip.
+                        ContentDownloadBus.publish(activeDownloadStatuses.values.lastOrNull())
                         contentStorageState = contentStorageState.copy(
                             categories = contentStorageState.categories.map {
                                 if (it.categoryKey == category) it.copy(isDownloading = false) else it
                             },
                         )
-                        contentDownloadJob = null
                         refreshContentStorage(message, retryCategory = category.takeIf { message != null })
                     }
                 }
             }
-            contentDownloadJob = downloadJob
+            contentDownloadJobs = contentDownloadJobs + (category to downloadJob)
             downloadJob.start()
         }
 
         fun deleteContentCategory(category: String) {
-            if (contentDownloadJob?.isActive == true || contentRefreshJob?.isActive == true) return
+            // Only the category actively downloading cannot be deleted;
+            // other categories stay deletable while downloads run.
+            if (contentDownloadJobs[category]?.isActive == true || contentRefreshJob?.isActive == true) return
             if (category.startsWith("model_")) {
                 recognitionSession += 1
                 recognitionJob?.cancel()
@@ -662,7 +710,7 @@ private fun createPrayerTimesViewController(
                 sherpaService?.shutdown()
                 recognitionJob?.cancel()
                 narrationJob?.cancel()
-                contentDownloadJob?.cancel()
+                contentDownloadJobs.values.forEach { it.cancel() }
                 contentRefreshJob?.cancel()
             }
         }
@@ -1198,7 +1246,9 @@ private fun createPrayerTimesViewController(
                         contentStorageActions = ContentStorageActions(
                             onRefresh = { refreshContentStorage() },
                             onDownloadCategory = ::downloadContentCategory,
-                            onCancelDownload = { contentDownloadJob?.cancel() },
+                            onCancelDownload = { category ->
+                                contentDownloadJobs[category]?.cancel()
+                            },
                             onDeleteCategory = ::deleteContentCategory,
                         ),
                     )

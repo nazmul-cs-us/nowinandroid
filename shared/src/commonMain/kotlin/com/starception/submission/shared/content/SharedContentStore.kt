@@ -72,7 +72,7 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
 
     fun quranArabicFont(): String =
         store.getString(QURAN_ARABIC_FONT)?.takeUnless(String::isNullOrBlank)
-            ?: QuranArabicFonts.PDMS_SALEEM
+            ?: QuranArabicFonts.INDOPAK
 
     fun saveQuranArabicFont(font: String) {
         store.putString(QURAN_ARABIC_FONT, font)

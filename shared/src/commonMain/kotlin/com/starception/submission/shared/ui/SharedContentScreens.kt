@@ -1451,6 +1451,7 @@ internal fun FortressLibraryScreen(
 internal fun FortressChapterScreen(
     chapterId: Int,
     player: QuranAudioPlayer,
+    store: SharedContentStore,
     onBack: () -> Unit,
 ) {
     val repository = remember { createSharedFortressRepository() }
@@ -1459,6 +1460,11 @@ internal fun FortressChapterScreen(
     var references by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
     var chapter by remember { mutableStateOf<FortressChapter?>(null) }
     var state by remember { mutableStateOf<DuaDetailState>(DuaDetailState.Loading) }
+    var showReadingSettings by remember { mutableStateOf(false) }
+    var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
+    var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
+    val preferredLanguage = remember { store.duaTranslationLanguage() }
     LaunchedEffect(chapterId, loadAttempt) {
         state = DuaDetailState.Loading
         try {
@@ -1501,10 +1507,24 @@ internal fun FortressChapterScreen(
             Column {
                 DetailToolbar(
                     onBack = onBack,
+                    // The surah toolbar's translation chip: the two-letter
+                    // language code opens the reading settings here too.
+                    inlineActions = listOf(
+                        DetailAction(
+                            id = "translation_chip",
+                            label = "Translation",
+                            trailingText = preferredLanguage.uppercase().take(2),
+                        ) { showReadingSettings = true },
+                    ),
                     sheetActions = listOf(
                         DetailAction(
+                            id = "reading_settings",
+                            label = "Reading settings",
+                            trailingText = QuranArabicFonts.displayName(selectedArabicFont),
+                        ) { showReadingSettings = true },
+                        DetailAction(
                             id = "stop_audio",
-                            label = if (playingId == null) "Stop recitation" else "Stop recitation",
+                            label = "Stop recitation",
                             selected = playingId != null,
                         ) {
                             player.stop()
@@ -1536,6 +1556,9 @@ internal fun FortressChapterScreen(
                         invocation = invocation,
                         reference = references[invocation.id].orEmpty(),
                         playing = playingId == invocation.id,
+                        arabicFont = selectedArabicFont,
+                        arabicFontSize = arabicFontSize,
+                        textAlignment = textAlignment,
                         onTogglePlay = {
                             if (playingId == invocation.id) {
                                 player.pause()
@@ -1557,6 +1580,28 @@ internal fun FortressChapterScreen(
                 }
             }
         }
+    }
+    if (showReadingSettings) {
+        ReaderReadingSettingsSheet(
+            previewText = invocations.firstOrNull()?.arabic?.trim().orEmpty()
+                .ifBlank { "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ" },
+            selectedFont = selectedArabicFont,
+            fontSize = arabicFontSize,
+            textAlignment = textAlignment,
+            onFontChange = { font ->
+                store.saveQuranArabicFont(font)
+                selectedArabicFont = font
+            },
+            onFontSizeChange = { size ->
+                store.saveQuranArabicFontSize(size)
+                arabicFontSize = size
+            },
+            onAlignmentChange = { alignment ->
+                store.saveQuranTextAlignment(alignment)
+                textAlignment = alignment
+            },
+            onDismiss = { showReadingSettings = false },
+        )
     }
 }
 
@@ -2222,6 +2267,9 @@ private fun FortressInvocationCard(
     invocation: FortressInvocation,
     reference: String,
     playing: Boolean,
+    arabicFont: String,
+    arabicFontSize: Float,
+    textAlignment: String,
     onTogglePlay: () -> Unit,
 ) {
     val contentStore = remember { SharedContentStore() }
@@ -2272,10 +2320,10 @@ private fun FortressInvocationCard(
                 Text(
                     invocation.arabic,
                     modifier = Modifier.fillMaxWidth(),
-                    fontFamily = QuranArabicFonts.fontFamily(QuranArabicFonts.PDMS_SALEEM),
-                    fontSize = 27.sp,
-                    lineHeight = 46.sp,
-                    textAlign = TextAlign.End,
+                    fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                    fontSize = arabicFontSize.sp,
+                    lineHeight = (arabicFontSize * 1.7f).sp,
+                    textAlign = readerTextAlignment(textAlignment),
                 )
             }
             if (invocation.transliteration.isNotBlank()) {
@@ -2468,6 +2516,13 @@ internal fun SharedDuaDetailScreen(
         label = "Reading settings",
         trailingText = QuranArabicFonts.displayName(selectedArabicFont),
     ) { showReadingSettings = true }
+    // The surah toolbar's translation chip — the two-letter language code
+    // opens the reading settings' translation picker here too.
+    val translationChipAction = DetailAction(
+        id = "translation_chip",
+        label = "Translation",
+        trailingText = preferredLanguage.uppercase().take(2),
+    ) { showReadingSettings = true }
     Box(Modifier.fillMaxSize()) {
         ImmersiveDetailScaffold(onBack = onBack, header = {
             Box(Modifier.fillMaxWidth().height(220.dp)) {
@@ -2486,7 +2541,7 @@ internal fun SharedDuaDetailScreen(
                 Column {
                     DetailToolbar(
                         onBack = onBack,
-                        inlineActions = listOf(bookmarkAction),
+                        inlineActions = listOf(translationChipAction, bookmarkAction),
                         sheetActions = listOf(
                             readingSettingsAction,
                             DetailAction(
@@ -2998,6 +3053,16 @@ internal fun BukhariHadithDetailScreen(
                     Column {
                         DetailToolbar(
                             onBack = onBack,
+                            // The surah toolbar's translation chip: the
+                            // two-letter language code opens the reading
+                            // settings' translation picker.
+                            inlineActions = listOf(
+                                DetailAction(
+                                    id = "translation_chip",
+                                    label = "Translation",
+                                    trailingText = translationLanguage.uppercase().take(2),
+                                ) { showReadingSettings = true },
+                            ),
                             sheetActions = listOf(
                                 listenAction,
                                 playAllAction,
@@ -3017,8 +3082,7 @@ internal fun BukhariHadithDetailScreen(
                 ) { index ->
                     HadithDetailPage(
                         hadith = hadiths[index],
-                        bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },
-                        arabicFont = selectedArabicFont,
+                        bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },                        arabicFont = selectedArabicFont,
                         arabicFontSize = arabicFontSize,
                         textAlignment = textAlignment,
                         listening = narrationOnThisBook &&
@@ -3387,11 +3451,11 @@ internal fun ShamayelHadithDetailScreen(
                 translationProvider = providers[(providers.indexOf(translationProvider) + 1) % providers.size]
                 store.saveHadithTranslationProvider(translationProvider)
             }
-            val readingSettingsAction = DetailAction(
-                id = "reading_settings",
-                label = "Reading settings",
-                trailingText = QuranArabicFonts.displayName(selectedArabicFont),
-            ) { showReadingSettings = true }
+    val readingSettingsAction = DetailAction(
+        id = "reading_settings",
+        label = "Reading settings",
+        trailingText = QuranArabicFonts.displayName(selectedArabicFont),
+    ) { showReadingSettings = true }
             val listeningToThisHadith =
                 narrationOnThisBook && narration.hadithId == currentHadith.id
             val listenAction = DetailAction(
@@ -3444,9 +3508,19 @@ internal fun ShamayelHadithDetailScreen(
                         supportingText = "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
                         arabicTitle = "شمائل الترمذي",
                     )
-                    Column {
-                        DetailToolbar(
+                     Column {
+                         DetailToolbar(
                             onBack = onBack,
+                            // The surah toolbar's translation chip: the
+                            // two-letter language code opens the reading
+                            // settings' translation picker.
+                            inlineActions = listOf(
+                                DetailAction(
+                                    id = "translation_chip",
+                                    label = "Translation",
+                                    trailingText = translationLanguage.uppercase().take(2),
+                                ) { showReadingSettings = true },
+                            ),
                             sheetActions = listOf(
                                 listenAction,
                                 playAllAction,
@@ -4957,6 +5031,15 @@ internal fun NewsDetailScreen(
         id = "share",
         label = "Share",
     ) { onBack() } // host-level share integration point
+    var showReadingSettings by remember { mutableStateOf(false) }
+    var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
+    var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
+    val readingSettingsAction = DetailAction(
+        id = "reading_settings",
+        label = "Reading settings",
+        trailingText = QuranArabicFonts.displayName(selectedArabicFont),
+    ) { showReadingSettings = true }
     val headerNews = (state as? SharedNewsState.Loaded)?.news?.firstOrNull()
     val rawHeaderType = headerNews?.type?.takeIf(String::isNotBlank) ?: "Invocations"
     val isHadith = rawHeaderType.contains("hadith", ignoreCase = true)
@@ -4977,7 +5060,7 @@ internal fun NewsDetailScreen(
                 DetailToolbar(
                     onBack = onBack,
                     inlineActions = listOf(bookmarkAct),
-                    sheetActions = listOf(shareAct),
+                    sheetActions = listOf(readingSettingsAction, shareAct),
                     contentColor = androidx.compose.ui.graphics.Color.White,
                     toolbarTitle = headerType,
                 )
@@ -5005,10 +5088,45 @@ internal fun NewsDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(0.dp),
                     contentPadding = PaddingValues(bottom = 28.dp),
                 ) {
-                    item { SharedNewsDetailContent(news) }
+                    item {
+                        SharedNewsDetailContent(
+                            news = news,
+                            arabicFont = selectedArabicFont,
+                            arabicFontSize = arabicFontSize,
+                            textAlignment = textAlignment,
+                        )
+                    }
                 }
             }
         }
+    }
+    if (showReadingSettings) {
+        ReaderReadingSettingsSheet(
+            previewText = (state as? SharedNewsState.Loaded)?.news?.firstOrNull()
+                ?.let { newsItem ->
+                    sharedNewsSections(newsItem.content)
+                        .firstOrNull { it.first.equals("Arabic", ignoreCase = true) }
+                        ?.second?.lineSequence()?.firstOrNull { line -> line.isNotBlank() }
+                }
+                .orEmpty()
+                .ifBlank { "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ" },
+            selectedFont = selectedArabicFont,
+            fontSize = arabicFontSize,
+            textAlignment = textAlignment,
+            onFontChange = { font ->
+                store.saveQuranArabicFont(font)
+                selectedArabicFont = font
+            },
+            onFontSizeChange = { size ->
+                store.saveQuranArabicFontSize(size)
+                arabicFontSize = size
+            },
+            onAlignmentChange = { alignment ->
+                store.saveQuranTextAlignment(alignment)
+                textAlignment = alignment
+            },
+            onDismiss = { showReadingSettings = false },
+        )
     }
 }
 

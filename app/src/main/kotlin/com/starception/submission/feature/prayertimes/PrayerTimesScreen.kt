@@ -511,7 +511,7 @@ private fun getSelectedArabicFontFamily(context: Context): androidx.compose.ui.t
     val prefs = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
 
     // Re-read every time this composable recomposes
-    val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+    val selectedFont = prefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
 
     return com.starception.submission.feature.surah.getArabicFontFamilyForSelection(selectedFont)
 }
@@ -4200,7 +4200,7 @@ fun PrayerTimesScreen(
                                                                 val context = androidx.compose.ui.platform.LocalContext.current
                                                                 val arabicFontFamily = if (containsArabic) {
                                                                     val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
-                                                                    val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+                                                                    val selectedFont = prefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
                                                                     when (selectedFont) {
                                                                         "pdms_saleem" -> QuranFonts.PDMSSaleem
                                                                         "noor_e_hidayat" -> QuranFonts.NoorEHidayat

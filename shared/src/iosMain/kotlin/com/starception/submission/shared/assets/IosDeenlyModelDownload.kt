@@ -63,16 +63,21 @@ private const val ASSEMBLY_CHUNK_BYTES = 4L * 1024L * 1024L
 internal fun installDeenlyModelDownloadHook() {
     DeenlyKnowledgeRuntime.downloadModels = { onProgress ->
         withContext(Dispatchers.Default) {
+            // Per-chunk progress coalesced to whole-percent steps; see
+            // ContentDownloadProgressThrottle.
+            val throttle = ContentDownloadProgressThrottle()
             val result = iosCloudAssets.downloadCategory(NOW_NUDGE_CATEGORY) { progress ->
                 // Compose snapshot state is safe to write from any thread;
                 // recomposition is scheduled on the main dispatcher.
                 onProgress(progress.bytesDownloaded, progress.totalBytes)
-                ContentDownloadBus.publish(
-                    ContentDownloadStatus(
-                        label = "On-device AI Question Model",
-                        progress = progress.fraction,
-                    ),
-                )
+                if (throttle.shouldPublish(progress.fraction)) {
+                    ContentDownloadBus.publish(
+                        ContentDownloadStatus(
+                            label = "On-device AI Question Model",
+                            progress = progress.fraction,
+                        ),
+                    )
+                }
             }
             val assembled = result.isComplete && assembleNowNudgeQuestionModel()
             // The banner belongs to the app shell: clear it whether the

@@ -42,3 +42,26 @@ object ContentDownloadBus {
         _state.value = status
     }
 }
+
+/**
+ * Coalesces per-chunk download progress into whole-percent steps.
+ *
+ * The CDN layer reports progress for every downloaded chunk — far faster
+ * than any UI can consume. Publishing each callback flooded the main
+ * queue with a fresh progress coroutine per chunk and invalidated every
+ * collector's composition (the whole navigation host) continuously,
+ * saturating the main thread and the GC and freezing the app. One
+ * throttle per download call; also passes the terminal (fraction >= 1)
+ * callback through.
+ */
+class ContentDownloadProgressThrottle {
+    private var lastFraction = -1f
+
+    fun shouldPublish(fraction: Float): Boolean {
+        if (fraction - lastFraction >= 0.01f || fraction >= 1f) {
+            lastFraction = fraction
+            return true
+        }
+        return false
+    }
+}
