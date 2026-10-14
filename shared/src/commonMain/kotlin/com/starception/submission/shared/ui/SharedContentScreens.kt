@@ -1093,9 +1093,11 @@ internal fun QuranDetailScreen(
     }
     if (!mushafMode) {
         val nameStartYPx = artworkBottomPx + with(density) { 12.dp.toPx() }
-        // Stops centered against the pinned toolbar's back button: the
-        // toolbar row is 64dp tall, the scaled name block ~35dp.
-        val nameEndYPx = with(density) { 15.dp.toPx() }
+        // The SwiftUI host renders Compose edge-to-edge (ignoresSafeArea) and
+        // WindowInsets reports zero inside it, so the physical status-bar band
+        // (up to ~59dp on iPhones) must be cleared by hand: the name parks
+        // just under the 64dp pinned toolbar, never at the screen's edge.
+        val nameEndYPx = with(density) { 64.dp.toPx() }
         val nameStartXPx = with(density) { 24.dp.toPx() }
         val nameEndXPx = with(density) { 76.dp.toPx() }
         Box(
