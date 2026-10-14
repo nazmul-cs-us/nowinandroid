@@ -152,6 +152,8 @@ fun SharedNavHost(
     startInSettings: Boolean = false,
     startInSurah: Int? = null,
     startFortressChapter: Int? = null,
+    startDuaNumber: Int? = null,
+    startBukhariHadithId: Int? = null,
     startBottomIndex: Int = 0,
     onSelectTopLevel: ((Int) -> Unit)? = null,
     externalVoiceSearchRequests: Flow<Int>? = null,
@@ -246,15 +248,25 @@ fun SharedNavHost(
             selectBottom(0)
         }
     }
+    // UI-testing hooks: push a reader detail screen over the home tab so the
+    // back stack matches the real flow — tapping Back must pop to home.
+    LaunchedEffect(startFortressChapter, startDuaNumber, startBukhariHadithId) {
+        startFortressChapter
+            ?.takeIf { it in 1..298 }
+            ?.let { navController.navigate(FortressChapterRoute(it)) }
+        startDuaNumber
+            ?.takeIf { it > 0 }
+            ?.let { navController.navigate(DuaDetailRoute(it)) }
+        startBukhariHadithId
+            ?.takeIf { it > 0 }
+            ?.let { navController.navigate(BukhariHadithRoute(it)) }
+    }
     Box(modifier) {
         NavHost(
             navController = navController,
             startDestination = startInSurah
                 ?.takeIf { it in 1..114 }
                 ?.let(::QuranDetailRoute)
-                ?: startFortressChapter
-                    ?.takeIf { it in 1..298 }
-                    ?.let { FortressChapterRoute(it) }
                 ?: when {
                     startInSettings -> PrayerSettingsRoute
                     startBottomIndex == 1 -> ForYouRoute

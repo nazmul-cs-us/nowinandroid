@@ -427,6 +427,22 @@ private fun createPrayerTimesViewController(
                 ?.substringAfter('=')
                 ?.toIntOrNull()
         }
+        // UI-testing hooks for the other reader detail screens; each pushes
+        // over home so the Back button pop can be verified end-to-end.
+        val startDuaNumber = remember {
+            NSProcessInfo.processInfo.arguments
+                .mapNotNull { it as? String }
+                .firstOrNull { it.startsWith("--start-dua=") }
+                ?.substringAfter('=')
+                ?.toIntOrNull()
+        }
+        val startBukhariHadithId = remember {
+            NSProcessInfo.processInfo.arguments
+                .mapNotNull { it as? String }
+                .firstOrNull { it.startsWith("--start-bukhari=") }
+                ?.substringAfter('=')
+                ?.toIntOrNull()
+        }
         // Lock-screen and Control Center controls for the detached hadith
         // narration queue; installing is idempotent so every tab's
         // composition can call it.
@@ -890,6 +906,8 @@ private fun createPrayerTimesViewController(
                 startInSettings = startInSettings,
                 startInSurah = startInSurah,
                 startFortressChapter = startFortressChapter,
+                startDuaNumber = startDuaNumber,
+                startBukhariHadithId = startBukhariHadithId,
                 startBottomIndex = startBottomIndex,
                 onSelectTopLevel = onSelectBottom,
                 externalVoiceSearchRequests = iosVoiceSearchRequests
