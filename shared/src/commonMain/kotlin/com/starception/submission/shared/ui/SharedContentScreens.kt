@@ -610,12 +610,59 @@ internal fun QuranDetailScreen(
             if (playing) showAudioPlayer = true
         }
     }
+    val density = LocalDensity.current
+    val headerAboveArtworkPx = if (mushafMode) {
+        WindowInsets.statusBars.getTop(density) + with(density) { 44.dp.toPx() }
+    } else {
+        0f
+    }
+    val artworkBottomPx = headerAboveArtworkPx + with(density) { (maxWidth * 2f / 3f).toPx() }
     ImmersiveDetailScaffold(
         onBack = onBack,
         collapsibleHeader = true,
         headerCollapseOffset = headerCollapseOffset,
         contentHorizontalPadding = 0.dp,
         contentTopPadding = 0.dp,
+        // Android's AlbumPlayerTopBar: the toolbar stays on screen after the
+        // header collapses, its background fading in with the collapse so the
+        // floating surah name and the back button always keep a home. In
+        // mushaf mode the minibar's header toolbar already covers this.
+        pinnedTopBar = if (!mushafMode) {
+            {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(
+                                alpha = (-headerCollapseOffset.floatValue / artworkBottomPx)
+                                    .coerceIn(0f, 1f),
+                            ),
+                        ),
+                ) {
+                    DetailToolbar(
+                        onBack = onBack,
+                        inlineActions = listOf(
+                            translationChipAction,
+                            bookmarkAction,
+                        ),
+                        sheetActions = listOf(
+                            playAudioAction,
+                            readingSettingsAction,
+                        ),
+                        contentColor = if (
+                            -headerCollapseOffset.floatValue > artworkBottomPx / 2f
+                        ) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            androidx.compose.ui.graphics.Color.White
+                        },
+                        toolbarTitle = "Surah ${surah.number} · ${surah.nameEnglish}",
+                    )
+                }
+            }
+        } else {
+            null
+        },
         header = {
             Column {
                 if (mushafMode) {
@@ -661,21 +708,23 @@ internal fun QuranDetailScreen(
                                 ),
                             ),
                     )
-                    Column {
-                        DetailToolbar(
-                            onBack = onBack,
-                            inlineActions = listOf(
-                                translationChipAction,
-                                bookmarkAction,
-                            ),
-                            sheetActions = listOf(
-                                playAudioAction,
-                                readingSettingsAction,
-                            ),
-                            contentColor = androidx.compose.ui.graphics.Color.White,
-                            toolbarTitle = "Surah ${surah.number} · ${surah.nameEnglish}",
-                            includeStatusBarInset = !mushafMode,
-                        )
+                    if (mushafMode) {
+                        Column {
+                            DetailToolbar(
+                                onBack = onBack,
+                                inlineActions = listOf(
+                                    translationChipAction,
+                                    bookmarkAction,
+                                ),
+                                sheetActions = listOf(
+                                    playAudioAction,
+                                    readingSettingsAction,
+                                ),
+                                contentColor = androidx.compose.ui.graphics.Color.White,
+                                toolbarTitle = "Surah ${surah.number} · ${surah.nameEnglish}",
+                                includeStatusBarInset = false,
+                            )
+                        }
                     }
                 }
             }
@@ -1027,13 +1076,6 @@ internal fun QuranDetailScreen(
 
     // Android-parity pinned overlays: the floating surah name and the play FAB
     // track the artwork edge and the reader scroll.
-    val density = LocalDensity.current
-    val headerAboveArtworkPx = if (mushafMode) {
-        WindowInsets.statusBars.getTop(density) + with(density) { 44.dp.toPx() }
-    } else {
-        0f
-    }
-    val artworkBottomPx = headerAboveArtworkPx + with(density) { (maxWidth * 2f / 3f).toPx() }
     var showFabVisible by remember { mutableStateOf(true) }
     LaunchedEffect(ayahListState) {
         var previousScroll = 0f
@@ -1051,8 +1093,9 @@ internal fun QuranDetailScreen(
     }
     if (!mushafMode) {
         val nameStartYPx = artworkBottomPx + with(density) { 12.dp.toPx() }
-        val nameEndYPx = WindowInsets.statusBars.getTop(density).toFloat() +
-            with(density) { 18.dp.toPx() }
+        // Stops centered against the pinned toolbar's back button: the
+        // toolbar row is 64dp tall, the scaled name block ~35dp.
+        val nameEndYPx = with(density) { 15.dp.toPx() }
         val nameStartXPx = with(density) { 24.dp.toPx() }
         val nameEndXPx = with(density) { 76.dp.toPx() }
         Box(

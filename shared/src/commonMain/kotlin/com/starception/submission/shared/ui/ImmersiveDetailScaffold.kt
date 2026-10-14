@@ -76,6 +76,7 @@ internal fun ImmersiveDetailScaffold(
     contentTopPadding: Dp = 12.dp,
     collapsibleHeader: Boolean = false,
     headerCollapseOffset: MutableState<Float>? = null,
+    pinnedTopBar: (@Composable () -> Unit)? = null,
     header: @Composable () -> Unit,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
@@ -154,6 +155,10 @@ internal fun ImmersiveDetailScaffold(
                     content()
                 }
             }
+            // Android's AlbumPlayerTopBar stays on screen after the header
+            // collapses; hosts draw it here so the back button and the
+            // floating title always have a resting place.
+            pinnedTopBar?.invoke()
         }
     }
 }
