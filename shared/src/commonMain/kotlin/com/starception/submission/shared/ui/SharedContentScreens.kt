@@ -25,6 +25,12 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -33,6 +39,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +52,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -104,6 +112,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -115,9 +124,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -127,8 +138,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.model.data.BukhariBook
 import com.starception.submission.core.model.data.BukhariBooks
@@ -578,10 +591,13 @@ internal fun QuranDetailScreen(
     ) {
         showReadingSettings = true
     }
-    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
     val headerCollapseOffset = remember { mutableFloatStateOf(0f) }
+    // The ayah list drives the floating surah name and the play FAB's
+    // hide-on-scroll behavior, matching Android's scrollState.
+    val ayahListState = rememberLazyListState()
     // Android's pinned play FAB and the info card share one toggle; both the
-    // header FAB and the toolbar's play action route through it.
+    // pinned FAB and the toolbar's play action route through it.
     val toggleSurahPlay = {
         if (playing) {
             player.pause()
@@ -645,27 +661,6 @@ internal fun QuranDetailScreen(
                                 ),
                             ),
                     )
-                    // Android's pinned play FAB, anchored over the artwork's
-                    // bottom edge beside the album info card.
-                    Surface(
-                        onClick = toggleSurahPlay,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = 12.dp)
-                            .size(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shadowElevation = 6.dp,
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                contentDescription = if (playing) "Pause recitation" else "Play surah",
-                                modifier = Modifier.size(30.dp),
-                            )
-                        }
-                    }
                     Column {
                         DetailToolbar(
                             onBack = onBack,
@@ -948,7 +943,6 @@ internal fun QuranDetailScreen(
                                     surah = surah,
                                     ayahCount = displayVerses.size,
                                     nameTranslation = state.nameTranslation,
-                                    arabicFont = selectedArabicFont,
                                 )
                             },
                             requestedPage = requestedMushafPage,
@@ -961,6 +955,7 @@ internal fun QuranDetailScreen(
                         )
                     } else {
                         LazyColumn(
+                            state = ayahListState,
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(0.dp),
                             contentPadding = PaddingValues(bottom = 24.dp),
@@ -973,7 +968,6 @@ internal fun QuranDetailScreen(
                                     surah = surah,
                                     ayahCount = displayVerses.size,
                                     nameTranslation = state.nameTranslation,
-                                    arabicFont = selectedArabicFont,
                                 )
                             }
                             if (showBismillah) {
@@ -1030,6 +1024,106 @@ internal fun QuranDetailScreen(
             }
         }
     }
+
+    // Android-parity pinned overlays: the floating surah name and the play FAB
+    // track the artwork edge and the reader scroll.
+    val density = LocalDensity.current
+    val headerAboveArtworkPx = if (mushafMode) {
+        WindowInsets.statusBars.getTop(density) + with(density) { 44.dp.toPx() }
+    } else {
+        0f
+    }
+    val artworkBottomPx = headerAboveArtworkPx + with(density) { (maxWidth * 2f / 3f).toPx() }
+    var showFabVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(ayahListState) {
+        var previousScroll = 0f
+        snapshotFlow {
+            -headerCollapseOffset.floatValue + ayahListState.firstVisibleItemScrollOffset
+        }.collect { current ->
+            val delta = current - previousScroll
+            if (kotlin.math.abs(delta) > 50f) {
+                // Android's FAB rule: always visible near the top, hidden
+                // while scrolling down into the reader, shown scrolling up.
+                showFabVisible = if (current < 100f) true else delta < 0f
+                previousScroll = current
+            }
+        }
+    }
+    if (!mushafMode) {
+        val nameStartYPx = artworkBottomPx + with(density) { 12.dp.toPx() }
+        val nameEndYPx = WindowInsets.statusBars.getTop(density).toFloat() +
+            with(density) { 18.dp.toPx() }
+        val nameStartXPx = with(density) { 24.dp.toPx() }
+        val nameEndXPx = with(density) { 76.dp.toPx() }
+        Box(
+            modifier = Modifier
+                .offset {
+                    val scrolled = -headerCollapseOffset.floatValue +
+                        ayahListState.firstVisibleItemScrollOffset
+                    val y = (nameStartYPx - scrolled).coerceAtLeast(nameEndYPx)
+                    val progress = ((nameStartYPx - y) / (nameStartYPx - nameEndYPx))
+                        .coerceIn(0f, 1f)
+                    IntOffset(
+                        x = (nameStartXPx + progress * (nameEndXPx - nameStartXPx)).roundToInt(),
+                        y = y.roundToInt(),
+                    )
+                }
+                .graphicsLayer {
+                    val scrolled = -headerCollapseOffset.floatValue +
+                        ayahListState.firstVisibleItemScrollOffset
+                    val y = (nameStartYPx - scrolled).coerceAtLeast(nameEndYPx)
+                    val progress = ((nameStartYPx - y) / (nameStartYPx - nameEndYPx))
+                        .coerceIn(0f, 1f)
+                    val scale = 1f - progress * 0.4f
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(0f, 0f)
+                },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = surah.nameEnglish,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = surah.nameArabic,
+                    fontFamily = QuranArabicFonts.fontFamily(selectedArabicFont),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    AnimatedVisibility(
+        visible = showFabVisible,
+        enter = scaleIn(tween(300)) + fadeIn(tween(300)),
+        exit = scaleOut(tween(300)) + fadeOut(tween(300)),
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .padding(end = 12.dp)
+            .offset { IntOffset(x = 0, y = (artworkBottomPx - 28.dp.toPx()).roundToInt()) },
+    ) {
+        Surface(
+            onClick = toggleSurahPlay,
+            modifier = Modifier.size(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            shadowElevation = 6.dp,
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (playing) "Pause recitation" else "Play surah",
+                    modifier = Modifier.size(30.dp),
+                )
+            }
+        }
+    }
         if (showReadingSettings) {
             SurahReadingSettingsSheet(
                 previewText = (ayahState as? QuranAyahState.Loaded)?.verses
@@ -1082,11 +1176,11 @@ private fun SurahAlbumInfoCard(
     surah: com.starception.submission.feature.quran.Surah,
     ayahCount: Int,
     nameTranslation: String,
-    arabicFont: String,
 ) {
     // Android's AlbumInfoCard: one continuous surface starting flush under the
-    // artwork — the surah name rests just below the artwork edge, then the
-    // name-translation quote, then the info chips row. No transparent strips.
+    // artwork. The surah name is NOT here — it is the floating overlay that
+    // rests over this card's top zone, anchored to the artwork edge; the
+    // spacer reserves its room, then the translation quote, then the chips.
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
@@ -1095,30 +1189,10 @@ private fun SurahAlbumInfoCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(top = 12.dp, bottom = 14.dp),
+                .padding(top = 10.dp, bottom = 14.dp),
         ) {
-            // The floating name's resting spot, 12dp below the artwork edge.
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = surah.nameEnglish,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = surah.nameArabic,
-                    fontFamily = QuranArabicFonts.fontFamily(arabicFont),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.height(10.dp))
+            // Room for the floating surah-name overlay.
+            Spacer(Modifier.height(44.dp))
             if (nameTranslation.isNotBlank()) {
                 Text(
                     text = "\"$nameTranslation\"",
@@ -2240,17 +2314,14 @@ private fun SettingsSwitchRow(
 /** Android's InfoChip (NiaTopicTag look): a tinted uppercase pill. */
 @androidx.compose.runtime.Composable
 private fun InfoChip(text: String) {
-    androidx.compose.material3.Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    // Android's album-info chips are NiaTopicTags (SurahDetailScreen's
+    // InfoChip); the tag ships from the shared design-system module.
+    NiaTopicTag(
+        followed = true,
+        onClick = {},
+        enabled = true,
     ) {
-        Text(
-            text = text.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-        )
+        Text(text = text.uppercase())
     }
 }
 
