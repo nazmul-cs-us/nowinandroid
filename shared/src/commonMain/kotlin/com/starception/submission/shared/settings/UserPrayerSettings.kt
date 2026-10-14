@@ -82,6 +82,13 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
         store.putString(KEY_NOTIFICATIONS, json.encodeToString(preferences))
     }
 
+    fun liveActivitiesEnabled(): Boolean =
+        store.getString(KEY_LIVE_ACTIVITIES)?.toBooleanStrictOrNull() ?: true
+
+    fun saveLiveActivitiesEnabled(enabled: Boolean) {
+        store.putString(KEY_LIVE_ACTIVITIES, enabled.toString())
+    }
+
     /** Clears only this country's choices so its defaults apply again. */
     fun restoreDefaults(countryCode: String) {
         store.putString(settingsKey(countryCode), "")
@@ -166,6 +173,7 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
         const val ANDROID_OFFSET_MODE = "android_combined_v1"
         const val UNKNOWN_COUNTRY = "UNKNOWN"
         const val KEY_NOTIFICATIONS = "prayer_notification_preferences"
+        const val KEY_LIVE_ACTIVITIES = "ios_prayer_live_activities_enabled"
 
         /**
          * The same range the Android dial allows: three hours either way. Wide

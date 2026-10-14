@@ -21,6 +21,7 @@ private struct PrayerSchedulePayload: Decodable {
     let locationName: String
     let timeZoneOffset: Double?
     let notificationsEnabled: Bool
+    let liveActivitiesEnabled: Bool?
     let soundEnabled: Bool
     let days: [PrayerDay]
 }
@@ -57,6 +58,7 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
     private var hasStarted = false
     private var activityUpdatesTask: Task<Void, Never>?
     private var activityPushTokenTasks: [String: Task<Void, Never>] = [:]
+    private var activityEndTasks: [String: Task<Void, Never>] = [:]
     private var pushToStartTokenTask: Task<Void, Never>?
     private var uploadTask: Task<Void, Never>?
     private var tokenSnapshot: PrayerPushTokenSnapshot
@@ -312,10 +314,13 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         prayers: [DatedPrayer]
     ) {
         guard #available(iOS 16.1, *),
-              payload.notificationsEnabled,
+               payload.notificationsEnabled,
+              payload.liveActivitiesEnabled ?? true,
               let next = prayers.first else {
             if #available(iOS 16.1, *) {
                 Task { [weak self] in
+                    self?.activityEndTasks.values.forEach { $0.cancel() }
+                    self?.activityEndTasks.removeAll()
                     for activity in Activity<PrayerActivityAttributes>.activities {
                         await Self.end(activity)
                     }
@@ -332,19 +337,92 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         guard next.date > Date() else { return }
         let state = liveActivityState(payload: payload, next: next)
         Task { [weak self] in
-            if let activity = Activity<PrayerActivityAttributes>.activities.first {
-                await Self.update(activity, state: state)
-            } else if ActivityAuthorizationInfo().areActivitiesEnabled {
-                do {
-                    let activity = try Self.requestLiveActivity(
-                        attributes: PrayerActivityAttributes(locationName: payload.locationName),
-                        state: state
-                    )
-                    self?.observePushTokens(for: activity)
-                } catch {
-                    NSLog("Live Activity request failed: %@", error.localizedDescription)
-                }
+            await self?.reconcileLiveActivity(payload: payload, proposedState: state)
+        }
+    }
+
+    @available(iOS 16.1, *)
+    private func reconcileLiveActivity(
+        payload: PrayerSchedulePayload,
+        proposedState: PrayerActivityAttributes.ContentState
+    ) async {
+        let now = Date()
+        let activities = Activity<PrayerActivityAttributes>.activities
+        var activity = activities.first
+
+        // This feature owns exactly one event. Clean up remnants from interrupted
+        // debug runs instead of making people cycle between duplicate activities.
+        for duplicate in activities.dropFirst() {
+            await Self.end(duplicate)
+        }
+
+        if let existing = activity {
+            let currentState: PrayerActivityAttributes.ContentState
+            if #available(iOS 16.2, *) {
+                currentState = existing.content.state
+            } else {
+                currentState = existing.contentState
             }
+
+            if now >= currentState.activeUntil {
+                activityEndTasks[existing.id]?.cancel()
+                activityEndTasks[existing.id] = nil
+                await Self.end(existing)
+                activity = nil
+            } else if currentState.prayerDate != proposedState.prayerDate {
+                // Keep the current prayer through its configured active window;
+                // don't silently turn one event into the next prayer.
+                scheduleEnd(for: existing, at: currentState.activeUntil)
+                return
+            } else if existing.attributes.locationName != payload.locationName {
+                // Attributes are immutable, so location changes require a new event.
+                activityEndTasks[existing.id]?.cancel()
+                activityEndTasks[existing.id] = nil
+                await Self.end(existing)
+                activity = nil
+            } else {
+                if currentState != proposedState {
+                    await Self.update(existing, state: proposedState)
+                }
+                scheduleEnd(for: existing, at: proposedState.activeUntil)
+                return
+            }
+        }
+
+        guard activity == nil,
+              proposedState.activeUntil > now,
+              proposedState.activeUntil.timeIntervalSince(now) <= 8 * 60 * 60,
+              ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        do {
+            let created = try Self.requestLiveActivity(
+                attributes: PrayerActivityAttributes(locationName: payload.locationName),
+                state: proposedState
+            )
+            observePushTokens(for: created)
+            scheduleEnd(for: created, at: proposedState.activeUntil)
+        } catch {
+            NSLog("Live Activity request failed: %@", error.localizedDescription)
+        }
+    }
+
+    @available(iOS 16.1, *)
+    private func scheduleEnd(
+        for activity: Activity<PrayerActivityAttributes>,
+        at endDate: Date
+    ) {
+        activityEndTasks[activity.id]?.cancel()
+        let delay = max(0, endDate.timeIntervalSinceNow)
+        let nanoseconds = UInt64(min(delay, 8 * 60 * 60) * 1_000_000_000)
+        activityEndTasks[activity.id] = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: nanoseconds)
+            } catch {
+                return
+            }
+            await Self.end(activity)
+            self?.activityEndTasks[activity.id] = nil
+            self?.reconcileLiveActivityTokens()
         }
     }
 
@@ -353,10 +431,8 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         attributes: PrayerActivityAttributes,
         state: PrayerActivityAttributes.ContentState
     ) throws -> Activity<PrayerActivityAttributes> {
-        // No pushType: the schedule republishes every minute, so local
-        // updates drive the activity. Requesting .token requires APNs
-        // registration and fails on debug builds without the push
-        // entitlement.
+        // No pushType: local state drives this event while the process is
+        // available. The stale date and scheduled end share the event boundary.
         if #available(iOS 16.2, *) {
             return try Activity.request(
                 attributes: attributes,

@@ -155,6 +155,7 @@ fun SharedNavHost(
     onSelectTopLevel: ((Int) -> Unit)? = null,
     externalVoiceSearchRequests: Flow<Int>? = null,
     onExternalVoiceSearchHandled: (() -> Unit)? = null,
+    externalPrayerTimesRequests: Flow<Unit>? = null,
     latitude: Double,
     longitude: Double,
     today: LocalDate,
@@ -237,6 +238,11 @@ fun SharedNavHost(
                 launchSingleTop = true
                 restoreState = true
             }
+        }
+    }
+    LaunchedEffect(externalPrayerTimesRequests) {
+        externalPrayerTimesRequests?.collect {
+            selectBottom(0)
         }
     }
     Box(modifier) {

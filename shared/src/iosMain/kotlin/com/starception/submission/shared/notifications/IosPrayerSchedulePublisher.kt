@@ -50,6 +50,7 @@ internal object IosPrayerSchedulePublisher {
         defaults: CountryPrayerDefaults?,
         settings: PrayerSettings,
         preferences: PrayerNotificationPreferences,
+        liveActivitiesEnabled: Boolean,
     ) {
         val days = (0 until SCHEDULE_DAYS).map { dayOffset ->
             val date = startDate.plus(DatePeriod(days = dayOffset))
@@ -92,6 +93,7 @@ internal object IosPrayerSchedulePublisher {
             locationName = locationName,
             timeZoneOffset = timeZoneOffset,
             notificationsEnabled = preferences.notificationsEnabled,
+            liveActivitiesEnabled = liveActivitiesEnabled,
             soundEnabled = preferences.notificationSound != "silent",
             days = days,
         )
@@ -134,6 +136,7 @@ internal object IosPrayerSchedulePublisher {
             locationName = "Adhan test",
             timeZoneOffset = offsetSeconds / 3600.0,
             notificationsEnabled = true,
+            liveActivitiesEnabled = true,
             soundEnabled = true,
             days = listOf(
                 IosPrayerDay(
@@ -168,6 +171,7 @@ private data class IosPrayerPayload(
     val locationName: String,
     val timeZoneOffset: Double,
     val notificationsEnabled: Boolean,
+    val liveActivitiesEnabled: Boolean,
     val soundEnabled: Boolean,
     val days: List<IosPrayerDay>,
 )

@@ -54,6 +54,11 @@ final class DeenlyKnowledgeServiceImpl: NSObject, DeenlyKnowledgeService {
         userPrompt: String,
         onComplete: @escaping (String?) -> Void
     ) {
+        let sourceContext = userPrompt
+            .split(separator: "\n")
+            .filter { $0.hasPrefix("Collection:") || $0.hasPrefix("Reference:") }
+            .joined(separator: " | ")
+        NSLog("DeenlyKnowledgeService: task=%@ %@", task, sourceContext)
         DeenlyRunner.generate(
             modelPath: modelPath,
             systemPrompt: systemPrompt,

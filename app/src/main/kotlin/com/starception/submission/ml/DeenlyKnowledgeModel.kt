@@ -310,10 +310,13 @@ citations, rulings, or claims unsupported by the source."""
                 DeenlyKnowledgeTask.KNOWLEDGE -> {
                     if (output.keys != setOf("contentType", "title")) return null
                     val title = output["title"]?.jsonPrimitive?.content?.trim().orEmpty()
+                    val meaningfulCharacters = title.filter { character -> character.isLetterOrDigit() }
                     title.takeIf {
                         it.isNotEmpty() &&
                             it.length <= MAX_TITLE_CHARS &&
-                            it.none(Char::isISOControl)
+                            it.none(Char::isISOControl) &&
+                            meaningfulCharacters.length >= 3 &&
+                            meaningfulCharacters.map { it.lowercaseChar() }.distinct().size >= 2
                     }?.let(DeenlyKnowledgeDecision::Knowledge)
                 }
 

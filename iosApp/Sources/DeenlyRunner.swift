@@ -105,7 +105,10 @@ enum DeenlyRunner {
         defer { llama_free(context) }
 
         let prompt = chatMLPrompt(system: systemPrompt, user: userPrompt)
-        guard let promptTokens = tokenize(vocab, prompt, addSpecial: false),
+        // Match llama-completion on Android and llama.cpp's reference runner.
+        // Qwen's prompt still needs the vocabulary's leading special token in
+        // addition to the explicit ChatML turn markers.
+        guard let promptTokens = tokenize(vocab, prompt, addSpecial: true),
               !promptTokens.isEmpty else {
             NSLog("DeenlyRunner: prompt tokenization failed")
             return nil

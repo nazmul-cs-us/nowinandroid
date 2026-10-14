@@ -2,6 +2,10 @@ import Shared
 import SwiftUI
 import UIKit
 
+extension Notification.Name {
+    static let openPrayerLiveActivity = Notification.Name("openPrayerLiveActivity")
+}
+
 @MainActor
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
@@ -68,6 +72,11 @@ struct iOSApp: App {
                 }
             }
                 .preferredColorScheme(appPreferredColorScheme)
+                .onOpenURL { url in
+                    guard url.scheme == "deenly", url.host == "prayer-times" else { return }
+                    IosComposeRootKt.OpenPrayerTimesFromLiveActivity()
+                    NotificationCenter.default.post(name: .openPrayerLiveActivity, object: nil)
+                }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
                         PrayerNotificationCoordinator.shared.refresh()

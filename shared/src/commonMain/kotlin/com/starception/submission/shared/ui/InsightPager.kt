@@ -20,10 +20,13 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -45,6 +48,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,6 +64,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -94,6 +99,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -118,8 +124,11 @@ import com.starception.submission.core.images.resources.insight_qibla_foreground
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.images.resources.insight_suggestion
+import com.starception.submission.core.model.data.BukhariBooks
+import com.starception.submission.core.model.data.ShamayelBooks
 import com.starception.submission.feature.quran.dailyReading
 import com.starception.submission.feature.quran.subtitle
+import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.SharedPrayerSlot
@@ -130,6 +139,7 @@ import com.starception.submission.shared.content.ContextualRecommendation
 import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.content.contextualRecommendation
 import com.starception.submission.shared.content.createSharedFortressRepository
+import com.starception.submission.shared.hadith.createSharedHadithRepository
 import com.starception.submission.shared.ml.DeenlyKnowledgeRuntime
 import com.starception.submission.shared.qibla.HeadingProvider
 import com.starception.submission.shared.qibla.HeadingReading
@@ -176,6 +186,7 @@ fun InsightPager(
     onOpenRecommendation: () -> Unit = {},
     onOpenFortressChapter: (Int) -> Unit = {},
     onOpenBukhariBook: (Int) -> Unit = {},
+    onOpenBukhariHadith: (Int) -> Unit = {},
     onOpenShamayelBook: (Int) -> Unit = {},
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     tileHeight: Dp = 220.dp,
@@ -187,9 +198,10 @@ fun InsightPager(
     modifier: Modifier = Modifier,
 ) {
     val primaryPageCount = 5
-    val hadithDetailPage = 5
-    val readingDetailPage = 6
-    val expandedPages = listOf(0, 1, hadithDetailPage, 2, readingDetailPage, 3, 4)
+    // Android keeps the same five logical cards in both modes. Expanded
+    // content replaces the card's compact body; it is not inserted as another
+    // pager page (which previously duplicated Today's Salah and reading).
+    val expandedPages = remember { List(primaryPageCount) { it } }
     var expandedLogicalPage by rememberSaveable { mutableStateOf<Int?>(initialExpandedPage) }
     var lastExpandedLogicalPage by rememberSaveable {
         mutableIntStateOf(initialExpandedPage ?: 0)
@@ -291,6 +303,50 @@ fun InsightPager(
             chapterTitles = fortressTitles,
         )
     }
+    var modelCard by remember(today) { mutableStateOf<DeenlyKnowledgeCard?>(null) }
+    var modelLoading by remember(today) { mutableStateOf(false) }
+    var modelMissing by remember(today) { mutableStateOf(false) }
+    var modelGenerationKey by remember(today) { mutableStateOf<String?>(null) }
+    val downloadProgress by DeenlyKnowledgeRuntime.downloadProgress.collectAsState()
+    val downloadCompleted by DeenlyKnowledgeRuntime.downloadCompleted.collectAsState()
+    LaunchedEffect(expandedLogicalPage, today, recommendation, downloadCompleted) {
+        if (expandedLogicalPage != 4) return@LaunchedEffect
+        val generationKey = "$today|expanded-knowledge|$downloadCompleted"
+        if (modelGenerationKey == generationKey) return@LaunchedEffect
+        modelGenerationKey = generationKey
+        modelCard = null
+        modelMissing = false
+        if (!DeenlyKnowledgeRuntime.isKnowledgeModelAvailable()) {
+            modelLoading = false
+            modelMissing = true
+            return@LaunchedEffect
+        }
+        modelLoading = true
+        // The pager scope survives swiping to another expanded insight. Android
+        // retains the same in-flight generation instead of cancelling the model
+        // when tile 4 leaves the viewport.
+        pagerScope.launch {
+            val generated = runCatching {
+                generateInsightKnowledgeCard(
+                    date = today,
+                    appSituation = recommendation.supportingText,
+                    fortressInvocations = fortressInvocations,
+                )
+            }.getOrNull()
+            if (modelGenerationKey == generationKey) {
+                modelCard = generated
+                modelLoading = false
+            }
+        }
+    }
+    val openModelCard: (DeenlyKnowledgeCard) -> Unit = { card ->
+        when (val target = card.target) {
+            is DeenlyKnowledgeTarget.Surah -> onOpenQuran(target.number)
+            is DeenlyKnowledgeTarget.FortressDua -> onOpenFortressChapter(target.chapterId)
+            is DeenlyKnowledgeTarget.BukhariHadith -> onOpenBukhariHadith(target.hadithId)
+            is DeenlyKnowledgeTarget.ShamayelBook -> onOpenShamayelBook(target.bookId)
+        }
+    }
     val autoAdvanceProgress = remember { Animatable(0f) }
     val headingProvider = remember { HeadingProvider() }
     var heading by remember { mutableStateOf(HeadingReading()) }
@@ -312,11 +368,7 @@ fun InsightPager(
     LaunchedEffect(pagerState.settledPage, expandedLogicalPage, expandedPagerReady) {
         if (expandedLogicalPage != null && expandedPagerReady) {
             val visiblePage = visiblePages[pagerState.settledPage % pageCount]
-            expandedLogicalPage = when (visiblePage) {
-                hadithDetailPage -> 1
-                readingDetailPage -> 2
-                else -> visiblePage
-            }
+            expandedLogicalPage = visiblePage
         }
     }
     val qiblaPageVisible = visiblePages[pagerState.settledPage % pageCount] == 3
@@ -363,9 +415,7 @@ fun InsightPager(
             ) {
                 repeat(primaryPageCount) { index ->
                     val currentVisiblePage = visiblePages[pagerState.currentPage % pageCount]
-                    val selected = currentVisiblePage == index ||
-                        (currentVisiblePage == hadithDetailPage && index == 1) ||
-                        (currentVisiblePage == readingDetailPage && index == 2)
+                    val selected = currentVisiblePage == index
                     val indicatorWidth = if (selected) 26.dp else 6.dp
                     Box(
                         modifier = Modifier
@@ -445,11 +495,7 @@ fun InsightPager(
                 modifier = Modifier.fillMaxWidth().height(effectiveTileHeight),
             ) { page ->
                 val logicalPage = visiblePages[page % pageCount]
-                val sourceLogicalPage = when (logicalPage) {
-                    hadithDetailPage -> 1
-                    readingDetailPage -> 2
-                    else -> logicalPage
-                }
+                val sourceLogicalPage = logicalPage
                 val isExpanded = expandedLogicalPage == sourceLogicalPage
                 val onLongClick = {
                     expandedLogicalPage = if (isExpanded) null else sourceLogicalPage
@@ -535,32 +581,22 @@ fun InsightPager(
                             tileHeight = effectiveTileHeight,
                             onLongClick = onLongClick,
                         ) {
-                            SalahMarkers(
-                                completed = salah.completed,
-                                available = day.slots
-                                    .filter { it.hasStarted && it.name in FARD_PRAYERS }
-                                    .mapTo(mutableSetOf()) { it.name },
-                                onToggle = onTogglePrayer,
-                            )
-                        }
-
-                        hadithDetailPage -> ArtworkTile(
-                            backgroundPageOffset = { pageOffset },
-                            artwork = Res.drawable.insight_prayer_background,
-                            foreground = Res.drawable.insight_prayer_foreground,
-                            foregroundScale = 0.84f,
-                            foregroundOffsetYFraction = 0.08f,
-                            isExpanded = true,
-                            label = "Today's salah",
-                            title = "Prayer guidance",
-                            subtitle = salah.nextUnprayed ?: "Salah",
-                            tileHeight = effectiveTileHeight,
-                            onLongClick = onLongClick,
-                        ) {
-                            ExpandedSalahHadith(
-                                nextPrayer = salah.nextUnprayed,
-                                modifier = Modifier.fillMaxSize(),
-                            )
+                            if (isExpanded) {
+                                ExpandedSalahHadith(
+                                    prayerName = day.currentPrayer ?: day.nextPrayer ?: salah.nextUnprayed,
+                                    date = today,
+                                    onOpenHadith = onOpenBukhariHadith,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else {
+                                SalahMarkers(
+                                    completed = salah.completed,
+                                    available = day.slots
+                                        .filter { it.hasStarted && it.name in FARD_PRAYERS }
+                                        .mapTo(mutableSetOf()) { it.name },
+                                    onToggle = onTogglePrayer,
+                                )
+                            }
                         }
 
                         2 -> {
@@ -629,7 +665,13 @@ fun InsightPager(
                                     onOpenQuran(surah.number)
                                 },
                                 content = {
-                                    if (isReadingAudio && duration > 0f) {
+                                    if (isExpanded) {
+                                        ExpandedReadingPreview(
+                                            surahNumber = surah.number,
+                                            surahName = surah.nameEnglish,
+                                            isPlaying = isReadingAudio,
+                                        )
+                                    } else if (isReadingAudio && duration > 0f) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier
@@ -667,39 +709,7 @@ fun InsightPager(
                             )
                         }
 
-                        readingDetailPage -> {
-                            val surah = dailyReading(today)
-                            ArtworkTile(
-                                backgroundPageOffset = { pageOffset },
-                                artwork = Res.drawable.insight_quran_background,
-                                foreground = Res.drawable.insight_quran_foreground_v2,
-                                foregroundScale = 0.74f,
-                                foregroundOffsetYFraction = 0.09f,
-                                isExpanded = true,
-                                label = "Today's reading",
-                                title = surah.nameEnglish,
-                                subtitle = surah.nameArabic,
-                                tileHeight = effectiveTileHeight,
-                                onLongClick = onLongClick,
-                                onClick = {
-                                    quranPlayer.stop()
-                                    com.starception.submission.shared.media.QuranPlaybackBus.clear()
-                                    isReadingAudio = false
-                                    onOpenQuran(surah.number)
-                                },
-                            ) {
-                                ExpandedReadingPreview(
-                                    surahNumber = surah.number,
-                                    surahName = surah.nameEnglish,
-                                    isPlaying = isReadingAudio,
-                                )
-                            }
-                        }
-
                         3 -> {
-                            // Android's live directional arrow: the needle holds
-                            // the bearing while the device heading rotates the
-                            // arrow, spring-eased through the shortest angle.
                             val rawRotation = normalizeBearing(
                                 qiblaBearing - (heading.headingDegrees?.toFloat() ?: 0f),
                             )
@@ -744,7 +754,6 @@ fun InsightPager(
                                         ExpandedQiblaRadar(
                                             bearing = qiblaBearing,
                                             headingDegrees = heading.headingDegrees?.toFloat(),
-                                            needleRotation = arrowRotation,
                                         )
                                     }
                                 } else {
@@ -793,7 +802,6 @@ fun InsightPager(
                         }
 
                         else -> {
-                            val surah = dailyReading(today)
                             // Android's RecommendationExpandedStage: the
                             // enlarged state shows the model-generated
                             // grounded suggestion over the day's reading,
@@ -801,49 +809,6 @@ fun InsightPager(
                             // the GGUF is missing or its output is rejected.
                             // The model download is owned by the runtime, so
                             // it survives leaving this tile.
-                            var modelCard by remember(today) {
-                                mutableStateOf<DeenlyKnowledgeCard?>(null)
-                            }
-                            var modelLoading by remember(today) { mutableStateOf(false) }
-                            var modelMissing by remember(today) { mutableStateOf(false) }
-                            val downloadProgress by DeenlyKnowledgeRuntime.downloadProgress.collectAsState()
-                            val downloadCompleted by DeenlyKnowledgeRuntime.downloadCompleted.collectAsState()
-
-                            LaunchedEffect(isExpanded, today, downloadCompleted) {
-                                modelCard = null
-                                modelLoading = false
-                                modelMissing = false
-                                if (!isExpanded) return@LaunchedEffect
-                                val runtime = DeenlyKnowledgeRuntime
-                                if (!runtime.isKnowledgeModelAvailable()) {
-                                    modelMissing = true
-                                    return@LaunchedEffect
-                                }
-                                modelLoading = true
-                                modelCard = runCatching {
-                                    val store = SharedContentStore()
-                                    val translationLanguage = QuranTranslationLanguage.fromCode(
-                                        store.quranTranslationLanguage(),
-                                    )
-                                    val verses = createQuranVerseRepository()
-                                        .getVersesBySurah(surah.number, translationLanguage)
-                                        .take(3)
-                                    val sourceText = verses
-                                        .mapNotNull { it.translation.takeIf(String::isNotBlank) }
-                                        .joinToString(" ")
-                                        .ifBlank { return@runCatching null }
-                                    val title = runtime.generateKnowledgeTitle(
-                                        collection = "Holy Quran",
-                                        reference = "Surah ${surah.number} · ${surah.nameEnglish}",
-                                        topic = "Daily reading",
-                                        appSituation = null,
-                                        sourceText = sourceText,
-                                    ) ?: return@runCatching null
-                                    DeenlyKnowledgeCard(title = title, sourceText = sourceText)
-                                }.getOrNull()
-                                modelLoading = false
-                            }
-
                             ArtworkTile(
                                 backgroundPageOffset = { pageOffset },
                                 artwork = Res.drawable.insight_suggestion,
@@ -860,7 +825,7 @@ fun InsightPager(
                                             modelLoading -> ModelSuggestionLoading()
                                             modelCard != null -> ModelSuggestionStage(
                                                 card = modelCard,
-                                                onOpen = { onOpenQuran(surah.number) },
+                                                onOpen = { modelCard?.let(openModelCard) },
                                             )
                                             modelMissing -> MissingModelDownloadCard(
                                                 downloading = downloadProgress != null,
@@ -880,7 +845,7 @@ fun InsightPager(
                                 },
                                 onClick = {
                                     if (isExpanded && modelCard != null) {
-                                        onOpenQuran(surah.number)
+                                        modelCard?.let(openModelCard)
                                     } else {
                                         when (val target = recommendation.target) {
                                             is ContextualRecommendation.Target.Surah -> onOpenQuran(target.number)
@@ -1070,8 +1035,7 @@ private fun ExpandedReadingPreview(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(7.dp),
         modifier = modifier
-            .fillMaxWidth()
-            .fillMaxSize(),
+            .fillMaxWidth(),
     ) {
         if (surahNumber != 1 && surahNumber != 9) {
             Text(
@@ -1208,7 +1172,7 @@ private fun ExpandedPrayerLine(
     if (prayers.isEmpty()) return
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .clip(RoundedCornerShape(18.dp))
             .background(Color.Black.copy(alpha = 0.36f))
             .border(
@@ -1217,7 +1181,7 @@ private fun ExpandedPrayerLine(
                 shape = RoundedCornerShape(18.dp),
             )
             .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = "TODAY'S PRAYER LINE",
@@ -1284,6 +1248,16 @@ private fun formatTileClock(hour: Int, minute: Int): String {
     return "$h:${minute.toString().padStart(2, '0')} $suffix"
 }
 
+/** Android's prayer-specific Bukhari query order. */
+private fun prayerHadithQueries(prayerName: String?): List<String> = when (prayerName?.lowercase()) {
+    "fajr" -> listOf("Fajr prayer", "morning prayer")
+    "dhuhr" -> listOf("Dhuhr prayer", "midday prayer")
+    "asr" -> listOf("Asr prayer", "afternoon prayer")
+    "maghrib" -> listOf("Maghrib prayer", "sunset prayer")
+    "isha" -> listOf("Isha prayer", "night prayer")
+    else -> listOf("prayer", "congregational prayer")
+}
+
 /**
  * Android's SalahHadithExpandedStage: the staged fallback narration for the
  * next unprayed prayer — a full-bleed gradient overlay (not a floating
@@ -1293,11 +1267,13 @@ private fun formatTileClock(hour: Int, minute: Int): String {
  */
 @Composable
 private fun ExpandedSalahHadith(
-    nextPrayer: String?,
+    prayerName: String?,
+    date: LocalDate,
+    onOpenHadith: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val displayName = nextPrayer?.replaceFirstChar { it.uppercase() } ?: "Salah"
-    val (text, source) = when (nextPrayer?.lowercase()) {
+    val displayName = prayerName?.replaceFirstChar { it.uppercase() } ?: "Salah"
+    val (fallbackText, fallbackSource) = when (prayerName?.lowercase()) {
         "fajr", "asr" ->
             "Whoever prays the two cool prayers will enter Paradise." to "Sahih al-Bukhari · 574"
         "isha" ->
@@ -1307,6 +1283,31 @@ private fun ExpandedSalahHadith(
             "Prayer in congregation is twenty-seven times superior to prayer " +
                 "offered alone." to "Sahih al-Bukhari · 645"
     }
+    var resolvedHadith by remember(prayerName, date) {
+        mutableStateOf<com.starception.submission.shared.hadith.SharedHadith?>(null)
+    }
+    LaunchedEffect(prayerName, date) {
+        val repository = createSharedHadithRepository()
+        val candidates = prayerHadithQueries(prayerName)
+            .flatMap { query ->
+                runCatching { repository.searchBukhari(query, limit = 24) }
+                    .getOrDefault(emptyList())
+            }
+            .distinctBy { it.id }
+            .filter { hadith ->
+                hadith.english.isNotBlank() && hadith.english.length in 40..1_200
+            }
+            .sortedBy { it.english.length }
+            .take(8)
+        resolvedHadith = if (candidates.isEmpty()) {
+            null
+        } else {
+            val seed = date.toEpochDays().toInt() * 31 + prayerName.orEmpty().lowercase().hashCode()
+            candidates[((seed % candidates.size) + candidates.size) % candidates.size]
+        }
+    }
+    val text = resolvedHadith?.english ?: fallbackText
+    val source = resolvedHadith?.let { "Sahih al-Bukhari · ${it.id}" } ?: fallbackSource
     // Kept outside AnimatedContent so touch scrolling never recreates the
     // scrollable subtree, matching Android's structure.
     val hadithScrollState = androidx.compose.foundation.rememberScrollState()
@@ -1429,119 +1430,401 @@ private fun ExpandedSalahHadith(
                 color = Color.White.copy(alpha = 0.56f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.then(
+                    resolvedHadith?.let { hadith ->
+                        Modifier.clickable { onOpenHadith(hadith.id) }
+                    } ?: Modifier,
+                ),
             )
         }
     }
 }
 
-/**
- * Lean port of Android's QiblaBearingExpandedStage: a perspective radar with
- * the rotating rose, a faceted needle holding the bearing, and turn guidance.
- */
+/** Android's complete expanded Qibla hierarchy and perspective instrument. */
 @Composable
 private fun ExpandedQiblaRadar(
     bearing: Int,
     headingDegrees: Float?,
-    needleRotation: Float?,
     modifier: Modifier = Modifier,
 ) {
     val turn = headingDegrees?.let { shortestBearingDelta(it, bearing.toFloat()) }
+    val isAligned = turn != null && abs(turn) < 6f
     val instruction = when {
-        turn == null -> "Open the live compass for turn guidance"
-        abs(turn) < 6f -> "You are facing the Qibla"
+        turn == null -> "Finding your direction"
+        isAligned -> "You are facing the Qibla"
         turn > 0f -> "Turn ${abs(turn).roundToInt()}° right"
         else -> "Turn ${abs(turn).roundToInt()}° left"
     }
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    val direction = qiblaCardinalDirection(bearing).substringBefore(" from your location")
+    val pulse by rememberInfiniteTransition(label = "expandedQiblaPulse").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1_400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "expandedQiblaPulsePhase",
+    )
+    val radarSweep by rememberInfiniteTransition(label = "expandedQiblaSweep").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(5_500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "expandedQiblaSweepAngle",
+    )
+    val foreground = Color.White
+    val surface = Color(0xFF171816)
+    val accent = ReadingPreviewGold
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(24.dp))
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.14f to surface.copy(alpha = 0.38f),
+                    0.68f to surface.copy(alpha = 0.72f),
+                    1f to surface.copy(alpha = 0.28f),
+                ),
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.20f to foreground.copy(alpha = 0.12f),
+                    0.58f to accent.copy(alpha = 0.18f + (0.06f * pulse)),
+                    0.90f to foreground.copy(alpha = 0.08f),
+                    1f to Color.Transparent,
+                ),
+                shape = RoundedCornerShape(24.dp),
+            )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = "Direction to Makkah",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = foreground,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "$bearing°  ·  $direction",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = foreground.copy(alpha = 0.60f),
+                )
+            }
+            if (headingDegrees != null) {
+                Row(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(foreground.copy(alpha = 0.08f))
+                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .graphicsLayer {
+                                scaleX = 1f + (0.35f * pulse)
+                                scaleY = 1f + (0.35f * pulse)
+                            }
+                            .background(accent, CircleShape),
+                    )
+                    Text(
+                        text = if (isAligned) "Aligned" else "Live",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                        color = foreground.copy(alpha = 0.88f),
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+        }
+
         BoxWithConstraints(
             modifier = Modifier
+                .align(Alignment.Center)
+                .padding(top = 8.dp)
+                .widthIn(max = 286.dp)
                 .fillMaxWidth()
-                .weight(1f)
-                .clip(RoundedCornerShape(22.dp))
-                .background(Color.Black.copy(alpha = 0.36f))
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(22.dp),
-                ),
+                .aspectRatio(286f / 174f)
+                .semantics {
+                    contentDescription = if (isAligned) {
+                        "Aligned with Qibla"
+                    } else {
+                        "Qibla compass, ${turn?.roundToInt() ?: 0} degrees to turn"
+                    }
+                },
+            contentAlignment = Alignment.Center,
         ) {
             val density = LocalDensity.current
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val centerX = size.width / 2f
-                val centerY = size.height / 2f
-                val radiusX = (size.width / 2f) - 18.dp.toPx()
-                val radiusY = (size.height / 2f) - 12.dp.toPx()
+                val radarCenter = Offset(center.x, center.y + 11.dp.toPx())
+                val radiusX = (size.width / 2f) - 21.dp.toPx()
+                val radiusY = (size.height / 2f) - 34.dp.toPx()
+                val radarTopLeft = Offset(radarCenter.x - radiusX, radarCenter.y - radiusY)
+                val radarSize = Size(radiusX * 2f, radiusY * 2f)
 
-                // Perspective depth rings.
+                repeat(2) { index ->
+                    val expansion = (8f + (index * 8f)).dp.toPx()
+                    drawArc(
+                        color = foreground.copy(alpha = if (index == 0) 0.08f else 0.04f),
+                        startAngle = 198f,
+                        sweepAngle = 144f,
+                        useCenter = false,
+                        topLeft = Offset(
+                            radarCenter.x - radiusX - expansion,
+                            radarCenter.y - radiusY - (expansion * 0.28f),
+                        ),
+                        size = Size(
+                            (radiusX + expansion) * 2f,
+                            (radiusY + (expansion * 0.28f)) * 2f,
+                        ),
+                        style = Stroke(width = 0.8.dp.toPx()),
+                    )
+                }
+                drawOval(
+                    color = Color.Black.copy(alpha = 0.28f),
+                    topLeft = radarTopLeft + Offset(0f, 7.dp.toPx()),
+                    size = radarSize,
+                )
+                drawOval(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(surface.copy(alpha = 0.64f), surface.copy(alpha = 0.88f)),
+                        startY = radarTopLeft.y,
+                        endY = radarTopLeft.y + radarSize.height,
+                    ),
+                    topLeft = radarTopLeft,
+                    size = radarSize,
+                )
+                drawOval(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            accent.copy(alpha = if (isAligned) 0.15f else 0.06f),
+                            Color.Transparent,
+                        ),
+                        center = radarCenter,
+                        radius = radiusX,
+                    ),
+                    topLeft = radarTopLeft,
+                    size = radarSize,
+                )
+                drawArc(
+                    color = foreground.copy(alpha = 0.20f),
+                    startAngle = 202f,
+                    sweepAngle = 136f,
+                    useCenter = false,
+                    topLeft = radarTopLeft,
+                    size = radarSize,
+                    style = Stroke(width = 0.8.dp.toPx()),
+                )
                 listOf(1f, 0.62f, 0.30f).forEachIndexed { index, scale ->
                     drawOval(
-                        color = Color.White.copy(alpha = if (index == 0) 0.22f else 0.10f),
-                        topLeft = Offset(centerX - radiusX * scale, centerY - radiusY * scale),
+                        color = foreground.copy(alpha = if (index == 0) 0.22f else 0.10f),
+                        topLeft = Offset(
+                            radarCenter.x - (radiusX * scale),
+                            radarCenter.y - (radiusY * scale),
+                        ),
                         size = Size(radiusX * 2f * scale, radiusY * 2f * scale),
                         style = Stroke(width = if (index == 0) 1.2.dp.toPx() else 0.8.dp.toPx()),
                     )
                 }
-
-                // The rose rotates against the live heading.
+                val headingCone = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y - (radiusY * 0.72f))
+                    lineTo(radarCenter.x - 13.dp.toPx(), radarCenter.y + 5.dp.toPx())
+                    quadraticTo(
+                        radarCenter.x,
+                        radarCenter.y + 10.dp.toPx(),
+                        radarCenter.x + 13.dp.toPx(),
+                        radarCenter.y + 5.dp.toPx(),
+                    )
+                    close()
+                }
+                drawPath(
+                    path = headingCone,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            foreground.copy(alpha = 0.13f),
+                            foreground.copy(alpha = 0.01f),
+                        ),
+                        startY = radarCenter.y - radiusY,
+                        endY = radarCenter.y + 10.dp.toPx(),
+                    ),
+                )
                 val roseHeading = headingDegrees ?: 0f
+                repeat(4) { index ->
+                    val angle = radians((index * 90f - roseHeading).toDouble())
+                    drawLine(
+                        color = foreground.copy(alpha = 0.07f),
+                        start = radarCenter,
+                        end = Offset(
+                            radarCenter.x + cos(angle).toFloat() * radiusX,
+                            radarCenter.y + sin(angle).toFloat() * radiusY,
+                        ),
+                        strokeWidth = 0.7.dp.toPx(),
+                    )
+                }
+                drawArc(
+                    color = foreground.copy(alpha = 0.035f),
+                    startAngle = radarSweep,
+                    sweepAngle = 42f,
+                    useCenter = true,
+                    topLeft = radarTopLeft,
+                    size = radarSize,
+                )
+                if (turn != null) {
+                    drawArc(
+                        color = accent.copy(alpha = if (isAligned) 0.92f else 0.58f),
+                        startAngle = -90f,
+                        sweepAngle = if (isAligned) 360f else turn.coerceIn(-180f, 180f),
+                        useCenter = false,
+                        topLeft = radarTopLeft,
+                        size = radarSize,
+                        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
+                    )
+                }
                 repeat(48) { index ->
-                    val rotated = radians(
+                    val angle = radians(
                         (index * 7.5f - roseHeading - 90f).toDouble(),
                     )
-                    val rx = cos(rotated).toFloat()
-                    val ry = sin(rotated).toFloat()
+                    val x = cos(angle).toFloat()
+                    val y = sin(angle).toFloat()
                     val major = index % 6 == 0
                     drawLine(
-                        color = Color.White.copy(alpha = if (major) 0.55f else 0.22f),
+                        color = foreground.copy(alpha = if (major) 0.68f else 0.28f),
                         start = Offset(
-                            centerX + rx * radiusX * (if (major) 0.88f else 0.93f),
-                            centerY + ry * radiusY * (if (major) 0.88f else 0.93f),
+                            radarCenter.x + x * radiusX * (if (major) 0.90f else 0.95f),
+                            radarCenter.y + y * radiusY * (if (major) 0.90f else 0.95f),
                         ),
                         end = Offset(
-                            centerX + rx * radiusX,
-                            centerY + ry * radiusY,
+                            radarCenter.x + x * radiusX,
+                            radarCenter.y + y * radiusY,
                         ),
-                        strokeWidth = if (major) 1.3.dp.toPx() else 0.7.dp.toPx(),
+                        strokeWidth = if (major) 1.4.dp.toPx() else 0.7.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                }
+                repeat(30) { index ->
+                    val angle = radians(
+                        (index * 12f + (roseHeading * 0.42f) - 90f).toDouble(),
+                    )
+                    val x = cos(angle).toFloat()
+                    val y = sin(angle).toFloat()
+                    drawLine(
+                        color = if (index % 5 == 0) {
+                            accent.copy(alpha = 0.32f)
+                        } else {
+                            foreground.copy(alpha = 0.11f)
+                        },
+                        start = Offset(
+                            radarCenter.x + (x * radiusX * 0.65f),
+                            radarCenter.y + (y * radiusY * 0.62f),
+                        ),
+                        end = Offset(
+                            radarCenter.x + (x * radiusX * 0.70f),
+                            radarCenter.y + (y * radiusY * 0.67f),
+                        ),
+                        strokeWidth = if (index % 5 == 0) 1.dp.toPx() else 0.55.dp.toPx(),
+                        cap = StrokeCap.Round,
                     )
                 }
 
-                // Faceted needle: gold point at the bearing, white
-                // counterweight behind the center, pivoting with the heading.
-                val needleAngle = radians(
-                    ((needleRotation ?: bearing.toFloat()) - 90f).toDouble(),
+                val qiblaAngle = radians(((turn ?: 0f) - 90f).toDouble())
+                val qiblaPoint = Offset(
+                    radarCenter.x + cos(qiblaAngle).toFloat() * radiusX * 0.64f,
+                    radarCenter.y + sin(qiblaAngle).toFloat() * radiusY * 0.64f,
                 )
-                val dirX = kotlin.math.cos(needleAngle).toFloat()
-                val dirY = kotlin.math.sin(needleAngle).toFloat()
-                val normalX = -dirY
-                val normalY = dirX
-                val tipX = centerX + dirX * radiusX * 0.72f
-                val tipY = centerY + dirY * radiusY * 0.72f
-                val tailX = centerX - dirX * radiusX * 0.40f
-                val tailY = centerY - dirY * radiusY * 0.40f
-                val pointHalf = 4.dp.toPx()
-                val tailHalf = 3.dp.toPx()
-                val goldPoint = Path().apply {
-                    moveTo(centerX + normalX * pointHalf, centerY + normalY * pointHalf)
-                    lineTo(tipX, tipY)
-                    lineTo(centerX - normalX * pointHalf, centerY - normalY * pointHalf)
+                val routeDelta = qiblaPoint - radarCenter
+                val perspectiveScale = radiusY / radiusX
+                val routeNormal = Offset(
+                    x = -sin(qiblaAngle).toFloat(),
+                    y = cos(qiblaAngle).toFloat() * perspectiveScale,
+                )
+                val counterPoint = Offset(
+                    radarCenter.x - (routeDelta.x * 0.62f),
+                    radarCenter.y - (routeDelta.y * 0.62f),
+                )
+                val shadowOffset = 1.5.dp.toPx() * perspectiveScale
+                val handShadow = Path().apply {
+                    moveTo(
+                        radarCenter.x + (routeNormal.x * 7.dp.toPx()),
+                        radarCenter.y + (routeNormal.y * 7.dp.toPx()) + shadowOffset,
+                    )
+                    lineTo(qiblaPoint.x, qiblaPoint.y + shadowOffset)
+                    lineTo(
+                        radarCenter.x - (routeNormal.x * 7.dp.toPx()),
+                        radarCenter.y - (routeNormal.y * 7.dp.toPx()) + shadowOffset,
+                    )
+                    lineTo(counterPoint.x, counterPoint.y + shadowOffset)
                     close()
                 }
-                drawPath(goldPoint, ReadingPreviewGold)
-                val counterweight = Path().apply {
-                    moveTo(centerX + normalX * tailHalf, centerY + normalY * tailHalf)
-                    lineTo(tailX, tailY)
-                    lineTo(centerX - normalX * tailHalf, centerY - normalY * tailHalf)
+                drawPath(handShadow, Color.Black.copy(alpha = 0.34f))
+                val qiblaLeft = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y)
+                    lineTo(
+                        radarCenter.x + (routeNormal.x * 5.5.dp.toPx()),
+                        radarCenter.y + (routeNormal.y * 5.5.dp.toPx()),
+                    )
+                    lineTo(qiblaPoint.x, qiblaPoint.y)
                     close()
                 }
-                drawPath(counterweight, Color.White.copy(alpha = 0.86f))
-                drawCircle(Color.White.copy(alpha = 0.30f), radius = 1.8.dp.toPx(), center = Offset(centerX, centerY))
+                drawPath(qiblaLeft, accent)
+                val qiblaRight = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y)
+                    lineTo(qiblaPoint.x, qiblaPoint.y)
+                    lineTo(
+                        radarCenter.x - (routeNormal.x * 5.5.dp.toPx()),
+                        radarCenter.y - (routeNormal.y * 5.5.dp.toPx()),
+                    )
+                    close()
+                }
+                drawPath(qiblaRight, accent.copy(alpha = 0.68f))
+                val counterLeft = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y)
+                    lineTo(
+                        radarCenter.x + (routeNormal.x * 5.5.dp.toPx()),
+                        radarCenter.y + (routeNormal.y * 5.5.dp.toPx()),
+                    )
+                    lineTo(counterPoint.x, counterPoint.y)
+                    close()
+                }
+                drawPath(counterLeft, foreground.copy(alpha = 0.92f))
+                val counterRight = Path().apply {
+                    moveTo(radarCenter.x, radarCenter.y)
+                    lineTo(counterPoint.x, counterPoint.y)
+                    lineTo(
+                        radarCenter.x - (routeNormal.x * 5.5.dp.toPx()),
+                        radarCenter.y - (routeNormal.y * 5.5.dp.toPx()),
+                    )
+                    close()
+                }
+                drawPath(counterRight, foreground.copy(alpha = 0.56f))
+                drawCircle(
+                    color = accent.copy(alpha = 0.12f + (0.08f * pulse)),
+                    radius = 12.dp.toPx(),
+                    center = qiblaPoint,
+                )
+                drawCircle(surface, radius = 2.2.dp.toPx(), center = radarCenter)
+
+                val headingMarker = Path().apply {
+                    moveTo(radarCenter.x, radarTopLeft.y - 7.dp.toPx())
+                    lineTo(radarCenter.x - 4.dp.toPx(), radarTopLeft.y - 13.dp.toPx())
+                    lineTo(radarCenter.x + 4.dp.toPx(), radarTopLeft.y - 13.dp.toPx())
+                    close()
+                }
+                drawPath(headingMarker, accent)
             }
 
-            // Cardinal labels orbit the rose; keep them their own layers so
-            // they stay crisp while the heading changes every frame.
             listOf("N", "E", "S", "W").forEachIndexed { index, label ->
                 Text(
                     text = label,
@@ -1550,9 +1833,9 @@ private fun ExpandedQiblaRadar(
                         lineHeight = 10.sp,
                     ),
                     color = if (label == "N") {
-                        ReadingPreviewGold
+                        accent
                     } else {
-                        Color.White.copy(alpha = 0.62f)
+                        foreground.copy(alpha = 0.62f)
                     },
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
@@ -1562,38 +1845,82 @@ private fun ExpandedQiblaRadar(
                                 (index * 90f - (headingDegrees ?: 0f) - 90f).toDouble(),
                             )
                             translationX = cos(angle).toFloat() *
-                                (maxWidth.toPx() / 2f - 22.dp.toPx()) * 0.92f
-                            translationY = sin(angle).toFloat() *
-                                (maxHeight.toPx() / 2f - 16.dp.toPx()) * 0.92f
+                                (maxWidth.toPx() / 2f - 21.dp.toPx()) * 0.79f
+                            translationY = 11.dp.toPx() + sin(angle).toFloat() *
+                                (maxHeight.toPx() / 2f - 34.dp.toPx()) * 0.76f
+                        },
+                )
+            }
+            if (turn != null) {
+                Text(
+                    text = "KAABA",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        lineHeight = 10.sp,
+                        letterSpacing = 1.1.sp,
+                    ),
+                    color = accent,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .graphicsLayer {
+                            val angle = radians((turn - 90f).toDouble())
+                            translationX = cos(angle).toFloat() *
+                                (maxWidth.toPx() / 2f - 21.dp.toPx()) * 0.64f
+                            translationY = 11.dp.toPx() + sin(angle).toFloat() *
+                                (maxHeight.toPx() / 2f - 34.dp.toPx()) * 0.64f -
+                                41.dp.toPx()
                         },
                 )
             }
         }
-        Text(
-            text = instruction,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 12.sp,
-                lineHeight = 15.sp,
-            ),
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = headingDegrees
-                    ?.let { "Heading ${it.roundToInt()}°" }
-                    ?: "$bearing° to Makkah",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.60f),
-                maxLines = 1,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = instruction,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (isAligned) accent else foreground,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = headingDegrees
+                        ?.let { "Phone heading ${it.roundToInt()}°" }
+                        ?: "Open the compass for live guidance",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = foreground.copy(alpha = 0.56f),
+                    maxLines = 1,
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(foreground.copy(alpha = 0.08f))
+                    .padding(horizontal = 11.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "3D globe",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = foreground.copy(alpha = 0.84f),
+                    fontWeight = FontWeight.Medium,
+                )
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Open live Qibla globe",
+                    tint = foreground.copy(alpha = 0.76f),
+                    modifier = Modifier.size(15.dp),
+                )
+            }
         }
     }
 }
@@ -1662,30 +1989,240 @@ private fun ExpandedSuggestion(
     }
 }
 
+private sealed interface DeenlyKnowledgeTarget {
+    data class Surah(val number: Int) : DeenlyKnowledgeTarget
+    data class FortressDua(val chapterId: Int) : DeenlyKnowledgeTarget
+    data class BukhariHadith(val hadithId: Int) : DeenlyKnowledgeTarget
+    data class ShamayelBook(val bookId: Int) : DeenlyKnowledgeTarget
+}
+
+private data class DeenlyInsightSource(
+    val collection: String,
+    val reference: String,
+    val topic: String,
+    val text: String,
+    val target: DeenlyKnowledgeTarget,
+)
+
+internal fun expandedKnowledgeSourceIndex(date: LocalDate, sourceCount: Int): Int {
+    require(sourceCount > 0)
+    return date.dayOfYear % sourceCount
+}
+
 /** The model-generated grounded suggestion shown by the enlarged AI tile. */
 private data class DeenlyKnowledgeCard(
     val title: String,
     val sourceText: String,
+    val reference: String,
+    val target: DeenlyKnowledgeTarget,
 )
+
+private suspend fun generateInsightKnowledgeCard(
+    date: LocalDate,
+    appSituation: String?,
+    fortressInvocations: Map<Int, List<com.starception.submission.shared.content.FortressInvocation>>,
+): DeenlyKnowledgeCard? {
+    val seed = date.toEpochDays().toInt()
+    val sources = mutableListOf<DeenlyInsightSource>()
+    val quranStore = SharedContentStore()
+    val quranLanguage = QuranTranslationLanguage.fromCode(quranStore.quranTranslationLanguage())
+    val surah = QuranData.surahs[((seed % QuranData.surahs.size) + QuranData.surahs.size) % QuranData.surahs.size]
+    runCatching {
+        createQuranVerseRepository()
+            .getVersesBySurah(surah.number, quranLanguage)
+            .take(3)
+            .mapNotNull { it.translation.takeIf(String::isNotBlank) }
+            .joinToString(" ")
+    }.getOrNull()?.takeIf(String::isNotBlank)?.let { text ->
+        sources += DeenlyInsightSource(
+            collection = "Holy Quran",
+            reference = "Surah ${surah.number} · ${surah.nameEnglish}",
+            topic = "Reflect on ${surah.nameEnglish}",
+            text = text,
+            target = DeenlyKnowledgeTarget.Surah(surah.number),
+        )
+    }
+
+    fortressInvocations
+        .entries
+        .sortedBy { it.key }
+        .flatMap { it.value }
+        .filter { invocation ->
+            listOf(
+                invocation.translation,
+                invocation.context,
+                invocation.instruction,
+                invocation.note,
+                invocation.postContext,
+                invocation.description,
+            ).any(String::isNotBlank)
+        }
+        .let { invocations ->
+            invocations.getOrNull(
+                if (invocations.isEmpty()) 0 else ((seed + 17) % invocations.size + invocations.size) % invocations.size,
+            )
+        }
+        ?.let { invocation ->
+            sources += DeenlyInsightSource(
+                collection = "Fortress of the Muslim",
+                reference = "Chapter ${invocation.chapterId} · Dua ${invocation.position}",
+                topic = "A dua for today",
+                text = listOf(
+                    invocation.translation,
+                    invocation.context,
+                    invocation.instruction,
+                    invocation.note,
+                    invocation.postContext,
+                    invocation.description,
+                ).filter(String::isNotBlank).joinToString(" "),
+                target = DeenlyKnowledgeTarget.FortressDua(invocation.chapterId),
+            )
+        }
+
+    val hadithRepository = createSharedHadithRepository()
+    BukhariBooks.all.getOrNull(((seed + 31) % BukhariBooks.all.size + BukhariBooks.all.size) % BukhariBooks.all.size)
+        ?.let { book ->
+            runCatching { hadithRepository.getHadiths(book.firstHadithId, book.lastHadithId) }
+                .getOrNull()
+                ?.filter { it.english.isNotBlank() }
+                ?.let { hadiths ->
+                    hadiths.getOrNull(
+                        if (hadiths.isEmpty()) 0 else ((seed + 7) % hadiths.size + hadiths.size) % hadiths.size,
+                    )
+                }
+                ?.let { hadith ->
+                    sources += DeenlyInsightSource(
+                        collection = "Sahih al-Bukhari",
+                        reference = "Hadith ${hadith.id} · ${book.nameEnglish}",
+                        topic = "A teaching from ${book.nameEnglish}",
+                        text = hadith.english,
+                        target = DeenlyKnowledgeTarget.BukhariHadith(hadith.id),
+                    )
+                }
+        }
+    ShamayelBooks.all.getOrNull(((seed + 47) % ShamayelBooks.all.size + ShamayelBooks.all.size) % ShamayelBooks.all.size)
+        ?.let { book ->
+            runCatching { hadithRepository.getShamayelHadiths(book.firstHadithId, book.lastHadithId) }
+                .getOrNull()
+                ?.filter { it.english.isNotBlank() }
+                ?.let { hadiths ->
+                    hadiths.getOrNull(
+                        if (hadiths.isEmpty()) 0 else ((seed + 11) % hadiths.size + hadiths.size) % hadiths.size,
+                    )
+                }
+                ?.let { hadith ->
+                    sources += DeenlyInsightSource(
+                        collection = "Shama'il At-Tirmidhi",
+                        reference = "Hadith ${hadith.id} · ${book.nameEnglish}",
+                        topic = "Learn about ${book.nameEnglish}",
+                        text = hadith.english,
+                        target = DeenlyKnowledgeTarget.ShamayelBook(book.id),
+                    )
+                }
+        }
+
+    if (sources.isEmpty()) return null
+    val source = sources[expandedKnowledgeSourceIndex(date, sources.size)]
+    println("[DeenlyKnowledge] selected ${source.collection}: ${source.reference}")
+    val generatedTitle = DeenlyKnowledgeRuntime.generateKnowledgeTitle(
+        collection = source.collection,
+        reference = source.reference,
+        topic = source.topic,
+        appSituation = appSituation,
+        sourceText = source.text,
+    )
+    if (generatedTitle == null) {
+        println("[DeenlyKnowledge] model title rejected; using grounded source title")
+    }
+    return DeenlyKnowledgeCard(
+        title = generatedTitle ?: source.topic,
+        sourceText = source.text,
+        reference = source.reference,
+        target = source.target,
+    )
+}
 
 /** Android's RecommendationExpandedStage loading beat. */
 @Composable
 private fun ModelSuggestionLoading() {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(9.dp),
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            CircularProgressIndicator(
+                color = ReadingPreviewGold,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(24.dp),
+            )
+            Text(
+                text = "Reading your downloaded sources…",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.72f),
+            )
+        }
+        PreparingKnowledgeFooter(
+            modifier = Modifier.align(Alignment.BottomStart),
+        )
+    }
+}
+
+@Composable
+private fun PreparingKnowledgeFooter(modifier: Modifier = Modifier) {
+    val progressSteps = remember {
+        listOf(
+            "Selecting a verified local source…",
+            "Checking Quran and daily duas…",
+            "Checking Sahih al-Bukhari…",
+            "Checking Shama'il at-Tirmidhi…",
+            "Comparing relevance for this moment…",
+            "Composing with the on-device model…",
+        )
+    }
+    var progressStep by remember { mutableIntStateOf(0) }
+    LaunchedEffect(progressSteps) {
+        while (true) {
+            kotlinx.coroutines.delay(1_100L)
+            progressStep = (progressStep + 1) % progressSteps.size
+        }
+    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        CircularProgressIndicator(
+        Text(
+            text = "✦",
+            style = MaterialTheme.typography.titleLarge,
             color = ReadingPreviewGold,
-            strokeWidth = 2.dp,
             modifier = Modifier.size(24.dp),
         )
-        Text(
-            text = "Reading your downloaded sources…",
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.72f),
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                text = "Finding grounded knowledge for you…",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                ),
+                color = Color.White.copy(alpha = 0.88f),
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = progressSteps[progressStep],
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.5.sp,
+                    lineHeight = 12.sp,
+                ),
+                color = Color.White.copy(alpha = 0.58f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -1744,6 +2281,13 @@ private fun ModelSuggestionStage(
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = card?.reference.orEmpty(),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.62f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = "Tap to open the verified source",

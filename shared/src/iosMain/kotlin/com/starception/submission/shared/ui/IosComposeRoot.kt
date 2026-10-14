@@ -74,6 +74,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.DayOfWeek
@@ -87,6 +88,13 @@ import platform.UIKit.UIViewController
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.time.Clock
+
+private val prayerTimesDeepLinks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+@Suppress("FunctionName", "unused")
+fun OpenPrayerTimesFromLiveActivity() {
+    prayerTimesDeepLinks.tryEmit(Unit)
+}
 
 /**
  * Bridges the shared Compose UI into UIKit so `iosApp/` can present it.
@@ -756,6 +764,9 @@ private fun createPrayerTimesViewController(
             mutableStateOf(settingsStore.settings(place.countryCode, country))
         }
         var notificationPrefs by remember { mutableStateOf(settingsStore.notifications()) }
+        var liveActivitiesEnabled by remember {
+            mutableStateOf(settingsStore.liveActivitiesEnabled())
+        }
         // Prayer times belong to the resolved location, not necessarily the device's
         // current timezone (for example, when viewing a cached location while travelling).
         val localNow = now.toLocalDateTime(timeZoneForOffset(place.timeZoneOffset))
@@ -805,6 +816,7 @@ private fun createPrayerTimesViewController(
             country,
             prayerSettings,
             notificationPrefs,
+            liveActivitiesEnabled,
             localNow.hour,
             localNow.minute,
         ) {
@@ -819,6 +831,7 @@ private fun createPrayerTimesViewController(
                     defaults = country,
                     settings = prayerSettings,
                     preferences = notificationPrefs,
+                    liveActivitiesEnabled = liveActivitiesEnabled,
                 )
             }
         }
@@ -875,6 +888,7 @@ private fun createPrayerTimesViewController(
                 onExternalVoiceSearchHandled = {
                     iosVoiceSearchRequests.value = null
                 }.takeIf { onSelectBottom != null },
+                externalPrayerTimesRequests = prayerTimesDeepLinks,
                 latitude = place.latitude,
                 longitude = place.longitude,
                 today = today,
@@ -943,7 +957,7 @@ private fun createPrayerTimesViewController(
                          onNudgeChanged = { nudge ->
                              NowNudgeBus.updateAmbient(nudge)
                          },
-                         externalNudgeActionRequests = NowNudgeBus.actionRequests,
+                          externalNudgeActionRequests = NowNudgeBus.actionRequests,
                           initialExpandedInsight = expandInsight,
                           initialShowAllPrayers = showAllPrayers,
                       )
@@ -985,6 +999,11 @@ private fun createPrayerTimesViewController(
                         onNotificationsChange = { updated ->
                             notificationPrefs = updated
                             settingsStore.saveNotifications(updated)
+                        },
+                        liveActivitiesEnabled = liveActivitiesEnabled,
+                        onLiveActivitiesEnabledChange = { enabled ->
+                            liveActivitiesEnabled = enabled
+                            settingsStore.saveLiveActivitiesEnabled(enabled)
                         },
                         themeSettings = themeSettings,
                         onThemeBrandChange = { brand ->

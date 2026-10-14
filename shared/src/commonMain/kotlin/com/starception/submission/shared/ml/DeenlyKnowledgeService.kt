@@ -162,8 +162,13 @@ object DeenlyKnowledgeRuntime {
         val contentType = (output["contentType"] as? JsonPrimitive)?.content
         if (contentType != DeenlyKnowledgeTasks.KNOWLEDGE) return null
         val title = (output["title"] as? JsonPrimitive)?.content?.trim().orEmpty()
+        val meaningfulCharacters = title.filter { character -> character.isLetterOrDigit() }
         return title.takeIf {
-            it.isNotEmpty() && it.length <= MAX_TITLE_CHARS && it.none(Char::isISOControl)
+            it.isNotEmpty() &&
+                it.length <= MAX_TITLE_CHARS &&
+                it.none(Char::isISOControl) &&
+                meaningfulCharacters.length >= MIN_MEANINGFUL_TITLE_CHARS &&
+                meaningfulCharacters.map { it.lowercaseChar() }.distinct().size >= 2
         }
     }
 
@@ -199,4 +204,5 @@ object DeenlyKnowledgeRuntime {
     internal const val MAX_SOURCE_CHARS = 1_400
     internal const val MAX_APP_SITUATION_CHARS = 320
     internal const val MAX_TITLE_CHARS = 84
+    internal const val MIN_MEANINGFUL_TITLE_CHARS = 3
 }

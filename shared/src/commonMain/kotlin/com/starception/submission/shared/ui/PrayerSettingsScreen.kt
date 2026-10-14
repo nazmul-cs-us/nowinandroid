@@ -32,6 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -90,6 +91,8 @@ fun PrayerSettingsScreen(
     databaseStats: com.starception.submission.shared.content.SharedDatabaseStats? = null,
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     onNotificationsChange: (PrayerNotificationPreferences) -> Unit = {},
+    liveActivitiesEnabled: Boolean = true,
+    onLiveActivitiesEnabledChange: (Boolean) -> Unit = {},
     themeSettings: ThemeSettingsState = ThemeSettingsState(),
     onThemeBrandChange: (ThemeBrand) -> Unit = {},
     onDarkThemeConfigChange: (DarkThemeConfig) -> Unit = {},
@@ -213,6 +216,28 @@ fun PrayerSettingsScreen(
                                 ImageRes.drawable.flaticon_sound_14925198,
                             ),
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Live Activities",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Text(
+                                    text = "Show the current prayer on the Lock Screen and Dynamic Island",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = liveActivitiesEnabled,
+                                onCheckedChange = onLiveActivitiesEnabledChange,
+                            )
+                        }
                     }
 
                     SettingsSection(

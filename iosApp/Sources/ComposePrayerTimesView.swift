@@ -752,6 +752,11 @@ struct NativePrayerTabsView: View {
         .onDisappear {
             bot.stop()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openPrayerLiveActivity)) { _ in
+            morePath = []
+            selectedTab = 0
+            lastSelectedTab = 0
+        }
         .onChange(of: selectedTab) { _, newValue in
             if newValue == 6 {
                 if bot.showNudge {

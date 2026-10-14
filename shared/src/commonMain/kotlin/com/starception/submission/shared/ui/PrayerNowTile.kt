@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -314,6 +315,22 @@ fun PrayerNowTile(
                     modifier = if (isExpanded) {
                         Modifier
                             .fillMaxWidth()
+                            // Match every ArtworkTile expanded stage: reclaim
+                            // 10dp from each metadata inset without moving the
+                            // footer alignment.
+                            .layout { measurable, constraints ->
+                                val bleed = 10.dp.roundToPx()
+                                val placeable = measurable.measure(
+                                    constraints.copy(
+                                        minWidth = 0,
+                                        maxWidth = (constraints.maxWidth + bleed * 2)
+                                            .coerceAtLeast(constraints.minWidth),
+                                    ),
+                                )
+                                layout(constraints.maxWidth, placeable.height) {
+                                    placeable.placeRelative(-bleed, 0)
+                                }
+                            }
                             .weight(1f)
                             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                             .drawWithContent {

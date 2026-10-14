@@ -2,6 +2,8 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
+private let prayerDeepLink = URL(string: "deenly://prayer-times")!
+
 // MARK: - Phase presentation (Android parity, Apple HIG presentation)
 //
 // The schedule defines five presentation states. Everything the lock screen
@@ -89,6 +91,27 @@ private func phasePresentation(
     )
 }
 
+private struct PhaseTimeline<Content: View>: View {
+    let state: PrayerActivityAttributes.ContentState
+    let content: (PhasePresentation) -> Content
+
+    init(
+        state: PrayerActivityAttributes.ContentState,
+        @ViewBuilder content: @escaping (PhasePresentation) -> Content
+    ) {
+        self.state = state
+        self.content = content
+    }
+
+    var body: some View {
+        // Re-evaluate the phase while the app is suspended. Text(timer:) keeps
+        // counting by itself, but titles, colors, and progress branches don't.
+        TimelineView(.periodic(from: .now, by: 30)) { timeline in
+            content(phasePresentation(for: state, now: timeline.date))
+        }
+    }
+}
+
 /// The live countdown text shared by every presentation. A nil target
 /// renders an em dash so layouts keep a stable footprint.
 @ViewBuilder
@@ -110,115 +133,149 @@ struct PrayerLiveActivityWidget: Widget {
             // the StandBy bezel, and survives Night Mode's red tint.
             LockScreenPrayerActivityView(context: context)
                 .activitySystemActionForegroundColor(.primary)
+                .widgetURL(prayerDeepLink)
         } dynamicIsland: { context in
-            let presentation = phasePresentation(for: context.state)
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label(
-                            presentation.phase.title,
-                            systemImage: "moon.stars.fill"
-                        )
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(presentation.phase.color)
-                        HStack(spacing: 4) {
-                            Text(context.state.prayerName)
-                                .font(.subheadline.weight(.semibold))
-                            if !context.state.prayerArabicName.isEmpty {
-                                Text(context.state.prayerArabicName)
-                                    .font(.footnote)
+                    PhaseTimeline(state: context.state) { presentation in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(
+                                presentation.phase.title,
+                                systemImage: "moon.stars.fill"
+                            )
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(presentation.phase.color)
+                            HStack(spacing: 4) {
+                                Text(context.state.prayerName)
+                                    .font(.subheadline.weight(.semibold))
+                                if !context.state.prayerArabicName.isEmpty {
+                                    Text(context.state.prayerArabicName)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .widgetURL(prayerDeepLink)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    PhaseTimeline(state: context.state) { presentation in
+                        VStack(alignment: .trailing, spacing: 2) {
+                            phaseTimer(presentation, weight: .semibold)
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(presentation.phase.color)
+                            if let label = presentation.timerLabel {
+                                Text(label)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(context.state.prayerTime)
+                                    .font(.caption2.weight(.medium))
+                                    .monospacedDigit()
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
-                }
-                DynamicIslandExpandedRegion(.trailing) {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        phaseTimer(presentation, weight: .semibold)
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(presentation.phase.color)
-                        if let label = presentation.timerLabel {
-                            Text(label)
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text(context.state.prayerTime)
-                                .font(.caption2.weight(.medium))
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    .widgetURL(prayerDeepLink)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     // Wrap content tightly under the camera: one description
                     // line, then the live progress bar in the phase color.
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(
-                                presentation.phase.description
-                                    ?? context.attributes.locationName
-                            )
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(
-                                presentation.phase.description == nil
-                                    ? context.attributes.locationName
-                                    : context.state.prayerTime
-                            )
-                            .font(.footnote)
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                        }
-                        if let target = presentation.timerTarget {
-                            ProgressView(
-                                timerInterval: context.state.prayerDate...max(
-                                    target,
-                                    context.state.prayerDate.addingTimeInterval(1)
-                                ),
-                                countsDown: false
-                            )
-                            .tint(presentation.phase.color)
+                    PhaseTimeline(state: context.state) { presentation in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(
+                                    presentation.phase.description
+                                        ?? context.attributes.locationName
+                                )
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(
+                                    presentation.phase.description == nil
+                                        ? context.attributes.locationName
+                                        : context.state.prayerTime
+                                )
+                                .font(.footnote)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                            }
+                            if let target = presentation.timerTarget {
+                                ProgressView(
+                                    timerInterval: context.state.prayerDate...max(
+                                        target,
+                                        context.state.prayerDate.addingTimeInterval(1)
+                                    ),
+                                    countsDown: false
+                                )
+                                .tint(presentation.phase.color)
+                            }
                         }
                     }
+                    .widgetURL(prayerDeepLink)
                 }
             } compactLeading: {
                 Image(systemName: "moon.stars.fill")
-                    .foregroundStyle(presentation.phase.color)
+                    .foregroundStyle(.teal)
+                    .widgetURL(prayerDeepLink)
             } compactTrailing: {
                 // HIG: compact shows dynamic, essential info — the live
                 // countdown, recolored by phase.
-                phaseTimer(presentation, weight: .semibold)
-                    .font(.caption2.weight(.semibold))
-                    .monospacedDigit()
-                    .minimumScaleFactor(0.6)
+                PhaseTimeline(state: context.state) { presentation in
+                    ViewThatFits(in: .horizontal) {
+                        phaseTimer(presentation, weight: .semibold)
+                            .font(.caption2.weight(.semibold))
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.7)
+                        Image(systemName: "clock.fill")
+                            .font(.caption2.weight(.semibold))
+                    }
                     .foregroundStyle(presentation.phase.color)
+                }
+                .widgetURL(prayerDeepLink)
             } minimal: {
                 // HIG: minimal displays updated information, not just a
                 // logo — the remaining time itself, like the Timer app.
-                phaseTimer(presentation, weight: .semibold)
-                    .font(.caption2.weight(.semibold))
-                    .monospacedDigit()
-                    .minimumScaleFactor(0.5)
+                PhaseTimeline(state: context.state) { presentation in
+                    ViewThatFits(in: .horizontal) {
+                        phaseTimer(presentation, weight: .semibold)
+                            .font(.caption2.weight(.semibold))
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.7)
+                        Image(systemName: "moon.stars.fill")
+                            .font(.caption2.weight(.semibold))
+                    }
                     .foregroundStyle(presentation.phase.color)
+                }
+                .widgetURL(prayerDeepLink)
             }
             // HIG: tint the keyline around the Dynamic Island to match the
             // phase color so the island reads as one piece in dark mode.
-            .keylineTint(presentation.phase.color)
+            .keylineTint(.teal)
         }
     }
 }
 
 /// Lock-screen presentation: one glanceable identity row with the live
-/// timer, one progress line, and the day's schedule strip — within the
+/// timer, one progress line, and a three-prayer summary — within the
 /// system's 84-160pt height budget with the standard 14pt layout margin.
 private struct LockScreenPrayerActivityView: View {
     let context: ActivityViewContext<PrayerActivityAttributes>
     private var state: PrayerActivityAttributes.ContentState { context.state }
 
+    private var summaryTimes: [PrayerActivityAttributes.PrayerTime] {
+        guard state.times.count > 3,
+              let nextIndex = state.times.firstIndex(where: \.isNext) else {
+            return state.times
+        }
+        let start = min(max(nextIndex - 1, 0), state.times.count - 3)
+        return Array(state.times[start..<(start + 3)])
+    }
+
     var body: some View {
-        let presentation = phasePresentation(for: state)
-        VStack(alignment: .leading, spacing: 8) {
+        TimelineView(.periodic(from: .now, by: 30)) { timeline in
+            let presentation = phasePresentation(for: state, now: timeline.date)
+            VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 10) {
                 Image(systemName: "moon.stars.fill")
                     .font(.title3.weight(.medium))
@@ -274,16 +331,16 @@ private struct LockScreenPrayerActivityView: View {
             }
             // Today's schedule strip: the glanceable summary of the day,
             // with the next prayer highlighted in the phase tint.
-            if !state.times.isEmpty {
+            if !summaryTimes.isEmpty {
                 HStack(spacing: 4) {
-                    ForEach(state.times, id: \.self) { time in
+                    ForEach(summaryTimes, id: \.self) { time in
                         VStack(spacing: 1) {
                             Text(time.name)
-                                .font(.caption2.weight(time.isNext ? .bold : .medium))
+                                .font(.footnote.weight(time.isNext ? .bold : .medium))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                             Text(time.time)
-                                .font(.caption2.weight(.semibold))
+                                .font(.caption.weight(.semibold))
                                 .monospacedDigit()
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
@@ -300,7 +357,8 @@ private struct LockScreenPrayerActivityView: View {
                     }
                 }
             }
+            }
+            .padding(14)
         }
-        .padding(14)
     }
 }

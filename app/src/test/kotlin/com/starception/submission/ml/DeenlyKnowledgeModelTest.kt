@@ -114,6 +114,18 @@ class DeenlyKnowledgeModelTest {
                 DeenlyKnowledgeTask.KNOWLEDGE,
             ),
         )
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"knowledge","title":"!!!!!!!!!!!!!!!!!!!!"}""",
+                DeenlyKnowledgeTask.KNOWLEDGE,
+            ),
+        )
+        assertNull(
+            DeenlyKnowledgeModel.parseDecision(
+                """{"contentType":"knowledge","title":"aaaaaaaa"}""",
+                DeenlyKnowledgeTask.KNOWLEDGE,
+            ),
+        )
     }
 
     @Test
