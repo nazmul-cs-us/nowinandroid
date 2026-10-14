@@ -73,6 +73,7 @@ internal fun ImmersiveDetailScaffold(
     onBack: () -> Unit,
     maxContentWidth: Dp = 720.dp,
     contentHorizontalPadding: Dp = 16.dp,
+    contentTopPadding: Dp = 12.dp,
     collapsibleHeader: Boolean = false,
     headerCollapseOffset: MutableState<Float>? = null,
     header: @Composable () -> Unit,
@@ -148,7 +149,7 @@ internal fun ImmersiveDetailScaffold(
                             ),
                         )
                         .padding(horizontal = contentHorizontalPadding)
-                        .padding(top = 12.dp),
+                        .padding(top = contentTopPadding),
                 ) {
                     content()
                 }

@@ -580,11 +580,26 @@ internal fun QuranDetailScreen(
     }
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     val headerCollapseOffset = remember { mutableFloatStateOf(0f) }
+    // Android's pinned play FAB and the info card share one toggle; both the
+    // header FAB and the toolbar's play action route through it.
+    val toggleSurahPlay = {
+        if (playing) {
+            player.pause()
+            playing = false
+        } else {
+            playing = player.play(quranAudioUrl(number))
+            if (playing) {
+                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
+            }
+            if (playing) showAudioPlayer = true
+        }
+    }
     ImmersiveDetailScaffold(
         onBack = onBack,
         collapsibleHeader = true,
         headerCollapseOffset = headerCollapseOffset,
         contentHorizontalPadding = 0.dp,
+        contentTopPadding = 0.dp,
         header = {
             Column {
                 if (mushafMode) {
@@ -630,6 +645,27 @@ internal fun QuranDetailScreen(
                                 ),
                             ),
                     )
+                    // Android's pinned play FAB, anchored over the artwork's
+                    // bottom edge beside the album info card.
+                    Surface(
+                        onClick = toggleSurahPlay,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 12.dp)
+                            .size(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shadowElevation = 6.dp,
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (playing) "Pause recitation" else "Play surah",
+                                modifier = Modifier.size(30.dp),
+                            )
+                        }
+                    }
                     Column {
                         DetailToolbar(
                             onBack = onBack,
@@ -913,19 +949,6 @@ internal fun QuranDetailScreen(
                                     ayahCount = displayVerses.size,
                                     nameTranslation = state.nameTranslation,
                                     arabicFont = selectedArabicFont,
-                                    playing = playing,
-                                    onPlayClick = {
-                                        if (playing) {
-                                            player.pause()
-                                            playing = false
-                                        } else {
-                                            playing = player.play(quranAudioUrl(number))
-                            if (playing) {
-                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
-                            }
-                                            if (playing) showAudioPlayer = true
-                                        }
-                                    },
                                 )
                             },
                             requestedPage = requestedMushafPage,
@@ -951,19 +974,6 @@ internal fun QuranDetailScreen(
                                     ayahCount = displayVerses.size,
                                     nameTranslation = state.nameTranslation,
                                     arabicFont = selectedArabicFont,
-                                    playing = playing,
-                                    onPlayClick = {
-                                        if (playing) {
-                                            player.pause()
-                                            playing = false
-                                        } else {
-                                            playing = player.play(quranAudioUrl(number))
-                            if (playing) {
-                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
-                            }
-                                            if (playing) showAudioPlayer = true
-                                        }
-                                    },
                                 )
                             }
                             if (showBismillah) {
@@ -1073,88 +1083,63 @@ private fun SurahAlbumInfoCard(
     ayahCount: Int,
     nameTranslation: String,
     arabicFont: String,
-    playing: Boolean,
-    onPlayClick: () -> Unit,
 ) {
-    // Lazy layouts clip children drawn beyond an item's bounds. Reserve room
-    // for both overlapping controls so neither is cut at the item boundary.
-    Box(modifier = Modifier.fillMaxWidth().height(223.dp)) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainer,
+    // Android's AlbumInfoCard: one continuous surface starting flush under the
+    // artwork — the surah name rests just below the artwork edge, then the
+    // name-translation quote, then the info chips row. No transparent strips.
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(172.dp)
-                .offset(y = 28.dp),
+                .padding(horizontal = 24.dp)
+                .padding(top = 12.dp, bottom = 14.dp),
         ) {
+            // The floating name's resting spot, 12dp below the artwork edge.
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 12.dp, bottom = 6.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        text = surah.nameEnglish,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "سُورَةُ ${surah.nameArabic}",
-                        fontFamily = QuranArabicFonts.fontFamily(arabicFont),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (nameTranslation.isNotBlank()) {
-                        Text(
-                            text = "\"$nameTranslation\"",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        InfoChip(text = "$ayahCount Ayahs")
-                        InfoChip(text = surah.revelationType)
-                        InfoChip(text = "Holy Quran")
-                    }
-                }
-            }
-        }
-        Surface(
-            onClick = onPlayClick,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = (-24).dp)
-                .size(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shadowElevation = 6.dp,
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playing) "Pause recitation" else "Play surah",
-                    modifier = Modifier.size(30.dp),
+                Text(
+                    text = surah.nameEnglish,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = surah.nameArabic,
+                    fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Spacer(Modifier.height(10.dp))
+            if (nameTranslation.isNotBlank()) {
+                Text(
+                    text = "\"$nameTranslation\"",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    InfoChip(text = "$ayahCount Ayahs")
+                    InfoChip(text = surah.revelationType)
+                }
+                InfoChip(text = "Holy Quran")
+            }
         }
-        Icon(
-            imageVector = Icons.Filled.KeyboardArrowUp,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .size(46.dp),
-        )
     }
 }
 
