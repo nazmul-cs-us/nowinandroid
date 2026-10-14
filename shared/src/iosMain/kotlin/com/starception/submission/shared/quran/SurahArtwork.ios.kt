@@ -16,7 +16,7 @@
 
 package com.starception.submission.shared.quran
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -25,12 +25,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.viewinterop.UIKitView
+import androidx.compose.ui.layout.ContentScale
 import com.starception.submission.shared.assets.iosCloudAssets
-import platform.UIKit.UIImage
-import platform.UIKit.UIImageView
-import platform.UIKit.UIViewContentMode
+import com.starception.submission.shared.ui.fileImageBitmap
 
 @Composable
 internal actual fun SurahArtworkHeader(
@@ -40,7 +39,8 @@ internal actual fun SurahArtworkHeader(
 ) {
     // CDN resolve + download happens once per surah; the resolved file path is
     // remembered for the composition and the (immutable) artwork file renders
-    // through UIImageView, matching the shared TopicArtwork interop.
+    // as a plain Compose image decoded through Skia, so the album header's
+    // graphicsLayer parallax applies to it.
     var imagePath by remember(surahNumber) { mutableStateOf<String?>(null) }
     LaunchedEffect(surahNumber) {
         imagePath = surahArtworkCdnKey(surahNumber)?.let { cdnKey ->
@@ -53,20 +53,13 @@ internal actual fun SurahArtworkHeader(
     Box(modifier = modifier.background(androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh)) {
         val path = imagePath
         if (path != null) {
-            val image = remember(path) { UIImage.imageWithContentsOfFile(path) }
-            if (image != null) {
-                UIKitView(
-                    factory = {
-                        UIImageView().apply {
-                            clipsToBounds = true
-                            contentMode = UIViewContentMode.UIViewContentModeScaleAspectFill
-                            setUserInteractionEnabled(false)
-                        }
-                    },
-                    update = { imageView ->
-                        imageView.image = image
-                    },
+            val imageBitmap = remember(path) { fileImageBitmap(path) }
+            if (imageBitmap != null) {
+                Image(
+                    bitmap = imageBitmap,
+                    contentDescription = contentDescription,
                     modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
                 )
             }
         }

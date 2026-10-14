@@ -418,6 +418,15 @@ private fun createPrayerTimesViewController(
                 ?.substringAfter('=')
                 ?.toIntOrNull()
         }
+        // UI-testing hook: open a Fortress chapter directly so the bundled
+        // masjid artwork header (album parallax) can be verified on device.
+        val startFortressChapter = remember {
+            NSProcessInfo.processInfo.arguments
+                .mapNotNull { it as? String }
+                .firstOrNull { it.startsWith("--start-fortress=") }
+                ?.substringAfter('=')
+                ?.toIntOrNull()
+        }
         // Lock-screen and Control Center controls for the detached hadith
         // narration queue; installing is idempotent so every tab's
         // composition can call it.
@@ -880,6 +889,7 @@ private fun createPrayerTimesViewController(
             SharedNavHost(
                 startInSettings = startInSettings,
                 startInSurah = startInSurah,
+                startFortressChapter = startFortressChapter,
                 startBottomIndex = startBottomIndex,
                 onSelectTopLevel = onSelectBottom,
                 externalVoiceSearchRequests = iosVoiceSearchRequests

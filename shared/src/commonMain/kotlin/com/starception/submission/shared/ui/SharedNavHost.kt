@@ -151,6 +151,7 @@ fun SharedNavHost(
     navController: NavHostController = rememberNavController(),
     startInSettings: Boolean = false,
     startInSurah: Int? = null,
+    startFortressChapter: Int? = null,
     startBottomIndex: Int = 0,
     onSelectTopLevel: ((Int) -> Unit)? = null,
     externalVoiceSearchRequests: Flow<Int>? = null,
@@ -251,6 +252,9 @@ fun SharedNavHost(
             startDestination = startInSurah
                 ?.takeIf { it in 1..114 }
                 ?.let(::QuranDetailRoute)
+                ?: startFortressChapter
+                    ?.takeIf { it in 1..298 }
+                    ?.let { FortressChapterRoute(it) }
                 ?: when {
                     startInSettings -> PrayerSettingsRoute
                     startBottomIndex == 1 -> ForYouRoute

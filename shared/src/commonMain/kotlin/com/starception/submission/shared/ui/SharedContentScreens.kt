@@ -49,7 +49,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -577,9 +579,11 @@ internal fun QuranDetailScreen(
         showReadingSettings = true
     }
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+    val headerCollapseOffset = remember { mutableFloatStateOf(0f) }
     ImmersiveDetailScaffold(
         onBack = onBack,
         collapsibleHeader = true,
+        headerCollapseOffset = headerCollapseOffset,
         contentHorizontalPadding = 0.dp,
         header = {
             Column {
@@ -613,7 +617,7 @@ internal fun QuranDetailScreen(
                     com.starception.submission.shared.quran.SurahArtworkHeader(
                         surahNumber = number,
                         contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().detailCollapseParallax(headerCollapseOffset),
                     )
                     Box(
                         modifier = Modifier
@@ -1496,9 +1500,13 @@ internal fun FortressChapterScreen(
         }
     }
     var playingId by remember { mutableStateOf<Int?>(null) }
+    val chapterListState = rememberLazyListState()
     ImmersiveDetailScaffold(onBack = onBack, header = {
-        Box(Modifier.fillMaxWidth().height(190.dp)) {
-            NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+        Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
+            NewsHeaderArtwork(
+                "masjid_al_nawabi",
+                Modifier.fillMaxSize().detailAlbumParallax(chapterListState),
+            )
             ImmersiveDetailHeaderScrim(
                 title = "Fortress of the Muslim",
                 supportingText = chapter?.title ?: "Chapter $chapterId",
@@ -1547,6 +1555,7 @@ internal fun FortressChapterScreen(
                 Button(onClick = { loadAttempt++ }) { Text("Try again") }
             }
             is DuaDetailState.Loaded -> LazyColumn(
+                state = chapterListState,
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 28.dp),
@@ -2524,9 +2533,13 @@ internal fun SharedDuaDetailScreen(
         trailingText = preferredLanguage.uppercase().take(2),
     ) { showReadingSettings = true }
     Box(Modifier.fillMaxSize()) {
+        val duaListState = rememberLazyListState()
         ImmersiveDetailScaffold(onBack = onBack, header = {
-            Box(Modifier.fillMaxWidth().height(220.dp)) {
-                NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+            Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
+                NewsHeaderArtwork(
+                    "masjid_al_nawabi",
+                    Modifier.fillMaxSize().detailAlbumParallax(duaListState),
+                )
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -2583,6 +2596,7 @@ internal fun SharedDuaDetailScreen(
                 val dua = current.dua
                 val arabicFontFamily = QuranArabicFonts.fontFamily(selectedArabicFont)
                 LazyColumn(
+                    state = duaListState,
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 28.dp),
@@ -2940,6 +2954,12 @@ internal fun BukhariHadithDetailScreen(
             val pagerState = androidx.compose.foundation.pager.rememberPagerState(
                 initialPage = initialIndex,
             ) { hadiths.size }
+            // The hadith pages share one list state so the album header's
+            // parallax follows the visible page; every page starts at the top.
+            val hadithPageListState = rememberLazyListState()
+            LaunchedEffect(pagerState.currentPage) {
+                hadithPageListState.scrollToItem(0)
+            }
             // The pager follows the detached queue while this screen is
             // visible; manual swipes are not fought, the next hadith simply
             // scrolls back in.
@@ -3043,8 +3063,11 @@ internal fun BukhariHadithDetailScreen(
             }
             Box(Modifier.fillMaxSize()) {
                 ImmersiveDetailScaffold(onBack = onBack, header = {
-                Box(Modifier.fillMaxWidth().height(190.dp)) {
-                    NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+                Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
+                    NewsHeaderArtwork(
+                        "masjid_al_nawabi",
+                        Modifier.fillMaxSize().detailAlbumParallax(hadithPageListState),
+                    )
                     ImmersiveDetailHeaderScrim(
                         title = "Sahih al-Bukhari",
                         supportingText = "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
@@ -3085,6 +3108,7 @@ internal fun BukhariHadithDetailScreen(
                         bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },                        arabicFont = selectedArabicFont,
                         arabicFontSize = arabicFontSize,
                         textAlignment = textAlignment,
+                        listState = hadithPageListState,
                         listening = narrationOnThisBook &&
                             narration.hadithId == hadiths[index].id,
                         onListeningChange = { enabled ->
@@ -3154,6 +3178,7 @@ private fun HadithDetailPage(
     arabicFont: String,
     arabicFontSize: Float,
     textAlignment: String,
+    listState: LazyListState,
     listening: Boolean,
     onListeningChange: (Boolean) -> Unit,
     translatedText: String? = null,
@@ -3161,6 +3186,7 @@ private fun HadithDetailPage(
     isTranslating: Boolean = false,
 ) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 28.dp),
@@ -3389,6 +3415,12 @@ internal fun ShamayelHadithDetailScreen(
             val pagerState = androidx.compose.foundation.pager.rememberPagerState(
                 initialPage = initialIndex,
             ) { hadiths.size }
+            // The hadith pages share one list state so the album header's
+            // parallax follows the visible page; every page starts at the top.
+            val hadithPageListState = rememberLazyListState()
+            LaunchedEffect(pagerState.currentPage) {
+                hadithPageListState.scrollToItem(0)
+            }
             // Play-all queue — the same detached NarrationQueue as the Bukhari
             // detail screen, narrating the Shama'il corpus. It keeps speaking
             // after this screen is gone and the lock-screen controls follow.
@@ -3501,8 +3533,11 @@ internal fun ShamayelHadithDetailScreen(
             }
             Box(Modifier.fillMaxSize()) {
                 ImmersiveDetailScaffold(onBack = onBack, header = {
-                Box(Modifier.fillMaxWidth().height(190.dp)) {
-                    NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+                Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
+                    NewsHeaderArtwork(
+                        "masjid_al_nawabi",
+                        Modifier.fillMaxSize().detailAlbumParallax(hadithPageListState),
+                    )
                     ImmersiveDetailHeaderScrim(
                         title = "Shama'il At-Tirmidhi",
                         supportingText = "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
@@ -3544,6 +3579,7 @@ internal fun ShamayelHadithDetailScreen(
                         arabicFont = selectedArabicFont,
                         arabicFontSize = arabicFontSize,
                         textAlignment = textAlignment,
+                        listState = hadithPageListState,
                         listening = narrationOnThisBook &&
                             narration.hadithId == hadiths[index].id,
                         onListeningChange = { enabled ->
@@ -5044,11 +5080,12 @@ internal fun NewsDetailScreen(
     val rawHeaderType = headerNews?.type?.takeIf(String::isNotBlank) ?: "Invocations"
     val isHadith = rawHeaderType.contains("hadith", ignoreCase = true)
     val headerType = displayNewsType(rawHeaderType)
+    val newsListState = rememberLazyListState()
     ImmersiveDetailScaffold(onBack = onBack, header = {
-        Box(Modifier.fillMaxWidth().height(190.dp)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
             NewsHeaderArtwork(
                 resourceName = headerNews?.let(::newsHeaderResource) ?: "masjid_al_haram",
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().detailAlbumParallax(newsListState),
             )
             ImmersiveDetailHeaderScrim(
                 title = headerType,
@@ -5084,6 +5121,7 @@ internal fun NewsDetailScreen(
             is SharedNewsState.Loaded -> {
                 val news = current.news.first()
                 LazyColumn(
+                    state = newsListState,
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(0.dp),
                     contentPadding = PaddingValues(bottom = 28.dp),

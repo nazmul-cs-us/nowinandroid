@@ -31,10 +31,13 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +48,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -55,6 +59,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveSurface
 import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
+import kotlin.math.abs
 
 /**
  * Immersive detail scaffold matching the Android app's album-header pages
@@ -69,6 +74,7 @@ internal fun ImmersiveDetailScaffold(
     maxContentWidth: Dp = 720.dp,
     contentHorizontalPadding: Dp = 16.dp,
     collapsibleHeader: Boolean = false,
+    headerCollapseOffset: MutableState<Float>? = null,
     header: @Composable () -> Unit,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
@@ -80,6 +86,7 @@ internal fun ImmersiveDetailScaffold(
                 if (!collapsibleHeader || available.y >= 0f || headerHeightPx <= 0f) return Offset.Zero
                 val previous = headerOffsetPx
                 headerOffsetPx = (headerOffsetPx + available.y).coerceIn(-headerHeightPx, 0f)
+                headerCollapseOffset?.value = headerOffsetPx
                 return Offset(x = 0f, y = headerOffsetPx - previous)
             }
 
@@ -91,6 +98,7 @@ internal fun ImmersiveDetailScaffold(
                 if (!collapsibleHeader || available.y <= 0f || headerHeightPx <= 0f) return Offset.Zero
                 val previous = headerOffsetPx
                 headerOffsetPx = (headerOffsetPx + available.y).coerceIn(-headerHeightPx, 0f)
+                headerCollapseOffset?.value = headerOffsetPx
                 return Offset(x = 0f, y = headerOffsetPx - previous)
             }
         }
@@ -121,6 +129,7 @@ internal fun ImmersiveDetailScaffold(
                             } else {
                                 0
                             }
+                            headerCollapseOffset?.value = offset.toFloat()
                             layout(
                                 width = placeable.width,
                                 height = (placeable.height + offset).coerceAtLeast(0),
@@ -206,4 +215,38 @@ internal fun ImmersiveDetailTagRow(vararg tags: String) {
     Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
         tags.forEach { tag -> Text(tag, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
+}
+
+/**
+ * Android's album-header parallax (DuaDetailScreen / HadithDetailScreen):
+ * the reader scroll, eased over a 400.dp reference, drives a 1.0→1.08 zoom,
+ * a -15.dp drift, and a 0.95→1.0 alpha band on the artwork.
+ */
+internal fun Modifier.detailAlbumParallax(
+    lazyListState: LazyListState,
+    referenceHeight: Dp = 400.dp,
+): Modifier = graphicsLayer {
+    val progress = (lazyListState.firstVisibleItemScrollOffset.toFloat() / referenceHeight.toPx())
+        .coerceIn(0f, 1f)
+    val easedProgress = 1f - (1f - progress).let { it * it * it }
+    val centeredProgress = (easedProgress - 0.5f) * 2f
+    val scaleValue = 1f + (1f - abs(centeredProgress)) * 0.08f
+    scaleX = scaleValue
+    scaleY = scaleValue
+    translationY = -easedProgress * 15.dp.toPx()
+    alpha = 0.95f + (1f - abs(centeredProgress)) * 0.05f
+}
+
+/**
+ * Android's SurahDetailScreen album parallax: the 1.2× overscanned artwork
+ * lags the scroll by 0.4×, capped at 8.5% of the artwork height.
+ */
+internal fun Modifier.detailCollapseParallax(
+    collapseOffset: State<Float>,
+): Modifier = graphicsLayer {
+    val scrolled = -collapseOffset.value
+    if (scrolled <= 0f) return@graphicsLayer
+    scaleX = 1.2f
+    scaleY = 1.2f
+    translationY = (scrolled * 0.4f).coerceAtMost(size.height * 0.085f)
 }
