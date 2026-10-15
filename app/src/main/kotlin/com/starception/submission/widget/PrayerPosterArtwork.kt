@@ -149,6 +149,8 @@ internal object PrayerPosterArtwork {
         heightDp: Float,
         isNightOverride: Boolean? = null,
         lighting: Lighting = Lighting(),
+        sceneCropBiasY: Float = SCENE_CROP_BIAS_Y,
+        sceneHorizontalInsetFraction: Float = 0f,
     ): Bitmap {
         val metrics = context.resources.displayMetrics
         val requestedScale = min(metrics.density, 3f)
@@ -179,6 +181,8 @@ internal object PrayerPosterArtwork {
                 isNightOverride,
                 lighting,
                 0f,
+                sceneCropBiasY,
+                sceneHorizontalInsetFraction,
             ).drawSceneOnly()
         }
     }
@@ -234,8 +238,8 @@ internal object PrayerPosterArtwork {
      * appear with the other tiles instead of seconds after them.
      */
     fun prewarm(context: Context) {
-        artwork(context, R.drawable.prayer_widget_poster_night_moonless_hq_v4)
-        artwork(context, R.drawable.prayer_widget_poster_day_no_sun_v2)
+        artwork(context, R.drawable.prayer_now_insight_night)
+        artwork(context, R.drawable.prayer_now_insight_day)
         artwork(context, R.drawable.prayer_widget_sun_real_3d_v1)
         artwork(context, R.drawable.prayer_widget_moon_real_nasa_v1)
     }
@@ -255,6 +259,8 @@ internal object PrayerPosterArtwork {
         isNightOverride: Boolean?,
         lighting: Lighting,
         private val bitmapSampleOffsetY: Float,
+        private val sceneCropBiasY: Float = SCENE_CROP_BIAS_Y,
+        private val sceneHorizontalInsetFraction: Float = 0f,
     ) {
         private val unit = width / DESIGN_WIDTH
         private val isNight = isNightOverride
@@ -530,7 +536,7 @@ internal object PrayerPosterArtwork {
             // A centred crop left only the minaret tips visible; biasing the source window
             // downward moves the mosque upward in the rendered poster without changing the
             // reference card geometry or prayer-arc coordinates.
-            val src = sceneCrop(source, SCENE_CROP_BIAS_Y)
+            val src = sceneCrop(source, sceneCropBiasY)
             val target = RectF(0f, 0f, width, height)
             canvas.drawBitmap(
                 source,
@@ -545,24 +551,33 @@ internal object PrayerPosterArtwork {
         }
 
         private fun sceneCrop(source: Bitmap, verticalBias: Float): Rect {
-            val sourceAspect = source.width.toFloat() / source.height
+            val horizontalInset = (
+                source.width * sceneHorizontalInsetFraction.coerceIn(0f, 0.2f)
+                ).toInt()
+            val usableWidth = (source.width - horizontalInset * 2).coerceAtLeast(1)
+            val sourceAspect = usableWidth.toFloat() / source.height
             val targetAspect = width / height
             return if (sourceAspect > targetAspect) {
                 val cropWidth = (source.height * targetAspect).toInt()
-                val left = (source.width - cropWidth) / 2
+                val left = horizontalInset + (usableWidth - cropWidth) / 2
                 Rect(left, 0, left + cropWidth, source.height)
             } else {
-                val cropHeight = (source.width / targetAspect).toInt()
+                val cropHeight = (usableWidth / targetAspect).toInt()
                 val availableTravel = (source.height - cropHeight).coerceAtLeast(0)
                 val top = (availableTravel * verticalBias.coerceIn(0f, 1f)).toInt()
-                Rect(0, top, source.width, (top + cropHeight).coerceAtMost(source.height))
+                Rect(
+                    horizontalInset,
+                    top,
+                    horizontalInset + usableWidth,
+                    (top + cropHeight).coerceAtMost(source.height),
+                )
             }
         }
 
         private fun sceneBaseResource(): Int = if (isNight) {
-            R.drawable.prayer_widget_poster_night_moonless_hq_v4
+            R.drawable.prayer_now_insight_night
         } else {
-            R.drawable.prayer_widget_poster_day_no_glare_hq_v4
+            R.drawable.prayer_now_insight_day
         }
 
         private fun drawLightingLayer(source: Rect, target: RectF) {
