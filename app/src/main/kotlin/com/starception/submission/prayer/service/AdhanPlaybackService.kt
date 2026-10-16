@@ -36,6 +36,7 @@ import androidx.core.app.NotificationCompat
 import androidx.media.VolumeProviderCompat
 import com.starception.submission.MainActivity
 import com.starception.submission.R
+import com.starception.submission.prayer.model.DEFAULT_ADHAN_VOLUME_PERCENT
 
 internal const val ADHAN_AUDIO_STREAM = AudioManager.STREAM_ALARM
 
@@ -401,7 +402,7 @@ class AdhanPlaybackService : Service() {
         const val ACTION_STOP = "com.starception.submission.prayer.service.ADHAN_STOP"
         const val EXTRA_PRAYER_NAME = "prayer_name"
         const val EXTRA_VOLUME_PERCENT = "volume_percent"
-        const val DEFAULT_VOLUME_PERCENT = 10
+        const val DEFAULT_VOLUME_PERCENT = DEFAULT_ADHAN_VOLUME_PERCENT
 
         // Volume-provider capacity used to capture volume-key presses; the
         // adhan's own level comes from the user's adhanVolume preference.

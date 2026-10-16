@@ -152,6 +152,8 @@ class SyncContainerState(
      */
     val transientContentOffsetY: Dp = 0.dp,
     val pullModifier: Modifier = Modifier,
+    /** Pull handling for fixed layouts that have no scrollable child to emit nested-scroll events. */
+    val directPullModifier: Modifier = Modifier,
 )
 
 /**
@@ -293,6 +295,46 @@ fun PullToSyncContainer(
                 return Velocity.Zero
             }
         }
+    }
+
+    val directPullModifier = if (enabled) {
+        Modifier.pointerInput(isRefreshing) {
+            detectVerticalDragGestures(
+                onVerticalDrag = { _, dragAmount ->
+                    when {
+                        dragAmount > 0f && !isRefreshing -> {
+                            val resistance = 1f -
+                                (dragDistance / maxDragDistance * 0.5f).coerceIn(0f, 0.5f)
+                            dragDistance = (dragDistance + dragAmount * resistance)
+                                .coerceAtMost(maxDragDistance)
+                            val hapticInterval = 50f
+                            if (dragDistance - lastHapticDistance >= hapticInterval) {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                lastHapticDistance = dragDistance - (dragDistance % hapticInterval)
+                            }
+                        }
+
+                        dragAmount < 0f && dragDistance > 0f -> {
+                            dragDistance = (dragDistance + dragAmount).coerceAtLeast(0f)
+                        }
+                    }
+                },
+                onDragEnd = {
+                    if (dragDistance > 150f && !isRefreshing) {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onRefresh()
+                    }
+                    dragDistance = 0f
+                    lastHapticDistance = 0f
+                },
+                onDragCancel = {
+                    dragDistance = 0f
+                    lastHapticDistance = 0f
+                },
+            )
+        }
+    } else {
+        Modifier
     }
 
     // Animated drag distance with smooth settle (no bounce, like Fitbit)
@@ -560,6 +602,7 @@ fun PullToSyncContainer(
         heldContentInsetNetTop = heldContentInsetNetTop,
         transientContentOffsetY = transientContentOffsetY,
         pullModifier = Modifier.nestedScroll(nestedScrollConnection),
+        directPullModifier = directPullModifier,
     )
 
     // Keep the container itself on the destination's normal canvas. The active

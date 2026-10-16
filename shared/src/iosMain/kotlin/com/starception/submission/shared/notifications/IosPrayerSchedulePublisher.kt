@@ -17,6 +17,7 @@
 package com.starception.submission.shared.notifications
 
 import com.starception.submission.prayer.model.CountryPrayerDefaults
+import com.starception.submission.prayer.model.DEFAULT_ADHAN_VOLUME_PERCENT
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.shared.PrayerSchedule
@@ -113,7 +114,10 @@ internal object IosPrayerSchedulePublisher {
      * terminated — local UNCalendarNotificationTrigger requests live in the
      * system's notification center, not the process).
      */
-    fun publishSimulated(fireInSeconds: Long, adhanVolume: Int = 100) {
+    fun publishSimulated(
+        fireInSeconds: Long,
+        adhanVolume: Int = DEFAULT_ADHAN_VOLUME_PERCENT,
+    ) {
         val zone = TimeZone.currentSystemDefault()
         val now = Clock.System.now()
         var fireAt = now + fireInSeconds.seconds
@@ -193,7 +197,7 @@ private data class IosPrayerEntry(
     // Per-prayer adhan toggle: the prayer-time notification plays the bundled
     // adhan audio instead of the default sound.
     val adhanEnabled: Boolean = false,
-    val adhanVolume: Int = 5,
+    val adhanVolume: Int = DEFAULT_ADHAN_VOLUME_PERCENT,
     // Local-language (Arabic by default) prayer name for the Live Activity.
     val localName: String = "",
 )

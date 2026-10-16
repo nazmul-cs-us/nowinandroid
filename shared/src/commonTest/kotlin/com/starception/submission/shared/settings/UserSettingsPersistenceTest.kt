@@ -34,6 +34,26 @@ import kotlin.test.assertTrue
 class UserSettingsPersistenceTest {
 
     @Test
+    fun perPrayerAdhanVolumesDefaultToFiveAndPersistIndependently() {
+        val store = InMemoryKeyValueStore()
+        val settings = UserPrayerSettings(store)
+
+        listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha").forEach { prayer ->
+            assertEquals(5, settings.notifications().getAdhanVolumeForPrayer(prayer))
+        }
+
+        settings.setAdhanVolumeForPrayer("Fajr", 15)
+        settings.setAdhanVolumeForPrayer("Isha", 35)
+        val restored = UserPrayerSettings(store).notifications()
+
+        assertEquals(15, restored.getAdhanVolumeForPrayer("Fajr"))
+        assertEquals(5, restored.getAdhanVolumeForPrayer("Dhuhr"))
+        assertEquals(5, restored.getAdhanVolumeForPrayer("Asr"))
+        assertEquals(5, restored.getAdhanVolumeForPrayer("Maghrib"))
+        assertEquals(35, restored.getAdhanVolumeForPrayer("Isha"))
+    }
+
+    @Test
     fun prayerSettingsAreScopedAndRestoredPerCountry() {
         val store = InMemoryKeyValueStore()
         val settings = UserPrayerSettings(store)

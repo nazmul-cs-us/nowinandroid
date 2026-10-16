@@ -399,7 +399,12 @@ private fun createPrayerTimesViewController(
     onSelectBottom: ((Int) -> Unit)?,
 ): UIViewController = ComposeUIViewController {
     val setupStore = remember { com.starception.submission.shared.content.SharedContentStore() }
-    ContentSetupGate(store = setupStore) {
+    io.github.alexzhirkevich.cupertino.adaptive.AdaptiveTheme(
+        target = io.github.alexzhirkevich.cupertino.adaptive.Theme.Cupertino,
+        material = io.github.alexzhirkevich.cupertino.adaptive.MaterialThemeSpec.Default(),
+        cupertino = io.github.alexzhirkevich.cupertino.adaptive.CupertinoThemeSpec.Default(),
+    ) {
+        ContentSetupGate(store = setupStore) {
         val tracker = remember { SalahTracker() }
         val settingsStore = remember { UserPrayerSettings() }
         val appearanceStore = remember { UserAppearanceSettings() }
@@ -953,9 +958,7 @@ private fun createPrayerTimesViewController(
                             settingsStore.saveNotifications(notificationPrefs)
                         },
                         onAdhanVolumeChange = { prayer, volume ->
-                            notificationPrefs = notificationPrefs
-                                .withAdhanVolumeForPrayer(prayer, volume)
-                            settingsStore.saveNotifications(notificationPrefs)
+                            notificationPrefs = settingsStore.setAdhanVolumeForPrayer(prayer, volume)
                         },
                         onOpenProfile = actions.onOpenProfile,
                         onOpenSearch = actions.onOpenSearch,
@@ -1303,6 +1306,7 @@ private fun createPrayerTimesViewController(
             )
         }
             }
+    }
     }
 }
 

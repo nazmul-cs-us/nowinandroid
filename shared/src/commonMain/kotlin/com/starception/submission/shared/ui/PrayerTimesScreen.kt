@@ -479,6 +479,9 @@ fun PrayerTimesScreen(
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
                             .fillMaxHeight()
+                            .then(
+                                if (useTwoPaneLayout) Modifier else syncState.directPullModifier,
+                            )
                             .safeDrawingPadding()
                             .padding(
                                 start = if (useSideNavigation) 80.dp else 24.dp,

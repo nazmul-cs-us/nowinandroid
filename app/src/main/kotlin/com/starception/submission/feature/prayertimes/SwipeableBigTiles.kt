@@ -161,7 +161,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -223,6 +222,8 @@ import com.starception.submission.core.images.resources.insight_qibla_foreground
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.images.resources.insight_suggestion
+import com.starception.submission.core.images.resources.prayer_now_insight_day
+import com.starception.submission.core.images.resources.prayer_now_insight_night
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
 import com.starception.submission.core.qurandatabase.QuranDatabase
@@ -235,6 +236,7 @@ import com.starception.submission.download.AssetRepository
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.feature.prayertimes.components.GlobePopupScreen
 import com.starception.submission.feature.prayertimes.components.rememberParallaxTilt
+import com.starception.submission.feature.prayertimes.celestial.PrayerSkyCelestialLayer
 import com.starception.submission.feature.prayertimes.utils.calculateQiblaDirection
 import com.starception.submission.feature.prayertimes.weather.AnimatedPrayerWeatherIcon
 import com.starception.submission.feature.prayertimes.weather.CurrentWeather
@@ -256,9 +258,6 @@ import com.starception.submission.widget.DailyReminder
 import com.starception.submission.widget.DailyReminderRepository
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.service.EnhancedLocationService
-import com.starception.submission.widget.PrayerPosterArtwork
-import com.starception.submission.widget.PrayerWidgetState
-import com.starception.submission.widget.loadPrayerWidgetStateCached
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -1829,7 +1828,10 @@ internal fun SwipeableBigTiles(
                         },
                 ) {
                     val isFocused = page == pagerState.settledPage && !pagerState.isScrollInProgress
-                    val isExpandedCard = logicalPage == expandedLogicalPage
+                    // Expanded mode is a carousel mode, not a property of only the
+                    // settled page. Keeping incoming pages expanded prevents their
+                    // compact artwork flashing while a swipe is still settling.
+                    val isExpandedCard = expandedLogicalPage != null
                     val onCardLongPress: (() -> Unit)? = when {
                         !isFocused -> null
                         logicalPage == 0 -> {
@@ -1852,7 +1854,13 @@ internal fun SwipeableBigTiles(
                     }
                     when (logicalPage) {
                         0 -> PrayerPosterInsightCard(
-                            currentTime = currentTime,
+                            isNight = prayerTimes?.let { times ->
+                                currentTime.isBefore(times.sunrise) ||
+                                    !currentTime.isBefore(times.maghrib)
+                            } ?: (currentTime.hour < 6 || currentTime.hour >= 18),
+                            epochSeconds = System.currentTimeMillis() / 1_000.0,
+                            latitude = prayerTimes?.location?.latitude,
+                            longitude = prayerTimes?.location?.longitude,
                             label = "Prayer now",
                             title = prayerPrediction?.title ?: prayerTitle,
                             supportingText = prayerPrediction?.content
@@ -2566,51 +2574,12 @@ internal fun formatPrayerForecastMetric(
     }
 }
 
-/** Widget artwork only; this card keeps Prayer Now's original Compose text and actions. */
-private data class PrayerPosterSceneKey(
-    val day: Long,
-    val minute: Int,
-    val width: Int,
-    val height: Int,
-)
-
-private data class PrayerPosterScene(
-    val base: android.graphics.Bitmap,
-    val illuminated: android.graphics.Bitmap? = null,
-    val isNight: Boolean,
-)
-
-/**
- * Pager pages are deliberately disposed once they leave the small prefetch window. Prayer Now
- * generates its scene asynchronously, so recreating the page with a null bitmap exposed one blank
- * frame during a swipe. Keep the few most recent rendered scenes outside page composition: looped
- * copies of the same logical page can reuse the bitmap immediately, while the bounded map avoids
- * retaining old resize variants indefinitely.
- */
-private object PrayerPosterSceneCache {
-    private const val MAX_ENTRIES = 4
-    private val scenes = object : LinkedHashMap<PrayerPosterSceneKey, PrayerPosterScene>(
-        MAX_ENTRIES,
-        0.75f,
-        true,
-    ) {
-        override fun removeEldestEntry(
-            eldest: MutableMap.MutableEntry<PrayerPosterSceneKey, PrayerPosterScene>?,
-        ): Boolean = size > MAX_ENTRIES
-    }
-
-    @Synchronized
-    fun get(key: PrayerPosterSceneKey): PrayerPosterScene? = scenes[key]
-
-    @Synchronized
-    fun put(key: PrayerPosterSceneKey, scene: PrayerPosterScene) {
-        scenes[key] = scene
-    }
-}
-
 @Composable
 private fun PrayerPosterInsightCard(
-    currentTime: LocalTime,
+    isNight: Boolean,
+    epochSeconds: Double,
+    latitude: Double?,
+    longitude: Double?,
     label: String,
     title: String,
     supportingText: String?,
@@ -2637,92 +2606,34 @@ private fun PrayerPosterInsightCard(
     // card's long-press detector flashes before the scroll takes control.
     disableCardGesturesWhenExpanded: Boolean = false,
 ) {
-    val context = LocalContext.current
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        // Warm the poster decoder and the widget-state cache before the first
-        // render needs them, so the Prayer Now scene shows up with the other
-        // tiles rather than a beat behind them.
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                runCatching { loadPrayerWidgetStateCached(context) }
-                PrayerPosterArtwork.prewarm(context)
-            }
-        }
-        val widthDp = maxWidth.value.coerceAtLeast(1f)
-        val heightDp = maxHeight.value.coerceAtLeast(1f)
-        val minuteKey = currentTime.hour * 60 + currentTime.minute
-        val sceneKey = remember(minuteKey, widthDp, heightDp) {
-            PrayerPosterSceneKey(
-                day = LocalDate.now().toEpochDay(),
-                minute = minuteKey,
-                width = widthDp.roundToInt(),
-                height = heightDp.roundToInt(),
-            )
-        }
-        var retainedScene by remember { mutableStateOf<PrayerPosterScene?>(null) }
-        val scene by produceState<PrayerPosterScene?>(
-            initialValue = PrayerPosterSceneCache.get(sceneKey) ?: retainedScene,
-            key1 = sceneKey,
-        ) {
-            PrayerPosterSceneCache.get(sceneKey)?.let { cached ->
-                retainedScene = cached
-                value = cached
-                return@produceState
-            }
-            val rendered = withContext(Dispatchers.Default) {
-                val state = loadPrayerWidgetStateCached(context) as? PrayerWidgetState.Available
-                    ?: return@withContext null
-                val renderWidth = widthDp
-                val isNight = state.sky.now < state.sky.sunrise || state.sky.now >= state.sky.maghrib
-                val base = PrayerPosterArtwork.renderScene(
-                    context = context,
-                    state = state,
-                    widthDp = renderWidth,
-                    heightDp = renderWidth * (heightDp / widthDp),
-                    lighting = PrayerPosterArtwork.Lighting(
-                        mosqueLightIntensity = if (isNight) 0f else 1f,
-                    ),
-                    // Preserve more of the luminous sky, mosque, lake and framing arch
-                    // from the portrait artwork, matching the Prayer Now reference.
-                    sceneCropBiasY = 0.56f,
-                    sceneHorizontalInsetFraction = 0.14f,
-                )
-                PrayerPosterScene(
-                    base = base,
-                    illuminated = if (isNight) {
-                        PrayerPosterArtwork.renderScene(
-                            context = context,
-                            state = state,
-                            widthDp = renderWidth,
-                            heightDp = renderWidth * (heightDp / widthDp),
-                            lighting = PrayerPosterArtwork.Lighting(mosqueLightIntensity = 1f),
-                            sceneCropBiasY = 0.56f,
-                            sceneHorizontalInsetFraction = 0.14f,
-                        )
-                    } else {
-                        null
-                    },
-                    isNight = isNight,
-                )
-            }
-            if (rendered != null) {
-                PrayerPosterSceneCache.put(sceneKey, rendered)
-                retainedScene = rendered
-                value = rendered
-            }
-        }
-
-        InsightPreviewCard(
+    InsightPreviewCard(
             label = label,
             title = title,
             supportingText = supportingText,
             statusText = statusText,
             statusMetaText = statusMetaText,
             weatherThresholds = weatherThresholds,
-            backgroundBitmap = scene?.base?.asImageBitmap(),
-            backgroundOverlayBitmap = scene?.illuminated?.asImageBitmap(),
-            animateWater = scene?.isNight == false,
+            backgroundPainterRes = if (isNight) {
+                ImageRes.drawable.prayer_now_insight_night
+            } else {
+                ImageRes.drawable.prayer_now_insight_day
+            },
+            animateWater = !isNight,
             backgroundBaseScale = 1.018f,
+            backgroundLayer = if (latitude != null && longitude != null) {
+                {
+                    PrayerSkyCelestialLayer(
+                        epochSeconds = epochSeconds,
+                        latitude = latitude,
+                        longitude = longitude,
+                        isNight = isNight,
+                        replayKey = isFocused,
+                        forceSunForTesting = false,
+                    )
+                }
+            } else {
+                null
+            },
             wallpaperTintAlpha = 0.045f,
             compactProgress = compactProgress,
             expansionProgress = expansionProgress,
@@ -2742,7 +2653,6 @@ private fun PrayerPosterInsightCard(
             expandedContentHorizontalBleed = expandedContentHorizontalBleed,
             disableCardGesturesWhenExpanded = disableCardGesturesWhenExpanded,
         )
-    }
 }
 
 @Composable
@@ -2753,6 +2663,7 @@ private fun InsightPreviewCard(
     backgroundBitmap: ImageBitmap? = null,
     backgroundOverlayBitmap: ImageBitmap? = null,
     backgroundBaseScale: Float = 1.065f,
+    backgroundLayer: (@Composable () -> Unit)? = null,
     backgroundHorizontalBias: Float = 0f,
     wallpaperTintAlpha: Float = 0.13f,
     animateWater: Boolean = false,
@@ -3102,10 +3013,7 @@ private fun InsightPreviewCard(
                     label = "prayerSkyCrossfade",
                     modifier = Modifier.fillMaxSize(),
                 ) { resolvedBackgroundRes ->
-                    Image(
-                        painter = composePainterResource(resolvedBackgroundRes),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
+                    Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
@@ -3128,7 +3036,14 @@ private fun InsightPreviewCard(
                                 )
                                 translationY = restingMotion * 4.dp.toPx()
                             },
-                    )
+                    ) {
+                        Image(
+                            painter = composePainterResource(resolvedBackgroundRes),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
 
@@ -3187,6 +3102,11 @@ private fun InsightPreviewCard(
                 }
             }
 
+            // The celestial bodies are light sources: drawing them above the
+            // time-of-day washes keeps the sun's crepuscular wedge vivid against
+            // the sky instead of being flattened by the daylight lift.
+            backgroundLayer?.invoke()
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -3197,7 +3117,7 @@ private fun InsightPreviewCard(
                     .background(wallpaperTintBrush),
             )
 
-            if (animateWater && backgroundBitmap != null) {
+            if (animateWater && (backgroundBitmap != null || backgroundPainterRes != null)) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -3207,33 +3127,43 @@ private fun InsightPreviewCard(
                             }
                         },
                 ) {
-                    Image(
-                        bitmap = backgroundBitmap,
-                        contentDescription = null,
-                        contentScale = ContentScale.FillBounds,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                val phase = waterPhase * (Math.PI * 2.0).toFloat()
-                                val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                                val restingMotion = ambientMotion * focusedMotionStrength
-                                val imageScale = backgroundBaseScale + (restingMotion * 0.006f)
-                                val requestedTranslationX =
-                                    (backgroundHorizontalBias * size.width) - pageOffset * 18.dp.toPx()
-                                val maxCoveredHorizontalShift = (
-                                    (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
-                                    ).coerceAtLeast(0f)
-                                scaleX = imageScale + 0.006f
-                                scaleY = imageScale + 0.002f
-                                translationX = requestedTranslationX.coerceIn(
-                                    -maxCoveredHorizontalShift,
-                                    maxCoveredHorizontalShift,
-                                ) + sin(phase) * 2.5.dp.toPx()
-                                translationY = restingMotion * 4.dp.toPx() +
-                                    kotlin.math.cos(phase * 1.35f) * 1.25.dp.toPx()
-                                alpha = 0.32f
-                            },
-                    )
+                    val waterImageModifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val phase = waterPhase * (Math.PI * 2.0).toFloat()
+                            val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                            val restingMotion = ambientMotion * focusedMotionStrength
+                            val imageScale = backgroundBaseScale + (restingMotion * 0.006f)
+                            val requestedTranslationX =
+                                (backgroundHorizontalBias * size.width) - pageOffset * 18.dp.toPx()
+                            val maxCoveredHorizontalShift = (
+                                (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
+                                ).coerceAtLeast(0f)
+                            scaleX = imageScale + 0.006f
+                            scaleY = imageScale + 0.002f
+                            translationX = requestedTranslationX.coerceIn(
+                                -maxCoveredHorizontalShift,
+                                maxCoveredHorizontalShift,
+                            ) + sin(phase) * 2.5.dp.toPx()
+                            translationY = restingMotion * 4.dp.toPx() +
+                                kotlin.math.cos(phase * 1.35f) * 1.25.dp.toPx()
+                            alpha = 0.32f
+                        }
+                    if (backgroundBitmap != null) {
+                        Image(
+                            bitmap = backgroundBitmap,
+                            contentDescription = null,
+                            contentScale = ContentScale.FillBounds,
+                            modifier = waterImageModifier,
+                        )
+                    } else if (backgroundPainterRes != null) {
+                        Image(
+                            painter = composePainterResource(backgroundPainterRes),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = waterImageModifier,
+                        )
+                    }
                 }
             }
 

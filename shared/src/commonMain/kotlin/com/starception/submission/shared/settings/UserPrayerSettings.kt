@@ -82,6 +82,13 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
         store.putString(KEY_NOTIFICATIONS, json.encodeToString(preferences))
     }
 
+    /** Persists one prayer's volume without replacing newer changes to other prayers. */
+    fun setAdhanVolumeForPrayer(prayerName: String, volume: Int): PrayerNotificationPreferences {
+        val updated = notifications().withAdhanVolumeForPrayer(prayerName, volume)
+        saveNotifications(updated)
+        return updated
+    }
+
     fun liveActivitiesEnabled(): Boolean =
         store.getString(KEY_LIVE_ACTIVITIES)?.toBooleanStrictOrNull() ?: true
 

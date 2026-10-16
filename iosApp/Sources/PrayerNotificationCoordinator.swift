@@ -612,7 +612,7 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         // volume continuously instead of picking a pre-scaled file.
         if notification.request.identifier.hasSuffix(".start"),
            notification.request.content.userInfo["adhan"] as? Bool == true {
-            let volume = notification.request.content.userInfo["adhanVolume"] as? Int ?? 100
+            let volume = notification.request.content.userInfo["adhanVolume"] as? Int ?? 5
             playAdhan(volumePercent: volume)
             // No .sound: the adhan itself IS the sound; adding the default
             // notification sound would talk over it.

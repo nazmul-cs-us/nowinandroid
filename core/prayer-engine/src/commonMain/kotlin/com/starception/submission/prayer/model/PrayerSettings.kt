@@ -21,6 +21,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 import kotlin.time.Clock
 
+const val DEFAULT_ADHAN_VOLUME_PERCENT = 5
+
 /**
  * CALCULATION METHOD SETTINGS: Core astronomical parameters for prayer time calculations
  *
@@ -154,7 +156,7 @@ data class PrayerNotificationPreferences(
     // ADHAN PLAYBACK VOLUME - 0 (silent) to 100 (full), applied to the adhan
     // player independently of the device's notification volume. This is the
     // master volume; per-prayer values below override it for that prayer.
-    val adhanVolume: Int = 5,
+    val adhanVolume: Int = DEFAULT_ADHAN_VOLUME_PERCENT,
 
     // PER-PRAYER ADHAN VOLUME - overrides [adhanVolume] for that prayer;
     // null means "follow the master volume".

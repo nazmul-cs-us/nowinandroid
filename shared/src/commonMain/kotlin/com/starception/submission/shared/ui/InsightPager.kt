@@ -541,6 +541,9 @@ fun InsightPager(
                                 .firstOrNull { it.name == "Maghrib" }
                                 ?.let { it.hour * 60 + it.minute }
                                 ?: 1_080,
+                            epochSeconds = Clock.System.now().epochSeconds.toDouble(),
+                            latitude = latitude,
+                            longitude = longitude,
                             tileHeight = effectiveTileHeight,
                             isExpanded = isExpanded,
                             onClick = onOpenQibla,
