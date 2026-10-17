@@ -1295,7 +1295,14 @@ class UnifiedSettingsViewModel @Inject constructor(
 
     fun getDownloadManager(): AssetDownloadManager = downloadManager
 
-    private fun checkVoiceModelAvailable(engine: VoiceRecognitionEngine): Boolean {
+    // These checks hit the filesystem (File.exists + assets.open); they are
+    // called from viewModelScope (Main), so hop to IO for the disk work.
+    private suspend fun checkVoiceModelAvailable(engine: VoiceRecognitionEngine): Boolean =
+        withContext(Dispatchers.IO) {
+            checkVoiceModelAvailableBlocking(engine)
+        }
+
+    private fun checkVoiceModelAvailableBlocking(engine: VoiceRecognitionEngine): Boolean {
         return try {
             when (engine) {
                 VoiceRecognitionEngine.WHISPER -> {
@@ -1321,7 +1328,12 @@ class UnifiedSettingsViewModel @Inject constructor(
         }
     }
 
-    private fun checkTtsModelAvailable(voice: TtsVoice): Boolean {
+    private suspend fun checkTtsModelAvailable(voice: TtsVoice): Boolean =
+        withContext(Dispatchers.IO) {
+            checkTtsModelAvailableBlocking(voice)
+        }
+
+    private fun checkTtsModelAvailableBlocking(voice: TtsVoice): Boolean {
         val modelFile = voice.modelFile // e.g. "kokoro-int8-en-v0_19/model.int8.onnx"
         return try {
             // 1. Check previously extracted model cache (same location SherpaOnnxTtsService uses)

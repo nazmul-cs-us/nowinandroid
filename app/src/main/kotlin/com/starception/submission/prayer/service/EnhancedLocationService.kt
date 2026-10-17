@@ -28,7 +28,9 @@ import com.google.android.gms.location.*
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.starception.submission.prayer.model.Location
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.*
 import javax.inject.Inject
@@ -487,11 +489,15 @@ class EnhancedLocationService @Inject constructor(
                 android.util.Log.i("EnhancedLocationService", "   ✅ ENHANCED GEOCODER AVAILABLE: Starting reverse geocoding...")
 
                 withTimeoutOrNull(3000) { // 3 second timeout for geocoding to prevent delays
-                    val addresses = gc.getFromLocation(
-                        androidLocation.latitude,
-                        androidLocation.longitude,
-                        1,
-                    )
+                    // Geocoder.getFromLocation is a blocking network call on the calling
+                    // thread; hop to IO so the Main thread is never held hostage by it.
+                    val addresses = withContext(Dispatchers.IO) {
+                        gc.getFromLocation(
+                            androidLocation.latitude,
+                            androidLocation.longitude,
+                            1,
+                        )
+                    }
 
                     android.util.Log.i("EnhancedLocationService", "   📋 ENHANCED GEOCODING RESPONSE: ${addresses?.size ?: 0} addresses")
 

@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -172,7 +173,21 @@ internal fun SalahTrainingLabScreen(
     var windows by remember { mutableIntStateOf(0) }
     var sessionWindows by remember { mutableIntStateOf(0) }
     var sensorsUnavailable by remember { mutableStateOf(false) }
-    var sessions by remember { mutableStateOf(store.sessions()) }
+
+    // Session info fully reads each recording file from disk; loading it must
+    // stay off the main thread. Start empty and fill in when the first read
+    // completes (typically within a frame or two).
+    var sessions by remember { mutableStateOf<List<SalahSessionInfo>>(emptyList()) }
+    val sessionScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    fun refreshSessions() {
+        sessionScope.launch {
+            sessions = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                store.sessions()
+            }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) { refreshSessions() }
 
     val steps = remember(focusedPosture) {
         focusedPosture?.let { posture ->
@@ -184,10 +199,6 @@ internal fun SalahTrainingLabScreen(
                 ),
             )
         } ?: GUIDED_POSTURE_SEQUENCE
-    }
-
-    fun refreshSessions() {
-        sessions = store.sessions()
     }
 
     androidx.compose.runtime.DisposableEffect(Unit) {
@@ -224,7 +235,9 @@ internal fun SalahTrainingLabScreen(
                 stepSecondsTotal = duration
                 sessionWindows = 0
                 val sessionId = Clock.System.now().toEpochMilliseconds().toString(16).takeLast(8)
-                val sessionStart = store.startSession(prefix = "salah_guided_", sessionId = sessionId)
+                val sessionStart = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    store.startSession(prefix = "salah_guided_", sessionId = sessionId)
+                }
                 val started = if (sessionStart != null) {
                     recorder.start(sessionId) { sample ->
                         store.appendSample(sample.copy(posture = step.posture))
@@ -248,7 +261,13 @@ internal fun SalahTrainingLabScreen(
                     kotlinx.coroutines.delay(200)
                 }
                 recorder.stop()
-                store.stopSession(trimLastMs = TRIM_LAST_MS)
+                // Let any already-queued sensor callbacks drain on the main
+                // queue before finalizing the file off-thread, then trim and
+                // rename away from the main thread (whole-file read + write).
+                kotlinx.coroutines.delay(50)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    store.stopSession(trimLastMs = TRIM_LAST_MS)
+                }
                 refreshSessions()
                 if (stepIndex + 1 < steps.size) {
                     stepIndex += 1
@@ -336,12 +355,21 @@ internal fun SalahTrainingLabScreen(
                     sessions = sessions,
                     onOpen = onOpenSession,
                     onDelete = { name ->
-                        store.deleteSession(name)
-                        refreshSessions()
+                        sessionScope.launch {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                store.deleteSession(name)
+                            }
+                            refreshSessions()
+                        }
                     },
                     onDeleteAll = {
-                        store.deleteAllSessions()
-                        refreshSessions()
+                        sessionScope.launch {
+                            // deleteAllSessions reads every file before deleting.
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                store.deleteAllSessions()
+                            }
+                            refreshSessions()
+                        }
                     },
                 )
             }
@@ -370,8 +398,15 @@ internal fun SalahTrainingLabScreen(
                     windows = windows,
                     onCancel = {
                         recorder.stop()
-                        store.stopSession(trimLastMs = TRIM_LAST_MS)
-                        refreshSessions()
+                        // Drain queued sensor callbacks, then finalize the file
+                        // off the main thread (see the guided-stop comment).
+                        sessionScope.launch {
+                            kotlinx.coroutines.delay(50)
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                store.stopSession(trimLastMs = TRIM_LAST_MS)
+                            }
+                            refreshSessions()
+                        }
                         synthesizer.stop()
                         guidedState = GuidedState.IDLE
                     },

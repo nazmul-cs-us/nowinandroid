@@ -34,7 +34,14 @@ final class SalahTfliteServiceImpl: NSObject, SalahTfliteService {
 
     override init() {
         super.init()
-        queue.sync { initializeOnQueue() }
+        // Loading the ONNX session reads + parses the bundled model and norm
+        // params. Doing that with queue.sync blocked the main thread during
+        // makeUIViewController (app launch) for the whole session build.
+        // Initialize on the session queue instead; classify() synchronizes on
+        // the same queue and simply returns nil until the session is ready.
+        queue.async { [weak self] in
+            self?.initializeOnQueue()
+        }
     }
 
     private func initializeOnQueue() {
@@ -69,20 +76,23 @@ final class SalahTfliteServiceImpl: NSObject, SalahTfliteService {
     }
 
     func classify(sequence: KotlinArray<KotlinFloatArray>) -> KotlinFloatArray? {
-        guard let session, let inputName, let outputName,
-              Int(truncatingIfNeeded: sequence.size) == sequenceLength,
-              sequence.size > 0 else { return nil }
-        var flattened = [Float]()
-        flattened.reserveCapacity(sequenceLength * featuresPerWindow)
-        for i in 0..<Int(truncatingIfNeeded: sequence.size) {
-            guard let window = sequence.get(index: Int32(i)) else { return nil }
-            for j in 0..<Int(truncatingIfNeeded: window.size) {
-                flattened.append(window.get(index: Int32(j)))
-            }
-        }
         var output: KotlinFloatArray? = nil
+        // All mutable state (session/input/output names, shape) is written on
+        // the session queue from the async init, so read it under the same
+        // queue — never from the calling thread.
         dispatchPrecondition(condition: .notOnQueue(queue))
         queue.sync {
+            guard let session, let inputName, let outputName,
+                  Int(truncatingIfNeeded: sequence.size) == sequenceLength,
+                  sequence.size > 0 else { return }
+            var flattened = [Float]()
+            flattened.reserveCapacity(sequenceLength * featuresPerWindow)
+            for i in 0..<Int(truncatingIfNeeded: sequence.size) {
+                guard let window = sequence.get(index: Int32(i)) else { return }
+                for j in 0..<Int(truncatingIfNeeded: window.size) {
+                    flattened.append(window.get(index: Int32(j)))
+                }
+            }
             do {
                 let inputData = flattened.withUnsafeBufferPointer { buffer in
                     NSMutableData(bytes: buffer.baseAddress, length: flattened.count * MemoryLayout<Float>.size)

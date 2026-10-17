@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import com.starception.submission.shared.assets.iosCloudAssets
 import com.starception.submission.shared.ui.fileImageBitmap
@@ -53,10 +54,19 @@ internal actual fun SurahArtworkHeader(
     Box(modifier = modifier.background(androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh)) {
         val path = imagePath
         if (path != null) {
-            val imageBitmap = remember(path) { fileImageBitmap(path) }
-            if (imageBitmap != null) {
+            // Reading + decoding a CDN artwork file is disk/CPU work; never do
+            // it during composition on the main thread. The neutral surface
+            // background shows until the bitmap is ready.
+            var imageBitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
+            LaunchedEffect(path) {
+                imageBitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    fileImageBitmap(path)
+                }
+            }
+            val decodedBitmap = imageBitmap
+            if (decodedBitmap != null) {
                 Image(
-                    bitmap = imageBitmap,
+                    bitmap = decodedBitmap,
                     contentDescription = contentDescription,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,

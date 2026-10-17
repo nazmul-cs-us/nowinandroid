@@ -166,6 +166,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.util.Locale
@@ -720,7 +721,7 @@ fun HadithDetailScreen(
         // collections only require that model when English playback is selected.
         if (
             (isBukhariCollection || selectedLanguage == "en") &&
-            !isTtsVoiceModelAvailable(context, selectedVoice)
+            !withContext(Dispatchers.IO) { isTtsVoiceModelAvailable(context, selectedVoice) }
         ) {
             bookPlaylistEnabled = false
             showTtsModelDownload = true
@@ -925,37 +926,41 @@ fun HadithDetailScreen(
                     }
                     val playExactEnglishBukhariWithSherpa:
                         (onPlaybackCompleted: () -> Unit) -> Unit = { onPlaybackCompleted ->
-                            val englishText = bukhariTranslationRepo.getEnglishText(hadithNumber)
-                                ?: hadith?.textPlain
-                                ?: hadith?.elaboration
-                                ?: ""
-                            if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
-                                android.util.Log.i(
-                                    "HadithDetailScreen",
-                                    "${selectedVoice.displayName} model missing for English Bukhari fallback",
-                                )
-                                isPlaying = false
-                                showTtsModelDownload = true
-                            } else if (englishText.isBlank()) {
-                                android.util.Log.e(
-                                    "HadithDetailScreen",
-                                    "No English text available for Bukhari hadith #$hadithNumber",
-                                )
-                                isPlaying = false
-                            } else {
-                                android.util.Log.i(
-                                    "HadithDetailScreen",
-                                    "Playing exact English Bukhari fallback with ${selectedVoice.displayName}",
-                                )
-                                playWithSherpaOnnxTts(
-                                    sherpaOnnxTts = sherpaOnnxTts,
-                                    text = englishText,
-                                    hadithNumber = hadithNumber,
-                                    selectedVoice = selectedVoice,
-                                    speakerId = selectedSpeakerId,
-                                    onPlayingChanged = updateTtsPlaybackState,
-                                    onPlaybackCompleted = onPlaybackCompleted,
-                                )
+                            // Availability checks the filesystem; run them off the Main thread
+                            // inside a click-launched coroutine so the tap stays responsive.
+                            CoroutineScope(Dispatchers.Main).launch {
+                                val englishText = bukhariTranslationRepo.getEnglishText(hadithNumber)
+                                    ?: hadith?.textPlain
+                                    ?: hadith?.elaboration
+                                    ?: ""
+                                if (!withContext(Dispatchers.IO) { isTtsVoiceModelAvailable(context, selectedVoice) }) {
+                                    android.util.Log.i(
+                                        "HadithDetailScreen",
+                                        "${selectedVoice.displayName} model missing for English Bukhari fallback",
+                                    )
+                                    isPlaying = false
+                                    showTtsModelDownload = true
+                                } else if (englishText.isBlank()) {
+                                    android.util.Log.e(
+                                        "HadithDetailScreen",
+                                        "No English text available for Bukhari hadith #$hadithNumber",
+                                    )
+                                    isPlaying = false
+                                } else {
+                                    android.util.Log.i(
+                                        "HadithDetailScreen",
+                                        "Playing exact English Bukhari fallback with ${selectedVoice.displayName}",
+                                    )
+                                    playWithSherpaOnnxTts(
+                                        sherpaOnnxTts = sherpaOnnxTts,
+                                        text = englishText,
+                                        hadithNumber = hadithNumber,
+                                        selectedVoice = selectedVoice,
+                                        speakerId = selectedSpeakerId,
+                                        onPlayingChanged = updateTtsPlaybackState,
+                                        onPlaybackCompleted = onPlaybackCompleted,
+                                    )
+                                }
                             }
                         }
                     val handlePlayClick: () -> Unit = {
@@ -988,12 +993,14 @@ fun HadithDetailScreen(
                             val playBengaliRecordingWithIntro: (source: String) -> Unit =
                                 playRecording@{ source ->
                                     val recordingHadithNumber = hadithNumber
-                                    if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
-                                        showTtsModelDownload = true
-                                        isPlaying = false
-                                        return@playRecording
-                                    }
                                     CoroutineScope(Dispatchers.Main).launch {
+                                        // Availability checks the filesystem; do it off the
+                                        // Main thread before announcing playback state.
+                                        if (!withContext(Dispatchers.IO) { isTtsVoiceModelAvailable(context, selectedVoice) }) {
+                                            showTtsModelDownload = true
+                                            isPlaying = false
+                                            return@launch
+                                        }
                                         isPlaying = true
                                         isTtsBackedPlayback = true
                                         com.starception.submission.services.ChapterRecitationService
@@ -1139,22 +1146,25 @@ fun HadithDetailScreen(
                                 // For non-English languages, fall back to Android TTS
                                 val textToSpeak = translatedText ?: hadith!!.textPlain ?: ""
                                 if (selectedLanguage == "en") {
-                                    if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
-                                        // Selected voice model not downloaded — show the
-                                        // asset download page instead of failing silently.
-                                        android.util.Log.i("HadithDetailScreen", "🔊 ${selectedVoice.displayName} model missing — showing download page")
-                                        showTtsModelDownload = true
-                                    } else {
-                                        android.util.Log.i("HadithDetailScreen", "🔊 Using Sherpa-ONNX TTS with ${selectedVoice.displayName}, speaker $selectedSpeakerId")
-                                        playWithSherpaOnnxTts(
-                                            sherpaOnnxTts = sherpaOnnxTts,
-                                            text = textToSpeak,
-                                            hadithNumber = hadithNumber,
-                                            selectedVoice = selectedVoice,
-                                            speakerId = selectedSpeakerId,
-                                            onPlayingChanged = updateTtsPlaybackState,
-                                            onPlaybackCompleted = completeCurrentPlayback,
-                                        )
+                                    // Availability checks the filesystem; do it off the Main thread.
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        if (!withContext(Dispatchers.IO) { isTtsVoiceModelAvailable(context, selectedVoice) }) {
+                                            // Selected voice model not downloaded — show the
+                                            // asset download page instead of failing silently.
+                                            android.util.Log.i("HadithDetailScreen", "🔊 ${selectedVoice.displayName} model missing — showing download page")
+                                            showTtsModelDownload = true
+                                        } else {
+                                            android.util.Log.i("HadithDetailScreen", "🔊 Using Sherpa-ONNX TTS with ${selectedVoice.displayName}, speaker $selectedSpeakerId")
+                                            playWithSherpaOnnxTts(
+                                                sherpaOnnxTts = sherpaOnnxTts,
+                                                text = textToSpeak,
+                                                hadithNumber = hadithNumber,
+                                                selectedVoice = selectedVoice,
+                                                speakerId = selectedSpeakerId,
+                                                onPlayingChanged = updateTtsPlaybackState,
+                                                onPlaybackCompleted = completeCurrentPlayback,
+                                            )
+                                        }
                                     }
                                 } else {
                                     // Non-English languages use Android TTS (has more language support)

@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,8 +55,10 @@ import com.starception.submission.core.designsystem.component.NiaBottomSheetDefa
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.voice.SherpaOnnxTtsService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -78,7 +81,18 @@ fun TtsVoiceSelectionSheet(
     var previewJob by remember { mutableStateOf<Job?>(null) }
     var isPreviewing by remember { mutableStateOf(false) }
     var hasPreviewStarted by remember { mutableStateOf(false) }
-    val selectedVoiceAvailable = isVoiceAvailable(selectedVoice)
+
+    // Voice availability requires disk/asset checks (File.exists + assets.open),
+    // which must not run on the Main thread during composition. Resolve the
+    // small fixed voice set once off-thread when the sheet opens; voices read
+    // as available while the check is still in flight.
+    var availability by remember { mutableStateOf<Map<TtsVoice, Boolean>>(emptyMap()) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            availability = TtsVoice.entries.associateWith { voice -> isVoiceAvailable(voice) }
+        }
+    }
+    val selectedVoiceAvailable = availability[selectedVoice] ?: true
 
     fun stopPreview() {
         previewJob?.cancel()
@@ -161,7 +175,7 @@ fun TtsVoiceSelectionSheet(
                                     },
                                 )
                                 Text(
-                                    text = if (isVoiceAvailable(voice)) {
+                                    text = if (availability[voice] ?: true) {
                                         voice.description
                                     } else {
                                         "Not downloaded — tap play to download"

@@ -601,7 +601,13 @@ fun PrayerTimesScreen(
     var prayerTimeEditMode by rememberSaveable { mutableStateOf(false) }
     var showWeatherThresholds by rememberSaveable { mutableStateOf(false) }
     var prayerWeatherThresholds by remember {
-        mutableStateOf(PrayerWeatherThresholdStore.load(screenContext))
+        mutableStateOf(com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholds())
+    }
+    LaunchedEffect(Unit) {
+        // SharedPreferences reads are disk I/O on first load; keep them off the Main thread.
+        prayerWeatherThresholds = withContext(Dispatchers.IO) {
+            PrayerWeatherThresholdStore.load(screenContext)
+        }
     }
     var prayerTileWeatherAlerts by remember {
         mutableStateOf<Map<String, PrayerTileWeatherAlert>>(emptyMap())
@@ -647,8 +653,10 @@ fun PrayerTimesScreen(
     val prayerSettings = null
 
     // UI STATE MANAGEMENT - These control what the user sees
-    // Try to load cached data immediately, with Dubai fallback for instant startup
-    // Priority: 1. In-memory cache, 2. SharedPreferences cache, 3. Dubai fallback
+    // Only the in-memory cache is read here — it is pure RAM with no disk I/O.
+    // The SharedPreferences cache and the device-country fallback (disk + asset
+    // reads) are loaded off the Main thread in the INSTANT LOAD effect below.
+    // Priority: 1. In-memory cache, 2. SharedPreferences cache, 3. Country fallback
     val (initialPrayerTimes, initialLocation, initialLoading) = remember {
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
@@ -668,34 +676,12 @@ fun PrayerTimesScreen(
                 }
             }
 
-            // PRIORITY 2: Check SharedPreferences cache (persists across app restarts)
-            val settingsRepository = entryPoint.prayerSettingsRepository()
-            val persistedCache = settingsRepository.getCachedPrayerTimes()
-            if (persistedCache != null) {
-                android.util.Log.d("PrayerScreen", "🚀 INSTANT STARTUP: Loaded from SharedPreferences cache!")
-                android.util.Log.d("PrayerScreen", "  📍 Cached location: ${persistedCache.location.getDisplayName()}")
-                return@remember Triple(persistedCache, persistedCache.location.getDisplayName(), false)
-            }
-
-            // PRIORITY 3: Dubai fallback for first-time startup only
-            android.util.Log.d("PrayerScreen", "🕌 No cached data found, using Dubai default for first-time startup")
-            Triple(
-                com.starception.submission.feature.prayertimes.data.DeviceCountryFallback
-                    .countryFallbackPrayerTimes(screenContext),
-                com.starception.submission.feature.prayertimes.data.DeviceCountryFallback
-                    .countryFallbackLabel(screenContext),
-                false,
-            )
+            // PRIORITIES 2 & 3 involve disk/asset I/O and load asynchronously after
+            // the first frame (see the INSTANT LOAD STRATEGY effect below).
+            Triple(null, "", false)
         } catch (e: Exception) {
-            android.util.Log.w("PrayerScreen", "Failed to load cache, using Dubai fallback: ${e.message}")
-            // Always provide fallback data - never show loading
-            Triple(
-                com.starception.submission.feature.prayertimes.data.DeviceCountryFallback
-                    .countryFallbackPrayerTimes(screenContext),
-                com.starception.submission.feature.prayertimes.data.DeviceCountryFallback
-                    .countryFallbackLabel(screenContext),
-                false,
-            )
+            android.util.Log.w("PrayerScreen", "Failed to read in-memory cache: ${e.message}")
+            Triple(null, "", false)
         }
     }
 
@@ -2771,6 +2757,42 @@ fun PrayerTimesScreen(
         // resolved after the forecast arrives because it depends on severity.
         val appOpenStartedAt = System.currentTimeMillis()
         android.util.Log.d("PrayerScreen", "=== INSTANT LOAD STRATEGY ===")
+
+        // STEP 0: Load the persisted cache / first-launch fallback off the Main
+        // thread. These reads (SharedPreferences + country JSON asset) used to
+        // run inside remember{} during composition and blocked the first frame.
+        if (prayerTimes == null) {
+            val startupData = withContext(Dispatchers.IO) {
+                try {
+                    val entryPoint = EntryPointAccessors.fromApplication(
+                        screenContext.applicationContext,
+                        PrayerTimeCalculatorEntryPoint::class.java,
+                    )
+                    // PRIORITY 2: Check SharedPreferences cache (persists across app restarts)
+                    val persistedCache = entryPoint.prayerSettingsRepository().getCachedPrayerTimes()
+                    if (persistedCache != null) {
+                        android.util.Log.d("PrayerScreen", "🚀 INSTANT STARTUP: Loaded from SharedPreferences cache!")
+                        android.util.Log.d("PrayerScreen", "  📍 Cached location: ${persistedCache.location.getDisplayName()}")
+                        persistedCache to persistedCache.location.getDisplayName()
+                    } else {
+                        // PRIORITY 3: Device-country default for first-time startup only
+                        android.util.Log.d("PrayerScreen", "🕌 No cached data found, using device-country default for first-time startup")
+                        com.starception.submission.feature.prayertimes.data.DeviceCountryFallback
+                            .countryFallbackPrayerTimes(screenContext) to
+                            com.starception.submission.feature.prayertimes.data.DeviceCountryFallback
+                                .countryFallbackLabel(screenContext)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("PrayerScreen", "Failed to load startup cache: ${e.message}")
+                    null
+                }
+            }
+            // A concurrent refresh may have produced fresher data while we were loading.
+            if (startupData != null && prayerTimes == null) {
+                prayerTimes = startupData.first
+                location = startupData.second
+            }
+        }
 
         // STEP 1: Skip redundant cache loading - already done in remember{} block
         // The initial state was set from SharedPreferences cache which persists across app restarts

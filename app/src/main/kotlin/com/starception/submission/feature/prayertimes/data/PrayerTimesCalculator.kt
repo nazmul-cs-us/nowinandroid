@@ -27,6 +27,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * EntryPoint for accessing prayer services without ViewModel
@@ -123,7 +125,17 @@ class PrayerTimesCalculator(private val context: Context) {
      * - Add new location sources
      * - Change error handling strategy
      */
-    suspend fun calculateDefaultPrayerTimes(forceGpsRefresh: Boolean = false): Pair<DayPrayerTimes?, String> {
+    /**
+     * Runs on [Dispatchers.IO]: the calculation pipeline performs blocking
+     * SharedPreferences reads and reverse geocoding, so it must never run on
+     * the Main dispatcher even though it is launched from composable effects.
+     */
+    suspend fun calculateDefaultPrayerTimes(forceGpsRefresh: Boolean = false): Pair<DayPrayerTimes?, String> =
+        withContext(Dispatchers.IO) {
+            calculateDefaultPrayerTimesBlocking(forceGpsRefresh)
+        }
+
+    private suspend fun calculateDefaultPrayerTimesBlocking(forceGpsRefresh: Boolean): Pair<DayPrayerTimes?, String> {
         val startTime = System.currentTimeMillis()
         android.util.Log.i(TAG, "")
         android.util.Log.i(TAG, "🌅 COMPREHENSIVE PRAYER TIMES CALCULATION")

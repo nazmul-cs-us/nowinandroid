@@ -26,6 +26,7 @@ import com.starception.submission.ml.SalahSequenceValidator
 import com.starception.submission.sensor.SalahDataCollectionService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,11 +74,23 @@ class LivePrayerRecordingViewModel @Inject constructor(
         val targetRakahCount = _state.value.targetRakahCount
         Log.i(TAG, "Starting $targetRakahCount rak'ah live prayer recording...")
 
-        // Initialize ML detection engine for real-time predictions
-        try {
-            detectionEngine = SalahDetectionEngine(context)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize ML engine, recording without predictions", e)
+        // Initialize ML detection engine for real-time predictions. The engine
+        // constructor loads the TFLite model + normalization JSON from assets,
+        // which is far too heavy for the Main thread (this runs on a button
+        // press), so it is built off-thread and attached as soon as ready.
+        // Samples arriving before it is ready are simply counted, matching the
+        // existing "engine unavailable" behavior.
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val engine = SalahDetectionEngine(context)
+                if (_state.value.isRecording) {
+                    detectionEngine = engine
+                } else {
+                    engine.close() // recording stopped before initialization finished
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize ML engine, recording without predictions", e)
+            }
         }
 
         // Set up callbacks for real-time ML predictions

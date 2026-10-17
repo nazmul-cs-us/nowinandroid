@@ -21,7 +21,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -52,19 +56,30 @@ internal actual fun TopicArtwork(topicName: String, modifier: Modifier) {
 
 @Composable
 internal actual fun NewsHeaderArtwork(resourceName: String, modifier: Modifier) {
-    // Reader headers render as a plain Compose image (decoded once through
-    // Skia), matching Android's painterResource artwork: album parallax
-    // graphicsLayer transforms compose correctly, which they cannot do on
-    // the UIKit interop view used for the other bundled art.
-    val imageBitmap = remember(resourceName) { bundledImageBitmap(resourceName) }
-    if (imageBitmap != null) {
+    // Decoding + PNG re-encoding is real disk/CPU work; never do it during
+    // composition on the main thread. The header stays blank for the first
+    // frames and fills in as soon as the bitmap is ready.
+    var imageBitmap by remember(resourceName) { mutableStateOf<ImageBitmap?>(null) }
+    var decodeFinished by remember(resourceName) { mutableStateOf(false) }
+    LaunchedEffect(resourceName) {
+        imageBitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            bundledImageBitmap(resourceName)
+        }
+        decodeFinished = true
+    }
+    val decodedBitmap = imageBitmap
+    if (decodedBitmap != null) {
         Image(
-            bitmap = imageBitmap,
+            bitmap = decodedBitmap,
             contentDescription = null,
             modifier = modifier,
             contentScale = ContentScale.Crop,
         )
-    } else {
+    } else if (decodeFinished) {
+        // Reader headers render as a plain Compose image (decoded once through
+        // Skia), matching Android's painterResource artwork: album parallax
+        // graphicsLayer transforms compose correctly, which they cannot do on
+        // the UIKit interop view used for the other bundled art.
         BundledImage(
             name = resourceName,
             contentMode = UIViewContentMode.UIViewContentModeScaleAspectFill,
@@ -85,20 +100,28 @@ internal actual fun LocationMarkerArtwork(tint: Color, modifier: Modifier) {
 
 @Composable
 private fun BundledImage(name: String, contentMode: UIViewContentMode, modifier: Modifier) {
-    val image = remember(name) { bundledImage(name) }
+    // imageNamed is backed by the system cache and safe in composition; the
+    // uncached file-read fallback loads off the main thread instead.
+    var image by remember(name) { mutableStateOf(UIImage.imageNamed(name)) }
+    LaunchedEffect(name) {
+        if (image == null) {
+            image = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                bundledImage(name)
+            }
+        }
+    }
     UIKitView(
         factory = {
             UIImageView().apply {
                 clipsToBounds = true
                 this.contentMode = contentMode
-                this.image = image
             }
         },
-        modifier = modifier,
         update = { imageView ->
             imageView.contentMode = contentMode
             imageView.image = image
         },
+        modifier = modifier,
     )
 }
 

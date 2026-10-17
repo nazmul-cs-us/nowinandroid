@@ -20,6 +20,7 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSData
 import platform.Foundation.NSDate
 import platform.Foundation.NSFileManager
+import platform.Foundation.NSLock
 import platform.Foundation.NSNumber
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSString
@@ -50,6 +51,15 @@ private fun readText(path: String): String? {
 @OptIn(ExperimentalForeignApi::class)
 actual class SalahRecordingStore actual constructor() {
     private val fileManager = NSFileManager.defaultManager
+
+    /**
+     * Guards the active-recording state machine (`activePath` + `buffer`).
+     * Sensor samples arrive on the main queue while session stop/trim runs on
+     * a background dispatcher, so the shared state and the session file's
+     * writes must be serialized. Hold times are tiny: appends are small, and
+     * the heavy stop/trim path is only ever entered from off-main callers.
+     */
+    private val stateLock = NSLock()
     private var activePath: String? = null
     private var buffer = StringBuilder()
 
@@ -68,8 +78,13 @@ actual class SalahRecordingStore actual constructor() {
         val name = "${prefix}${timestamp}_$sessionId.jsonl"
         val path = "$directory/$name"
         return if (fileManager.createFileAtPath(path, contents = null, attributes = null)) {
-            activePath = path
-            buffer = StringBuilder()
+            stateLock.lock()
+            try {
+                activePath = path
+                buffer = StringBuilder()
+            } finally {
+                stateLock.unlock()
+            }
             name
         } else {
             null
@@ -77,37 +92,46 @@ actual class SalahRecordingStore actual constructor() {
     }
 
     actual fun appendSample(sample: SalahDataSample): Boolean {
-        val path = activePath ?: return false
-        buffer.append(sample.toJson())
-        buffer.append('\n')
-        // Flush on a comfortable cadence: ~64KB ≈ 10 s of capture at 10 windows/s.
-        if (buffer.length > 64_000) {
-            if (!flushBuffer()) return false
+        stateLock.lock()
+        try {
+            val path = activePath ?: return false
+            buffer.append(sample.toJson())
+            buffer.append('\n')
+            // Flush on a comfortable cadence: ~64KB ≈ 10 s of capture at 10 windows/s.
+            if (buffer.length > 64_000) {
+                if (!flushBufferLocked(path)) return false
+            }
+            return fileManager.fileExistsAtPath(path)
+        } finally {
+            stateLock.unlock()
         }
-        return fileManager.fileExistsAtPath(path)
     }
 
     actual fun stopSession(trimLastMs: Long): String? {
-        val path = activePath ?: return null
-        activePath = null
-        val content = buildString {
-            append(readText(path).orEmpty())
-            append(buffer)
+        stateLock.lock()
+        try {
+            val path = activePath ?: return null
+            activePath = null
+            val content = buildString {
+                append(readText(path).orEmpty())
+                append(buffer)
+            }
+            buffer = StringBuilder()
+            val finalContent = if (trimLastMs > 0) {
+                val cutoff = (NSDate().timeIntervalSince1970 * 1000).toLong() - trimLastMs
+                content.lineSequence()
+                    .filter { line -> line.isBlank() || line.timestampOf() <= cutoff }
+                    .joinToString("\n")
+            } else {
+                content
+            }
+            val payload = NSString.create(string = finalContent)
+                .dataUsingEncoding(NSUTF8StringEncoding) ?: return null
+            if (!payload.writeToFile(path, atomically = true)) return null
+            return renameToDescriptive(path, finalContent)
+        } finally {
+            stateLock.unlock()
         }
-        buffer = StringBuilder()
-        val finalContent = if (trimLastMs > 0) {
-            val cutoff = (NSDate().timeIntervalSince1970 * 1000).toLong() - trimLastMs
-            content.lineSequence()
-                .filter { line -> line.isBlank() || line.timestampOf() <= cutoff }
-                .joinToString("\n")
-        } else {
-            content
-        }
-        val payload = NSString.create(string = finalContent)
-            .dataUsingEncoding(NSUTF8StringEncoding) ?: return null
-        if (!payload.writeToFile(path, atomically = true)) return null
-        val finalName = renameToDescriptive(path)
-        return finalName
     }
 
     actual fun parseSample(line: String): SalahDataSample? = parseSalahSampleLine(line)
@@ -172,16 +196,28 @@ actual class SalahRecordingStore actual constructor() {
         )
     }
 
-    private fun flushBuffer(): Boolean {
-        val path = activePath ?: return false
-        val content = buildString {
-            append(readText(path).orEmpty())
-            append(buffer)
-        }
-        buffer = StringBuilder()
-        val payload = NSString.create(string = content)
+    /**
+     * Appends the buffer to the session file. Called with [stateLock] held.
+     *
+     * The previous implementation read the ENTIRE file back and rewrote it on
+     * every flush — O(file size) on the main queue (sensor callbacks), so each
+     * flush froze the UI longer as the session grew. Appending via POSIX
+     * fopen("a")/fwrite is O(buffer) (a single small write), which keeps the
+     * main-queue hold time sub-millisecond.
+     */
+    private fun flushBufferLocked(path: String): Boolean {
+        if (buffer.isEmpty()) return true
+        val payload = NSString.create(string = buffer.toString())
             .dataUsingEncoding(NSUTF8StringEncoding) ?: return false
-        return payload.writeToFile(path, atomically = true)
+        buffer = StringBuilder()
+        val file = platform.posix.fopen(path, "a") ?: return false
+        try {
+            val length = payload.length
+            val written = platform.posix.fwrite(payload.bytes, 1u, length, file)
+            return written == length
+        } finally {
+            platform.posix.fclose(file)
+        }
     }
 
     /**
@@ -190,13 +226,13 @@ actual class SalahRecordingStore actual constructor() {
      * posture is present, otherwise `partial<N>`; live recordings keep their
      * names (their labels are model output, not ground truth).
      */
-    private fun renameToDescriptive(path: String): String {
+    private fun renameToDescriptive(path: String, content: String? = null): String {
         val oldName = path.substringAfterLast('/')
         val prefix = FILE_PREFIXES.firstOrNull { oldName.startsWith(it) } ?: return oldName
-        val content = readText(path) ?: return oldName
+        val fileContent = content ?: readText(path) ?: return oldName
         val postures = mutableSetOf<String>()
         var rowCount = 0
-        for (line in content.lineSequence()) {
+        for (line in fileContent.lineSequence()) {
             if (line.isBlank()) continue
             rowCount++
             line.postureOf().takeIf { it.isNotEmpty() }?.let(postures::add)

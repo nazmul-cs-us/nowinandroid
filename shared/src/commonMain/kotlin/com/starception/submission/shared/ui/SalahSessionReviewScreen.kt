@@ -89,14 +89,21 @@ private enum class ReviewScene(val label: String) {
 @Composable
 internal fun SalahSessionReviewScreen(
     fileName: String,
-    qualityAnalyzer: com.starception.submission.shared.ml.SalahQualityAnalyzer? = null,
+    // A factory rather than a value: creating the analyzer reads + parses the
+    // bundled normalization params, which must happen off the main thread (see
+    // the analyzing effect below).
+    qualityAnalyzerFactory: (() -> com.starception.submission.shared.ml.SalahQualityAnalyzer?)? = null,
     scene3DService: Salah3DSceneService? = null,
     onBack: () -> Unit,
 ) {
     val store = remember { SalahRecordingStore() }
     var samples by remember { mutableStateOf<List<SalahDataSample>?>(null) }
     LaunchedEffect(fileName) {
-        samples = store.sessionSamples(fileName)
+        // Reading + parsing a session file (potentially multi-MB) must never
+        // run on the main dispatcher.
+        samples = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            store.sessionSamples(fileName)
+        }
     }
 
     SharedDetailScaffold(title = "Session review", onBack = onBack) {
@@ -110,7 +117,7 @@ internal fun SalahSessionReviewScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            else -> ReviewBody(fileName, loaded, qualityAnalyzer, scene3DService)
+            else -> ReviewBody(fileName, loaded, qualityAnalyzerFactory, scene3DService)
         }
     }
 }
@@ -131,7 +138,7 @@ private data class PcaResult(val positions: FloatArray, val varianceFraction: Fl
 private fun ReviewBody(
     fileName: String,
     samples: List<SalahDataSample>,
-    qualityAnalyzer: com.starception.submission.shared.ml.SalahQualityAnalyzer?,
+    qualityAnalyzerFactory: (() -> com.starception.submission.shared.ml.SalahQualityAnalyzer?)?,
     scene3DService: Salah3DSceneService?,
 ) {
     var report by remember { mutableStateOf<com.starception.submission.shared.ml.SalahQualityReport?>(null) }
@@ -152,11 +159,18 @@ private fun ReviewBody(
             frame = (frame + 1) % samples.size
         }
     }
-    // The model-vs-label quality pass — Android's "Analyze data quality".
+    // The model-vs-label quality pass — Android's "Analyze data quality". The
+    // analyzer construction (bundle read + JSON parse) happens on the same
+    // background dispatcher as the analysis itself, never during composition.
     LaunchedEffect(analyzing) {
         if (analyzing) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                qualityAnalyzer?.analyze(samples)
+            val analyzer = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                qualityAnalyzerFactory?.invoke()
+            }
+            analyzer?.let { created ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    created.analyze(samples)
+                }
             }?.let { result ->
                 report = result
                 analyzing = false
@@ -370,7 +384,7 @@ private fun ReviewBody(
             }
         }
         Spacer(Modifier.height(4.dp))
-        if (qualityAnalyzer != null && report == null) {
+        if (qualityAnalyzerFactory != null && report == null) {
             Button(
                 onClick = { analyzing = true },
                 enabled = !analyzing,

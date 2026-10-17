@@ -616,7 +616,10 @@ fun SharedNavHost(
             composable<SalahReviewRoute> { entry ->
                 SalahSessionReviewScreen(
                     fileName = entry.toRoute<SalahReviewRoute>().fileName,
-                    qualityAnalyzer = createQualityAnalyzer?.invoke(),
+                    // Forward the factory itself: invoking it here would read
+                    // + parse the bundled norm params during navigation on the
+                    // main thread.
+                    qualityAnalyzerFactory = createQualityAnalyzer,
                     scene3DService = salah3DService,
                     onBack = { navController.popBackStack() },
                 )
