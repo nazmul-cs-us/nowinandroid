@@ -243,6 +243,7 @@ object QuranTranslationHelper {
             "ar", // Arabic
             "transliteration", // English Transliteration
             "bn", // Bengali
+            "hi", // Hindi
             "zh", // Chinese
             "en", // English
             "es", // Spanish
@@ -263,6 +264,7 @@ object QuranTranslationHelper {
             "ar" -> "Arabic"
             "transliteration" -> "English Transliteration"
             "bn" -> "Bengali"
+            "hi" -> "Hindi"
             "zh" -> "Chinese"
             "en" -> "English"
             "es" -> "Spanish"

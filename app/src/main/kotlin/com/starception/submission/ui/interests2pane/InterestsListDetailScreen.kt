@@ -80,6 +80,11 @@ fun NavGraphBuilder.interestsListDetailScreen(
     onShamayelBookClick: (Int) -> Unit = {},
     onShamayelBookPlayClick: (Int) -> Unit = {},
     onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
+    onHadithCollectionBookClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionBookPlayClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionPlayClick: (databaseFile: String, shuffle: Boolean) -> Unit = { _, _ -> },
+    canRecategorizeHadithBooks: Boolean = false,
+    onHadithCollectionRecategorize: (databaseFile: String) -> Unit = {},
     onSearchSubmit: (query: String) -> Unit = {},
 ) {
     composable<InterestsRoute> {
@@ -99,6 +104,11 @@ fun NavGraphBuilder.interestsListDetailScreen(
                 onShamayelBookClick = onShamayelBookClick,
                 onShamayelBookPlayClick = onShamayelBookPlayClick,
                 onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
+                onHadithCollectionBookClick = onHadithCollectionBookClick,
+                onHadithCollectionBookPlayClick = onHadithCollectionBookPlayClick,
+                onHadithCollectionPlayClick = onHadithCollectionPlayClick,
+                canRecategorizeHadithBooks = canRecategorizeHadithBooks,
+                onHadithCollectionRecategorize = onHadithCollectionRecategorize,
             )
         }
     }
@@ -117,6 +127,11 @@ internal fun InterestsListDetailScreen(
     onShamayelBookClick: (Int) -> Unit = {},
     onShamayelBookPlayClick: (Int) -> Unit = {},
     onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
+    onHadithCollectionBookClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionBookPlayClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionPlayClick: (databaseFile: String, shuffle: Boolean) -> Unit = { _, _ -> },
+    canRecategorizeHadithBooks: Boolean = false,
+    onHadithCollectionRecategorize: (databaseFile: String) -> Unit = {},
 ) {
     val selectedTopicId by viewModel.selectedTopicId.collectAsStateWithLifecycle()
     InterestsListDetailScreen(
@@ -132,6 +147,11 @@ internal fun InterestsListDetailScreen(
         onShamayelBookClick = onShamayelBookClick,
         onShamayelBookPlayClick = onShamayelBookPlayClick,
         onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
+        onHadithCollectionBookClick = onHadithCollectionBookClick,
+        onHadithCollectionBookPlayClick = onHadithCollectionBookPlayClick,
+        onHadithCollectionPlayClick = onHadithCollectionPlayClick,
+        canRecategorizeHadithBooks = canRecategorizeHadithBooks,
+        onHadithCollectionRecategorize = onHadithCollectionRecategorize,
     )
 }
 
@@ -150,6 +170,11 @@ internal fun InterestsListDetailScreen(
     onShamayelBookClick: (Int) -> Unit = {},
     onShamayelBookPlayClick: (Int) -> Unit = {},
     onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
+    onHadithCollectionBookClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionBookPlayClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionPlayClick: (databaseFile: String, shuffle: Boolean) -> Unit = { _, _ -> },
+    canRecategorizeHadithBooks: Boolean = false,
+    onHadithCollectionRecategorize: (databaseFile: String) -> Unit = {},
 ) {
     val listDetailNavigator = rememberListDetailPaneScaffoldNavigator(
         scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo),
@@ -278,6 +303,11 @@ internal fun InterestsListDetailScreen(
                                     onShamayelBookClick = onShamayelBookClick,
                                     onShamayelBookPlayClick = onShamayelBookPlayClick,
                                     onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
+                                    onHadithCollectionBookClick = onHadithCollectionBookClick,
+                                    onHadithCollectionBookPlayClick = onHadithCollectionBookPlayClick,
+                                    onHadithCollectionPlayClick = onHadithCollectionPlayClick,
+                                    canRecategorizeHadithBooks = canRecategorizeHadithBooks,
+                                    onHadithCollectionRecategorize = onHadithCollectionRecategorize,
                                     // Offer to download missing content for downloadable Quran/Hadith topics.
                                     belowHeaderContent = { topicName ->
                                         com.starception.submission.download.TopicMissingContentCard(topicName)

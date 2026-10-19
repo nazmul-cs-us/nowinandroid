@@ -186,6 +186,8 @@ class DrivingAudioService : Service() {
         ARABIC_ONLY,
         BENGALI_TRANSLATION,
         ENGLISH_TRANSLATION,
+        URDU_TRANSLATION,
+        HINDI_TRANSLATION,
     }
 
     inner class DrivingAudioBinder : Binder() {
@@ -1168,6 +1170,8 @@ class DrivingAudioService : Service() {
             "ARABIC_ONLY", "AR", "ARABIC" -> ChainQuranAudioLanguage.ARABIC_ONLY
             "BENGALI_TRANSLATION", "BN", "BENGALI" -> ChainQuranAudioLanguage.BENGALI_TRANSLATION
             "ENGLISH_TRANSLATION", "EN", "ENGLISH" -> ChainQuranAudioLanguage.ENGLISH_TRANSLATION
+            "URDU_TRANSLATION", "URDU", "UR" -> ChainQuranAudioLanguage.URDU_TRANSLATION
+            "HINDI_TRANSLATION", "HINDI", "HI" -> ChainQuranAudioLanguage.HINDI_TRANSLATION
             else -> {
                 Log.w(TAG, "🕌 Unknown quran audio_language='$storedValue', defaulting to Arabic")
                 ChainQuranAudioLanguage.ARABIC_ONLY
@@ -1180,6 +1184,8 @@ class DrivingAudioService : Service() {
             ChainQuranAudioLanguage.ARABIC_ONLY -> AudioLanguage.ARABIC_ONLY
             ChainQuranAudioLanguage.BENGALI_TRANSLATION -> AudioLanguage.BENGALI_TRANSLATION
             ChainQuranAudioLanguage.ENGLISH_TRANSLATION -> AudioLanguage.ENGLISH_TRANSLATION
+            ChainQuranAudioLanguage.URDU_TRANSLATION -> AudioLanguage.URDU_TRANSLATION
+            ChainQuranAudioLanguage.HINDI_TRANSLATION -> AudioLanguage.HINDI_TRANSLATION
         }
     }
 

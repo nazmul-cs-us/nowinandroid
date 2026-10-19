@@ -146,6 +146,13 @@ interface HadithDao {
     suspend fun getHadithsInRange(startId: Int, endId: Int): List<HadithEntity>
 
     /**
+     * Get a spread of specific hadiths by id (categorizer sampling walks the
+     * ordered collection and never needs whole ranges).
+     */
+    @Query("SELECT * FROM hadiths WHERE id IN (:ids) ORDER BY id ASC")
+    suspend fun getHadithsByIds(ids: List<Int>): List<HadithEntity>
+
+    /**
      * FTS5 bm25-ranked full-text search. When the collection database has a
      * hadiths_fts index, this replaces LIKE scanning with proper IR ranking:
      * short dense passages that match the query intent rank above long

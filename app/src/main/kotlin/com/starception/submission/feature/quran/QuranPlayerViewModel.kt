@@ -185,6 +185,8 @@ class QuranPlayerViewModel(
             AudioLanguage.ARABIC_ONLY -> AudioLanguage.BENGALI_TRANSLATION
             AudioLanguage.BENGALI_TRANSLATION -> AudioLanguage.ENGLISH_TRANSLATION
             AudioLanguage.ENGLISH_TRANSLATION -> AudioLanguage.ARABIC_ONLY
+            AudioLanguage.URDU_TRANSLATION -> AudioLanguage.HINDI_TRANSLATION
+            AudioLanguage.HINDI_TRANSLATION -> AudioLanguage.ARABIC_ONLY
         }
         playbackService?.setAudioLanguage(audioLanguage)
         // Replay current surah with new language

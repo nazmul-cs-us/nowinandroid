@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.starception.submission.core.model.data.HadithCollections
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
@@ -107,27 +108,43 @@ private data class TopicContentSpec(
 )
 
 /** Maps a topic name to its downloadable content, or null for topics without bundled-DB content. */
-private fun topicContentSpec(name: String): TopicContentSpec? = when {
-    name.contains("Shamai", ignoreCase = true) || name.contains("Shamay", ignoreCase = true) ->
-        TopicContentSpec(
+private fun topicContentSpec(name: String): TopicContentSpec? {
+    // Named cases first: the Shamai'l and Quran branches, and Bukhari's JSON feed
+    // (the topic feed is generated from the JSON, not the reader database).
+    if (name.contains("Shamai", ignoreCase = true) || name.contains("Shamay", ignoreCase = true)) {
+        return TopicContentSpec(
             cdnKey = "databases/hadith/shamayele_tirmidhi_complete.db",
             category = "hadith_shamayele_tirmidhi",
             resourceName = "Shamai'l At-Tirmidhi",
             description = "56 chapters and 322 hadiths in Arabic, Bengali, and English.",
         )
-    name.contains("Quran", ignoreCase = true) -> TopicContentSpec(
-        cdnKey = "databases/quran/quran.db",
-        category = "quran_core",
-        resourceName = "Holy Quran",
-        description = "Arabic text, translations, and Tafseer.",
+    }
+    if (name.contains("Quran", ignoreCase = true)) {
+        return TopicContentSpec(
+            cdnKey = "databases/quran/quran.db",
+            category = "quran_core",
+            resourceName = "Holy Quran",
+            description = "Arabic text, translations, and Tafseer.",
+        )
+    }
+    if (name.contains("Bukhari", ignoreCase = true)) {
+        return TopicContentSpec(
+            // The topic feed is generated from the JSON (the reader DB is fetched separately by the
+            // Hadith screen on demand), so gate/download on the JSON the generator actually reads.
+            cdnKey = "json/sahih_bukhari.json",
+            category = "json_data",
+            resourceName = "Sahih Bukhari",
+            description = "The Sahih Bukhari hadith collection.",
+        )
+    }
+    // Every other registry collection (Muslim, Tirmidhi, Abu Dawud, Nasa'i, Ibn Majah,
+    // Malik, Darimi, Ahmad) gates on its own database.
+    val collection = HadithCollections.byName(name) ?: return null
+    return TopicContentSpec(
+        cdnKey = "databases/hadith/${collection.databaseFile}",
+        category = collection.downloadCategory,
+        resourceName = collection.name,
+        description = "${collection.books.size} books and ${collection.hadithCount} hadiths " +
+            "in Arabic and English.",
     )
-    name.contains("Bukhari", ignoreCase = true) -> TopicContentSpec(
-        // The topic feed is generated from the JSON (the reader DB is fetched separately by the
-        // Hadith screen on demand), so gate/download on the JSON the generator actually reads.
-        cdnKey = "json/sahih_bukhari.json",
-        category = "json_data",
-        resourceName = "Sahih Bukhari",
-        description = "The Sahih Bukhari hadith collection.",
-    )
-    else -> null
 }

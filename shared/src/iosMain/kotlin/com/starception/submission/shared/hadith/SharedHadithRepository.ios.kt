@@ -68,6 +68,102 @@ private class IosSharedHadithRepository : SharedHadithRepository {
             readShamayelHadiths(firstId, lastId)
         }
 
+    override suspend fun getCollectionHadiths(
+        databaseFile: String,
+        firstId: Int,
+        lastId: Int,
+    ): List<SharedHadith> = withContext(Dispatchers.Default) {
+        require(firstId > 0 && lastId >= firstId)
+        readCollectionHadiths(databaseFile, firstId, lastId)
+    }
+
+    override suspend fun getCollectionHadithsByIds(
+        databaseFile: String,
+        ids: List<Int>,
+    ): List<SharedHadith> = withContext(Dispatchers.Default) {
+        if (ids.isEmpty()) {
+            emptyList()
+        } else {
+            readCollectionHadithsByIds(databaseFile, ids)
+        }
+    }
+
+    /**
+     * Any registry collection. The shared schema (id, text_arabic, text_plain,
+     * elaboration) covers every hadith database; Arabic-only editions ship a
+     * null text_plain, which surfaces as an empty English string.
+     */
+    @OptIn(ExperimentalForeignApi::class)
+    private suspend fun readCollectionHadithsByIds(
+        databaseFile: String,
+        ids: List<Int>,
+    ): List<SharedHadith> = readCollectionRows(
+        databaseFile = databaseFile,
+        whereSql = "id IN (${ids.joinToString(",")})",
+    )
+
+    @OptIn(ExperimentalForeignApi::class)
+    private suspend fun readCollectionHadiths(
+        databaseFile: String,
+        firstId: Int,
+        lastId: Int,
+    ): List<SharedHadith> = readCollectionRows(
+        databaseFile = databaseFile,
+        whereSql = "id BETWEEN $firstId AND $lastId",
+    )
+
+    @OptIn(ExperimentalForeignApi::class)
+    private suspend fun readCollectionRows(
+        databaseFile: String,
+        whereSql: String,
+    ): List<SharedHadith> {
+        val path = resolveDatabaseAsset(
+            bundledPath = null,
+            remotePath = "databases/hadith/$databaseFile",
+            cacheName = databaseFile,
+        )
+        return memScoped {
+            val database = alloc<CPointerVar<sqlite3>>()
+            check(sqlite3_open_v2(path, database.ptr, SQLITE_OPEN_READONLY, null) == SQLITE_OK) {
+                "Unable to open $databaseFile: ${database.value.errorMessage()}"
+            }
+            try {
+                val statement = alloc<CPointerVar<sqlite3_stmt>>()
+                val sql = """
+                SELECT id, text_arabic, COALESCE(text_plain, ''), COALESCE(elaboration, '')
+                FROM hadiths
+                WHERE $whereSql
+                ORDER BY id ASC
+                """.trimIndent()
+                check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
+                    "Unable to prepare the $databaseFile query: ${database.value.errorMessage()}"
+                }
+                try {
+                    buildList {
+                        while (true) {
+                            when (sqlite3_step(statement.value)) {
+                                SQLITE_ROW -> add(
+                                    SharedHadith(
+                                        id = sqlite3_column_int(statement.value, 0),
+                                        arabic = statement.value.text(1),
+                                        english = statement.value.text(2),
+                                        explanation = statement.value.text(3),
+                                    ),
+                                )
+                                SQLITE_DONE -> break
+                                else -> error("Unable to read $databaseFile: ${database.value.errorMessage()}")
+                            }
+                        }
+                    }
+                } finally {
+                    statement.value?.let(::sqlite3_finalize)
+                }
+            } finally {
+                database.value?.let(::sqlite3_close)
+            }
+        }
+    }
+
     /**
      * Shama'il At-Tirmidhi: the hadiths table carries the Arabic text; the
      * curated hadith_details rows supply the English translation (falling back
@@ -100,8 +196,6 @@ private class IosSharedHadithRepository : SharedHadithRepository {
                     "Unable to prepare the Shama'il query: ${database.value.errorMessage()}"
                 }
                 try {
-                    check(sqlite3_bind_int(statement.value, 1, firstId) == SQLITE_OK)
-                    check(sqlite3_bind_int(statement.value, 2, lastId) == SQLITE_OK)
                     buildList {
                         while (true) {
                             when (sqlite3_step(statement.value)) {
@@ -214,8 +308,6 @@ private class IosSharedHadithRepository : SharedHadithRepository {
                     "Unable to prepare the Bukhari query: ${database.value.errorMessage()}"
                 }
                 try {
-                    check(sqlite3_bind_int(statement.value, 1, firstId) == SQLITE_OK)
-                    check(sqlite3_bind_int(statement.value, 2, lastId) == SQLITE_OK)
                     buildList {
                         while (true) {
                             when (sqlite3_step(statement.value)) {

@@ -8967,6 +8967,8 @@ private fun mapTranslationCodeToAudioLanguage(code: String): AudioLanguage? {
         "ar" -> AudioLanguage.ARABIC_ONLY
         "bn" -> AudioLanguage.BENGALI_TRANSLATION
         "en" -> AudioLanguage.ENGLISH_TRANSLATION
+        "ur" -> AudioLanguage.URDU_TRANSLATION
+        "hi" -> AudioLanguage.HINDI_TRANSLATION
         else -> null // No audio support for this translation
     }
 }
@@ -8976,6 +8978,8 @@ private fun getAudioLanguageDisplayName(language: AudioLanguage): String {
         AudioLanguage.ARABIC_ONLY -> "Arabic"
         AudioLanguage.ENGLISH_TRANSLATION -> "English"
         AudioLanguage.BENGALI_TRANSLATION -> "Bengali"
+        AudioLanguage.URDU_TRANSLATION -> "Urdu"
+        AudioLanguage.HINDI_TRANSLATION -> "Hindi"
     }
 }
 

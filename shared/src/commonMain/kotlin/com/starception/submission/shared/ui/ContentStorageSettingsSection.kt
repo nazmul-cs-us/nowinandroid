@@ -436,11 +436,14 @@ internal fun storageCategoryDisplayName(category: String): String = when (catego
     "model_kws" -> "Keyword Detection"
     "model_now_nudge" -> "Now Nudge Question Model"
     "model_now_nudge_knowledge" -> "Now Nudge Knowledge Model"
+    "model_hadith_categorizer" -> "Hadith Book Generator Model"
     "bukhari_audio_bn" -> "Bukhari Audio (Bengali)"
     "fortress_audio_arabic" -> "Fortress Dua Audio (Arabic)"
     "quran_audio_arabic" -> "Quran Audio (Arabic)"
     "quran_audio_bengali" -> "Quran Audio (Bengali)"
     "quran_audio_english" -> "Quran Audio (English)"
+    "quran_audio_urdu" -> "Quran Audio (Urdu)"
+    "quran_audio_hindi" -> "Quran Audio (Hindi)"
     else -> category.replace('_', ' ').replaceFirstChar { it.uppercase() }
 }
 
@@ -458,11 +461,16 @@ internal fun storageCategoryDescription(category: String): String = when (catego
     "model_kws" -> "Offline yes/no detection"
     "model_now_nudge" -> "Creates source-grounded questions locally without sending content off-device"
     "model_now_nudge_knowledge" -> "Answers your questions from the downloaded Quran and Hadith, entirely on-device"
+    "model_hadith_categorizer" -> "Generates the book/chapter structure of a hadith collection entirely on-device"
+    "hadith_musnad_ahmad" -> "The largest hadith collection, arranged by companion — Arabic with English"
+    "hadith_sunan_darimi" -> "An early topical collection — Arabic with English"
     "bukhari_audio_bn" -> "Sahih Bukhari narration in Bengali"
     "fortress_audio_arabic" -> "Fortress of the Muslim recitations"
     "quran_audio_arabic" -> "Arabic Quran recitation"
     "quran_audio_bengali" -> "Bengali Quran translation audio"
     "quran_audio_english" -> "English Quran translation audio"
+    "quran_audio_urdu" -> "Urdu Quran translation audio"
+    "quran_audio_hindi" -> "Hindi Quran translation audio"
     else -> ""
 }
 
@@ -472,7 +480,8 @@ private fun storageCategoryGroup(category: String): String = when {
     category.startsWith("quran_audio_") || category.endsWith("_audio_bn") ||
         category.startsWith("fortress_audio_") -> "Audio Recitations"
     category.startsWith("model_tts_") -> "Text-to-Speech"
-    category == "model_now_nudge" || category == "model_now_nudge_knowledge" -> "On-device AI"
+    category == "model_now_nudge" || category == "model_now_nudge_knowledge" ||
+        category == "model_hadith_categorizer" -> "On-device AI"
     category.startsWith("model_") -> "Voice Recognition"
     else -> "App Data"
 }

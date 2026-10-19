@@ -35,6 +35,29 @@ interface SharedHadithRepository {
     suspend fun getShamayelHadith(id: Int): SharedHadith? = getShamayelHadiths(id, id).firstOrNull()
     suspend fun getShamayelHadiths(firstId: Int, lastId: Int): List<SharedHadith>
 
+    /**
+     * Any [com.starception.submission.core.model.data.HadithCollections]
+     * registry collection, resolved from `databases/hadith/<databaseFile>`.
+     * Rows whose translation column is null (Arabic-only editions) return an
+     * empty English string.
+     */
+    suspend fun getCollectionHadith(
+        databaseFile: String,
+        id: Int,
+    ): SharedHadith? = getCollectionHadiths(databaseFile, id, id).firstOrNull()
+
+    suspend fun getCollectionHadiths(
+        databaseFile: String,
+        firstId: Int,
+        lastId: Int,
+    ): List<SharedHadith> = emptyList()
+
+    /** The evenly spread sample ids the AI book generator classifies. */
+    suspend fun getCollectionHadithsByIds(
+        databaseFile: String,
+        ids: List<Int>,
+    ): List<SharedHadith> = emptyList()
+
     /** Full-text Bukhari search over the English text, for search suggestions. */
     suspend fun searchBukhari(query: String, limit: Int = 10): List<SharedHadith> = emptyList()
 }

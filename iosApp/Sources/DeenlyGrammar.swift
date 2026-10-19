@@ -21,9 +21,20 @@ enum DeenlyGrammar {
         switch task {
         case "answer": return answer
         case "question": return question
+        case "categorizer-propose": return categorizerPropose
+        case "categorizer-classify": return categorizerClassify
         default: return knowledge
         }
     }
+
+    /// The hadith-book generator's taxonomy proposal: a JSON array of 4-40
+    /// short English book titles (mirrors Android's PROPOSAL_JSON_SCHEMA).
+    static let categorizerPropose = "root ::= \"[\" space title (\",\" space title){3,39} space \"]\"\nspace ::= \" \"?\ntitle ::= \"\\\"\" word (\" \" word){0,5} \"\\\"\"\ntitle-char ::= [A-Za-z0-9'-]\nword ::= [A-Za-z0-9] title-char{0,20}\n"
+
+    /// The classifier's verdict: {"book": <index>}. The grammar admits any
+    /// two-digit integer; the Kotlin side validates it against the proposed
+    /// book count (the proposal is per-run, so the grammar cannot know N).
+    static let categorizerClassify = "book ::= \"\\\"book\\\"\" space \":\" space int\nint ::= [0-9]{1,2}\nroot ::= \"{\" space book space \"}\"\nspace ::= \" \"?\n"
 
     // The schema-generated free-form string allowed greedy sampling to collapse
     // into punctuation. Requiring two to six short words keeps the same title

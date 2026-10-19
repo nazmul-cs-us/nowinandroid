@@ -1211,7 +1211,9 @@ fun PrayerTimesScreen(
     var modelKnowledgeCandidate by remember(nudgeDay) {
         mutableStateOf<NowNudgeKnowledgeCandidate?>(null)
     }
-    var expandedInsightPage by rememberSaveable { mutableStateOf<Int?>(null) }
+    // Always open with the first insight tile in its expanded stage; the
+    // pager's collapse control returns to the compact grid for the session.
+    var expandedInsightPage by rememberSaveable { mutableStateOf<Int?>(0) }
     var expandedAiCandidate by remember(nudgeDay) {
         mutableStateOf<NowNudgeKnowledgeCandidate?>(null)
     }

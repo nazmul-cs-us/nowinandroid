@@ -393,10 +393,13 @@ class AssetDownloadViewModel @Inject constructor(
             "model_kws" -> "Keyword Detection"
             "model_now_nudge" -> "Now Nudge Question Model"
             "model_now_nudge_knowledge" -> "Now Nudge Knowledge Model"
+            "model_hadith_categorizer" -> "Hadith Book Generator Model"
             "bukhari_audio_bn" -> "Bukhari Audio (Bengali)"
             "quran_audio_arabic" -> "Quran Audio (Arabic)"
             "quran_audio_bengali" -> "Quran Audio (Bengali)"
             "quran_audio_english" -> "Quran Audio (English)"
+            "quran_audio_urdu" -> "Quran Audio (Urdu)"
+            "quran_audio_hindi" -> "Quran Audio (Hindi)"
             "other" -> "Additional Resources"
             else -> category.replace('_', ' ')
                 .replaceFirstChar { it.uppercase() }
@@ -410,7 +413,8 @@ class AssetDownloadViewModel @Inject constructor(
             category.startsWith("hadith_") -> "Hadith Collections"
             category.startsWith("quran_audio_") || category == "bukhari_audio_bn" -> "Audio Recitations"
             category.startsWith("model_tts_") -> "Text-to-Speech"
-            category == "model_now_nudge" || category == "model_now_nudge_knowledge" -> "On-device AI"
+            category == "model_now_nudge" || category == "model_now_nudge_knowledge" ||
+                category == "model_hadith_categorizer" -> "On-device AI"
             category.startsWith("model_") -> "Voice Recognition"
             category == "json_data" || category == "news" || category == "other" -> "App Data"
             else -> "Other"
@@ -468,10 +472,13 @@ class AssetDownloadViewModel @Inject constructor(
             "model_kws" -> "Wake word and voice command detection"
             "model_now_nudge" -> "Creates source-grounded questions locally without sending content off-device"
             "model_now_nudge_knowledge" -> "Answers your questions from the downloaded Quran and Hadith, entirely on-device"
+            "model_hadith_categorizer" -> "Generates the book/chapter structure of a hadith collection entirely on-device"
             "bukhari_audio_bn" -> "Sahih Bukhari narration in Bengali"
             "quran_audio_arabic" -> "Full Quran recitation by renowned Qari"
             "quran_audio_bengali" -> "Bengali translation audio recitation"
             "quran_audio_english" -> "English translation audio recitation"
+            "quran_audio_urdu" -> "Urdu translation audio recitation"
+            "quran_audio_hindi" -> "Hindi translation audio recitation"
             "other" -> "Supplementary app content"
             else -> ""
         }

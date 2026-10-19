@@ -54,13 +54,43 @@ private class IosSharedTopicRepository : SharedTopicRepository {
 
     override suspend fun articles(topicId: Int): List<SharedTopicArticle> =
         withContext(Dispatchers.Default) {
-            when (topicId) {
-                9 -> readShamayelBooks()
-                11 -> readQuranicDuas()
-                in fortressChaptersByTopic.keys -> readFortressArticles(topicId)
+            when {
+                // Registry-backed hadith collections: the books themselves are
+                // the topic's browsable content (topic 8 = Sahih al-Bukhari,
+                // 38–45 = the eight collections added to topics.db).
+                hadithCollectionDatabaseForTopic[topicId] != null -> readHadithCollectionBooks(topicId)
+                topicId == 9 -> readShamayelBooks()
+                topicId == 11 -> readQuranicDuas()
+                topicId in fortressChaptersByTopic.keys -> readFortressArticles(topicId)
                 else -> emptyList()
             }
         }
+
+
+
+    /** The registry collection's books, mapped to topic articles for browsing. */
+    private fun readHadithCollectionBooks(topicId: Int): List<SharedTopicArticle> {
+        val databaseFile = hadithCollectionDatabaseForTopic[topicId] ?: return emptyList()
+        val collection = com.starception.submission.core.model.data.HadithCollections
+            .byDatabaseFile(databaseFile) ?: return emptyList()
+        // Registry books win; collections without a structured source fall
+        // back to whatever the AI generator persisted for this database.
+        val books = collection.books.ifEmpty {
+            com.starception.submission.core.model.data.GeneratedHadithBooks
+                .booksFor(databaseFile)
+        }
+        return books.map { book ->
+            SharedTopicArticle(
+                id = book.id,
+                topicId = topicId,
+                title = book.nameEnglish,
+                arabic = "",
+                translation = book.nameEnglish,
+                transliteration = "",
+                reference = "Books ${book.firstHadithId}–${book.lastHadithId} · ${book.hadithCount} hadiths",
+            )
+        }
+    }
 
     @OptIn(ExperimentalForeignApi::class)
     private suspend fun readTopics(): List<SharedTopic> = query(
@@ -136,6 +166,7 @@ private class IosSharedTopicRepository : SharedTopicRepository {
             SELECT i.id, c.title, i.position, i.arabic, i.translation,
                    i.transliteration, i.context, i.instruction, i.note,
                    i.post_context,
+                   i.audio_url,
                    (SELECT h.reference_str FROM hadith_references h
                     WHERE h.invocation_id = i.id LIMIT 1),
                    c.id
@@ -158,8 +189,9 @@ private class IosSharedTopicRepository : SharedTopicRepository {
                     .filter(String::isNotBlank)
                     .joinToString("\n\n"),
                 additionalContext = statement.text(9),
-                reference = statement.text(10).ifBlank {
-                    "Fortress of the Muslim · Chapter ${sqlite3_column_int(statement, 11)}"
+                audioUrl = statement.text(10),
+                reference = statement.text(11).ifBlank {
+                    "Fortress of the Muslim · Chapter ${sqlite3_column_int(statement, 12)}"
                 },
             )
         }

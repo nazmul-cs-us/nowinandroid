@@ -145,11 +145,15 @@ import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.model.data.BukhariBook
 import com.starception.submission.core.model.data.BukhariBooks
+import com.starception.submission.core.model.data.HadithCollection
+import com.starception.submission.core.model.data.HadithCollectionBook
+import com.starception.submission.core.model.data.HadithCollections
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.Surah
 import com.starception.submission.feature.quran.subtitle
 import com.starception.submission.shared.audio.QuranAudioPlayer
+import com.starception.submission.shared.content.hadithCollectionDatabaseForTopic
 import com.starception.submission.shared.audio.quranAudioUrl
 import com.starception.submission.shared.content.CatalogResult
 import com.starception.submission.shared.content.DailyRecommendation
@@ -4936,6 +4940,7 @@ internal fun TopicNewsScreen(
     onOpenSurah: (Int) -> Unit,
     onOpenBukhariBook: (Int) -> Unit,
     onOpenShamayelBook: (Int) -> Unit = {},
+    onOpenHadithCollectionBook: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
     onOpenArticle: (Int, Int) -> Unit,
     onOpenNews: (Int) -> Unit = {},
     onOpenTopic: (Int) -> Unit = {},
@@ -4951,6 +4956,22 @@ internal fun TopicNewsScreen(
     var viewedNewsIds by remember { mutableStateOf(store.viewedNewsIds()) }
     var requestedOffset by remember(topicId) { mutableStateOf(0) }
     var loadAttempt by remember(topicId) { mutableStateOf(0) }
+    // A local player: LocalQuranAudioPlayer is only provided inside the
+    // PrayerTimes route, and reading it from any other destination throws
+    // "No QuranAudioPlayer provided" — the crash that killed topic taps.
+    // PrayerSimulationScreen uses the same local-instance pattern.
+    val audioPlayer = remember { com.starception.submission.shared.audio.QuranAudioPlayer() }
+    var playingAudioUrl by remember(topicId) { mutableStateOf<String?>(null) }
+
+    fun toggleArticleAudio(url: String) {
+        if (playingAudioUrl == url && audioPlayer.isPlaying()) {
+            audioPlayer.pause()
+            playingAudioUrl = null
+        } else {
+            audioPlayer.stop()
+            playingAudioUrl = if (audioPlayer.play(url)) url else null
+        }
+    }
 
     LaunchedEffect(topicId, topicRepository) {
         println("[TopicScreen] loading topics for topicId=$topicId")
@@ -5075,7 +5096,48 @@ internal fun TopicNewsScreen(
                             )
                         }
                     }
-                    is TopicNewsState.Loaded -> if (current.news.isEmpty() && articles.isEmpty()) {
+                    is TopicNewsState.Loaded -> if (hadithCollectionDatabaseForTopic[topicId] != null && articles.isNotEmpty()) {
+                        // Registry hadith collections browse their books (the
+                        // shared counterpart of Android's TopicScreen browser);
+                        // the news feed stays for editorial topics.
+                        val collectionDatabase = hadithCollectionDatabaseForTopic.getValue(topicId)
+                        items(articles, key = { "article:${it.id}" }) { article ->
+                            TopicArticleRow(
+                                article = article,
+                                topic = currentTopic,
+                                bookmarked = false,
+                                onToggleBookmark = { },
+                                isAudioPlaying = article.audioUrl.isNotBlank() && playingAudioUrl == article.audioUrl,
+                                onPlayAudio = article.audioUrl.takeIf { it.isNotBlank() }
+                                    ?.let { url -> { toggleArticleAudio(url) } },
+                                onClick = { onOpenHadithCollectionBook(collectionDatabase, article.id) },
+                            )
+                        }
+                        item(key = "recategorize") {
+                            // The AI book generator: downloads its model on first
+                            // use, then re-derives the collection's book ranges.
+                            // Progress rides the pull-to-sync banner.
+                            val scope = androidx.compose.runtime.rememberCoroutineScope()
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                androidx.compose.material3.TextButton(
+                                    onClick = {
+                                        scope.launch {
+                                            com.starception.submission.shared.ml.HadithBookGenerator
+                                                .runFromUi(collectionDatabase)
+                                        }
+                                    },
+                                ) {
+                                    Text(
+                                        "Recategorize with AI",
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
+                            }
+                        }
+                    } else if (current.news.isEmpty() && articles.isEmpty()) {
                         item {
                             Box(Modifier.padding(horizontal = 24.dp)) {
                                 SupportingCard(
@@ -5092,6 +5154,9 @@ internal fun TopicNewsScreen(
                                 article = article,
                                 topic = currentTopic,
                                 bookmarked = false,
+                                isAudioPlaying = article.audioUrl.isNotBlank() && playingAudioUrl == article.audioUrl,
+                                onPlayAudio = article.audioUrl.takeIf { it.isNotBlank() }
+                                    ?.let { url -> { toggleArticleAudio(url) } },
                                 onToggleBookmark = { },
                                 onClick = { onOpenArticle(topicId, article.id) },
                             )
@@ -5352,6 +5417,8 @@ private fun TopicArticleRow(
     article: SharedTopicArticle,
     topic: SharedTopic,
     bookmarked: Boolean,
+    isAudioPlaying: Boolean = false,
+    onPlayAudio: (() -> Unit)? = null,
     onToggleBookmark: () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -5372,6 +5439,14 @@ private fun TopicArticleRow(
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.weight(1f),
                     )
+                    onPlayAudio?.let { play ->
+                        IconButton(onClick = play) {
+                            Icon(
+                                imageVector = if (isAudioPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (isAudioPlaying) "Pause Arabic audio" else "Play Arabic audio",
+                            )
+                        }
+                    }
                     FilledIconToggleButton(
                         checked = bookmarked,
                         onCheckedChange = { onToggleBookmark() },
@@ -6188,6 +6263,331 @@ internal fun SupportingCard(
             Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (action != null && onAction != null) {
                 TextButton(onClick = onAction, modifier = Modifier.align(Alignment.End)) { Text(action) }
+            }
+        }
+    }
+}
+
+
+/**
+ * Book browser for any registry collection — the shared counterpart of
+ * Android's HadithCollectionBookScreen. Books and ranges come from
+ * [HadithCollections]; hadiths are read from the collection's database.
+ */
+@Composable
+internal fun HadithCollectionBookScreen(
+    databaseFile: String,
+    bookId: Int,
+    onBack: () -> Unit,
+    onOpenHadith: (Int) -> Unit,
+) {
+    val collection = remember(databaseFile) { HadithCollections.byDatabaseFile(databaseFile) }
+    val book = remember(databaseFile, bookId) {
+        collection?.books?.firstOrNull { it.id == bookId }
+    }
+    if (collection == null || book == null) {
+        SharedDetailScaffold(title = "Hadith collection", onBack = onBack) {
+            Text("This book could not be found.")
+        }
+        return
+    }
+    var query by remember(bookId) { mutableStateOf("") }
+    var loadAttempt by remember(bookId) { mutableStateOf(0) }
+    var state by remember(bookId) { mutableStateOf<HadithsState>(HadithsState.Loading) }
+    val repository = remember { createSharedHadithRepository() }
+    LaunchedEffect(databaseFile, bookId, loadAttempt) {
+        state = HadithsState.Loading
+        state = try {
+            val hadiths = repository.getCollectionHadiths(
+                databaseFile,
+                book.firstHadithId,
+                book.lastHadithId,
+            )
+            if (hadiths.isEmpty()) {
+                HadithsState.Error(
+                    "The ${collection.name} database needs to be downloaded once. " +
+                        "Go to Settings → Content & Storage to download it.",
+                )
+            } else {
+                HadithsState.Loaded(hadiths)
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            HadithsState.Error(error.message ?: "The ${collection.name} database could not be read.")
+        }
+    }
+    SharedDetailScaffold(title = collection.name, onBack = onBack, maxContentWidth = 900.dp) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TopicArtwork(collection.name, Modifier.size(56.dp))
+                Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                    Text(book.nameEnglish, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (book.nameSecondary.isNotBlank()) {
+                        Text(
+                            book.nameSecondary,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Text(
+                        "${book.hadithCount} hadiths · ${book.firstHadithId}–${book.lastHadithId}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Text(
+                    "BOOK ${book.id.toString().padStart(2, '0')}\nOF ${collection.books.size}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        when (val current = state) {
+            HadithsState.Loading -> Box(
+                Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            is HadithsState.Error -> Column(
+                Modifier.fillMaxWidth().weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                SupportingCard("Unable to load this book", current.message)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { loadAttempt++ }) { Text("Try again") }
+            }
+            is HadithsState.Loaded -> {
+                val filtered = remember(current.hadiths, query) {
+                    val term = query.trim().lowercase()
+                    if (term.isEmpty()) {
+                        current.hadiths
+                    } else {
+                        current.hadiths.filter {
+                            it.id.toString() == term ||
+                                it.english.lowercase().contains(term) ||
+                                it.arabic.contains(query.trim())
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search this book") },
+                    leadingIcon = { Icon(NiaIcons.Search, null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    if (query.isBlank()) "${current.hadiths.size} hadiths" else "${filtered.size} matches",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(7.dp))
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 28.dp),
+                ) {
+                    items(filtered, key = { it.id }) { hadith ->
+                        HadithCollectionTile(hadith, onClick = { onOpenHadith(hadith.id) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HadithCollectionTile(hadith: SharedHadith, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+            ReaderTag("HADITH ${hadith.id}")
+            if (hadith.arabic.isNotBlank()) {
+                Text(
+                    hadith.arabic,
+                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                    fontSize = 22.sp,
+                    lineHeight = 34.sp,
+                    textAlign = TextAlign.End,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (hadith.english.isNotBlank()) {
+                Text(
+                    hadith.english,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Reader for a single hadith of any registry collection, with pager
+ * navigation across its book — the shared counterpart of Android's
+ * collection-aware HadithDetailScreen for browsing (narration queues and
+ * translation services stay Bukhari/Shama'il-specific for now).
+ */
+@Composable
+internal fun HadithCollectionHadithScreen(
+    databaseFile: String,
+    hadithId: Int,
+    onBack: () -> Unit,
+) {
+    val collection = remember(databaseFile) { HadithCollections.byDatabaseFile(databaseFile) }
+    val book = remember(databaseFile, hadithId) {
+        collection?.books?.firstOrNull { hadithId in it.firstHadithId..it.lastHadithId }
+    }
+    val repository = remember { createSharedHadithRepository() }
+    var state by remember(hadithId) { mutableStateOf<HadithsState>(HadithsState.Loading) }
+    LaunchedEffect(databaseFile, hadithId) {
+        state = HadithsState.Loading
+        state = try {
+            val hadiths = if (book != null) {
+                repository.getCollectionHadiths(databaseFile, book.firstHadithId, book.lastHadithId)
+            } else {
+                listOfNotNull(repository.getCollectionHadith(databaseFile, hadithId))
+            }
+            if (hadiths.isEmpty()) {
+                HadithsState.Error("Hadith $hadithId was not found.")
+            } else {
+                HadithsState.Loaded(hadiths)
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            HadithsState.Error(error.message ?: "Unable to read this hadith.")
+        }
+    }
+    val title = collection?.name ?: "Hadith"
+    when (val current = state) {
+        HadithsState.Loading -> SharedDetailScaffold(title = title, onBack = onBack) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        is HadithsState.Error -> SharedDetailScaffold(title = title, onBack = onBack) {
+            SupportingCard("Unable to load hadith", current.message)
+        }
+        is HadithsState.Loaded -> {
+            val hadiths = current.hadiths
+            val initialIndex = hadiths.indexOfFirst { it.id == hadithId }.coerceAtLeast(0)
+            val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+                initialPage = initialIndex,
+            ) { hadiths.size }
+            val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
+            SharedDetailScaffold(
+                title = title,
+                onBack = onBack,
+            ) {
+                Column(Modifier.fillMaxWidth().weight(1f)) {
+                    if (book != null) {
+                        Text(
+                            book.nameEnglish,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
+                    Text(
+                        "${pagerState.currentPage + 1} of ${hadiths.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    androidx.compose.foundation.pager.HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                    ) { page ->
+                        val hadith = hadiths[page]
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 28.dp),
+                        ) {
+                            item { ReaderTag("HADITH ${hadith.id}") }
+                            if (hadith.arabic.isNotBlank()) {
+                                item {
+                                    Surface(
+                                        shape = RoundedCornerShape(22.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                    ) {
+                                        Column(
+                                            Modifier.fillMaxWidth()
+                                                .padding(horizontal = 20.dp, vertical = 22.dp),
+                                        ) {
+                                            Text(
+                                                "ARABIC",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                            )
+                                            Spacer(Modifier.height(10.dp))
+                                            Text(
+                                                hadith.arabic,
+                                                modifier = Modifier.fillMaxWidth(),
+                                                fontSize = 28.sp,
+                                                lineHeight = 46.sp,
+                                                textAlign = TextAlign.End,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            if (hadith.english.isNotBlank()) {
+                                item {
+                                    ReaderSection("TRANSLATION", MaterialTheme.colorScheme.secondary) {
+                                        Text(
+                                            hadith.english,
+                                            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp),
+                                        )
+                                    }
+                                }
+                            }
+                            if (hadith.explanation.isNotBlank()) {
+                                item {
+                                    ReaderSection("EXPLANATION", MaterialTheme.colorScheme.tertiary) {
+                                        Text(
+                                            hadith.explanation,
+                                            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

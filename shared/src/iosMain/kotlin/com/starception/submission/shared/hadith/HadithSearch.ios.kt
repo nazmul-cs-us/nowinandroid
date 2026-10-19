@@ -55,6 +55,9 @@ private val ENGLISH_HADITH_COLLECTIONS = listOf(
     "sahih_bukhari" to "Sahih al-Bukhari",
     "sahih_muslim" to "Sahih Muslim",
     "muwatta_malik" to "Muwatta Malik",
+    // Bilingual since the tohed rebuild; Musnad Ahmad stays out because its
+    // corpus rows are Arabic-only, so English search cannot rank them.
+    "sunan_darimi" to "Sunan ad-Darimi",
     "sunan_abu_dawud" to "Sunan Abu Dawud",
     "sunan_nasai" to "Sunan an-Nasa'i",
     "sunan_ibn_majah" to "Sunan Ibn Majah",

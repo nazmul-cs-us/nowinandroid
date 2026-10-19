@@ -36,6 +36,7 @@ import com.starception.submission.feature.course.navigation.navigateToCourseDeta
 import com.starception.submission.feature.dua.duaDetailScreen
 import com.starception.submission.feature.dua.navigateToDuaDetail
 import com.starception.submission.feature.hadith.bukhariBookScreen
+import com.starception.submission.feature.hadith.hadithCollectionBookScreen
 import com.starception.submission.feature.hadith.hadithDetailScreen
 import com.starception.submission.feature.hadith.navigateToBukhariBook
 import com.starception.submission.feature.hadith.navigateToBukhariBookPlayback
@@ -45,6 +46,12 @@ import com.starception.submission.feature.hadith.navigateToShamayelBook
 import com.starception.submission.feature.hadith.navigateToShamayelBookPlayback
 import com.starception.submission.feature.hadith.navigateToShamayelCollectionPlayback
 import com.starception.submission.feature.hadith.shamayelBookScreen
+import com.starception.submission.feature.hadith.navigateToHadithCollectionBook
+import com.starception.submission.feature.hadith.navigateToHadithCollectionBook
+import com.starception.submission.feature.hadith.navigateToHadithCollectionBookPlayback
+import com.starception.submission.feature.hadith.navigateToHadithCollectionPlayback
+import com.starception.submission.ml.HadithBookCategorizer
+import kotlinx.coroutines.launch
 import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
 import com.starception.submission.feature.prayertimes.navigation.prayerTimesScreen
 import com.starception.submission.feature.salah.datacollection.navigateToSalahDataCollection
@@ -59,6 +66,7 @@ import com.starception.submission.feature.surah.navigation.navigateToSurah
 import com.starception.submission.feature.surah.navigation.surahScreen
 import com.starception.submission.feature.topic.navigation.navigateToTopic
 import com.starception.submission.feature.topic.navigation.topicScreen
+import com.starception.submission.core.model.data.GeneratedHadithBooks
 import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.settings.navigation.settingsScreen
 import com.starception.submission.ui.NiaAppState
@@ -84,6 +92,7 @@ fun NiaNavHost(
 ) {
     val navController = appState.navController
     val context = LocalContext.current
+    val recategorizeScope = androidx.compose.runtime.rememberCoroutineScope()
     val quranRepository = remember { QuranRepository(context) }
 
     // A tap on the Daily Reminder widget lands here. MainActivity reads the hadith or dua
@@ -345,6 +354,19 @@ fun NiaNavHost(
                 onShamayelBookClick = navController::navigateToShamayelBook,
                 onShamayelBookPlayClick = navController::navigateToShamayelBookPlayback,
                 onShamayelCollectionPlayClick = navController::navigateToShamayelCollectionPlayback,
+                onHadithCollectionBookClick = navController::navigateToHadithCollectionBook,
+                onHadithCollectionBookPlayClick = navController::navigateToHadithCollectionBookPlayback,
+                onHadithCollectionPlayClick = navController::navigateToHadithCollectionPlayback,
+                canRecategorizeHadithBooks = HadithBookCategorizer.isModelDownloaded(context),
+                onHadithCollectionRecategorize = { databaseFile ->
+                    recategorizeScope.launch {
+                        if (
+                            HadithBookCategorizer(context).generateBooks(databaseFile) != null
+                        ) {
+                            GeneratedHadithBooks.notifyChanged()
+                        }
+                    }
+                },
                 // Show a download card under the header for downloadable Quran/Hadith topics.
                 // whose database isn't downloaded yet.
                 belowHeaderContent = { topicName ->
@@ -469,6 +491,19 @@ fun NiaNavHost(
                 onShamayelBookClick = navController::navigateToShamayelBook,
                 onShamayelBookPlayClick = navController::navigateToShamayelBookPlayback,
                 onShamayelCollectionPlayClick = navController::navigateToShamayelCollectionPlayback,
+                onHadithCollectionBookClick = navController::navigateToHadithCollectionBook,
+                onHadithCollectionBookPlayClick = navController::navigateToHadithCollectionBookPlayback,
+                onHadithCollectionPlayClick = navController::navigateToHadithCollectionPlayback,
+                canRecategorizeHadithBooks = HadithBookCategorizer.isModelDownloaded(context),
+                onHadithCollectionRecategorize = { databaseFile ->
+                    recategorizeScope.launch {
+                        if (
+                            HadithBookCategorizer(context).generateBooks(databaseFile) != null
+                        ) {
+                            GeneratedHadithBooks.notifyChanged()
+                        }
+                    }
+                },
             )
             prayerTimesScreen(
                 onSearchClick = { appState.navigateToSearch() },
@@ -586,6 +621,17 @@ fun NiaNavHost(
                     )
                 },
                 onPlayAllClick = navController::navigateToShamayelBookPlayback,
+            )
+            // Book browser for every other registry collection (Muslim, Tirmidhi,
+            // Abu Dawud, Nasa'i, Ibn Majah, Malik, Darimi, Ahmad, …)
+            hadithCollectionBookScreen(
+                onBackClick = navController::popBackStack,
+                onHadithClick = { collectionName, hadithNumber, databaseFile ->
+                    navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
+                },
+                onPlayAllClick = { databaseFile, bookId ->
+                    navController.navigateToHadithCollectionBookPlayback(databaseFile, bookId)
+                },
             )
             // Hadith detail screen
             hadithDetailScreen(

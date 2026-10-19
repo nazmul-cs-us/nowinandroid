@@ -60,6 +60,7 @@ import com.starception.submission.shared.settings.UserAudioSettings
 import com.starception.submission.shared.settings.UserPrayerSettings
 import com.starception.submission.shared.settings.VoiceRecognitionMode
 import com.starception.submission.shared.travel.IosTravelDuaMonitor
+import com.starception.submission.shared.travel.TravelDuaPlayer
 import com.starception.submission.shared.voice.IosSherpaAssetResolver
 import com.starception.submission.shared.voice.IosSherpaEventSink
 import com.starception.submission.shared.voice.IosSherpaService
@@ -344,6 +345,15 @@ fun RequestDeenlyNudgeSuggestion(prompt: String?) {
 }
 
 @Suppress("FunctionName", "unused")
+fun IsDeenlyKnowledgeModelAvailable(): Boolean =
+    com.starception.submission.shared.ml.DeenlyKnowledgeRuntime.isKnowledgeModelAvailable()
+
+@Suppress("FunctionName", "unused")
+fun StartDeenlyModelDownload() {
+    com.starception.submission.shared.ml.DeenlyKnowledgeRuntime.startModelDownload()
+}
+
+@Suppress("FunctionName", "unused")
 fun CancelDeenlyNudgeSuggestion() {
     com.starception.submission.shared.ui.NowNudgeBus.cancelSuggestion()
 }
@@ -454,13 +464,15 @@ private fun createPrayerTimesViewController(
         remember {
             com.starception.submission.shared.voice.NarrationNowPlaying.install()
             com.starception.submission.shared.assets.installDeenlyModelDownloadHook()
+            com.starception.submission.shared.assets.installHadithCategorizerDownloadHook()
             true
         }
         val nudgePreview = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--preview-deenly-nudge" }
         }
-        // UI-testing hook: start with a given insight tile already in its
-        // enlarged Android-parity stage, e.g. --expand-insight=3.
+        // Start with the first insight tile already in its enlarged
+        // Android-parity stage; the --expand-insight=N launch argument
+        // (UI tests) overrides which page opens expanded.
         val expandInsight = remember {
             NSProcessInfo.processInfo.arguments
                 .mapNotNull { it as? String }
@@ -468,6 +480,7 @@ private fun createPrayerTimesViewController(
                 ?.substringAfter('=')
                 ?.toIntOrNull()
                 ?.takeIf { it in 0..4 }
+                ?: 0
         }
         val showAllPrayers = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--show-all-prayers" }
@@ -477,14 +490,22 @@ private fun createPrayerTimesViewController(
         }
         // UI-testing hook: schedule a synthetic adhan-backed prayer
         // notification that fires N seconds after launch, e.g.
-        // --simulate-adhan=75. The real schedule publisher stays silent for
-        // the whole launch so it cannot clobber the simulated payload.
-        val simulateAdhanSeconds = remember {
+        // --simulate-adhan=75 or --simulate-adhan=75@100 (seconds@volume%).
+        // The real schedule publisher stays silent for the whole launch so it
+        // cannot clobber the simulated payload. The default adhan volume is a
+        // deliberately quiet 5%, which is inaudible for a delivery test —
+        // @volume overrides it (100 = full scale).
+        val simulateAdhanSpec = remember {
             NSProcessInfo.processInfo.arguments
                 .mapNotNull { it as? String }
                 .firstOrNull { it.startsWith("--simulate-adhan=") }
                 ?.substringAfter('=')
-                ?.toLongOrNull()
+                ?.let { spec ->
+                    val parts = spec.split("@", limit = 2)
+                    val seconds = parts.getOrNull(0)?.toLongOrNull()
+                    val volume = parts.getOrNull(1)?.toIntOrNull()
+                    if (seconds != null) seconds to volume else null
+                }
         }
 
         var location by remember { mutableStateOf(locationStore.location()) }
@@ -559,12 +580,17 @@ private fun createPrayerTimesViewController(
             IosTravelDuaMonitor { automaticTravelDuaRequests += 1 }
         }
 
+        // Plays the bundled travel_dua.caf recording — Android parity. The
+        // Arabic system voice below is only a fallback for builds without it.
+        val travelDuaPlayer = remember { BundledTravelDuaPlayer() }
+
         fun stopAllSpeech() {
             narrationSession += 1
             narrationJob?.cancel()
             narrationJob = null
             sherpaService?.stopSpeaking()
             speechSynthesizer.stop()
+            travelDuaPlayer.stop()
             isTravelDuaPlaying = false
             isNarrationSpeaking = false
             narrationStatus = null
@@ -579,16 +605,31 @@ private fun createPrayerTimesViewController(
             stopAllSpeech()
             narrationError = null
             isTravelDuaPlaying = true
-            val started = speechSynthesizer.speak(
-                text = TRAVEL_DUA_ARABIC,
-                language = "ar-SA",
-            ) { error ->
-                isTravelDuaPlaying = false
-                if (error != null) narrationError = error
+
+            fun startArabicSystemVoice() {
+                val started = speechSynthesizer.speak(
+                    text = TRAVEL_DUA_ARABIC,
+                    language = "ar-SA",
+                ) { error ->
+                    isTravelDuaPlaying = false
+                    if (error != null) narrationError = error
+                }
+                if (!started) {
+                    isTravelDuaPlaying = false
+                    narrationError = "An Arabic system voice is not installed"
+                }
             }
-            if (!started) {
-                isTravelDuaPlaying = false
-                narrationError = "An Arabic system voice is not installed"
+
+            // Primary: the bundled recording, which always works offline.
+            // Fallback: the Arabic system voice, which most devices do not
+            // have downloaded — the previous TTS-only path silently failed
+            // with "An Arabic system voice is not installed" on fresh devices.
+            if (hasBundledTravelDuaClip()) {
+                travelDuaPlayer.play {
+                    isTravelDuaPlaying = false
+                }
+            } else {
+                startArabicSystemVoice()
             }
         }
 
@@ -743,6 +784,7 @@ private fun createPrayerTimesViewController(
         DisposableEffect(Unit) {
             onDispose {
                 travelDuaMonitor.stop()
+                travelDuaPlayer.stop()
                 speechRecognizer.stop()
                 speechSynthesizer.stop()
                 sherpaService?.shutdown()
@@ -850,7 +892,7 @@ private fun createPrayerTimesViewController(
             localNow.hour,
             localNow.minute,
         ) {
-            if (simulateAdhanSeconds == null) {
+            if (simulateAdhanSpec == null) {
                 IosPrayerSchedulePublisher.publish(
                     locationName = place.placeName,
                     startDate = today,
@@ -868,11 +910,11 @@ private fun createPrayerTimesViewController(
 
         // Adhan simulation: wait for the notification coordinator to start,
         // then publish the synthetic one-prayer schedule it should schedule.
-        LaunchedEffect(simulateAdhanSeconds) {
-            simulateAdhanSeconds?.let { seconds ->
+        LaunchedEffect(simulateAdhanSpec) {
+            simulateAdhanSpec?.let { (seconds, volume) ->
                 kotlinx.coroutines.delay(3000)
                 com.starception.submission.shared.notifications.IosPrayerSchedulePublisher
-                    .publishSimulated(fireInSeconds = seconds)
+                    .publishSimulated(fireInSeconds = seconds, adhanVolume = volume ?: 100)
             }
         }
 
@@ -1355,6 +1397,29 @@ private const val NARRATION_SAMPLE =
     "Assalamu alaikum, this is your selected narration voice."
 private const val TRAVEL_DUA_ARABIC =
     "سبحان الذي سخر لنا هذا وما كنا له مقرنين وإنا إلى ربنا لمنقلبون"
+
+/**
+ * Opt-in bridge over the foreign-API surface of the bundled Travel Dua
+ * playback: hides the experimental TravelDuaPlayer type behind a plain
+ * facade so composable call sites need no opt-in of their own.
+ */
+@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+private class BundledTravelDuaPlayer {
+    private val player = TravelDuaPlayer()
+
+    fun play(onFinished: () -> Unit) {
+        player.play(onFinished)
+    }
+
+    fun stop() {
+        player.stop()
+    }
+}
+
+/** Whether the app bundle carries the recorded travel_dua.caf clip. */
+@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+private fun hasBundledTravelDuaClip(): Boolean =
+    platform.Foundation.NSBundle.mainBundle.pathForResource("travel_dua", ofType = "caf") != null
 
 private fun iosColorScheme(brand: ThemeBrand, dark: Boolean): ColorScheme = when (brand) {
     ThemeBrand.DEFAULT -> if (dark) DarkDefaultColorScheme else LightDefaultColorScheme

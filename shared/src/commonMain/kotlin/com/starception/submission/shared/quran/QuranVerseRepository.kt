@@ -59,6 +59,7 @@ enum class QuranTranslationLanguage(
 ) {
     English("en", "English"),
     Bengali("bn", "বাংলা"),
+    Hindi("hi", "हिन्दी"),
     Spanish("es", "Español"),
     French("fr", "Français"),
     Indonesian("id", "Indonesia"),

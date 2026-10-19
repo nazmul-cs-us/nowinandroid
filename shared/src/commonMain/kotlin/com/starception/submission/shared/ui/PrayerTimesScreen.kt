@@ -408,7 +408,7 @@ fun PrayerTimesScreen(
                 // Requiring room in both axes keeps wide, short phones out of tablet sizing.
                 val isTablet = maxWidth >= 600.dp && layoutHeight >= 600.dp
                 val isTabletPortrait = isTablet && maxWidth <= maxHeight
-                // The phone and tablet share one design language: identical
+                    // The phone and tablet share one design language: identical
                 // cards at identical aspect ratios. Portrait tablets therefore
                 // reuse the single-pane layout and simply show more of the
                 // carousel; only landscape tablets split into two panes.
@@ -432,7 +432,11 @@ fun PrayerTimesScreen(
                     // transient finger pull translates the sheet rigidly, so
                     // its full amount is absorbed here too.
                     (
-                        (layoutHeight - 627.dp).coerceIn(220.dp, 280.dp) -
+                        // When the Prayer Now tile is expanded, reclaim the
+                        // schedule's spare vertical budget for the tile rather
+                        // than leaving it as empty space above/below the rows.
+                        (layoutHeight - if (expandedInsightPage != null) 611.dp else 627.dp)
+                            .coerceIn(220.dp, 280.dp) -
                             syncState.heldContentInsetNetTop -
                             syncState.transientContentOffsetY
                         ).coerceAtLeast(180.dp)
@@ -658,7 +662,9 @@ fun PrayerTimesScreen(
                             // making the entire home page scroll.
                             Column(
                                 modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(
+                                    if (expandedInsightPage != null) 2.dp else 8.dp,
+                                ),
                             ) {
                                 InsightPager(
                                     initialExpandedPage = initialExpandedInsight,
@@ -743,7 +749,13 @@ fun PrayerTimesScreen(
                                 }
                                 // Fixed bottom navigation clearance in every state,
                                 // matching Android's constant FloatingNavClearance.
-                                Spacer(Modifier.height(48.dp))
+                                Spacer(
+                                    Modifier.height(
+                                        // Keep the location card safely above the
+                                        // floating bottom navigation in every state.
+                                        48.dp,
+                                    ),
+                                )
                             }
                         }
                     }
@@ -1682,7 +1694,11 @@ private fun PrayerScheduleSection(
             }
         }
         if (showExpandControl) {
-            Box(modifier = Modifier.fillMaxWidth().height(40.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (compact) 32.dp else 40.dp),
+            ) {
                 TextButton(
                     onClick = onToggleExpanded,
                     modifier = Modifier.align(Alignment.Center).height(32.dp),

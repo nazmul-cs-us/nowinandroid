@@ -25,6 +25,8 @@ import android.os.StrictMode.ThreadPolicy.Builder
 import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import com.starception.submission.ml.GeneratedHadithBooksStore
+import com.starception.submission.ml.asBookEntries
 import com.starception.submission.prayer.util.FileLogger
 import com.starception.submission.services.PrayerNotificationService
 import com.starception.submission.sync.initializers.Sync
@@ -101,6 +103,18 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
             surahArtworkResolver::resolveArtworkFile
         com.starception.submission.core.ui.SurahArtworkBridge.artworkFileDownloader =
             surahArtworkResolver::ensureArtworkDownloaded
+
+        // Bridge the AI hadith-book generator's persisted output into the shared
+        // model so collection browsing falls back to generated books when the
+        // registry carries none. Feature modules read through the bridge; the
+        // app process owns the store.
+        com.starception.submission.core.model.data.GeneratedHadithBooks.provider =
+            { databaseFile ->
+                com.starception.submission.ml.GeneratedHadithBooksStore
+                    .load(this, databaseFile)
+                    ?.asBookEntries()
+                    .orEmpty()
+            }
 
         // Use background thread for heavy initialization to prevent ANR
         Thread {

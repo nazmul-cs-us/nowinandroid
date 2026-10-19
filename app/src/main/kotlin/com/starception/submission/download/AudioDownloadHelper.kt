@@ -151,6 +151,10 @@ class AudioDownloadHelper @Inject constructor(
                 // So look up by numeric prefix rather than trying to reconstruct the filename.
                 findCdnKeyByNumericPrefix("audio/quran/english/", surah.number)
             }
+            AudioLanguage.URDU_TRANSLATION ->
+                findCdnKeyByNumericPrefix("audio/quran/urdu/", surah.number)
+            AudioLanguage.HINDI_TRANSLATION ->
+                findCdnKeyByNumericPrefix("audio/quran/hindi/", surah.number)
         }
     }
 
@@ -197,11 +201,11 @@ class AudioDownloadHelper @Inject constructor(
      */
     private fun resolveQuranFromSdCard(surahIndex: Int, language: AudioLanguage): File? {
         val surah = QuranData.surahs.getOrNull(surahIndex) ?: return null
+        val pattern = String.format("%03d", surah.number)
         return when (language) {
             AudioLanguage.ARABIC_ONLY -> {
                 // Match by number like the English path — on-disk spellings can
                 // differ from QuranData.fileName (e.g. 074 muddathir vs muddaththir).
-                val pattern = String.format("%03d", surah.number)
                 File(SD_QURAN_ARABIC).listFiles()?.find { it.name.startsWith(pattern) }
                     ?: File(SD_QURAN_ARABIC, surah.fileName)
             }
@@ -212,8 +216,13 @@ class AudioDownloadHelper @Inject constructor(
             }
             AudioLanguage.ENGLISH_TRANSLATION -> {
                 val englishDir = File(SD_QURAN_ENGLISH)
-                val pattern = String.format("%03d", surah.number)
                 englishDir.listFiles()?.find { it.name.startsWith(pattern) }
+            }
+            AudioLanguage.URDU_TRANSLATION -> {
+                File("/sdcard/Quran/Urdu").listFiles()?.find { it.name.startsWith(pattern) }
+            }
+            AudioLanguage.HINDI_TRANSLATION -> {
+                File("/sdcard/Quran/Hindi").listFiles()?.find { it.name.startsWith(pattern) }
             }
         }
     }

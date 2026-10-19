@@ -61,6 +61,7 @@ abstract class TopicsDatabase : RoomDatabase() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
                             ensureShamayeleTopic(db)
+                            ensureHadithCollectionTopics(db)
                         }
                     })
                     .build()
@@ -102,6 +103,99 @@ abstract class TopicsDatabase : RoomDatabase() {
                 ),
             )
         }
+
+        /**
+         * Adds the downloadable hadith-collection topics to databases created by an
+         * older app version. Names must match [com.starception.submission.core.model
+         * .data.HadithCollections] so the TopicScreen book browser resolves them.
+         */
+        private fun ensureHadithCollectionTopics(db: SupportSQLiteDatabase) {
+            val topics = listOf(
+                HadithTopic(
+                    38, "Sahih Muslim", "صحيح مسلم",
+                    "Sahih Muslim is one of the 'Two Sahihs' — the most authentic hadith " +
+                        "collections after the Qur'an, compiled by Imam Muslim ibn al-Hajjaj. " +
+                        "Browse 57 books and 7,459 hadiths.",
+                    "https://cdn-icons-png.flaticon.com/512/17410/17410809.png",
+                ),
+                HadithTopic(
+                    39, "Jami' at-Tirmidhi", "جامع الترمذي",
+                    "Jami' at-Tirmidhi by Imam Abu Isa al-Tirmidhi is one of the six canonical " +
+                        "collections, valued for its grading and commentary. Browse 49 books " +
+                        "and 4,053 hadiths.",
+                    "https://cdn-icons-png.flaticon.com/512/11633/11633008.png",
+                ),
+                HadithTopic(
+                    40, "Sunan Abu Dawud", "سنن أبي داود",
+                    "Sunan Abu Dawud by Imam Abu Dawud al-Sijistani is one of the six canonical " +
+                        "collections, focused on legal rulings. Browse 43 books and 5,276 hadiths.",
+                    "https://cdn-icons-png.flaticon.com/512/17363/17363743.png",
+                ),
+                HadithTopic(
+                    41, "Sunan an-Nasa'i", "سنن النسائي",
+                    "Sunan an-Nasa'i by Imam Ahmad ibn Shu'ayb al-Nasa'i is one of the six " +
+                        "canonical collections. Browse 52 books and 5,768 hadiths.",
+                    "https://cdn-icons-png.flaticon.com/512/3459/3459381.png",
+                ),
+                HadithTopic(
+                    42, "Sunan Ibn Majah", "سنن ابن ماجه",
+                    "Sunan Ibn Majah by Imam Ibn Majah al-Qazwini completes the six canonical " +
+                        "collections. Browse 38 books and 4,345 hadiths.",
+                    "https://cdn-icons-png.flaticon.com/512/3459/3459034.png",
+                ),
+                HadithTopic(
+                    43, "Muwatta Malik", "موطأ مالك",
+                    "The Muwatta of Imam Malik ibn Anas is the earliest surviving collection of " +
+                        "hadith and Islamic law. Browse 61 books and 1,985 hadiths.",
+                    "https://cdn-icons-png.flaticon.com/512/3528/3528211.png",
+                ),
+                HadithTopic(
+                    44, "Sunan ad-Darimi", "سنن الدارمي",
+                    "Sunan ad-Darimi by Imam Abdullah ibn Abd ar-Rahman ad-Darimi is an early " +
+                        "topical collection. Browse 25 books and 3,534 hadiths in Arabic and English.",
+                    "https://cdn-icons-png.flaticon.com/512/9358/9358484.png",
+                ),
+                HadithTopic(
+                    45, "Musnad Ahmad", "مسند أحمد",
+                    "The Musnad of Imam Ahmad ibn Hanbal is the largest hadith collection, " +
+                        "arranged by companion. Browse 15 sections and 27,642 hadiths in Arabic " +
+                        "and English.",
+                    "https://cdn-icons-png.flaticon.com/512/17364/17364182.png",
+                ),
+            )
+            for (topic in topics) {
+                db.execSQL(
+                    """
+                    INSERT OR REPLACE INTO topics (
+                        id, name, short_description, long_description, image_url, url, icon,
+                        is_system, is_user_created, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """.trimIndent(),
+                    arrayOf<Any?>(
+                        topic.id,
+                        topic.name,
+                        topic.shortDescription,
+                        topic.longDescription,
+                        topic.imageUrl,
+                        null,
+                        null,
+                        1,
+                        0,
+                        null,
+                        null,
+                    ),
+                )
+            }
+        }
+
+        /** One row of [ensureHadithCollectionTopics]. */
+        private data class HadithTopic(
+            val id: Int,
+            val name: String,
+            val shortDescription: String,
+            val longDescription: String,
+            val imageUrl: String,
+        )
 
         /**
          * Refresh database from assets using Room DAO operations.

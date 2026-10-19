@@ -31,6 +31,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.navigation.NavBackStackEntry
@@ -91,6 +93,10 @@ object PrayerSettingsRoute
 @Serializable data class ShamayelHadithRoute(val id: Int)
 
 @Serializable data class BukhariHadithRoute(val id: Int)
+
+@Serializable data class HadithCollectionBookRoute(val databaseFile: String, val bookId: Int)
+
+@Serializable data class HadithCollectionHadithRoute(val databaseFile: String, val hadithId: Int)
 
 @Serializable data class TopicRoute(val id: Int)
 
@@ -276,15 +282,18 @@ fun SharedNavHost(
                     else -> PrayerTimesRoute
                 },
             modifier = Modifier,
-            // iOS navigation choreography: bottom-tab switches crossfade
-            // quickly, while every detail screen performs a
+            // iOS navigation choreography: bottom-tab switches use a
+            // Material fade-through (subtle scale + delayed fade), while every detail screen performs a
             // UINavigationController-style horizontal push — the incoming
             // page slides in from the trailing edge on a no-bounce spring
             // (interruptible mid-flight), the outgoing page recedes a third
             // of the width with a gentle fade. Pop reverses the move.
             enterTransition = {
                 if (isTabSwitch(targetState)) {
-                    fadeIn(tween(220))
+                    fadeIn(tween(260, delayMillis = 55)) + scaleIn(
+                        initialScale = 0.94f,
+                        animationSpec = tween(260),
+                    )
                 } else {
                     slideInHorizontally(
                         animationSpec = iosPushSpring(),
@@ -294,7 +303,10 @@ fun SharedNavHost(
             },
             exitTransition = {
                 if (isTabSwitch(initialState)) {
-                    fadeOut(tween(160))
+                    fadeOut(tween(120)) + scaleOut(
+                        targetScale = 0.98f,
+                        animationSpec = tween(180),
+                    )
                 } else {
                     slideOutHorizontally(
                         animationSpec = iosPushSpring(),
@@ -304,7 +316,10 @@ fun SharedNavHost(
             },
             popEnterTransition = {
                 if (isTabSwitch(targetState)) {
-                    fadeIn(tween(220))
+                    fadeIn(tween(260, delayMillis = 55)) + scaleIn(
+                        initialScale = 0.94f,
+                        animationSpec = tween(260),
+                    )
                 } else {
                     slideInHorizontally(
                         animationSpec = iosPushSpring(),
@@ -314,7 +329,10 @@ fun SharedNavHost(
             },
             popExitTransition = {
                 if (isTabSwitch(targetState)) {
-                    fadeOut(tween(160))
+                    fadeOut(tween(120)) + scaleOut(
+                        targetScale = 0.98f,
+                        animationSpec = tween(180),
+                    )
                 } else {
                     slideOutHorizontally(
                         animationSpec = iosPushSpring(),
@@ -574,6 +592,25 @@ fun SharedNavHost(
                     onBack = { navController.popBackStack() },
                 )
             }
+            composable<HadithCollectionBookRoute> { entry ->
+                val route = entry.toRoute<HadithCollectionBookRoute>()
+                HadithCollectionBookScreen(
+                    databaseFile = route.databaseFile,
+                    bookId = route.bookId,
+                    onBack = { navController.popBackStack() },
+                    onOpenHadith = {
+                        navController.navigate(HadithCollectionHadithRoute(route.databaseFile, it))
+                    },
+                )
+            }
+            composable<HadithCollectionHadithRoute> { entry ->
+                val route = entry.toRoute<HadithCollectionHadithRoute>()
+                HadithCollectionHadithScreen(
+                    databaseFile = route.databaseFile,
+                    hadithId = route.hadithId,
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable<TopicRoute> { entry ->
                 TopicNewsScreen(
                     topicId = entry.toRoute<TopicRoute>().id,
@@ -582,6 +619,9 @@ fun SharedNavHost(
                     onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
                     onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
                     onOpenShamayelBook = { navController.navigate(ShamayelBookRoute(it)) },
+                    onOpenHadithCollectionBook = { databaseFile, bookId ->
+                        navController.navigate(HadithCollectionBookRoute(databaseFile, bookId))
+                    },
                     onOpenArticle = { topicId, articleId ->
                         navController.navigate(TopicArticleRoute(topicId, articleId))
                     },

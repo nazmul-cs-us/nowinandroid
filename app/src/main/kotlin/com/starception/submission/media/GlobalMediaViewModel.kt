@@ -596,7 +596,9 @@ class GlobalMediaViewModel(
             val next = when (current) {
                 AudioLanguage.ARABIC_ONLY -> AudioLanguage.BENGALI_TRANSLATION
                 AudioLanguage.BENGALI_TRANSLATION -> AudioLanguage.ENGLISH_TRANSLATION
-                AudioLanguage.ENGLISH_TRANSLATION -> AudioLanguage.ARABIC_ONLY
+                AudioLanguage.ENGLISH_TRANSLATION -> AudioLanguage.URDU_TRANSLATION
+                AudioLanguage.URDU_TRANSLATION -> AudioLanguage.HINDI_TRANSLATION
+                AudioLanguage.HINDI_TRANSLATION -> AudioLanguage.ARABIC_ONLY
             }
             quranService?.setAudioLanguage(next)
             _controllerState.update {

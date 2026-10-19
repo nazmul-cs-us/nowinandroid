@@ -22,6 +22,7 @@ import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.starception.submission.core.model.data.BukhariBooks
+import com.starception.submission.core.model.data.HadithCollections
 import com.starception.submission.core.model.data.ShamayelBooks
 import com.starception.submission.navigation.detailEnterTransition
 import com.starception.submission.navigation.detailExitTransition
@@ -55,12 +56,58 @@ data class BukhariBookRoute(val bookId: Int)
 @Serializable
 data class ShamayelBookRoute(val bookId: Int)
 
+/**
+ * Book browser route for any registry collection (see [com.starception.submission
+ * .core.model.data.HadithCollections]) — the generalized form of
+ * [BukhariBookRoute]/[ShamayelBookRoute].
+ */
+@Serializable
+data class HadithCollectionBookRoute(
+    val databaseFile: String,
+    val bookId: Int,
+)
+
 fun NavController.navigateToBukhariBook(bookId: Int) {
     navigate(BukhariBookRoute(bookId))
 }
 
 fun NavController.navigateToShamayelBook(bookId: Int) {
     navigate(ShamayelBookRoute(bookId))
+}
+
+/** Opens the book browser for any registry collection. */
+fun NavController.navigateToHadithCollectionBook(databaseFile: String, bookId: Int) {
+    navigate(HadithCollectionBookRoute(databaseFile, bookId))
+}
+
+/** Opens the first hadith of any registry collection's book and continuously plays its range. */
+fun NavController.navigateToHadithCollectionBookPlayback(databaseFile: String, bookId: Int) {
+    val collection = HadithCollections.byDatabaseFile(databaseFile) ?: return
+    val book = collection.books.firstOrNull { it.id == bookId } ?: return
+    navigateToHadithDetail(
+        collectionName = collection.name,
+        hadithNumber = book.firstHadithId,
+        databaseFile = collection.databaseFile,
+        autoPlay = true,
+        autoAdvance = true,
+        playbackRangeStart = book.firstHadithId,
+        playbackRangeEnd = book.lastHadithId,
+    )
+}
+
+/** Opens the first hadith of a whole registry collection and continuously plays it. */
+fun NavController.navigateToHadithCollectionPlayback(databaseFile: String, shuffle: Boolean = false) {
+    val collection = HadithCollections.byDatabaseFile(databaseFile) ?: return
+    navigateToHadithDetail(
+        collectionName = collection.name,
+        hadithNumber = 1,
+        databaseFile = collection.databaseFile,
+        autoPlay = true,
+        autoAdvance = true,
+        playbackRangeStart = 1,
+        playbackRangeEnd = collection.books.maxOf { it.lastHadithId },
+        shufflePlayback = shuffle,
+    )
 }
 
 /** Opens the first hadith in a canonical book and continuously plays only that book's range. */
@@ -224,6 +271,37 @@ fun NavGraphBuilder.shamayelBookScreen(
             onBackClick = onBackClick,
             onHadithClick = onHadithClick,
             onPlayAllClick = { onPlayAllClick(route.bookId) },
+        )
+    }
+}
+
+/**
+ * Book browser screen for any registry collection. The hadith-click callback receives the
+ * resolved collection so the host navigates with the right collection name and database.
+ */
+fun NavGraphBuilder.hadithCollectionBookScreen(
+    onBackClick: () -> Unit,
+    onHadithClick: (collectionName: String, hadithNumber: Int, databaseFile: String) -> Unit,
+    onPlayAllClick: (databaseFile: String, bookId: Int) -> Unit,
+) {
+    composable<HadithCollectionBookRoute>(
+        enterTransition = { detailEnterTransition() },
+        exitTransition = { detailExitTransition() },
+        popEnterTransition = { detailPopEnterTransition() },
+        popExitTransition = { detailPopExitTransition() },
+    ) { backStackEntry ->
+        val route = backStackEntry.toRoute<HadithCollectionBookRoute>()
+        val collection = HadithCollections.byDatabaseFile(route.databaseFile)
+        HadithCollectionBookScreen(
+            databaseFile = route.databaseFile,
+            bookId = route.bookId,
+            onBackClick = onBackClick,
+            onHadithClick = { hadithNumber ->
+                if (collection != null) {
+                    onHadithClick(collection.name, hadithNumber, collection.databaseFile)
+                }
+            },
+            onPlayAllClick = { onPlayAllClick(route.databaseFile, route.bookId) },
         )
     }
 }

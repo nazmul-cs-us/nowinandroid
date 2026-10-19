@@ -513,6 +513,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".util.HadithBooksDebugReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.starception.submission.DEBUG_GENERATE_HADITH_BOOKS" />
+            </intent-filter>
+        </receiver>
+
         <!-- Debug receiver to trigger adhan playback via adb -->
         <receiver
             android:name=".util.DebugAdhanReceiver"

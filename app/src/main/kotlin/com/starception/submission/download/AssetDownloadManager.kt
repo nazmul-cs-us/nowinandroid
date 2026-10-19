@@ -629,6 +629,15 @@ class AssetDownloadManager @Inject constructor(
         private const val NOW_NUDGE_KNOWLEDGE_MODEL_SHA256 =
             "d6e49d4aadca50b815a2a054c6facd22dccad9871561f146cb73dd6b5204aeee"
 
+        // The on-device hadith-book generator model (Qwen2.5-1.5B-Instruct);
+        // shipped as four verified parts like the Now Nudge models.
+        private const val HADITH_CATEGORIZER_CATEGORY = "model_hadith_categorizer"
+        private const val HADITH_CATEGORIZER_MODEL_KEY =
+            "models/hadith/hadith-categorizer-v1-q4_k_m.gguf"
+        private const val HADITH_CATEGORIZER_MODEL_SIZE = 1_117_320_736L
+        private const val HADITH_CATEGORIZER_MODEL_SHA256 =
+            "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e"
+
         private val PARTED_MODELS = listOf(
             PartedModelArtifact(
                 category = NOW_NUDGE_CATEGORY,
@@ -654,6 +663,19 @@ class AssetDownloadManager @Inject constructor(
                     "$NOW_NUDGE_KNOWLEDGE_MODEL_KEY.part-01",
                     "$NOW_NUDGE_KNOWLEDGE_MODEL_KEY.part-02",
                     "$NOW_NUDGE_KNOWLEDGE_MODEL_KEY.part-03",
+                ),
+            ),
+            PartedModelArtifact(
+                category = HADITH_CATEGORIZER_CATEGORY,
+                cdnKey = HADITH_CATEGORIZER_MODEL_KEY,
+                sizeBytes = HADITH_CATEGORIZER_MODEL_SIZE,
+                sha256 = HADITH_CATEGORIZER_MODEL_SHA256,
+                displayName = "Hadith book generator model",
+                partKeys = listOf(
+                    "$HADITH_CATEGORIZER_MODEL_KEY.part-00",
+                    "$HADITH_CATEGORIZER_MODEL_KEY.part-01",
+                    "$HADITH_CATEGORIZER_MODEL_KEY.part-02",
+                    "$HADITH_CATEGORIZER_MODEL_KEY.part-03",
                 ),
             ),
         )

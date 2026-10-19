@@ -301,6 +301,28 @@ fun ExpandedMediaController(
                         }
                     },
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                LanguageChip(
+                    label = "UR",
+                    selected = state.currentLanguage == AudioLanguage.URDU_TRANSLATION,
+                    onClick = {
+                        if (state.currentLanguage != AudioLanguage.URDU_TRANSLATION) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onAction(MediaAction.ToggleLanguage)
+                        }
+                    },
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                LanguageChip(
+                    label = "HI",
+                    selected = state.currentLanguage == AudioLanguage.HINDI_TRANSLATION,
+                    onClick = {
+                        if (state.currentLanguage != AudioLanguage.HINDI_TRANSLATION) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onAction(MediaAction.ToggleLanguage)
+                        }
+                    },
+                )
             }
         }
 

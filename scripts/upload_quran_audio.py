@@ -20,6 +20,8 @@ LANGUAGES = [
     ("arabic", "audio/quran/arabic", "quran_audio_arabic", "Arabic"),
     ("bengali", "audio/quran/bengali", "quran_audio_bengali", "Bengali"),
     ("english", "audio/quran/english", "quran_audio_english", "English"),
+    ("urdu", "audio/quran/urdu", "quran_audio_urdu", "Urdu"),
+    ("hindi", "audio/quran/hindi", "quran_audio_hindi", "Hindi"),
 ]
 
 
@@ -122,7 +124,8 @@ def upload_all(files, start_from=0):
 
         size_str = format_size(f["size"])
         print(f"  [{i+1}/{total}] {f['cdn_key'][:70]} ({size_str})... ", end="", flush=True)
-        if upload_file(f["cdn_key"], f["local_path"], content_type="audio/ogg"):
+        content_type = "audio/mpeg" if f["name"].lower().endswith(".mp3") else "audio/ogg"
+        if upload_file(f["cdn_key"], f["local_path"], content_type=content_type):
             print("OK")
             uploaded += 1
         else:
@@ -144,7 +147,7 @@ def main():
     parser.add_argument("--hash-only", action="store_true", help="Only compute hashes and update manifest")
     parser.add_argument("--upload-only", action="store_true", help="Skip hashing, just upload")
     parser.add_argument("--start-from", type=int, default=0, help="Start upload from file index N")
-    parser.add_argument("--lang", choices=["arabic", "bengali", "english"], help="Only process one language")
+    parser.add_argument("--lang", choices=["arabic", "bengali", "english", "urdu", "hindi"], help="Only process one language")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be uploaded")
     args = parser.parse_args()
 

@@ -57,6 +57,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -67,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -94,11 +96,11 @@ import com.starception.submission.core.designsystem.icon.isMonochromeTopicIcon
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.designsystem.theme.QuranFonts
-import com.starception.submission.core.model.data.BukhariBook
-import com.starception.submission.core.model.data.BukhariBooks
 import com.starception.submission.core.model.data.FollowableTopic
+import com.starception.submission.core.model.data.GeneratedHadithBooks
+import com.starception.submission.core.model.data.HadithCollection
 import com.starception.submission.core.model.data.HadithCollectionBook
-import com.starception.submission.core.model.data.ShamayelBooks
+import com.starception.submission.core.model.data.HadithCollections
 import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.core.ui.DevicePreviews
 import com.starception.submission.core.ui.FlaticonIcon
@@ -125,6 +127,13 @@ fun TopicScreen(
     onShamayelBookClick: (Int) -> Unit = {},
     onShamayelBookPlayClick: (Int) -> Unit = {},
     onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
+    onHadithCollectionBookClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionBookPlayClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionPlayClick: (databaseFile: String, shuffle: Boolean) -> Unit = { _, _ -> },
+    /** Whether the AI categorizer model is downloaded (gates the recategorize action). */
+    canRecategorizeHadithBooks: Boolean = false,
+    /** Asks the app to re-run the AI categorizer over this collection's database. */
+    onHadithCollectionRecategorize: (databaseFile: String) -> Unit = {},
     modifier: Modifier = Modifier,
     // Optional app-provided content rendered directly under the topic header (gets the topic name).
     // Used to surface a "download missing content" card for content-backed topics (Quran/Hadith).
@@ -154,6 +163,11 @@ fun TopicScreen(
         onShamayelBookClick = onShamayelBookClick,
         onShamayelBookPlayClick = onShamayelBookPlayClick,
         onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
+        onHadithCollectionBookClick = onHadithCollectionBookClick,
+        onHadithCollectionBookPlayClick = onHadithCollectionBookPlayClick,
+        onHadithCollectionPlayClick = onHadithCollectionPlayClick,
+        canRecategorizeHadithBooks = canRecategorizeHadithBooks,
+        onHadithCollectionRecategorize = onHadithCollectionRecategorize,
         belowHeaderContent = belowHeaderContent,
     )
 }
@@ -178,35 +192,21 @@ internal fun TopicScreen(
     onShamayelBookClick: (Int) -> Unit = {},
     onShamayelBookPlayClick: (Int) -> Unit = {},
     onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
+    onHadithCollectionBookClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionBookPlayClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionPlayClick: (databaseFile: String, shuffle: Boolean) -> Unit = { _, _ -> },
+    /** Whether the AI categorizer model is downloaded (gates the recategorize action). */
+    canRecategorizeHadithBooks: Boolean = false,
+    /** Asks the app to re-run the AI categorizer over this collection's database. */
+    onHadithCollectionRecategorize: (databaseFile: String) -> Unit = {},
     modifier: Modifier = Modifier,
     belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
     val state = rememberLazyListState()
     var collectionQuery by rememberSaveable { mutableStateOf("") }
-    val filteredBukhariBooks = remember(collectionQuery) {
-        val query = collectionQuery.trim()
-        if (query.isEmpty()) {
-            BukhariBooks.all
-        } else {
-            BukhariBooks.all.filter { book ->
-                book.id.toString() == query ||
-                    book.nameEnglish.contains(query, ignoreCase = true) ||
-                    book.nameArabic.contains(query)
-            }
-        }
-    }
-    val filteredShamayelBooks = remember(collectionQuery) {
-        val query = collectionQuery.trim()
-        if (query.isEmpty()) {
-            ShamayelBooks.all
-        } else {
-            ShamayelBooks.all.filter { book ->
-                book.id.toString() == query ||
-                    book.nameEnglish.contains(query, ignoreCase = true) ||
-                    book.nameBengali.contains(query)
-            }
-        }
-    }
+    // Bumped after an AI regeneration completes; recomposition re-reads the
+    // generated-books store through the bridge so the browser updates live.
+    val generatedBooksVersion by GeneratedHadithBooks.version.collectAsStateWithLifecycle()
     TrackScrollJank(scrollableState = state, stateName = "topic:screen")
     Box(
         modifier = modifier,
@@ -294,10 +294,13 @@ internal fun TopicScreen(
                         onShamayelBookClick = onShamayelBookClick,
                         onShamayelBookPlayClick = onShamayelBookPlayClick,
                         onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
+                        onHadithCollectionBookClick = onHadithCollectionBookClick,
+                        onHadithCollectionBookPlayClick = onHadithCollectionBookPlayClick,
+                        onHadithCollectionPlayClick = onHadithCollectionPlayClick,
+                        canRecategorizeHadithBooks = canRecategorizeHadithBooks,
+                        onHadithCollectionRecategorize = onHadithCollectionRecategorize,
                         collectionQuery = collectionQuery,
                         onCollectionQueryChange = { collectionQuery = it },
-                        filteredBukhariBooks = filteredBukhariBooks,
-                        filteredShamayelBooks = filteredShamayelBooks,
                         belowHeaderContent = belowHeaderContent,
                     )
                 }
@@ -329,13 +332,15 @@ internal fun TopicScreen(
     }
 }
 
-private fun String.isShamayelCollection(): Boolean =
-    contains("Shamai", ignoreCase = true) || contains("Shamay", ignoreCase = true)
-
+/** True when the topic name resolves to a browsable collection with books. */
 private fun String.isHadithBookCollection(): Boolean =
-    contains("Bukhari", ignoreCase = true) || isShamayelCollection()
+    HadithCollections.byName(this)?.let { collection ->
+        collection.hasBooks ||
+            GeneratedHadithBooks.booksFor(collection.databaseFile).isNotEmpty()
+    } == true
 
-private sealed class HadithBookBrowserConfig(
+/** Model-driven browser identity: every registry collection browses the same way. */
+private data class HadithBookBrowserConfig(
     val key: String,
     val label: String,
     val shortName: String,
@@ -343,25 +348,35 @@ private sealed class HadithBookBrowserConfig(
     val hadithCountLabel: String,
     val searchPlaceholder: String,
     val secondaryIsArabic: Boolean,
-) {
-    data object Bukhari : HadithBookBrowserConfig(
-        key = "bukhari",
-        label = "SAHIH BUKHARI",
-        shortName = "Bukhari",
-        bookCount = 97,
-        hadithCountLabel = "7,277",
-        searchPlaceholder = "Search English or Arabic",
-        secondaryIsArabic = true,
-    )
+    /** The collection's bundled artwork, shown beside the browser header title. */
+    val artworkRes: Int?,
+)
 
-    data object Shamayel : HadithBookBrowserConfig(
-        key = "shamayel",
-        label = "SHAMA'IL AT-TIRMIDHI",
-        shortName = "Shama’il",
-        bookCount = 56,
-        hadithCountLabel = "322",
-        searchPlaceholder = "Search English or Bengali",
-        secondaryIsArabic = false,
+private fun hadithBookBrowserConfig(
+    collection: HadithCollection,
+    books: List<HadithCollectionBook> = collection.books,
+): HadithBookBrowserConfig {
+    val secondaryIsArabic = books.firstOrNull()
+        ?.nameSecondary.orEmpty().firstOrNull()?.let { it in '\u0600'..'\u06FF' } ?: true
+    val hadithCount = if (collection.hasBooks) {
+        collection.hadithCount
+    } else {
+        books.sumOf { it.hadithCount }
+    }
+    return HadithBookBrowserConfig(
+        key = collection.databaseFile,
+        label = collection.name.uppercase(),
+        // The single most distinctive word for the "No X books match" line.
+        shortName = collection.name.split(" ", "'").last { it.isNotBlank() },
+        bookCount = books.size,
+        hadithCountLabel = "%,d".format(hadithCount),
+        searchPlaceholder = if (secondaryIsArabic) {
+            "Search English or Arabic"
+        } else {
+            "Search English or Bengali"
+        },
+        secondaryIsArabic = secondaryIsArabic,
+        artworkRes = topicIconResFor(collection.name),
     )
 }
 
@@ -382,18 +397,30 @@ private fun LazyListScope.topicBody(
     onShamayelBookClick: (Int) -> Unit = {},
     onShamayelBookPlayClick: (Int) -> Unit = {},
     onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
+    onHadithCollectionBookClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionBookPlayClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionPlayClick: (databaseFile: String, shuffle: Boolean) -> Unit = { _, _ -> },
+    /** Whether the AI categorizer model is downloaded (gates the recategorize action). */
+    canRecategorizeHadithBooks: Boolean = false,
+    /** Asks the app to re-run the AI categorizer over this collection's database. */
+    onHadithCollectionRecategorize: (databaseFile: String) -> Unit = {},
     collectionQuery: String = "",
     onCollectionQueryChange: (String) -> Unit = {},
-    filteredBukhariBooks: List<BukhariBook> = BukhariBooks.all,
-    filteredShamayelBooks: List<HadithCollectionBook> = ShamayelBooks.all,
     belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
-    val isBukhari = name.contains("Bukhari", ignoreCase = true)
-    val isShamayel = name.isShamayelCollection()
+    // The registry owns collection identity: any topic whose name resolves to a
+    // HadithCollection renders the book browser. Collections whose verified
+    // registry books are absent fall back to the AI-generated books the app
+    // persisted for their database (GeneratedHadithBooks bridge).
+    val collection = HadithCollections.byName(name)
+    val browserBooks = collection?.books?.ifEmpty {
+        GeneratedHadithBooks.booksFor(collection.databaseFile)
+    }.orEmpty()
+    val isHadithBrowser = browserBooks.isNotEmpty()
 
     // The collection browser owns its compact identity header. The generic topic hero is useful
     // for editorial topics, but duplicates collection titles and consumes most of the first screen.
-    if (!isBukhari && !isShamayel) {
+    if (!isHadithBrowser) {
         item {
             TopicHeader(name, description, imageUrl)
         }
@@ -404,25 +431,46 @@ private fun LazyListScope.topicBody(
         belowHeaderContent(name)
     }
 
-    if (isBukhari) {
+    if (collection != null && isHadithBrowser) {
+        // Bukhari and Shamai'l keep their dedicated routes so existing back-stack
+        // behavior is unchanged; every other collection uses the parameterized route.
+        val isBukhari = collection.databaseFile == "sahih_bukhari.db"
+        val isShamayel = collection.databaseFile == "shamayele_tirmidhi_complete.db"
+        val onBookClick: (Int) -> Unit = when {
+            isBukhari -> onBukhariBookClick
+            isShamayel -> onShamayelBookClick
+            else -> { bookId -> onHadithCollectionBookClick(collection.databaseFile, bookId) }
+        }
+        val onBookPlayClick: (Int) -> Unit = when {
+            isBukhari -> onBukhariBookPlayClick
+            isShamayel -> onShamayelBookPlayClick
+            else -> { bookId -> onHadithCollectionBookPlayClick(collection.databaseFile, bookId) }
+        }
+        val onCollectionPlayClick: (Boolean) -> Unit = when {
+            isBukhari -> onBukhariCollectionPlayClick
+            isShamayel -> onShamayelCollectionPlayClick
+            else -> { shuffle -> onHadithCollectionPlayClick(collection.databaseFile, shuffle) }
+        }
+        val query = collectionQuery.trim()
+        val filteredBooks = if (query.isEmpty()) {
+            browserBooks
+        } else {
+            browserBooks.filter { book ->
+                book.id.toString() == query ||
+                    book.nameEnglish.contains(query, ignoreCase = true) ||
+                    book.nameSecondary.contains(query)
+            }
+        }
         hadithBookBrowser(
-            config = HadithBookBrowserConfig.Bukhari,
+            config = hadithBookBrowserConfig(collection, browserBooks),
             query = collectionQuery,
             onQueryChange = onCollectionQueryChange,
-            books = filteredBukhariBooks,
-            onBookClick = onBukhariBookClick,
-            onBookPlayClick = onBukhariBookPlayClick,
-            onCollectionPlayClick = onBukhariCollectionPlayClick,
-        )
-    } else if (isShamayel) {
-        hadithBookBrowser(
-            config = HadithBookBrowserConfig.Shamayel,
-            query = collectionQuery,
-            onQueryChange = onCollectionQueryChange,
-            books = filteredShamayelBooks,
-            onBookClick = onShamayelBookClick,
-            onBookPlayClick = onShamayelBookPlayClick,
-            onCollectionPlayClick = onShamayelCollectionPlayClick,
+            books = filteredBooks,
+            onBookClick = onBookClick,
+            onBookPlayClick = onBookPlayClick,
+            onCollectionPlayClick = onCollectionPlayClick,
+            canRecategorize = canRecategorizeHadithBooks,
+            onRecategorize = { onHadithCollectionRecategorize(collection.databaseFile) },
         )
     } else {
         userNewsResourceCards(news, onBookmarkChanged, onNewsResourceViewed, onTopicClick, onSurahClick, onDuaClick, onHadithClick)
@@ -437,6 +485,8 @@ private fun LazyListScope.hadithBookBrowser(
     onBookClick: (Int) -> Unit,
     onBookPlayClick: (Int) -> Unit,
     onCollectionPlayClick: (Boolean) -> Unit,
+    canRecategorize: Boolean = false,
+    onRecategorize: () -> Unit = {},
 ) {
     item(key = "${config.key}-book-search") {
         Surface(
@@ -461,28 +511,42 @@ private fun LazyListScope.hadithBookBrowser(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top,
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = config.label,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp,
-                        )
-                        Text(
-                            text = "Browse ${config.bookCount} books",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = 25.sp,
-                        )
-                        Text(
-                            text = "${config.hadithCountLabel} hadiths · arranged by subject",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        config.artworkRes?.let { artwork ->
+                            Image(
+                                painter = painterResource(artwork),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                            )
+                        }
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            Text(
+                                text = config.label,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp,
+                            )
+                            Text(
+                                text = "Browse ${config.bookCount} books",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 25.sp,
+                            )
+                            Text(
+                                text = "${config.hadithCountLabel} hadiths · arranged by subject",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     Surface(
                         shape = RoundedCornerShape(
@@ -528,6 +592,24 @@ private fun LazyListScope.hadithBookBrowser(
                         modifier = Modifier.weight(1f),
                     ) {
                         Text("Feeling blessed")
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(
+                        onClick = onRecategorize,
+                        enabled = canRecategorize,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 10.dp,
+                            vertical = 0.dp,
+                        ),
+                    ) {
+                        Text(
+                            text = "Recategorize with AI",
+                            style = MaterialTheme.typography.labelMedium,
+                        )
                     }
                 }
                 OutlinedTextField(

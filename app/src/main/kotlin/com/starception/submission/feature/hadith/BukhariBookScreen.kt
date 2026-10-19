@@ -74,7 +74,9 @@ import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithEntity
 import com.starception.submission.core.model.data.BukhariBooks
+import com.starception.submission.core.model.data.HadithCollection
 import com.starception.submission.core.model.data.HadithCollectionBook
+import com.starception.submission.core.model.data.HadithCollections
 import com.starception.submission.core.model.data.ShamayelBooks
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
@@ -158,6 +160,65 @@ fun ShamayelBookScreen(
         onPlayAllClick = onPlayAllClick,
     )
 }
+
+/**
+ * Book browser for any registry collection — the model-driven form of
+ * [BukhariBookScreen]/[ShamayelBookScreen]. Books and their ranges come from
+ * [HadithCollections], so every collection browses identically.
+ */
+@Composable
+fun HadithCollectionBookScreen(
+    databaseFile: String,
+    bookId: Int,
+    onBackClick: () -> Unit,
+    onHadithClick: (Int) -> Unit,
+    onPlayAllClick: () -> Unit,
+) {
+    val collection = remember(databaseFile) { HadithCollections.byDatabaseFile(databaseFile) }
+    val book = remember(databaseFile, bookId) {
+        collection?.books?.firstOrNull { it.id == bookId }
+    }
+    val config = remember(databaseFile) { collection?.let(::hadithBookCollectionConfig) }
+    if (collection == null || config == null) {
+        // Unknown collection file: keep the same treatment as an unknown book.
+        HadithBookScreen(
+            book = null,
+            config = hadithBookCollectionConfig(
+                HadithCollection(
+                    name = databaseFile,
+                    nameArabic = "",
+                    author = "",
+                    databaseFile = databaseFile,
+                    downloadCategory = HadithCollections.downloadCategoryFor(databaseFile),
+                    hadithCount = 0,
+                    books = emptyList(),
+                ),
+            ),
+            onBackClick = onBackClick,
+            onHadithClick = onHadithClick,
+            onPlayAllClick = onPlayAllClick,
+        )
+    } else {
+        HadithBookScreen(
+            book = book,
+            config = config,
+            onBackClick = onBackClick,
+            onHadithClick = onHadithClick,
+            onPlayAllClick = onPlayAllClick,
+        )
+    }
+}
+
+/** Builds the browsing config for a registry collection; books' secondary names decide the font. */
+private fun hadithBookCollectionConfig(collection: HadithCollection) = HadithBookCollectionConfig(
+    title = collection.name,
+    databaseFile = collection.databaseFile,
+    downloadCategory = collection.downloadCategory,
+    totalBooks = collection.books.size,
+    iconTopicName = collection.name,
+    secondaryIsArabic = collection.books.firstOrNull()
+        ?.nameSecondary.orEmpty().firstOrNull()?.let { it in '\u0600'..'\u06FF' } ?: true,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

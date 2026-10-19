@@ -32,6 +32,19 @@ final class DeenlyKnowledgeServiceImpl: NSObject, DeenlyKnowledgeService {
         case "answer":
             file = Self.answerModelFile
             expectedSize = Self.answerModelSize
+        case "categorizer-propose", "categorizer-classify":
+            // The hadith-book generator GGUF, assembled from the four CDN
+            // parts under the same StarceptionAssets root.
+            let categorizerUrl = FileManager.default
+                .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent(
+                    "StarceptionAssets/models/hadith/hadith-categorizer-v1-q4_k_m.gguf"
+                )
+            guard DeenlyRunner.modelFileIsPresent(
+                atPath: categorizerUrl.path,
+                expectedSize: 1_117_320_736
+            ) else { return nil }
+            return categorizerUrl.path
         default:
             file = Self.questionModelFile
             expectedSize = Self.questionModelSize
@@ -64,7 +77,18 @@ final class DeenlyKnowledgeServiceImpl: NSObject, DeenlyKnowledgeService {
             systemPrompt: systemPrompt,
             userPrompt: userPrompt,
             grammar: DeenlyGrammar.forTask(task),
+            maxTokens: Self.maxTokens(for: task),
             onComplete: onComplete
         )
+    }
+
+    /// The proposal emits up to 40 titles — far beyond the 256-token Deenly
+    /// budget — while a classify verdict needs a handful of tokens.
+    private static func maxTokens(for task: String) -> Int {
+        switch task {
+        case "categorizer-propose": return 1_024
+        case "categorizer-classify": return 24
+        default: return 256
+        }
     }
 }

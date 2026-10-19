@@ -44,7 +44,17 @@ internal expect fun LocationMarkerArtwork(
 internal fun topicArtworkResourceName(topicName: String): String {
     val normalized = topicName.lowercase()
     return when {
-        "bukhari" in normalized || "hadith" in normalized -> "topic_sahih_bukhari"
+        "shamai" in normalized || "shamay" in normalized -> "topic_shamayele_tirmidhi"
+        "bukhari" in normalized -> "topic_sahih_bukhari"
+        "muslim" in normalized -> "topic_sahih_muslim"
+        "tirmidhi" in normalized -> "topic_jami_tirmidhi"
+        "dawud" in normalized -> "topic_sunan_abu_dawud"
+        "nasai" in normalized -> "topic_sunan_nasai"
+        "majah" in normalized -> "topic_sunan_ibn_majah"
+        "muwatta" in normalized || "malik" in normalized -> "topic_muwatta_malik"
+        "darimi" in normalized -> "topic_sunan_darimi"
+        "musnad" in normalized || "ahmad" in normalized -> "topic_musnad_ahmad"
+        "hadith" in normalized -> "topic_sahih_bukhari"
         "dua" in normalized -> "topic_quranic_duas"
         "quran" in normalized || "surah" in normalized -> "topic_holy_quran"
         "morning" in normalized || "evening" in normalized -> "topic_morning_evening"

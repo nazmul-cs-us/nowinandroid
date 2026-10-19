@@ -29,7 +29,16 @@ fun topicIconResFor(name: String): Int? {
     val n = name.lowercase()
     return when {
         "shamai" in n || "shamay" in n -> R.drawable.topic_shamayele_tirmidhi
-        "bukhari" in n || "hadith" in n -> R.drawable.topic_sahih_bukhari
+        "bukhari" in n -> R.drawable.topic_sahih_bukhari
+        "muslim" in n -> R.drawable.topic_sahih_muslim
+        "tirmidhi" in n -> R.drawable.topic_jami_tirmidhi
+        "dawud" in n -> R.drawable.topic_sunan_abu_dawud
+        "nasai" in n || "nasa'i" in n -> R.drawable.topic_sunan_nasai
+        "majah" in n -> R.drawable.topic_sunan_ibn_majah
+        "muwatta" in n || "malik" in n -> R.drawable.topic_muwatta_malik
+        "darimi" in n -> R.drawable.topic_sunan_darimi
+        "musnad" in n || "ahmad" in n -> R.drawable.topic_musnad_ahmad
+        "hadith" in n -> R.drawable.topic_sahih_bukhari
         "dua" in n -> R.drawable.topic_quranic_duas
         "quran" in n || "surah" in n -> R.drawable.topic_holy_quran
         "morning" in n || "evening" in n -> R.drawable.topic_morning_evening

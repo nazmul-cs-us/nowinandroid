@@ -34,6 +34,8 @@ enum class AudioLanguage {
     ARABIC_ONLY,
     BENGALI_TRANSLATION,
     ENGLISH_TRANSLATION,
+    URDU_TRANSLATION,
+    HINDI_TRANSLATION,
 }
 
 /**

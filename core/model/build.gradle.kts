@@ -29,6 +29,8 @@ kotlin {
         }
         commonMain.dependencies {
             api(libs.kotlinx.datetime)
+            // GeneratedHadithBooks' change notification (StateFlow<Int> version).
+            api(libs.kotlinx.coroutines.core)
         }
     }
 }

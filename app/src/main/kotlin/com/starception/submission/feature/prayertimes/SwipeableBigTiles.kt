@@ -8316,6 +8316,8 @@ private fun DailyStatsTile(
                                 com.starception.submission.feature.quran.AudioLanguage.ARABIC_ONLY -> "AR"
                                 com.starception.submission.feature.quran.AudioLanguage.BENGALI_TRANSLATION -> "বাংলা"
                                 com.starception.submission.feature.quran.AudioLanguage.ENGLISH_TRANSLATION -> "EN"
+                                com.starception.submission.feature.quran.AudioLanguage.URDU_TRANSLATION -> "UR"
+                                com.starception.submission.feature.quran.AudioLanguage.HINDI_TRANSLATION -> "HI"
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.tertiary,

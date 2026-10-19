@@ -98,6 +98,15 @@ targets:
         buildPhase: resources
         type: file
       - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_sahih_bukhari.png
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_sahih_muslim.png
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_jami_tirmidhi.png
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_sunan_abu_dawud.png
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_sunan_nasai.png
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_sunan_ibn_majah.png
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_muwatta_malik.png
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_sunan_darimi.png
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_musnad_ahmad.png
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_shamayele_tirmidhi.png
         buildPhase: resources
         type: file
       - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_quranic_duas.png

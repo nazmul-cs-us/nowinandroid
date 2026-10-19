@@ -38,6 +38,8 @@ data class SharedTopicArticle(
     val instruction: String = "",
     val additionalContext: String = "",
     val reference: String = "",
+    /** Arabic recitation URL for Fortress-of-the-Muslim cards, when available. */
+    val audioUrl: String = "",
 )
 
 interface SharedTopicRepository {
@@ -63,6 +65,14 @@ val SharedTopics = listOf(
         "Explore 56 books and 322 hadiths describing the Prophet's appearance, character, manners, and daily life.",
         imageUrl = "https://cdn-icons-png.flaticon.com/512/4556/4556746.png",
     ),
+    SharedTopic(38, "Sahih Muslim", "صحيح مسلم", "One of the 'Two Sahihs' — 57 books and 7,459 hadiths."),
+    SharedTopic(39, "Jami' at-Tirmidhi", "جامع الترمذي", "One of the six canonical collections — 49 books and 4,053 hadiths."),
+    SharedTopic(40, "Sunan Abu Dawud", "سنن أبي داود", "One of the six canonical collections — 43 books and 5,276 hadiths."),
+    SharedTopic(41, "Sunan an-Nasa'i", "سنن النسائي", "One of the six canonical collections — 52 books and 5,768 hadiths."),
+    SharedTopic(42, "Sunan Ibn Majah", "سنن ابن ماجه", "Completes the six canonical collections — 38 books and 4,345 hadiths."),
+    SharedTopic(43, "Muwatta Malik", "موطأ مالك", "The earliest surviving collection — 61 books and 1,985 hadiths."),
+    SharedTopic(44, "Sunan ad-Darimi", "سنن الدارمي", "An early topical collection — 25 books and 3,534 hadiths in Arabic and English."),
+    SharedTopic(45, "Musnad Ahmad", "مسند أحمد", "The largest hadith collection — 15 sections and 27,642 hadiths in Arabic and English."),
     SharedTopic(11, "Quranic Duas", "Remembrance of Allah and supplications", "Supplications collected directly from the Holy Quran."),
     SharedTopic(21, "Morning & Evening", "أذكار الصباح والمساء", "Fortress of the Muslim invocations for morning and evening."),
     SharedTopic(22, "Prayer", "الصلاة", "Fortress of the Muslim invocations connected with salah."),
@@ -84,6 +94,23 @@ val SharedTopics = listOf(
 )
 
 fun sharedTopic(id: Int): SharedTopic? = SharedTopics.firstOrNull { it.id == id }
+
+/**
+ * Registry database file for a hadith-collection topic (topic 8 = Sahih
+ * al-Bukhari, 38-45 = the eight collections added to topics.db), or null.
+ * Shared by the topic repository (book lists) and the topic screen (routing).
+ */
+val hadithCollectionDatabaseForTopic = mapOf(
+    8 to "sahih_bukhari.db",
+    38 to "sahih_muslim.db",
+    39 to "sunan_tirmidhi.db",
+    40 to "sunan_abu_dawud.db",
+    41 to "sunan_nasai.db",
+    42 to "sunan_ibn_majah.db",
+    43 to "muwatta_malik.db",
+    44 to "sunan_darimi.db",
+    45 to "musnad_ahmad.db",
+)
 
 internal fun canonicalInterestKey(value: String): String {
     val normalized = value.trim()

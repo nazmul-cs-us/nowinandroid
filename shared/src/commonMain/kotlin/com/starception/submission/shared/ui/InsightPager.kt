@@ -48,6 +48,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
@@ -510,19 +511,50 @@ fun InsightPager(
                             .coerceIn(-1f, 1f)
                     }
                 }
+                val pageDensity = LocalDensity.current.density
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
                             val focus = 1f - abs(pageOffset)
-                            val restingScale = 0.97f + (0.03f * focus)
-                            val restingAlpha = 0.9f + (0.1f * focus)
+                            val restingScale = 0.94f + (0.06f * focus)
+                            val restingAlpha = 0.76f + (0.24f * focus)
                             scaleX = restingScale + ((1f - restingScale) * expansionProgress)
                             scaleY = restingScale + ((1f - restingScale) * expansionProgress)
                             alpha = restingAlpha + ((1f - restingAlpha) * expansionProgress)
+                            // A restrained cover-flow tilt gives the swipe a clear
+                            // spatial relationship without making text feel tilted.
+                            translationX = -pageOffset * 8.dp.toPx()
+                            rotationY = pageOffset * -3.5f
+                            cameraDistance = 24f * pageDensity
                         },
                 ) {
-                    when (logicalPage) {
+                    AnimatedContent(
+                        targetState = logicalPage,
+                        transitionSpec = {
+                            (
+                                fadeIn(
+                                    animationSpec = tween(
+                                        durationMillis = 220,
+                                        delayMillis = 24,
+                                        easing = FastOutSlowInEasing,
+                                    ),
+                                ) + scaleIn(
+                                    initialScale = 0.965f,
+                                    animationSpec = tween(260, easing = FastOutSlowInEasing),
+                                )
+                            ) togetherWith (
+                                fadeOut(
+                                    animationSpec = tween(120, easing = LinearEasing),
+                                ) + scaleOut(
+                                    targetScale = 0.985f,
+                                    animationSpec = tween(160, easing = LinearEasing),
+                                )
+                            )
+                        },
+                        label = "insightTileContent",
+                    ) { animatedLogicalPage ->
+                    when (animatedLogicalPage) {
                         0 -> PrayerNowTile(
                             backgroundPageOffset = { pageOffset },
                             phase = day.skyPhase,
@@ -548,16 +580,14 @@ fun InsightPager(
                             isExpanded = isExpanded,
                             onClick = onOpenQibla,
                             onLongClick = onLongClick,
-                            expandedContent = if (isExpanded) {
-                                {
-                                    ExpandedPrayerLine(
-                                        nextPrayerName = day.nextPrayer,
-                                        slots = day.slots,
-                                    )
-                                }
-                            } else {
-                                null
-                            },
+                             // Preserve the expanded layout's vertical balance after
+                             // removing the prayer-line artwork/text. The headline
+                             // and timeline remain in their established position.
+                             expandedContent = if (isExpanded) {
+                                 { Spacer(Modifier.fillMaxSize()) }
+                             } else {
+                                 null
+                             },
                         )
 
                         1 -> ArtworkTile(
@@ -864,6 +894,7 @@ fun InsightPager(
                             )
                         }
                     }
+                    }
                 }
             }
         }
@@ -995,7 +1026,6 @@ private fun ExpandedReadingPreview(
     val store = remember { SharedContentStore() }
     val mushafMode = remember { store.quranMushafMode() }
     val arabicFont = remember { store.quranArabicFont() }
-    val arabicFontSize = remember { store.quranArabicFontSize() }
     val translationLanguage = remember {
         QuranTranslationLanguage.fromCode(store.quranTranslationLanguage())
     }
@@ -1032,9 +1062,17 @@ private fun ExpandedReadingPreview(
         label = "quranStageGlowPhase",
     )
 
-    // Android's reading stage is a plain centered column over the artwork —
-    // no glass card — with the bismillah above the opening ayahs.
-    Column(
+    // Scale Arabic from the actual expanded tile width. Fixed 17–23sp text
+    // was too small on the iPad/large expanded card and hard to read.
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val readingArabicSize = (maxWidth.value * 0.075f).coerceIn(22f, 34f).sp
+        val readingArabicLineHeight = (readingArabicSize.value * 1.45f).sp
+        val bismillahSize = (maxWidth.value * 0.052f).coerceIn(18f, 26f).sp
+        val readingTranslationSize = (maxWidth.value * 0.038f).coerceIn(13f, 18f).sp
+
+        // Android's reading stage is a plain centered column over the artwork —
+        // no glass card — with the bismillah above the opening ayahs.
+        Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(7.dp),
         modifier = modifier
@@ -1045,8 +1083,8 @@ private fun ExpandedReadingPreview(
                 text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
                 style = MaterialTheme.typography.titleSmall.copy(
                     fontFamily = QuranArabicFonts.fontFamily(arabicFont),
-                    fontSize = 15.sp,
-                    lineHeight = 22.sp,
+                    fontSize = bismillahSize,
+                    lineHeight = (bismillahSize.value * 1.35f).sp,
                     letterSpacing = 0.sp,
                 ),
                 color = Color.White.copy(alpha = 0.78f + (0.22f * bismillahGlow)),
@@ -1103,8 +1141,8 @@ private fun ExpandedReadingPreview(
                         }.ifBlank { "Preparing today's passage…" },
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = QuranArabicFonts.fontFamily(arabicFont),
-                            fontSize = (arabicFontSize * 0.46f).coerceIn(17f, 23f).sp,
-                            lineHeight = (arabicFontSize * 0.70f).coerceIn(27f, 34f).sp,
+                            fontSize = readingArabicSize,
+                            lineHeight = readingArabicLineHeight,
                             letterSpacing = 0.sp,
                         ),
                         color = Color.White.copy(alpha = if (passage.isEmpty()) 0.58f else 0.96f),
@@ -1132,8 +1170,8 @@ private fun ExpandedReadingPreview(
                                 .ifBlank { "Preparing today's passage…" },
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = QuranArabicFonts.fontFamily(arabicFont),
-                                fontSize = (arabicFontSize * 0.46f).coerceIn(17f, 23f).sp,
-                                lineHeight = (arabicFontSize * 0.66f).coerceIn(26f, 32f).sp,
+                                fontSize = readingArabicSize,
+                                lineHeight = readingArabicLineHeight,
                                 letterSpacing = 0.sp,
                             ),
                             color = Color.White.copy(alpha = if (verse == null) 0.58f else 0.96f),
@@ -1146,12 +1184,12 @@ private fun ExpandedReadingPreview(
                             Text(
                                 text = translation,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.sp,
-                                    lineHeight = 13.sp,
+                                    fontSize = readingTranslationSize,
+                                    lineHeight = (readingTranslationSize.value * 1.3f).sp,
                                 ),
                                 color = Color.White.copy(alpha = 0.66f),
                                 textAlign = TextAlign.Center,
-                                maxLines = 1,
+                                maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.fillMaxWidth(),
                             )
@@ -1161,86 +1199,12 @@ private fun ExpandedReadingPreview(
             }
         }
     }
+}
 
 /**
  * Android's PrayerTimelineExpandedStage, lean: the day's five prayers with
  * the next one highlighted in the reference gold.
  */
-@Composable
-private fun ExpandedPrayerLine(
-    nextPrayerName: String?,
-    slots: List<SharedPrayerSlot>,
-) {
-    val prayers = slots.filter { it.name in FARD_PRAYERS }
-    if (prayers.isEmpty()) return
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.Black.copy(alpha = 0.36f))
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.14f),
-                shape = RoundedCornerShape(18.dp),
-            )
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = "TODAY'S PRAYER LINE",
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 9.5.sp,
-                lineHeight = 12.sp,
-                letterSpacing = 1.2.sp,
-            ),
-            color = Color.White.copy(alpha = 0.68f),
-            fontWeight = FontWeight.Bold,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            prayers.forEach { slot ->
-                val highlighted = slot.name.equals(nextPrayerName, ignoreCase = true)
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                    modifier = Modifier.widthIn(min = 44.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(if (highlighted) 8.dp else 5.dp)
-                            .background(
-                                if (highlighted) ReadingPreviewGold else Color.White.copy(alpha = 0.30f),
-                                CircleShape,
-                            ),
-                    )
-                    Text(
-                        text = slot.name,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp,
-                            lineHeight = 12.sp,
-                        ),
-                        color = if (highlighted) ReadingPreviewGold else Color.White.copy(alpha = 0.72f),
-                        fontWeight = if (highlighted) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                    )
-                    Text(
-                        text = formatTileClock(slot.hour, slot.minute),
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize = 11.sp,
-                            lineHeight = 13.sp,
-                        ),
-                        color = Color.White.copy(alpha = if (highlighted) 0.96f else 0.58f),
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-    }
-}
-
 /** Degrees to radians for the radar drawing, common to all platforms. */
 private fun radians(degrees: Double): Double = degrees * PI / 180.0
 
@@ -2584,7 +2548,10 @@ private fun ArtworkTile(
                                 .weight(1f)
                                 .graphicsLayer {
                                     alpha = expandedContentEntrance
-                                    translationY = (1f - expandedContentEntrance) * 10.dp.toPx()
+                                    // Keep the content's center fixed while its
+                                    // alpha/scale entrance runs; translating it
+                                    // here makes it visibly drop into place.
+                                    translationY = 0f
                                     compositingStrategy = CompositingStrategy.Offscreen
                                 }
                                 .drawWithContent {

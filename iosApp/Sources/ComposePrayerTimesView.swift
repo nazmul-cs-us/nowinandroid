@@ -99,6 +99,7 @@ struct NudgePayload: Identifiable {
 enum NowNudgeSurface {
     case button
     case composer
+    case modelMissing
     case thinking
     case nudge
 }
@@ -113,6 +114,7 @@ final class NowNudgeBotModel: ObservableObject {
     @Published var thinkingMessageIndex = 0
     @Published var thinkingVerbRotation: [String] = []
     @Published var composerSuggestions: [String] = []
+    @Published var modelMissing = false
 
     // @Published: the reveal task writes these off the turn flow, and the
     // surfaces recompute from them — without the publish the thinking pill
@@ -145,6 +147,8 @@ final class NowNudgeBotModel: ObservableObject {
     var surface: NowNudgeSurface {
         if composerOpen {
             .composer
+        } else if modelMissing {
+            .modelMissing
         } else if isGeneratingNudge {
             .thinking
         } else if showNudge {
@@ -182,12 +186,21 @@ final class NowNudgeBotModel: ObservableObject {
 
     func requestAmbientSuggestion() {
         guard !busGenerating else { return }
+        guard IosComposeRootKt.IsDeenlyKnowledgeModelAvailable() else {
+            composerOpen = false
+            modelMissing = true
+            return
+        }
         composerOpen = false
         IosComposeRootKt.RequestDeenlyNudgeSuggestion(prompt: nil)
     }
 
     func openComposer() {
         guard surface == .button, !busGenerating else { return }
+        guard IosComposeRootKt.IsDeenlyKnowledgeModelAvailable() else {
+            modelMissing = true
+            return
+        }
         composerOpen = true
         if !suggestionsLoaded {
             suggestionsLoaded = true
@@ -203,9 +216,23 @@ final class NowNudgeBotModel: ObservableObject {
         composerOpen = false
     }
 
+    func closeModelMissing() {
+        modelMissing = false
+    }
+
+    func startModelDownload() {
+        modelMissing = false
+        IosComposeRootKt.StartDeenlyModelDownload()
+    }
+
     func submitComposerQuestion(_ question: String) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        guard IosComposeRootKt.IsDeenlyKnowledgeModelAvailable() else {
+            composerOpen = false
+            modelMissing = true
+            return
+        }
         composerOpen = false
         IosComposeRootKt.RequestDeenlyNudgeSuggestion(prompt: trimmed)
     }
@@ -350,6 +377,10 @@ private struct NowNudgeBotLayer: View {
                 composerCard
                     .offset(y: -(buttonSize + 8))
                     .transition(.opacity)
+            case .modelMissing:
+                missingModelCard
+                    .offset(y: -(buttonSize + 8))
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
             case .thinking:
                 thinkingPill
                     .offset(y: -(buttonSize + 8))
@@ -377,6 +408,46 @@ private struct NowNudgeBotLayer: View {
             glowColor: glowColor,
             glowPulse: glowPulse
         )
+        .matchedGeometryEffect(id: "voiceContainer", in: containerNamespace)
+    }
+
+    private var missingModelCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Download Now Nudge model")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("On-device AI needs a one-time model download.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    model.closeModelMissing()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close")
+            }
+            Button {
+                model.startModelDownload()
+            } label: {
+                Label("Download model", systemImage: "arrow.down.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(14)
+        .frame(width: 300)
+        .background(nudgeGradient)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: glowColor.opacity(0.28), radius: 12, y: 4)
         .matchedGeometryEffect(id: "voiceContainer", in: containerNamespace)
     }
 

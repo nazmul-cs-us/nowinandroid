@@ -50,6 +50,11 @@ fun NavGraphBuilder.topicScreen(
     onShamayelBookClick: (Int) -> Unit = {},
     onShamayelBookPlayClick: (Int) -> Unit = {},
     onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
+    onHadithCollectionBookClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionBookPlayClick: (databaseFile: String, bookId: Int) -> Unit = { _, _ -> },
+    onHadithCollectionPlayClick: (databaseFile: String, shuffle: Boolean) -> Unit = { _, _ -> },
+    canRecategorizeHadithBooks: Boolean = false,
+    onHadithCollectionRecategorize: (databaseFile: String) -> Unit = {},
     belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
     composable<TopicRoute>(
@@ -72,6 +77,11 @@ fun NavGraphBuilder.topicScreen(
             onShamayelBookClick = onShamayelBookClick,
             onShamayelBookPlayClick = onShamayelBookPlayClick,
             onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
+            onHadithCollectionBookClick = onHadithCollectionBookClick,
+            onHadithCollectionBookPlayClick = onHadithCollectionBookPlayClick,
+            onHadithCollectionPlayClick = onHadithCollectionPlayClick,
+            canRecategorizeHadithBooks = canRecategorizeHadithBooks,
+            onHadithCollectionRecategorize = onHadithCollectionRecategorize,
             belowHeaderContent = belowHeaderContent,
             viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                 key = id,
