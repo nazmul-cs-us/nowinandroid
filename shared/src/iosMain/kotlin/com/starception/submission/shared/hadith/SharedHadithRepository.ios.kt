@@ -33,6 +33,8 @@ import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import platform.Foundation.NSBundle
 import sqlite3.SQLITE_DONE
@@ -50,41 +52,100 @@ import sqlite3.sqlite3_open_v2
 import sqlite3.sqlite3_prepare_v2
 import sqlite3.sqlite3_step
 
-actual fun createSharedHadithRepository(): SharedHadithRepository = IosSharedHadithRepository()
+private val iosSharedHadithRepository: SharedHadithRepository by lazy { IosSharedHadithRepository() }
+
+actual fun createSharedHadithRepository(): SharedHadithRepository = iosSharedHadithRepository
 
 private class IosSharedHadithRepository : SharedHadithRepository {
-    override suspend fun getHadith(id: Int): SharedHadith? =
-        getHadiths(id, id).firstOrNull()
+    private val cacheMutex = Mutex()
+    private val bukhariRows = mutableMapOf<Int, SharedHadith>()
+    private val bukhariRanges = mutableSetOf<Pair<Int, Int>>()
+    private val shamayelRows = mutableMapOf<Int, SharedHadith>()
+    private val shamayelRanges = mutableSetOf<Pair<Int, Int>>()
+    private val collectionRows = mutableMapOf<String, MutableMap<Int, SharedHadith>>()
+    private val collectionRanges = mutableSetOf<CollectionRange>()
 
-    override suspend fun getHadiths(firstId: Int, lastId: Int): List<SharedHadith> =
-        withContext(Dispatchers.Default) {
-            require(firstId > 0 && lastId >= firstId)
-            readHadiths(firstId, lastId)
-        }
+    override suspend fun getHadith(id: Int): SharedHadith? {
+        cacheMutex.withLock { bukhariRows[id] }?.let { return it }
+        return getHadiths(id, id).firstOrNull()
+    }
 
-    override suspend fun getShamayelHadiths(firstId: Int, lastId: Int): List<SharedHadith> =
-        withContext(Dispatchers.Default) {
-            require(firstId > 0 && lastId >= firstId)
-            readShamayelHadiths(firstId, lastId)
+    override suspend fun getHadiths(firstId: Int, lastId: Int): List<SharedHadith> {
+        require(firstId > 0 && lastId >= firstId)
+        val range = firstId to lastId
+        cacheMutex.withLock {
+            if (range in bukhariRanges) {
+                return bukhariRows.values.inRange(firstId, lastId)
+            }
         }
+        val rows = withContext(Dispatchers.Default) { readHadiths(firstId, lastId) }
+        cacheMutex.withLock {
+            rows.associateByTo(bukhariRows, SharedHadith::id)
+            bukhariRanges += range
+        }
+        return rows
+    }
+
+    override suspend fun getShamayelHadiths(firstId: Int, lastId: Int): List<SharedHadith> {
+        require(firstId > 0 && lastId >= firstId)
+        val range = firstId to lastId
+        cacheMutex.withLock {
+            if (range in shamayelRanges) {
+                return shamayelRows.values.inRange(firstId, lastId)
+            }
+        }
+        val rows = withContext(Dispatchers.Default) { readShamayelHadiths(firstId, lastId) }
+        cacheMutex.withLock {
+            rows.associateByTo(shamayelRows, SharedHadith::id)
+            shamayelRanges += range
+        }
+        return rows
+    }
 
     override suspend fun getCollectionHadiths(
         databaseFile: String,
         firstId: Int,
         lastId: Int,
-    ): List<SharedHadith> = withContext(Dispatchers.Default) {
+    ): List<SharedHadith> {
         require(firstId > 0 && lastId >= firstId)
-        readCollectionHadiths(databaseFile, firstId, lastId)
+        val range = CollectionRange(databaseFile, firstId, lastId)
+        cacheMutex.withLock {
+            if (range in collectionRanges) {
+                return collectionRows[databaseFile].orEmpty().values.inRange(firstId, lastId)
+            }
+        }
+        val rows = withContext(Dispatchers.Default) {
+            readCollectionHadiths(databaseFile, firstId, lastId)
+        }
+        cacheMutex.withLock {
+            val cache = collectionRows.getOrPut(databaseFile) { mutableMapOf() }
+            rows.associateByTo(cache, SharedHadith::id)
+            collectionRanges += range
+        }
+        return rows
     }
 
     override suspend fun getCollectionHadithsByIds(
         databaseFile: String,
         ids: List<Int>,
-    ): List<SharedHadith> = withContext(Dispatchers.Default) {
-        if (ids.isEmpty()) {
-            emptyList()
-        } else {
-            readCollectionHadithsByIds(databaseFile, ids)
+    ): List<SharedHadith> {
+        if (ids.isEmpty()) return emptyList()
+        val cached = cacheMutex.withLock { collectionRows[databaseFile].orEmpty().toMap() }
+        val missingIds = ids.filterNot(cached::containsKey)
+        if (missingIds.isNotEmpty()) {
+            val loaded = withContext(Dispatchers.Default) {
+                readCollectionHadithsByIds(databaseFile, missingIds)
+            }
+            cacheMutex.withLock {
+                loaded.associateByTo(
+                    collectionRows.getOrPut(databaseFile) { mutableMapOf() },
+                    SharedHadith::id,
+                )
+            }
+        }
+        return cacheMutex.withLock {
+            val rows = collectionRows[databaseFile].orEmpty()
+            ids.mapNotNull(rows::get)
         }
     }
 
@@ -332,7 +393,19 @@ private class IosSharedHadithRepository : SharedHadithRepository {
             }
         }
     }
+
+    private data class CollectionRange(
+        val databaseFile: String,
+        val firstId: Int,
+        val lastId: Int,
+    )
 }
+
+private fun Collection<SharedHadith>.inRange(firstId: Int, lastId: Int): List<SharedHadith> =
+    asSequence()
+        .filter { it.id in firstId..lastId }
+        .sortedBy(SharedHadith::id)
+        .toList()
 
 /** Tells SQLite to copy bound text before the Kotlin-managed bytes are freed. */
 @OptIn(ExperimentalForeignApi::class)

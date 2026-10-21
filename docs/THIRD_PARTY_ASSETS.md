@@ -15,6 +15,17 @@
 The 1024 px source images are tightly cropped into 512 px WebP textures. Circular
 masking, directional shading, and glow are rendered by the widget at runtime.
 
+## Prayer Now native sun and moon
+
+- Source package: `/Users/smarterai/Downloads/celestial-native`
+- License: MIT
+- Android: Kotlin, `GLSurfaceView`, and OpenGL ES shaders
+- iOS: Swift, `MTKView`, and Metal shaders
+- Bundled license: `app/src/main/assets/licenses/celestial_native_mit.txt`
+
+The Prayer Now tile renders both bodies procedurally at native display resolution.
+It requires no WebView, JavaScript, remote model, texture download, or network access.
+
 ## Legacy Today's Prayers 3D sun and moon
 
 - Assets: Fluent Emoji `Sun` and `Crescent moon` 3D artwork

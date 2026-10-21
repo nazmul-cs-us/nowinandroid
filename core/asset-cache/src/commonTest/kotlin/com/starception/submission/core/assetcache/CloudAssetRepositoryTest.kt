@@ -175,6 +175,20 @@ class CloudAssetRepositoryTest {
     }
 
     @Test
+    fun validatedCachedAssetIsNotRehashedWithinProcess() = runTest {
+        val platform = FakeAssetPlatform().apply {
+            addCached("audio/one file!.mp3", size = 4, sha256 = "hash-one")
+        }
+        val repository = CloudAssetRepository(platform)
+        val manifest = AssetManifest.fromJson(manifestJson())
+
+        assertNotNull(repository.resolveAsset("audio/one file!.mp3", manifest))
+        assertNotNull(repository.resolveAsset("audio/one file!.mp3", manifest))
+
+        assertEquals(1, platform.sha256Requests)
+    }
+
+    @Test
     fun corruptCacheIsDeletedAndValidatedDownloadIsCommitted() = runTest {
         val platform = FakeAssetPlatform().apply {
             addCached("audio/one file!.mp3", size = 3, sha256 = "wrong")

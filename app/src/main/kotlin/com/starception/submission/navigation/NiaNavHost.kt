@@ -51,7 +51,10 @@ import com.starception.submission.feature.hadith.navigateToHadithCollectionBook
 import com.starception.submission.feature.hadith.navigateToHadithCollectionBookPlayback
 import com.starception.submission.feature.hadith.navigateToHadithCollectionPlayback
 import com.starception.submission.ml.HadithBookCategorizer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
 import com.starception.submission.feature.prayertimes.navigation.prayerTimesScreen
 import com.starception.submission.feature.salah.datacollection.navigateToSalahDataCollection
@@ -274,6 +277,20 @@ fun NiaNavHost(
         },
     )
 
+    // Statting the 1.1 GB categorizer GGUF on the graph-builder/main thread
+    // stalled every NiaNavHost graph rebuild (StrictMode logged ~2 s
+    // DiskReadViolations); resolve it off-thread and refresh it periodically
+    // so a completed download is still picked up.
+    var hadithCategorizerReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            hadithCategorizerReady = withContext(Dispatchers.IO) {
+                HadithBookCategorizer.isModelDownloaded(context)
+            }
+            delay(30_000L)
+        }
+    }
+
     androidx.compose.runtime.CompositionLocalProvider(
         com.starception.submission.ui.LocalSearchNavCallbacks provides searchNavCallbacks,
     ) {
@@ -357,7 +374,7 @@ fun NiaNavHost(
                 onHadithCollectionBookClick = navController::navigateToHadithCollectionBook,
                 onHadithCollectionBookPlayClick = navController::navigateToHadithCollectionBookPlayback,
                 onHadithCollectionPlayClick = navController::navigateToHadithCollectionPlayback,
-                canRecategorizeHadithBooks = HadithBookCategorizer.isModelDownloaded(context),
+                canRecategorizeHadithBooks = hadithCategorizerReady,
                 onHadithCollectionRecategorize = { databaseFile ->
                     recategorizeScope.launch {
                         if (
@@ -494,7 +511,7 @@ fun NiaNavHost(
                 onHadithCollectionBookClick = navController::navigateToHadithCollectionBook,
                 onHadithCollectionBookPlayClick = navController::navigateToHadithCollectionBookPlayback,
                 onHadithCollectionPlayClick = navController::navigateToHadithCollectionPlayback,
-                canRecategorizeHadithBooks = HadithBookCategorizer.isModelDownloaded(context),
+                canRecategorizeHadithBooks = hadithCategorizerReady,
                 onHadithCollectionRecategorize = { databaseFile ->
                     recategorizeScope.launch {
                         if (

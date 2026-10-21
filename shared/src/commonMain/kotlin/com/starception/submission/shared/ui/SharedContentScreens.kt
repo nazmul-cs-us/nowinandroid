@@ -114,6 +114,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -154,7 +155,7 @@ import com.starception.submission.feature.quran.Surah
 import com.starception.submission.feature.quran.subtitle
 import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.content.hadithCollectionDatabaseForTopic
-import com.starception.submission.shared.audio.quranAudioUrl
+import com.starception.submission.shared.audio.resolveQuranAudioUrl
 import com.starception.submission.shared.content.CatalogResult
 import com.starception.submission.shared.content.DailyRecommendation
 import com.starception.submission.shared.content.FortressChapter
@@ -478,20 +479,44 @@ internal fun QuranDetailScreen(
     }
     var playing by remember(number) { mutableStateOf(false) }
     var showAudioPlayer by remember(number) { mutableStateOf(false) }
+    var audioLoading by remember(number) { mutableStateOf(false) }
+    val globalPlayback by com.starception.submission.shared.media.QuranPlaybackBus.state.collectAsState()
+    var translationLanguage by remember {
+        mutableStateOf(QuranTranslationLanguage.fromCode(store.quranTranslationLanguage()))
+    }
+    val playbackScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    LaunchedEffect(number, globalPlayback) {
+        val playback = globalPlayback
+        if (playback?.surahNumber == number) {
+            playing = playback.playing
+            showAudioPlayer = true
+        }
+    }
+
+    suspend fun playSelectedAudio(): Boolean {
+        val url = resolveQuranAudioUrl(number, translationLanguage.code) ?: return false
+        val started = player.play(url)
+        if (started) {
+            com.starception.submission.shared.media.QuranPlaybackBus.startSurah(
+                player = player,
+                surahNumber = number,
+                audioUrl = url,
+            )
+        }
+        return started
+    }
+
     LaunchedEffect(number) {
         if (store.quranAutoplayPending()) {
             store.saveQuranAutoplayPending(false)
-            playing = player.play(quranAudioUrl(number))
-                            if (playing) {
-                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
-                            }
+            audioLoading = true
+            playing = playSelectedAudio()
+            audioLoading = false
             showAudioPlayer = playing
         }
     }
     var loadAttempt by remember(number) { mutableStateOf(0) }
-    var translationLanguage by remember {
-        mutableStateOf(QuranTranslationLanguage.fromCode(store.quranTranslationLanguage()))
-    }
     val tafseerRepository = remember { com.starception.submission.shared.quran.createQuranTafseerRepository() }
     val tafseerScope = androidx.compose.runtime.rememberCoroutineScope()
     var tafseerRequest by remember {
@@ -501,7 +526,7 @@ internal fun QuranDetailScreen(
     var tafseerSelectedBook by remember { mutableStateOf(0) }
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
     val repository = remember { createQuranVerseRepository() }
-    LaunchedEffect(number, loadAttempt) {
+    LaunchedEffect(number, translationLanguage, loadAttempt) {
         ayahState = QuranAyahState.Loading
         ayahState = try {
             val verses = repository.getVersesBySurah(number, translationLanguage)
@@ -546,10 +571,6 @@ internal fun QuranDetailScreen(
             }
         }
     }
-    LaunchedEffect(number, translationLanguage) {
-        // Reload the ayahs when the translation language changes.
-        loadAttempt += 1
-    }
     val savedSurah = remember(number) { number in store.bookmarkedSurahs() }
     var isBookmarked by remember(number) { mutableStateOf(savedSurah) }
     val bookmarkAction = DetailAction(
@@ -574,18 +595,23 @@ internal fun QuranDetailScreen(
     // Tajweed, Show Translation, Mushaf Page, Text Alignment, Arabic Font, Translation Language.
     val playAudioAction = DetailAction(
         id = "play_audio",
-        label = if (playing) "Pause recitation" else "Play surah audio",
+        label = when {
+            audioLoading -> "Preparing audio"
+            playing -> "Pause recitation"
+            else -> "Play surah audio"
+        },
         selected = playing,
     ) {
         if (playing) {
             player.pause()
             playing = false
-        } else {
-            playing = player.play(quranAudioUrl(number))
-                            if (playing) {
-                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
-                            }
-            if (playing) showAudioPlayer = true
+        } else if (!audioLoading) {
+            playbackScope.launch {
+                audioLoading = true
+                playing = playSelectedAudio()
+                audioLoading = false
+                if (playing) showAudioPlayer = true
+            }
         }
     }
     val readingSettingsAction = DetailAction(
@@ -606,12 +632,13 @@ internal fun QuranDetailScreen(
         if (playing) {
             player.pause()
             playing = false
-        } else {
-            playing = player.play(quranAudioUrl(number))
-            if (playing) {
-                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
+        } else if (!audioLoading) {
+            playbackScope.launch {
+                audioLoading = true
+                playing = playSelectedAudio()
+                audioLoading = false
+                if (playing) showAudioPlayer = true
             }
-            if (playing) showAudioPlayer = true
         }
     }
     val density = LocalDensity.current
@@ -811,12 +838,13 @@ internal fun QuranDetailScreen(
                                 if (playing) {
                                     player.pause()
                                     playing = false
-                                } else {
-                                    playing = player.play(quranAudioUrl(number))
-                            if (playing) {
-                                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(player, number)
-                            }
-                                    if (playing) showAudioPlayer = true
+                                } else if (!audioLoading) {
+                                    playbackScope.launch {
+                                        audioLoading = true
+                                        playing = playSelectedAudio()
+                                        audioLoading = false
+                                        if (playing) showAudioPlayer = true
+                                    }
                                 }
                             },
                         ) {
@@ -1240,8 +1268,10 @@ private fun SurahAlbumInfoCard(
                 .padding(horizontal = 24.dp)
                 .padding(top = 10.dp, bottom = 14.dp),
         ) {
-            // Room for the floating surah-name overlay.
-            Spacer(Modifier.height(44.dp))
+            // Reserve both lines of the floating title (English + Arabic).
+            // The old 44dp slot ended underneath the Arabic baseline, causing
+            // it to overlap the English meaning on iPhone-sized layouts.
+            Spacer(Modifier.height(80.dp))
             if (nameTranslation.isNotBlank()) {
                 Text(
                     text = "\"$nameTranslation\"",
@@ -3005,23 +3035,25 @@ internal fun BukhariHadithDetailScreen(
     var state by remember { mutableStateOf<HadithsState>(HadithsState.Loading) }
     LaunchedEffect(hadithId) {
         state = HadithsState.Loading
-        state = try {
-            // Load the whole book so the pager can swipe between narrations —
-            // matching Android's prev/next hadith navigation.
-            val hadiths = if (book != null) {
-                repository.getHadiths(book.firstHadithId, book.lastHadithId)
+        try {
+            val selected = listOfNotNull(repository.getHadith(hadithId))
+            if (selected.isEmpty()) {
+                state = HadithsState.Error("Hadith $hadithId was not found.")
             } else {
-                listOfNotNull(repository.getHadith(hadithId))
-            }
-            if (hadiths.isEmpty()) {
-                HadithsState.Error("Hadith $hadithId was not found.")
-            } else {
-                HadithsState.Loaded(hadiths)
+                // Paint the requested row first. The full book is added after
+                // the first frame so horizontal browsing remains available.
+                state = HadithsState.Loaded(selected)
+                book?.let { resolvedBook ->
+                    repository.getHadiths(
+                        resolvedBook.firstHadithId,
+                        resolvedBook.lastHadithId,
+                    ).takeIf { it.isNotEmpty() }?.let { state = HadithsState.Loaded(it) }
+                }
             }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
-            HadithsState.Error(error.message ?: "Unable to read this hadith.")
+            state = HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
     }
     var listening by remember { mutableStateOf(false) }
@@ -3056,9 +3088,11 @@ internal fun BukhariHadithDetailScreen(
         is HadithsState.Loaded -> {
             val hadiths = current.hadiths
             val initialIndex = hadiths.indexOfFirst { it.id == hadithId }.coerceAtLeast(0)
-            val pagerState = androidx.compose.foundation.pager.rememberPagerState(
-                initialPage = initialIndex,
-            ) { hadiths.size }
+            val pagerState = key(hadiths.size, hadiths.first().id, hadiths.last().id) {
+                androidx.compose.foundation.pager.rememberPagerState(
+                    initialPage = initialIndex,
+                ) { hadiths.size }
+            }
             // The hadith pages share one list state so the album header's
             // parallax follows the visible page; every page starts at the top.
             val hadithPageListState = rememberLazyListState()
@@ -3479,23 +3513,23 @@ internal fun ShamayelHadithDetailScreen(
     var state by remember { mutableStateOf<HadithsState>(HadithsState.Loading) }
     LaunchedEffect(hadithId) {
         state = HadithsState.Loading
-        state = try {
-            // The whole book loads so the pager can swipe between chapters,
-            // matching the Android prev/next hadith navigation.
-            val hadiths = if (book != null) {
-                repository.getShamayelHadiths(book.firstHadithId, book.lastHadithId)
+        try {
+            val selected = listOfNotNull(repository.getShamayelHadith(hadithId))
+            if (selected.isEmpty()) {
+                state = HadithsState.Error("Hadith $hadithId was not found.")
             } else {
-                listOfNotNull(repository.getShamayelHadith(hadithId))
-            }
-            if (hadiths.isEmpty()) {
-                HadithsState.Error("Hadith $hadithId was not found.")
-            } else {
-                HadithsState.Loaded(hadiths)
+                state = HadithsState.Loaded(selected)
+                book?.let { resolvedBook ->
+                    repository.getShamayelHadiths(
+                        resolvedBook.firstHadithId,
+                        resolvedBook.lastHadithId,
+                    ).takeIf { it.isNotEmpty() }?.let { state = HadithsState.Loaded(it) }
+                }
             }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
-            HadithsState.Error(error.message ?: "Unable to read this hadith.")
+            state = HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
     }
     var listening by remember { mutableStateOf(false) }
@@ -3517,9 +3551,11 @@ internal fun ShamayelHadithDetailScreen(
         is HadithsState.Loaded -> {
             val hadiths = current.hadiths
             val initialIndex = hadiths.indexOfFirst { it.id == hadithId }.coerceAtLeast(0)
-            val pagerState = androidx.compose.foundation.pager.rememberPagerState(
-                initialPage = initialIndex,
-            ) { hadiths.size }
+            val pagerState = key(hadiths.size, hadiths.first().id, hadiths.last().id) {
+                androidx.compose.foundation.pager.rememberPagerState(
+                    initialPage = initialIndex,
+                ) { hadiths.size }
+            }
             // The hadith pages share one list state so the album header's
             // parallax follows the visible page; every page starts at the top.
             val hadithPageListState = rememberLazyListState()
@@ -6472,21 +6508,24 @@ internal fun HadithCollectionHadithScreen(
     var state by remember(hadithId) { mutableStateOf<HadithsState>(HadithsState.Loading) }
     LaunchedEffect(databaseFile, hadithId) {
         state = HadithsState.Loading
-        state = try {
-            val hadiths = if (book != null) {
-                repository.getCollectionHadiths(databaseFile, book.firstHadithId, book.lastHadithId)
+        try {
+            val selected = listOfNotNull(repository.getCollectionHadith(databaseFile, hadithId))
+            if (selected.isEmpty()) {
+                state = HadithsState.Error("Hadith $hadithId was not found.")
             } else {
-                listOfNotNull(repository.getCollectionHadith(databaseFile, hadithId))
-            }
-            if (hadiths.isEmpty()) {
-                HadithsState.Error("Hadith $hadithId was not found.")
-            } else {
-                HadithsState.Loaded(hadiths)
+                state = HadithsState.Loaded(selected)
+                book?.let { resolvedBook ->
+                    repository.getCollectionHadiths(
+                        databaseFile,
+                        resolvedBook.firstHadithId,
+                        resolvedBook.lastHadithId,
+                    ).takeIf { it.isNotEmpty() }?.let { state = HadithsState.Loaded(it) }
+                }
             }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
-            HadithsState.Error(error.message ?: "Unable to read this hadith.")
+            state = HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
     }
     val title = collection?.name ?: "Hadith"
@@ -6502,9 +6541,11 @@ internal fun HadithCollectionHadithScreen(
         is HadithsState.Loaded -> {
             val hadiths = current.hadiths
             val initialIndex = hadiths.indexOfFirst { it.id == hadithId }.coerceAtLeast(0)
-            val pagerState = androidx.compose.foundation.pager.rememberPagerState(
-                initialPage = initialIndex,
-            ) { hadiths.size }
+            val pagerState = key(hadiths.size, hadiths.first().id, hadiths.last().id) {
+                androidx.compose.foundation.pager.rememberPagerState(
+                    initialPage = initialIndex,
+                ) { hadiths.size }
+            }
             val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
             SharedDetailScaffold(
                 title = title,

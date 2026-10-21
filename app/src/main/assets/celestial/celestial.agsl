@@ -1,0 +1,113 @@
+uniform float2 resolution;
+uniform float time;
+uniform float phase;
+uniform float mode;
+
+float hash(float3 p) {
+    p = fract(p * 0.3183099 + float3(0.1, 0.2, 0.3));
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+
+float noise(float3 p) {
+    float3 i = floor(p);
+    float3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(
+            mix(hash(i), hash(i + float3(1, 0, 0)), f.x),
+            mix(hash(i + float3(0, 1, 0)), hash(i + float3(1, 1, 0)), f.x),
+            f.y
+        ),
+        mix(
+            mix(hash(i + float3(0, 0, 1)), hash(i + float3(1, 0, 1)), f.x),
+            mix(hash(i + float3(0, 1, 1)), hash(i + float3(1, 1, 1)), f.x),
+            f.y
+        ),
+        f.z
+    );
+}
+
+float fbm(float3 p) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    for (int i = 0; i < 4; i++) {
+        value += amplitude * noise(p);
+        p = p * 2.03 + 3.1;
+        amplitude *= 0.5;
+    }
+    return value;
+}
+
+float3 rotateY(float3 p, float angle) {
+    return float3(
+        cos(angle) * p.x + sin(angle) * p.z,
+        p.y,
+        -sin(angle) * p.x + cos(angle) * p.z
+    );
+}
+
+float craters(float3 normal) {
+    float value = 0.0;
+    for (int i = 0; i < 38; i++) {
+        float index = float(i);
+        float3 center = normalize(
+            float3(
+                hash(float3(index, 1, 2)),
+                hash(float3(index, 3, 4)),
+                hash(float3(index, 5, 6))
+            ) * 2.0 - 1.0
+        );
+        float radius = 0.035 + 0.105 * hash(float3(index, 7, 8));
+        float distance = length(normal - center) / radius;
+        float rim = (distance - 0.88) * 9.0;
+        value += 0.20 * exp(-rim * rim) - 0.15 * exp(-distance * distance * 4.0);
+    }
+    return value;
+}
+
+float4 body(float2 point, bool sun) {
+    float radius = length(point);
+    float antialias = 3.0 / min(resolution.x, resolution.y);
+    if (radius > 1.32) return float4(0.0);
+    if (radius > 1.0) {
+        if (!sun) return float4(0.0);
+        float angle = atan(point.y, point.x);
+        float waves = 0.85 + 0.15 * sin(angle * 19.0 + time * 0.35) +
+            0.07 * sin(angle * 37.0 - time * 0.2);
+        float glow = exp(-(radius - 1.0) * 18.0) * 0.46 * waves *
+            (1.0 - smoothstep(1.2, 1.32, radius));
+        return float4(1.0, 0.47, 0.08, glow);
+    }
+
+    float3 normal = float3(point, sqrt(max(0.0, 1.0 - radius * radius)));
+    float3 color;
+    if (sun) {
+        float3 p = rotateY(normal, time * 0.018);
+        float flow = fbm(p * 5.0 + float3(time * 0.06, 0, 0));
+        float grain = fbm(p * 44.0 + flow * 2.0 + float3(0, time * 0.16, 0));
+        float fine = noise(p * 145.0 + time * 0.04);
+        float hot = smoothstep(0.32, 0.76, grain);
+        color = mix(float3(0.78, 0.16, 0.018), float3(1.0, 0.78, 0.26), hot);
+        color += float3(0.26, 0.12, 0.02) * fine;
+        color *= 0.72 + 0.28 * normal.z;
+    } else {
+        float3 p = rotateY(normal, 0.22 + time * 0.006);
+        float terrain = fbm(p * 7.0);
+        float detail = fbm(p * 70.0);
+        float crater = craters(p);
+        float albedo = 0.38 + 0.36 * terrain + 0.16 * detail + crater;
+        // Keep the crater/terrain texture, but do not apply directional
+        // diffuse lighting. That term created the dark shadow hemisphere.
+        color = float3(0.88, 0.89, 0.87) * albedo * 0.92;
+        color = pow(max(color, float3(0.0)), float3(0.65));
+    }
+    return float4(color, 1.0 - smoothstep(1.0 - antialias, 1.0, radius));
+}
+
+half4 main(float2 fragCoord) {
+    float radius = min(resolution.y * 0.35, resolution.x * 0.36);
+    float2 center = resolution * 0.5;
+    float4 result = body((fragCoord - center) / radius, mode < 1.5);
+    return half4(result.rgb * result.a, result.a);
+}

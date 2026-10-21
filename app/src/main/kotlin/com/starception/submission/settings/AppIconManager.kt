@@ -34,8 +34,8 @@ enum class AppIconChoice(
         aliasClassName = "com.starception.submission.launcher.EmeraldLauncherAlias",
     ),
     ROYAL(
-        displayName = "Royal",
-        previewDrawableRes = R.drawable.ic_launcher_foreground_art,
+        displayName = "Deenly",
+        previewDrawableRes = R.drawable.ic_launcher_foreground,
         aliasClassName = "com.starception.submission.launcher.RoyalLauncherAlias",
     ),
     NEON(
@@ -66,7 +66,7 @@ object AppIconManager {
         return AppIconChoice.entries.firstOrNull { choice ->
             context.packageManager.getComponentEnabledSetting(choice.componentName(context)) ==
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-        } ?: AppIconChoice.HORIZON
+        } ?: AppIconChoice.ROYAL
     }
 
     fun selectIcon(context: Context, choice: AppIconChoice) {

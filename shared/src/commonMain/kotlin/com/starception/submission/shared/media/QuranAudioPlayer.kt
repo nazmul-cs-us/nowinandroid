@@ -20,6 +20,12 @@ package com.starception.submission.shared.audio
 fun quranAudioUrl(surahNumber: Int): String =
     "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/$surahNumber.mp3"
 
+/** Resolves/downloads one Surah audio file for the selected translation. */
+expect suspend fun resolveQuranAudioUrl(
+    surahNumber: Int,
+    translationCode: String,
+): String?
+
 expect class QuranAudioPlayer() {
     fun play(url: String): Boolean
     fun pause()

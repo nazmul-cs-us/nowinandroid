@@ -789,6 +789,9 @@ struct NativePrayerTabsView: View {
     @State private var morePath: [Int] = []
     @State private var lastSelectedTab = 0
     @StateObject private var bot = NowNudgeBotModel()
+    @State private var insightImmersive = ProcessInfo.processInfo.arguments.contains {
+        $0.hasPrefix("--expand-insight=")
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -813,9 +816,11 @@ struct NativePrayerTabsView: View {
         .tabBarMinimizeBehavior(.automatic)
         .tint(Color.accentColor)
         .overlay(alignment: .bottomTrailing) {
-            NowNudgeBotLayer(model: bot)
-                .padding(.trailing, 16)
-                .padding(.bottom, 0)
+            if !insightImmersive {
+                NowNudgeBotLayer(model: bot)
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 0)
+            }
         }
         .onAppear {
             bot.start()
@@ -827,6 +832,9 @@ struct NativePrayerTabsView: View {
             morePath = []
             selectedTab = 0
             lastSelectedTab = 0
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("insightImmersiveChanged"))) { notification in
+            insightImmersive = (notification.object as? String) == "true"
         }
         .onChange(of: selectedTab) { _, newValue in
             if newValue == 6 {
@@ -849,6 +857,7 @@ struct NativePrayerTabsView: View {
     private func tabContent(_ index: Int) -> some View {
         ComposePrayerTimesTabView(tabIndex: index, onSelectTab: selectContentTab)
             .ignoresSafeArea(.all)
+            .toolbar(insightImmersive ? .hidden : .visible, for: .tabBar)
     }
 
     private func selectContentTab(_ index: Int) {

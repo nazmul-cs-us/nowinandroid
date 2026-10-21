@@ -97,6 +97,7 @@ class CloudAssetRepository(
     private val manifestMutex = Mutex()
     private val assetMutexesMutex = Mutex()
     private val assetMutexes = mutableMapOf<String, Mutex>()
+    private val validatedAssets = mutableMapOf<String, ValidatedAsset>()
     private var cachedManifest: AssetManifest? = null
 
     suspend fun loadManifest(forceRefresh: Boolean = false): AssetManifest? =
@@ -138,6 +139,7 @@ class CloudAssetRepository(
                             !previousEntry.sha256.equals(remoteEntry.sha256, ignoreCase = true)
                         if (isStale) {
                             mutexFor(cdnKey).withLock {
+                                validatedAssets.remove(cdnKey)
                                 try {
                                     platform.deleteCachedAsset(cdnKey)
                                 } catch (error: Exception) {
@@ -178,6 +180,7 @@ class CloudAssetRepository(
 
     fun clearMemoryCache() {
         cachedManifest = null
+        validatedAssets.clear()
     }
 
     suspend fun resolveAsset(
@@ -268,7 +271,10 @@ class CloudAssetRepository(
     }
 
     suspend fun deleteAsset(cdnKey: String): Boolean =
-        mutexFor(cdnKey).withLock { platform.deleteCachedAsset(cdnKey) }
+        mutexFor(cdnKey).withLock {
+            validatedAssets.remove(cdnKey)
+            platform.deleteCachedAsset(cdnKey)
+        }
 
     suspend fun deleteCategory(
         category: String,
@@ -369,7 +375,9 @@ class CloudAssetRepository(
                     onProgress,
                     AssetDownloadProgress(entry.cdnKey, entry.size, entry.size),
                 )
-                return ResolvedAsset(entry.cdnKey, committedPath, AssetSource.DOWNLOAD)
+                return ResolvedAsset(entry.cdnKey, committedPath, AssetSource.DOWNLOAD).also {
+                    validatedAssets[entry.cdnKey] = ValidatedAsset(entry, it)
+                }
             }
         } catch (error: Exception) {
             error.rethrowIfCancellation()
@@ -388,6 +396,19 @@ class CloudAssetRepository(
     }
 
     private suspend fun validCachedAsset(entry: AssetEntry): ResolvedAsset? {
+        validatedAssets[entry.cdnKey]
+            ?.takeIf { it.matches(entry) }
+            ?.let { verified ->
+                val stillExists = try {
+                    platform.fileSize(verified.asset.absolutePath) == entry.size
+                } catch (error: Exception) {
+                    error.rethrowIfCancellation()
+                    false
+                }
+                if (stillExists) return verified.asset
+                validatedAssets.remove(entry.cdnKey)
+            }
+
         val path = try {
             platform.cachedAssetPath(entry.cdnKey)
         } catch (error: Exception) {
@@ -396,9 +417,12 @@ class CloudAssetRepository(
         } ?: return null
 
         if (isValid(path, entry)) {
-            return ResolvedAsset(entry.cdnKey, path, AssetSource.CACHE)
+            return ResolvedAsset(entry.cdnKey, path, AssetSource.CACHE).also {
+                validatedAssets[entry.cdnKey] = ValidatedAsset(entry, it)
+            }
         }
 
+        validatedAssets.remove(entry.cdnKey)
         try {
             platform.deleteCachedAsset(entry.cdnKey)
         } catch (error: Exception) {
@@ -478,6 +502,21 @@ class CloudAssetRepository(
 
     private companion object {
         const val DEFAULT_MANIFEST_PATH = "manifest.json"
+    }
+
+    private data class ValidatedAsset(
+        val size: Long,
+        val sha256: String,
+        val asset: ResolvedAsset,
+    ) {
+        constructor(entry: AssetEntry, asset: ResolvedAsset) : this(
+            size = entry.size,
+            sha256 = entry.sha256,
+            asset = asset,
+        )
+
+        fun matches(entry: AssetEntry): Boolean =
+            size == entry.size && sha256.equals(entry.sha256, ignoreCase = true)
     }
 }
 

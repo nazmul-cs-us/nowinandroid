@@ -39,6 +39,7 @@ internal actual fun PlatformWorldWindGlobe(
     headingDegrees: Double?,
     headingAccuracyDegrees: Double?,
     qiblaBearing: Double,
+    expanded: Boolean,
     modifier: Modifier,
 ) {
     val ocean = Color(0xFF153F66)

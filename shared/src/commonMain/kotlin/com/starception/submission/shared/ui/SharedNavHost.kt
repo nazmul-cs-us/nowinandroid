@@ -156,11 +156,13 @@ fun SharedNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startInSettings: Boolean = false,
+    startInQibla: Boolean = false,
     startInSurah: Int? = null,
     startFortressChapter: Int? = null,
     startDuaNumber: Int? = null,
     startBukhariHadithId: Int? = null,
     startBottomIndex: Int = 0,
+    resetToPrayerTimes: Boolean = false,
     onSelectTopLevel: ((Int) -> Unit)? = null,
     externalVoiceSearchRequests: Flow<Int>? = null,
     onExternalVoiceSearchHandled: (() -> Unit)? = null,
@@ -201,6 +203,14 @@ fun SharedNavHost(
         onOpenNews = openNews,
         onRecordRecent = { contentStore.addRecentSearch(it) },
     )
+    LaunchedEffect(resetToPrayerTimes) {
+        if (resetToPrayerTimes) {
+            navController.navigate(PrayerTimesRoute) {
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
     LaunchedEffect(externalVoiceSearchRequests, startBottomIndex) {
         externalVoiceSearchRequests?.collect { requestedTab ->
             if (requestedTab == startBottomIndex) {
@@ -274,6 +284,7 @@ fun SharedNavHost(
                 ?.takeIf { it in 1..114 }
                 ?.let(::QuranDetailRoute)
                 ?: when {
+                    startInQibla -> QiblaRoute
                     startInSettings -> PrayerSettingsRoute
                     startBottomIndex == 1 -> ForYouRoute
                     startBottomIndex == 2 -> SavedRoute

@@ -17,10 +17,10 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,18 +50,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.shared.qibla.HeadingProvider
 import com.starception.submission.shared.qibla.HeadingReading
 import com.starception.submission.shared.qibla.cardinalDirection
 import com.starception.submission.shared.qibla.qiblaBearing
 import com.starception.submission.shared.qibla.relativeQiblaTurn
-import io.github.alexzhirkevich.cupertino.CupertinoNavigateBackButton
 import io.github.alexzhirkevich.cupertino.CupertinoSurface
 import io.github.alexzhirkevich.cupertino.CupertinoText
 import io.github.alexzhirkevich.cupertino.ExperimentalCupertinoApi
@@ -148,8 +149,9 @@ private fun QiblaMaterialPage(
                     headingDegrees = reading.headingDegrees,
                     headingAccuracyDegrees = reading.accuracyDegrees,
                     qiblaBearing = bearing,
+                    expanded = false,
                     modifier = Modifier
-                        .size(280.dp)
+                        .size(310.dp)
                         .clip(CircleShape)
                         .semantics {
                             contentDescription = "WorldWind Qibla globe from your location to Makkah"
@@ -190,62 +192,93 @@ private fun QiblaCupertinoPage(
                 .safeDrawingPadding()
                 .padding(horizontal = 16.dp),
         ) {
-            CupertinoNavigateBackButton(
-                onClick = onBack,
-                modifier = Modifier.height(44.dp),
-                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp),
+            Spacer(Modifier.height(40.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth().height(64.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                CupertinoText(
-                    text = "Qibla Compass",
-                    style = CupertinoTheme.typography.title2,
-                    fontWeight = FontWeight.Bold,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    KaabaTitleIcon()
+                    Spacer(Modifier.width(10.dp))
+                    CupertinoText(
+                        text = "Qibla Compass",
+                        style = CupertinoTheme.typography.title1,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                CupertinoSurface(
+                    onClick = onBack,
+                    shape = CircleShape,
+                    color = colors.quaternarySystemFill,
+                    modifier = Modifier.align(Alignment.CenterEnd).size(46.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CupertinoText(
+                            text = "×",
+                            style = CupertinoTheme.typography.title1,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
             }
 
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(top = 8.dp, bottom = 24.dp),
+                    .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                CupertinoText(
-                    text = "${bearing.roundToInt()}° ${cardinalDirection(bearing)}",
-                    style = CupertinoTheme.typography.title1,
-                    fontWeight = FontWeight.Bold,
-                )
-                CupertinoText(
-                    text = qiblaGuidance(bearing, reading),
-                    style = CupertinoTheme.typography.subhead,
-                    color = colors.secondaryLabel,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-                Spacer(Modifier.height(12.dp))
                 PlatformWorldWindGlobe(
                     latitude = latitude,
                     longitude = longitude,
                     headingDegrees = reading.headingDegrees,
                     headingAccuracyDegrees = reading.accuracyDegrees,
                     qiblaBearing = bearing,
+                    expanded = false,
                     modifier = Modifier
-                        .size(280.dp)
+                        .size(272.dp)
                         .clip(CircleShape)
                         .semantics {
                             contentDescription = "WorldWind Qibla globe from your location to Makkah"
                         },
                 )
-                CupertinoText(
-                    text = "Points toward the Kaaba in Makkah",
-                    style = CupertinoTheme.typography.footnote,
-                    color = colors.secondaryLabel,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 10.dp),
-                )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(17.dp))
                 CupertinoCalibrationCard(reading)
             }
         }
+    }
+}
+
+@Composable
+private fun KaabaTitleIcon() {
+    Canvas(Modifier.size(40.dp)) {
+        fun polygon(vararg points: Pair<Float, Float>) = Path().apply {
+            moveTo(points.first().first * size.width, points.first().second * size.height)
+            points.drop(1).forEach { (x, y) -> lineTo(x * size.width, y * size.height) }
+            close()
+        }
+
+        drawPath(
+            polygon(0.12f to 0.25f, 0.48f to 0.08f, 0.90f to 0.22f, 0.53f to 0.40f),
+            Color(0xFF4B4A47),
+        )
+        drawPath(
+            polygon(0.12f to 0.25f, 0.53f to 0.40f, 0.53f to 0.92f, 0.12f to 0.74f),
+            Color(0xFF292929),
+        )
+        drawPath(
+            polygon(0.53f to 0.40f, 0.90f to 0.22f, 0.90f to 0.74f, 0.53f to 0.92f),
+            Color(0xFF111111),
+        )
+        drawPath(
+            polygon(0.12f to 0.43f, 0.53f to 0.59f, 0.53f to 0.68f, 0.12f to 0.53f),
+            Color(0xFFD4AF37),
+        )
+        drawPath(
+            polygon(0.53f to 0.59f, 0.90f to 0.43f, 0.90f to 0.52f, 0.53f to 0.68f),
+            Color(0xFFF0CB52),
+        )
     }
 }
 
@@ -262,9 +295,16 @@ private fun CupertinoCalibrationCard(reading: HeadingReading) {
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            CupertinoText(
+                text = "∞",
+                color = Color(0xFF52BF8B).copy(alpha = 0.5f),
+                fontSize = 72.sp,
+                lineHeight = 64.sp,
+                fontWeight = FontWeight.Light,
+            )
             CupertinoText("For Better Accuracy", style = CupertinoTheme.typography.headline)
             CupertinoText(
-                text = "Move your device in a figure-8 pattern to improve compass accuracy.",
+                text = "Move your device in a figure-8 pattern to improve compass accuracy. Keep the phone flat and make smooth, continuous motions.",
                 style = CupertinoTheme.typography.subhead,
                 color = colors.secondaryLabel,
                 textAlign = TextAlign.Center,
@@ -272,11 +312,17 @@ private fun CupertinoCalibrationCard(reading: HeadingReading) {
             )
             CupertinoCalibrationStep("1", "Hold phone flat in your palm")
             CupertinoCalibrationStep("2", "Move in smooth figure-8 motions")
-            CupertinoCalibrationStep("3", "Watch the compass ring turn green")
+            CupertinoCalibrationStep("3", "Watch the compass border turn green")
             Spacer(Modifier.height(10.dp))
-            CupertinoAccuracyLegend(Color(0xFF10B981), "Green = Good accuracy")
-            CupertinoAccuracyLegend(Color(0xFFFFA500), "Orange = Fair accuracy")
-            CupertinoAccuracyLegend(Color(0xFFFF4444), "Red = Poor accuracy")
+            CupertinoText(
+                text = "Color Guide:",
+                style = CupertinoTheme.typography.subhead,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            )
+            CupertinoAccuracyLegend(Color(0xFF52BF8B), "Green = Good accuracy, reliable direction")
+            CupertinoAccuracyLegend(Color(0xFFFFA726), "Orange = Fair accuracy, mostly reliable")
+            CupertinoAccuracyLegend(Color(0xFFFF5252), "Red = Poor accuracy, recalibration needed")
             val accuracy = reading.accuracyDegrees
             CupertinoText(
                 text = when {
@@ -295,13 +341,12 @@ private fun CupertinoCalibrationCard(reading: HeadingReading) {
 
 @Composable
 private fun CupertinoCalibrationStep(number: String, instruction: String) {
-    val colors = CupertinoTheme.colorScheme
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(24.dp).clip(CircleShape).background(colors.accent),
+            modifier = Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF52BF8B)),
             contentAlignment = Alignment.Center,
         ) {
             CupertinoText(number, color = Color.White, fontWeight = FontWeight.Bold)

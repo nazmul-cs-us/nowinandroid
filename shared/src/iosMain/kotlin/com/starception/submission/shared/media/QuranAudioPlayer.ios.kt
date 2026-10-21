@@ -16,27 +16,54 @@
 
 package com.starception.submission.shared.audio
 
+import com.starception.submission.shared.assets.iosCloudAssets
 import kotlinx.cinterop.ExperimentalForeignApi
+import platform.AVFAudio.AVAudioEngine
+import platform.AVFAudio.AVAudioFile
+import platform.AVFAudio.AVAudioPlayerNode
 import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.setActive
-import platform.AVFoundation.AVPlayer
-import platform.AVFoundation.AVPlayerItem
-import platform.AVFoundation.AVPlayerTimeControlStatusPlaying
-import platform.AVFoundation.currentItem
-import platform.AVFoundation.currentTime
-import platform.AVFoundation.duration
-import platform.AVFoundation.pause
-import platform.AVFoundation.play
-import platform.AVFoundation.seekToTime
-import platform.AVFoundation.timeControlStatus
-import platform.CoreMedia.CMTimeMakeWithSeconds
 import platform.Foundation.NSURL
+import kotlin.math.roundToLong
+
+actual suspend fun resolveQuranAudioUrl(
+    surahNumber: Int,
+    translationCode: String,
+): String? {
+    val category = when (translationCode) {
+        "bn" -> "quran_audio_bengali"
+        "en" -> "quran_audio_english"
+        "hi" -> "quran_audio_hindi"
+        "ur" -> "quran_audio_urdu"
+        else -> "quran_audio_arabic"
+    }
+    val manifest = iosCloudAssets.loadManifest()
+        ?: return quranAudioUrl(surahNumber)
+    val entry = manifest.getAssetsByCategory(category).firstOrNull { asset ->
+        asset.cdnKey.substringAfterLast('/')
+            .takeWhile(Char::isDigit)
+            .toIntOrNull() == surahNumber
+    } ?: return quranAudioUrl(surahNumber)
+    val resolved = iosCloudAssets.resolveAsset(entry.cdnKey, manifest)
+        ?: return null
+    return NSURL.fileURLWithPath(resolved.absolutePath).absoluteString
+}
 
 @OptIn(ExperimentalForeignApi::class)
 actual class QuranAudioPlayer actual constructor() {
-    private var player: AVPlayer? = null
+    private val engine = AVAudioEngine()
+    private val player = AVAudioPlayerNode()
+    private var audioFile: AVAudioFile? = null
     private var currentUrl: String? = null
+    private var duration = 0.0
+    private var segmentStartSeconds = 0.0
+    private var completed = false
+    private var scheduleGeneration = 0
+
+    init {
+        engine.attachNode(player)
+    }
 
     actual fun play(url: String): Boolean {
         val nsUrl = NSURL.URLWithString(url) ?: return false
@@ -44,40 +71,100 @@ actual class QuranAudioPlayer actual constructor() {
         session.setCategory(AVAudioSessionCategoryPlayback, error = null)
         session.setActive(true, withOptions = 0u, error = null)
         if (url != currentUrl) {
-            player = AVPlayer(playerItem = AVPlayerItem(uRL = nsUrl))
+            stopEngine()
+            val file = runCatching { AVAudioFile(forReading = nsUrl, error = null) }.getOrNull()
+                ?.takeIf { it.isOpen }
+                ?: return false
+            val sampleRate = file.processingFormat.sampleRate
+            if (sampleRate <= 0.0 || file.length <= 0L) return false
+
+            audioFile = file
             currentUrl = url
+            duration = file.length / sampleRate
+            segmentStartSeconds = 0.0
+            completed = false
+            engine.connect(player, to = engine.mainMixerNode, format = file.processingFormat)
+            scheduleFrom(0.0)
         }
-        player?.play()
-        return player != null
+        if (completed) scheduleFrom(0.0)
+        if (!engine.running) {
+            engine.prepare()
+            if (!engine.startAndReturnError(null)) return false
+        }
+        player.play()
+        return player.playing
     }
 
     actual fun pause() {
-        player?.pause()
+        segmentStartSeconds = positionSeconds().toDouble()
+        player.pause()
     }
 
     actual fun stop() {
-        player?.pause()
-        player = null
+        stopEngine()
+        audioFile = null
         currentUrl = null
+        duration = 0.0
+        segmentStartSeconds = 0.0
+        completed = false
         AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
     }
 
     actual fun positionSeconds(): Float {
-        val time = player?.currentTime() ?: return 0f
-        return platform.CoreMedia.CMTimeGetSeconds(time).toFloat()
+        if (completed) return duration.toFloat()
+        val nodeTime = player.lastRenderTime ?: return segmentStartSeconds.toFloat()
+        val playerTime = player.playerTimeForNodeTime(nodeTime) ?: return segmentStartSeconds.toFloat()
+        val elapsed = if (playerTime.sampleRate > 0.0) {
+            playerTime.sampleTime / playerTime.sampleRate
+        } else {
+            0.0
+        }
+        return (segmentStartSeconds + elapsed).coerceIn(0.0, duration).toFloat()
     }
 
     actual fun durationSeconds(): Float {
-        val duration = player?.currentItem?.duration ?: return 0f
-        val seconds = platform.CoreMedia.CMTimeGetSeconds(duration)
-        return if (seconds.isNaN() || seconds.isInfinite()) 0f else seconds.toFloat()
+        return duration.toFloat()
     }
 
     actual fun isPlaying(): Boolean {
-        return player?.timeControlStatus() == AVPlayerTimeControlStatusPlaying
+        return player.playing
     }
 
     actual fun seekTo(seconds: Float) {
-        player?.seekToTime(CMTimeMakeWithSeconds(seconds.toDouble(), 600))
+        val wasPlaying = player.playing
+        scheduleFrom(seconds.toDouble())
+        if (wasPlaying) player.play()
+    }
+
+    private fun scheduleFrom(seconds: Double) {
+        val file = audioFile ?: return
+        scheduleGeneration++
+        val generation = scheduleGeneration
+        player.stop()
+        completed = false
+        segmentStartSeconds = seconds.coerceIn(0.0, duration)
+        val sampleRate = file.processingFormat.sampleRate
+        val startFrame = (segmentStartSeconds * sampleRate).roundToLong().coerceIn(0L, file.length)
+        val remainingFrames = (file.length - startFrame).coerceAtLeast(0L)
+        if (remainingFrames == 0L) {
+            completed = true
+            return
+        }
+        player.scheduleSegment(
+            file = file,
+            startingFrame = startFrame,
+            frameCount = remainingFrames.coerceAtMost(UInt.MAX_VALUE.toLong()).toUInt(),
+            atTime = null,
+        ) {
+            if (generation == scheduleGeneration) completed = true
+        }
+    }
+
+    private fun stopEngine() {
+        scheduleGeneration++
+        player.stop()
+        engine.stop()
+        engine.reset()
+        engine.disconnectNodeOutput(player)
     }
 }

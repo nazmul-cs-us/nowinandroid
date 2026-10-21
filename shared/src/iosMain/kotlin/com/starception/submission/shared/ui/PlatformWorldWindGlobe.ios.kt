@@ -49,13 +49,14 @@ internal actual fun PlatformWorldWindGlobe(
     headingDegrees: Double?,
     headingAccuracyDegrees: Double?,
     qiblaBearing: Double,
+    expanded: Boolean,
     modifier: Modifier,
 ) {
-    val pageKey = remember(latitude, longitude, qiblaBearing) {
-        "$latitude,$longitude,$qiblaBearing"
+    val pageKey = remember(latitude, longitude, qiblaBearing, expanded) {
+        "$latitude,$longitude,$qiblaBearing,$expanded"
     }
-    val html = remember(latitude, longitude, qiblaBearing) {
-        worldWindHtml(latitude, longitude, qiblaBearing)
+    val html = remember(latitude, longitude, qiblaBearing, expanded) {
+        worldWindHtml(latitude, longitude, qiblaBearing, expanded)
     }
 
     UIKitView(
@@ -101,6 +102,7 @@ private fun worldWindHtml(
     latitude: Double,
     longitude: Double,
     qiblaBearing: Double,
+    expanded: Boolean,
 ): String = """
 <!doctype html>
 <html>
@@ -108,19 +110,14 @@ private fun worldWindHtml(
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <style>
     html, body { margin:0; width:100%; height:100%; overflow:hidden; background:transparent; }
-    #shell { position:relative; width:100%; height:100%; overflow:hidden; border-radius:50%;
+    #shell { position:relative; width:100%; height:100%; overflow:hidden; border-radius:${if (expanded) "24px" else "50%"};
       background:#07121d; }
     #globe { position:absolute; inset:0; z-index:1; display:block; width:100%; height:100%;
-      touch-action:none; background:#07121d; border-radius:50%; }
+      touch-action:none; background:#07121d; border-radius:inherit; }
     #status { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
       padding:20px; color:#dce8f2; background:#07121d; font:600 14px -apple-system,sans-serif;
       text-align:center; z-index:4; }
-    #overlay { position:absolute; inset:0; z-index:3; display:block; width:100%; height:100%;
-      pointer-events:none; overflow:visible; }
-    #heading-cone { transform-box:view-box; transform-origin:150px var(--user-y);
-      transition:transform 90ms linear, opacity 180ms ease; }
-    #user-dot { transform-box:fill-box; transform-origin:center; animation:radar-pulse 1.1s ease-in-out infinite alternate; }
-    #kaaba-marker { filter:drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+    #overlay { position:absolute; inset:0; z-index:3; width:100%; height:100%; pointer-events:none; }
     #accuracy-ring { transition:stroke 240ms ease, filter 240ms ease; }
     @keyframes radar-pulse { from { transform:scale(.85); } to { transform:scale(1); } }
   </style>
@@ -130,24 +127,8 @@ private fun worldWindHtml(
   <div id="shell">
     <canvas id="globe">WorldWind globe</canvas>
     <svg id="overlay" viewBox="0 0 300 300" aria-hidden="true">
-      <defs>
-        <linearGradient id="cone-gradient" gradientUnits="userSpaceOnUse" x1="150" y1="260" x2="150" y2="80">
-          <stop offset="0" stop-color="#10b981" stop-opacity=".88"/>
-          <stop offset=".42" stop-color="#10b981" stop-opacity=".48"/>
-          <stop offset="1" stop-color="#10b981" stop-opacity=".06"/>
-        </linearGradient>
-      </defs>
-      <path id="heading-cone" fill="url(#cone-gradient)"/>
-      <circle id="user-ring" fill="white"/>
-      <circle id="user-dot" fill="#10b981"/>
-      <g id="kaaba-marker">
-        <circle r="19" fill="white" fill-opacity=".96"/>
-        <rect x="-12" y="-12" width="24" height="24" rx="2" fill="#101010"/>
-        <rect x="-12" y="-4" width="24" height="4" fill="#d4af37"/>
-        <rect x="3" y="5" width="5" height="7" rx="1" fill="#b99028"/>
-      </g>
-      <circle id="accuracy-ring" cx="150" cy="150" r="144" fill="none" stroke="white"
-        stroke-width="8" opacity=".94"/>
+      <circle id="accuracy-ring" cx="150" cy="150" r="145" fill="none" stroke="#72d9bd"
+        stroke-width="5" opacity=".72"/>
     </svg>
     <div id="status">Loading WorldWind globe…</div>
   </div>
@@ -160,29 +141,58 @@ private fun worldWindHtml(
       const wwd = new WorldWind.WorldWindow('globe');
       wwd.addLayer(new WorldWind.BMNGOneImageLayer());
       wwd.addLayer(new WorldWind.BMNGLayer());
-      wwd.addLayer(new WorldWind.AtmosphereLayer());
 
       const userLat = $latitude;
       const userLon = $longitude;
       const qiblaBearing = $qiblaBearing;
       const makkahLat = 21.4225;
       const makkahLon = 39.8262;
-      const routeLayer = new WorldWind.RenderableLayer('Qibla route');
+      const markerLayer = new WorldWind.RenderableLayer('Qibla markers');
+      const imageUri = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      function userMarkerSvg(heading, color) {
+        const radius = 180;
+        const sweep = 65;
+        const start = heading - sweep / 2;
+        const end = heading + sweep / 2;
+        const point = angle => {
+          const radians = angle * Math.PI / 180;
+          return [200 + radius * Math.sin(radians), 200 - radius * Math.cos(radians)];
+        };
+        const first = point(start);
+        const last = point(end);
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><defs><radialGradient id="beam" cx="50%" cy="50%" r="45%"><stop offset="0" stop-color="${'$'}{color}" stop-opacity="1"/><stop offset=".2" stop-color="${'$'}{color}" stop-opacity=".8"/><stop offset=".55" stop-color="${'$'}{color}" stop-opacity=".4"/><stop offset="1" stop-color="${'$'}{color}" stop-opacity="0"/></radialGradient></defs><path d="M200 200 L${'$'}{first[0]} ${'$'}{first[1]} A${'$'}{radius} ${'$'}{radius} 0 0 1 ${'$'}{last[0]} ${'$'}{last[1]} Z" fill="url(#beam)"/><circle cx="200" cy="200" r="21" fill="white"/><circle cx="200" cy="200" r="16.8" fill="${'$'}{color}"/></svg>`;
+      }
+      const kaabaSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144"><polygon points="30,38 70,20 114,35 74,55" fill="#4b4a47"/><polygon points="30,38 74,55 74,119 30,98" fill="#292929"/><polygon points="74,55 114,35 114,98 74,119" fill="#111111"/><polygon points="30,58 74,75 74,87 30,70" fill="#d4af37"/><polygon points="74,75 114,57 114,69 74,87" fill="#f0cb52"/><rect x="88" y="84" width="14" height="28" rx="2" fill="#b99028"/></svg>`;
+      function placemark(lat, lon, image, label, scale) {
+        const attributes = new WorldWind.PlacemarkAttributes(null);
+        attributes.imageSource = imageUri(image);
+        attributes.imageScale = scale;
+        attributes.imageOffset = new WorldWind.Offset(
+          WorldWind.OFFSET_FRACTION, 0.5, WorldWind.OFFSET_FRACTION, 0.5
+        );
+        attributes.labelAttributes.color = WorldWind.Color.WHITE;
+        attributes.labelAttributes.offset = new WorldWind.Offset(
+          WorldWind.OFFSET_FRACTION, 0.5, WorldWind.OFFSET_PIXELS, -34
+        );
+        const marker = new WorldWind.Placemark(
+          new WorldWind.Position(lat, lon, 0), false, attributes
+        );
+        marker.altitudeMode = WorldWind.CLAMP_TO_GROUND;
+        markerLayer.addRenderable(marker);
+        return marker;
+      }
+      const userPlacemark = placemark(
+        userLat,
+        userLon,
+        userMarkerSvg(qiblaBearing, '#10b981'),
+        'You',
+        0.5
+      );
+      placemark(makkahLat, makkahLon, kaabaSvg, 'Kaaba', 0.2);
+      wwd.addLayer(markerLayer);
 
-      const routeAttributes = new WorldWind.ShapeAttributes(null);
-      routeAttributes.outlineColor = new WorldWind.Color(0.20, 0.88, 0.55, 1.0);
-      routeAttributes.outlineWidth = 5;
-      const route = new WorldWind.SurfacePolyline([
-        new WorldWind.Location(userLat, userLon),
-        new WorldWind.Location(makkahLat, makkahLon)
-      ], routeAttributes);
-      route.pathType = WorldWind.GREAT_CIRCLE;
-      routeLayer.addRenderable(route);
-
-      wwd.addLayer(routeLayer);
-
-      const toRadians = value => value * Math.PI / 180;
-      const toDegrees = value => value * 180 / Math.PI;
+      function toRadians(value) { return value * Math.PI / 180; }
+      function toDegrees(value) { return value * 180 / Math.PI; }
       function angularDistance(lat1, lon1, lat2, lon2) {
         const dLat = toRadians(lat2 - lat1);
         const dLon = toRadians(lon2 - lon1);
@@ -233,57 +243,42 @@ private fun worldWindHtml(
         maximumRange,
         Math.max(minimumRange, baseRange)
       );
-      const cameraRange = Math.max(
-        earthRadius * 1.8,
-        nativeEquivalentRange * 0.55
-      );
-      wwd.navigator.lookAtLocation.latitude = routeMidpoint.latitude;
-      wwd.navigator.lookAtLocation.longitude = routeMidpoint.longitude;
-      wwd.navigator.range = cameraRange;
-      wwd.navigator.heading = cameraHeading;
-      wwd.navigator.tilt = 0;
+      function fitRoute() {
+        const width = Math.max(1, wwd.canvas.clientWidth);
+        const height = Math.max(1, wwd.canvas.clientHeight);
+        const aspect = width / height;
+        const aspectBoost = aspect < 1 ? Math.sqrt(1 / aspect) : 1;
+        const cameraRange = Math.max(
+          earthRadius * 1.67,
+          nativeEquivalentRange * 0.68 * aspectBoost
+        );
+        wwd.navigator.lookAtLocation.latitude = routeMidpoint.latitude;
+        wwd.navigator.lookAtLocation.longitude = routeMidpoint.longitude;
+        wwd.navigator.range = Math.min(maximumRange, cameraRange);
+        wwd.navigator.heading = cameraHeading;
+        wwd.navigator.tilt = ${if (expanded) 18 else 0};
+        wwd.redraw();
+      }
 
-      const halfAngle = distanceRadians / 2;
-      const focalLength = 1 / Math.tan(toRadians(22.5));
-      const rangeMultiplier = cameraRange / earthRadius;
-      // Keep the SVG compass markers over the rendered Earth. Web WorldWind's
-      // canvas projection leaves a wider dark margin than the native Android
-      // globe, so the raw perspective offset would place both markers outside
-      // the visible land/ocean sphere.
-      const normalizedOffset = Math.min(0.55,
-        Math.sin(halfAngle) * focalLength /
-          (rangeMultiplier + Math.cos(halfAngle)));
-      const userY = 150 + normalizedOffset * 150;
-      const kaabaY = 150 - normalizedOffset * 150;
-      const coneLength = 112;
-      const coneHalfWidth = 58;
-      const cone = document.getElementById('heading-cone');
-      const userRing = document.getElementById('user-ring');
-      const userDot = document.getElementById('user-dot');
-      const kaabaMarker = document.getElementById('kaaba-marker');
       const accuracyRing = document.getElementById('accuracy-ring');
-      cone.setAttribute('d', 'M 150 ' + userY + ' L ' + (150 - coneHalfWidth) + ' ' +
-        (userY - coneLength) + ' Q 150 ' + (userY - coneLength - 18) + ' ' +
-        (150 + coneHalfWidth) + ' ' + (userY - coneLength) + ' Z');
-      cone.style.setProperty('--user-y', userY + 'px');
-      userRing.setAttribute('cx', '150');
-      userRing.setAttribute('cy', String(userY));
-      userRing.setAttribute('r', '12');
-      userDot.setAttribute('cx', '150');
-      userDot.setAttribute('cy', String(userY));
-      userDot.setAttribute('r', '7');
-      kaabaMarker.setAttribute('transform', 'translate(150 ' + kaabaY + ')');
+      fitRoute();
+      if (window.ResizeObserver) {
+        new ResizeObserver(function () { fitRoute(); }).observe(document.getElementById('shell'));
+      }
 
       window.updateCompassHeading = function (heading, accuracy) {
         const hasHeading = heading !== null && Number.isFinite(heading);
-        const relative = hasHeading ? heading - cameraHeading : 0;
-        cone.style.transform = 'rotate(' + relative + 'deg)';
-        cone.style.opacity = hasHeading ? '1' : '.72';
         const color = accuracy === null ? '#ffffff' :
           accuracy <= 10 ? '#10b981' : accuracy <= 25 ? '#ffa500' : '#ff4444';
-        accuracyRing.setAttribute('stroke', color);
-        accuracyRing.style.filter = 'drop-shadow(0 0 7px ' + color + ')';
-        userDot.setAttribute('fill', color === '#ffffff' ? '#10b981' : color);
+        const ringColor = color === '#ffffff' ? '#72d9bd' : color;
+        accuracyRing.setAttribute('stroke', ringColor);
+        accuracyRing.style.filter = 'drop-shadow(0 0 5px ' + ringColor + ')';
+        userPlacemark.attributes.imageSource = imageUri(
+          userMarkerSvg(
+            hasHeading ? heading : qiblaBearing,
+            color === '#ffffff' ? '#10b981' : color
+          )
+        );
         wwd.redraw();
       };
       window.updateCompassHeading(null, null);

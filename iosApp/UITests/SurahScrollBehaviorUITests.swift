@@ -50,4 +50,27 @@ final class SurahScrollBehaviorUITests: XCTestCase {
         XCTAssertTrue(fabAfterDown, "FAB should reappear while scrolling down toward the top")
         XCTAssertTrue(backWhileDeep, "Pinned toolbar should keep the back button visible while collapsed")
     }
+
+    func testSurahAudioContinuesAfterReturningHome() {
+        app.launchArguments = ["--start-surah=1"]
+        app.launch()
+
+        let play = app.buttons["Play surah"].firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 30), "Surah play button did not appear")
+        play.tap()
+
+        XCTAssertTrue(
+            app.buttons["Pause recitation"].firstMatch.waitForExistence(timeout: 120),
+            "Surah audio did not download and begin playback"
+        )
+
+        let back = app.buttons["Back"].firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 10), "Back button did not appear")
+        back.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Playing"].firstMatch.waitForExistence(timeout: 15),
+            "Returning home stopped or cleared the active recitation"
+        )
+    }
 }

@@ -55,6 +55,9 @@ struct iOSApp: App {
     }
 
     init() {
+        CelestialNativeBridgeKt.RegisterCelestialNativeViewProvider(
+            provider: CelestialNativeViewProvider.shared
+        )
         // Proves the framework is linked and shared code executes, before any UI
         // draws. Appears in the Xcode console via NSLog.
         SharedFramework.shared.logSmokeTest()

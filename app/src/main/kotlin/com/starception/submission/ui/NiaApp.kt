@@ -334,7 +334,8 @@ internal fun NiaAppContent(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     // Check if we should hide the bottom navigation bar (for detail screens)
-    val shouldHideBottomBar = appState.shouldHideBottomBar
+    val insightImmersive by InsightImmersiveBus.immersive.collectAsStateWithLifecycle()
+    val shouldHideBottomBar = appState.shouldHideBottomBar || insightImmersive
 
     // Status bar visibility: show on parent tabs, hide on detail screens and Settings
     val view = LocalView.current

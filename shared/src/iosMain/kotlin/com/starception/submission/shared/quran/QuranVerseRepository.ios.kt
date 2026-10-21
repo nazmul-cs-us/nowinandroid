@@ -33,6 +33,8 @@ import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import platform.Foundation.NSBundle
 import sqlite3.SQLITE_DONE
@@ -50,20 +52,35 @@ import sqlite3.sqlite3_open_v2
 import sqlite3.sqlite3_prepare_v2
 import sqlite3.sqlite3_step
 
-actual fun createQuranVerseRepository(): QuranVerseRepository = IosQuranVerseRepository()
+private val iosQuranVerseRepository: QuranVerseRepository by lazy { IosQuranVerseRepository() }
+
+actual fun createQuranVerseRepository(): QuranVerseRepository = iosQuranVerseRepository
 
 private class IosQuranVerseRepository : QuranVerseRepository {
+    private val cacheMutex = Mutex()
+    private val versesBySurah = mutableMapOf<Pair<Int, QuranTranslationLanguage>, List<QuranVerse>>()
+    private val metadataBySurah = mutableMapOf<Int, QuranSurahMetadata?>()
+
     override suspend fun getVersesBySurah(
         surahNumber: Int,
         language: QuranTranslationLanguage,
     ): List<QuranVerse> {
         require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
-        return withContext(Dispatchers.Default) { readVerses(surahNumber, language) }
+        val key = surahNumber to language
+        cacheMutex.withLock { versesBySurah[key] }?.let { return it }
+        val verses = withContext(Dispatchers.Default) { readVerses(surahNumber, language) }
+        cacheMutex.withLock { versesBySurah[key] = verses }
+        return verses
     }
 
     override suspend fun getSurahMetadata(surahNumber: Int): QuranSurahMetadata? {
         require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
-        return withContext(Dispatchers.Default) { readSurahMetadata(surahNumber) }
+        cacheMutex.withLock {
+            if (surahNumber in metadataBySurah) return metadataBySurah[surahNumber]
+        }
+        val metadata = withContext(Dispatchers.Default) { readSurahMetadata(surahNumber) }
+        cacheMutex.withLock { metadataBySurah[surahNumber] = metadata }
+        return metadata
     }
 
     @OptIn(ExperimentalForeignApi::class)

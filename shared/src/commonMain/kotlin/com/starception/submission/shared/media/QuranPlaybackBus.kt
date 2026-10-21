@@ -62,8 +62,12 @@ object QuranPlaybackBus {
     val state: StateFlow<PlaybackState?> = _state.asStateFlow()
 
     /** Reports a surah recitation that just started; resolves its name async. */
-    fun startSurah(player: QuranAudioPlayer, surahNumber: Int) {
-        begin(player, quranAudioUrl(surahNumber), "Surah $surahNumber", surahNumber)
+    fun startSurah(
+        player: QuranAudioPlayer,
+        surahNumber: Int,
+        audioUrl: String = quranAudioUrl(surahNumber),
+    ) {
+        begin(player, audioUrl, "Surah $surahNumber", surahNumber)
         scope.launch {
             val name = runCatching {
                 repository.getSurahMetadata(surahNumber)?.nameTranslation

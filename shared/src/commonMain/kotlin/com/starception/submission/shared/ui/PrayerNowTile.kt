@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,6 +54,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -93,14 +95,20 @@ fun PrayerNowTile(
     longitude: Double,
     tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
     isExpanded: Boolean = false,
+    forceMoonForTesting: Boolean = false,
+    forceSunForTesting: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
+    onCompactContentHeightChange: (androidx.compose.ui.unit.Dp) -> Unit = {},
     expandedContent: (@Composable () -> Unit)? = null,
     backgroundPageOffset: () -> Float = { 0f },
 ) {
-    val isNight = nowMinute < sunriseMinute || nowMinute >= maghribMinute ||
-        (nowMinute == 0 && (phase == PrayerSkyPhase.Fajr || phase == PrayerSkyPhase.Isha))
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val isNight = !forceSunForTesting && (
+        forceMoonForTesting || nowMinute < sunriseMinute || nowMinute >= maghribMinute ||
+            (nowMinute == 0 && (phase == PrayerSkyPhase.Fajr || phase == PrayerSkyPhase.Isha))
+        )
     val weatherScrimBoost = when (weather) {
         PrayerSkyWeather.Clear, PrayerSkyWeather.PartlyCloudy -> 0f
         PrayerSkyWeather.Overcast, PrayerSkyWeather.Fog -> 0.04f
@@ -176,6 +184,8 @@ fun PrayerNowTile(
             latitude = latitude,
             longitude = longitude,
             isNight = isNight,
+            forceMoonForTesting = forceMoonForTesting,
+            forceSunForTesting = forceSunForTesting,
         )
         }
 
@@ -241,12 +251,17 @@ fun PrayerNowTile(
             modifier = if (isExpanded) {
                 Modifier
                     .fillMaxSize()
-                    .padding(start = 18.dp, top = 62.dp, end = 18.dp, bottom = 12.dp)
+                    .padding(start = 18.dp, top = 68.dp, end = 18.dp, bottom = 20.dp)
             } else {
                 Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(start = 22.dp, end = 22.dp, bottom = 16.dp)
+                    .padding(start = 22.dp, end = 22.dp, bottom = 24.dp)
+                    .onSizeChanged { size ->
+                        onCompactContentHeightChange(
+                            with(density) { size.height.toDp() },
+                        )
+                    }
             },
             verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
@@ -353,6 +368,22 @@ fun PrayerNowTile(
                     )
                 }
                 forecast?.let {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 9.dp)
+                            .width(1.dp)
+                            .height(30.dp)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    0f to Color.Transparent,
+                                    0.22f to Color.White.copy(alpha = 0.10f),
+                                    0.5f to Color.White.copy(alpha = 0.38f),
+                                    0.78f to Color.White.copy(alpha = 0.10f),
+                                    1f to Color.Transparent,
+                                ),
+                                shape = RoundedCornerShape(50),
+                            ),
+                    )
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
                             text = "Forecast",

@@ -27,5 +27,6 @@ internal expect fun PlatformWorldWindGlobe(
     headingDegrees: Double?,
     headingAccuracyDegrees: Double?,
     qiblaBearing: Double,
+    expanded: Boolean = false,
     modifier: Modifier = Modifier,
 )

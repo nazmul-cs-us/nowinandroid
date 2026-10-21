@@ -7,6 +7,7 @@
 package com.starception.submission.ml
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import java.io.File
 import java.security.MessageDigest
@@ -218,12 +219,25 @@ class DeenlyKnowledgeModel(context: Context) {
          * to the deterministic content bank; inference still re-verifies the SHA.
          */
         fun isModelDownloaded(context: Context, task: DeenlyKnowledgeTask): Boolean {
+            // Called from composition on card-heavy screens; stat the ~1 GB
+            // file at most once per cache window instead of every recomposition.
+            val now = SystemClock.elapsedRealtime()
+            val cached = cachedModelDownloaded[task]
+            if (cached != null && now - cached.first < MODEL_DOWNLOAD_CACHE_TTL_MS) {
+                return cached.second
+            }
             val file = File(
                 context.applicationContext.filesDir,
                 "cdn_assets/models/now_nudge/${task.modelFileName}",
             )
-            return file.isFile && file.length() == task.modelSizeBytes
+            val downloaded = file.isFile && file.length() == task.modelSizeBytes
+            cachedModelDownloaded[task] = now to downloaded
+            return downloaded
         }
+
+        private val cachedModelDownloaded = mutableMapOf<DeenlyKnowledgeTask, Pair<Long, Boolean>>()
+
+        private const val MODEL_DOWNLOAD_CACHE_TTL_MS = 30_000L
 
         private val DeenlyKnowledgeTask.modelFileName: String
             get() = when (this) {

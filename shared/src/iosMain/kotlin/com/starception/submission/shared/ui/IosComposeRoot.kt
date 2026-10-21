@@ -83,6 +83,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import platform.Foundation.NSBundle
 import platform.Foundation.NSProcessInfo
+import platform.Foundation.NSNotificationCenter
 import platform.Foundation.create
 import platform.Foundation.dataWithContentsOfFile
 import platform.UIKit.UIViewController
@@ -426,6 +427,9 @@ private fun createPrayerTimesViewController(
         val startInSettings = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--start-settings" }
         }
+        val startInQibla = remember {
+            NSProcessInfo.processInfo.arguments.any { it == "--start-qibla" }
+        }
         val startInSurah = remember {
             NSProcessInfo.processInfo.arguments
                 .mapNotNull { it as? String }
@@ -470,9 +474,8 @@ private fun createPrayerTimesViewController(
         val nudgePreview = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--preview-deenly-nudge" }
         }
-        // Start with the first insight tile already in its enlarged
-        // Android-parity stage; the --expand-insight=N launch argument
-        // (UI tests) overrides which page opens expanded.
+        // Open Prayer Now expanded by default. UI tests can still select a
+        // different logical page with --expand-insight=<0..4>.
         val expandInsight = remember {
             NSProcessInfo.processInfo.arguments
                 .mapNotNull { it as? String }
@@ -487,6 +490,12 @@ private fun createPrayerTimesViewController(
         }
         val showSyncBanner = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--show-sync-banner" }
+        }
+        val forcePrayerMoon = remember {
+            NSProcessInfo.processInfo.arguments.any { it == "--force-prayer-moon" }
+        }
+        val forcePrayerSun = remember {
+            NSProcessInfo.processInfo.arguments.any { it == "--force-prayer-sun" }
         }
         // UI-testing hook: schedule a synthetic adhan-backed prayer
         // notification that fires N seconds after launch, e.g.
@@ -951,11 +960,13 @@ private fun createPrayerTimesViewController(
             ) {
             SharedNavHost(
                 startInSettings = startInSettings,
+                startInQibla = startInQibla,
                 startInSurah = startInSurah,
                 startFortressChapter = startFortressChapter,
                 startDuaNumber = startDuaNumber,
                 startBukhariHadithId = startBukhariHadithId,
                 startBottomIndex = startBottomIndex,
+                resetToPrayerTimes = forcePrayerSun || forcePrayerMoon,
                 onSelectTopLevel = onSelectBottom,
                 externalVoiceSearchRequests = iosVoiceSearchRequests
                     .filterNotNull()
@@ -1031,9 +1042,17 @@ private fun createPrayerTimesViewController(
                              NowNudgeBus.updateAmbient(nudge)
                          },
                           externalNudgeActionRequests = NowNudgeBus.actionRequests,
-                          initialExpandedInsight = expandInsight,
-                          initialShowAllPrayers = showAllPrayers,
-                      )
+                           initialExpandedInsight = expandInsight,
+                           initialShowAllPrayers = showAllPrayers,
+                           forceMoonForTesting = forcePrayerMoon,
+                           forceSunForTesting = forcePrayerSun,
+                           onInsightImmersiveChange = { immersive ->
+                               NSNotificationCenter.defaultCenter.postNotificationName(
+                                   aName = "insightImmersiveChanged",
+                                   `object` = immersive.toString(),
+                               )
+                           },
+                       )
                 },
                 prayerDay = day,
                 notifications = notificationPrefs,

@@ -17,6 +17,7 @@
 package com.starception.submission.ml
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithRepository
@@ -465,9 +466,28 @@ class HadithBookCategorizer(context: Context) {
 
         /** Whether the categorizer GGUF has been downloaded and is complete. */
         fun isModelDownloaded(context: Context): Boolean {
+            // Called from composition on card-heavy screens; stat the 1.1 GB
+            // file at most once per cache window instead of every recomposition.
+            val now = SystemClock.elapsedRealtime()
+            val cachedAt = cachedModelDownloadedAtMs
+            val cached = cachedModelDownloaded
+            if (cached != null && now - cachedAt < MODEL_DOWNLOAD_CACHE_TTL_MS) {
+                return cached
+            }
             val file = File(context.applicationContext.filesDir, "cdn_assets/$MODEL_CDN_KEY")
-            return file.isFile && file.length() == MODEL_SIZE_BYTES
+            val downloaded = file.isFile && file.length() == MODEL_SIZE_BYTES
+            cachedModelDownloaded = downloaded
+            cachedModelDownloadedAtMs = now
+            return downloaded
         }
+
+        @Volatile
+        private var cachedModelDownloaded: Boolean? = null
+
+        @Volatile
+        private var cachedModelDownloadedAtMs: Long = 0L
+
+        private const val MODEL_DOWNLOAD_CACHE_TTL_MS = 30_000L
 
         private const val RUNNER_FILE_NAME = "libdeenly_completion.so"
         private const val TAG = "HadithBookCategorizer"

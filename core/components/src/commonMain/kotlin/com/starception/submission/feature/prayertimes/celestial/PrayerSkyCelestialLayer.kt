@@ -17,15 +17,19 @@
 package com.starception.submission.feature.prayertimes.celestial
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,8 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -45,19 +49,17 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.starception.submission.core.images.resources.Res
-import com.starception.submission.core.images.resources.prayer_celestial_moon_nasa
-import com.starception.submission.core.images.resources.prayer_celestial_sun_3d
 import com.starception.submission.prayer.sky.AltAz
 import com.starception.submission.prayer.sky.julianDay
 import com.starception.submission.prayer.sky.skySnapshotAt
-import org.jetbrains.compose.resources.painterResource
 import kotlin.math.PI
+import kotlin.math.acos
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
@@ -80,6 +82,7 @@ fun PrayerSkyCelestialLayer(
     modifier: Modifier = Modifier,
     replayKey: Any? = Unit,
     forceSunForTesting: Boolean = false,
+    forceMoonForTesting: Boolean = false,
 ) {
     // Keep the body at its real current astronomical position. Only the rays
     // have a subtle three-second shimmer; there is no sunrise-to-sunset or
@@ -100,12 +103,17 @@ fun PrayerSkyCelestialLayer(
             .dp
         val lightFieldDiameter = diameter * 6f
         val sunPosition = scenicPosition(snapshot.sunAltAz)
-        val moonPosition = scenicPosition(snapshot.moonAltAz)
+        val moonPosition = scenicPosition(snapshot.moonAltAz).let { position ->
+            // Keep the visible moon at the mountain horizon. The body is then
+            // occluded by PrayerNowSkylineShape while its soft glow can still
+            // read above the ridge.
+            position.copy(y = position.y.coerceAtLeast(0.42f))
+        }
         val fieldWidth = maxWidth
         val fieldHeight = maxHeight
 
-        if (isNight &&
-            (forceSunForTesting ||
+        if ((isNight || forceMoonForTesting) &&
+            (forceSunForTesting || forceMoonForTesting ||
                 (snapshot.moonAltAz.altitudeDeg > -1.5 &&
                     snapshot.moonPhase.illuminatedFraction > 0.01))
         ) {
@@ -118,19 +126,11 @@ fun PrayerSkyCelestialLayer(
                     bodyDiameter = diameter,
                     color = Color(0xFFFFD76A),
                 )
-            } else {
-                CelestialRays(
-                    position = moonPosition,
-                    bodyDiameter = diameter,
-                    color = Color(0xFFE8F4FF),
-                    beamCount = 8,
-                    intensity = 0.14f,
-                    surrounding = true,
-                )
             }
             Box(
                 modifier = Modifier
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .clip(PrayerNowSkylineShape(isNight)),
             ) {
                 if (forceSunForTesting) {
                     SunBody(
@@ -145,6 +145,7 @@ fun PrayerSkyCelestialLayer(
                 } else {
                     MoonBody(
                         illuminatedFraction = snapshot.moonPhase.illuminatedFraction.toFloat(),
+                        waxing = snapshot.moonPhase.waxing,
                         brightLimbRotation = snapshot.moonBrightLimbScreenDeg.toFloat(),
                         modifier = Modifier
                             .offset(
@@ -157,24 +158,106 @@ fun PrayerSkyCelestialLayer(
                 }
             }
         }
-        if (!isNight && snapshot.sunAltAz.altitudeDeg > -1.5) {
+        if (!isNight && !forceMoonForTesting &&
+            (forceSunForTesting || snapshot.sunAltAz.altitudeDeg > -1.5)
+        ) {
+            val displayedSunPosition = if (forceSunForTesting) Offset(0.72f, 0.20f) else sunPosition
             SunAtmosphericLight(
-                position = sunPosition,
+                position = displayedSunPosition,
                 bodyDiameter = diameter,
                 color = Color(0xFFFFD76A),
             )
             Box(
                 modifier = Modifier
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .clip(PrayerNowSkylineShape(isNight)),
             ) {
                 SunBody(
                     modifier = Modifier
                         .offset(
-                            x = fieldWidth * sunPosition.x - lightFieldDiameter / 2,
-                            y = fieldHeight * sunPosition.y - lightFieldDiameter / 2,
+                                x = fieldWidth * displayedSunPosition.x - lightFieldDiameter / 2,
+                                y = fieldHeight * displayedSunPosition.y - lightFieldDiameter / 2,
                         )
                         .size(lightFieldDiameter),
                     bodyDiameter = diameter,
+                )
+            }
+        }
+    }
+}
+
+private data class MosqueWindowLight(
+    val x: Float,
+    val y: Float,
+    val width: Float,
+    val height: Float,
+    val phase: Float,
+    val speed: Float,
+    val depth: Float,
+)
+
+private val MOSQUE_WINDOW_LIGHTS = listOf(
+    MosqueWindowLight(0.18f, 0.58f, 0.018f, 0.035f, 0.07f, 0.83f, 0.72f),
+    MosqueWindowLight(0.24f, 0.63f, 0.014f, 0.029f, 0.41f, 1.17f, 0.56f),
+    MosqueWindowLight(0.31f, 0.55f, 0.020f, 0.040f, 0.76f, 0.69f, 0.90f),
+    MosqueWindowLight(0.38f, 0.66f, 0.013f, 0.027f, 0.22f, 1.31f, 0.48f),
+    MosqueWindowLight(0.46f, 0.59f, 0.017f, 0.034f, 0.58f, 0.91f, 0.68f),
+    MosqueWindowLight(0.54f, 0.64f, 0.014f, 0.030f, 0.13f, 1.09f, 0.52f),
+    MosqueWindowLight(0.61f, 0.56f, 0.019f, 0.038f, 0.87f, 0.77f, 0.84f),
+    MosqueWindowLight(0.69f, 0.63f, 0.013f, 0.028f, 0.33f, 1.23f, 0.50f),
+    MosqueWindowLight(0.76f, 0.58f, 0.018f, 0.034f, 0.64f, 0.88f, 0.70f),
+    MosqueWindowLight(0.83f, 0.67f, 0.012f, 0.026f, 0.18f, 1.37f, 0.44f),
+)
+
+/** Small, deterministic window lights give the mosque a quiet 3D lived-in glow. */
+@Composable
+private fun MosqueWindowLights(
+    isNight: Boolean,
+) {
+    val transition = rememberInfiniteTransition(label = "mosqueWindowLights")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 9_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "mosqueWindowLightPhase",
+    )
+
+    Canvas(Modifier.fillMaxSize()) {
+        MOSQUE_WINDOW_LIGHTS.forEach { light ->
+            val cycle = (phase * light.speed + light.phase) % 1f
+            val fade = when {
+                cycle < 0.12f -> cycle / 0.12f
+                cycle < 0.68f -> 1f
+                cycle < 0.84f -> 1f - ((cycle - 0.68f) / 0.16f)
+                else -> 0f
+            }
+            val nightBoost = if (isNight) 1f else 0.42f
+            val alpha = (fade * nightBoost * (0.34f + (0.26f * light.depth)))
+                .coerceIn(0f, 0.72f)
+            if (alpha > 0f) {
+                val center = Offset(size.width * light.x, size.height * light.y)
+                val glowRadius = size.minDimension * (0.025f + (0.018f * light.depth))
+                drawCircle(
+                    color = Color(0xFFFFB85C).copy(alpha = alpha * 0.12f),
+                    radius = glowRadius,
+                    center = center,
+                )
+                drawRoundRect(
+                    color = Color(0xFFFFD27A).copy(alpha = alpha),
+                    topLeft = Offset(
+                        center.x - (size.width * light.width / 2f),
+                        center.y - (size.height * light.height / 2f),
+                    ),
+                    size = androidx.compose.ui.geometry.Size(
+                        size.width * light.width,
+                        size.height * light.height,
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(
+                        size.width * light.width * 0.22f,
+                    ),
                 )
             }
         }
@@ -187,13 +270,13 @@ private fun SunBody(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        // The real photographic sun, drawn above the time-of-day washes so its
-        // texture reads at full warmth instead of the old muddy olive ball.
-        Image(
-            painter = painterResource(Res.drawable.prayer_celestial_sun_3d),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.size(bodyDiameter).clip(CircleShape),
+        PlatformCelestialBody(
+            body = CelestialBody.Sun,
+            modifier = Modifier
+                .size(bodyDiameter)
+                .semantics {
+                    contentDescription = "Animated procedural sun"
+                },
         )
     }
 }
@@ -332,38 +415,23 @@ private fun SunAtmosphericLight(
 @Composable
 private fun MoonBody(
     illuminatedFraction: Float,
+    waxing: Boolean,
     brightLimbRotation: Float,
     bodyDiameter: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
+    val phaseAngle = acos((1f - 2f * illuminatedFraction).coerceIn(-1f, 1f)) /
+        (2f * PI.toFloat())
+    val lunarCyclePhase = if (waxing) phaseAngle else 1f - phaseAngle
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        // A trace of earthshine keeps the unlit sphere dimensional without
-        // misrepresenting the illuminated lunar phase.
-        Image(
-            painter = painterResource(Res.drawable.prayer_celestial_moon_nasa),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(bodyDiameter).clip(CircleShape).graphicsLayer { alpha = 0.10f },
-        )
-        Image(
-            painter = painterResource(Res.drawable.prayer_celestial_moon_nasa),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
+        PlatformCelestialBody(
+            body = CelestialBody.Moon,
+            lunarCyclePhase = lunarCyclePhase,
+            playing = true,
             modifier = Modifier
                 .size(bodyDiameter)
-                .clip(CircleShape)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawPath(
-                        path = illuminatedDiscPath(
-                            size = size,
-                            illuminatedFraction = illuminatedFraction,
-                            rotationClockwiseFromUp = brightLimbRotation,
-                        ),
-                        color = Color.White,
-                        blendMode = BlendMode.DstIn,
-                    )
+                .graphicsLayer {
+                    rotationZ = brightLimbRotation
                 },
         )
     }
@@ -510,11 +578,12 @@ private fun scenicPosition(position: AltAz): Offset {
     val azimuthRadians = (position.azimuthDeg - 180.0) * PI / 180.0
     // The scene faces south, so west is on the viewer's left and east is on the right.
     val x = 0.37f - sin(azimuthRadians).toFloat() * 0.29f
-    // The artwork's open sky is only the band above its treeline (~y 0.19),
-    // so altitude compresses into that strip; a low body settles at the trees
-    // exactly where the reference image's sun glows through the foliage.
+    // The current wallpaper's mountain ridge sits around y 0.55. Map a
+    // low-altitude body to that horizon so the skyline clip can occlude it.
     val altitudeRadians = position.altitudeDeg.coerceIn(0.0, 90.0) * PI / 180.0
-    val y = 0.19f - sin(altitudeRadians).toFloat() * 0.16f
+    // Give the disc enough lower clearance to disappear completely behind the
+    // ridge at sunset; the separate atmospheric light remains visible.
+    val y = 0.68f - sin(altitudeRadians).toFloat() * 0.42f
     return Offset(x, y)
 }
 
@@ -571,27 +640,25 @@ private class PrayerNowSkylineShape(private val isNight: Boolean) : Shape {
     )
 }
 
-// Traced from the artwork's mosque treeline (~y 0.19). The tall foliage at the
-// left edge is deliberately excluded: like the reference image, a low western
-// sun should glow among those trees rather than be clipped by them.
+// Traced from the current Prayer Now wallpaper's mountain ridge. The celestial
+// body is clipped to the sky above this path, so a low sun/moon disappears
+// naturally behind the mountains instead of floating at the top of the card.
 private val DAY_RIDGE = listOf(
-    Offset(0.00f, 0.185f),
-    Offset(0.12f, 0.185f),
-    Offset(0.25f, 0.190f),
-    Offset(0.38f, 0.200f),
-    Offset(0.50f, 0.190f),
-    Offset(0.69f, 0.187f),
-    Offset(0.81f, 0.190f),
-    Offset(1.00f, 0.195f),
+    Offset(0.00f, 0.56f),
+    Offset(0.16f, 0.54f),
+    Offset(0.34f, 0.50f),
+    Offset(0.52f, 0.43f),
+    Offset(0.66f, 0.49f),
+    Offset(0.82f, 0.56f),
+    Offset(1.00f, 0.55f),
 )
 
 private val NIGHT_RIDGE = listOf(
-    Offset(0.00f, 0.180f),
-    Offset(0.12f, 0.180f),
-    Offset(0.25f, 0.185f),
-    Offset(0.38f, 0.195f),
-    Offset(0.50f, 0.185f),
-    Offset(0.69f, 0.182f),
-    Offset(0.81f, 0.185f),
-    Offset(1.00f, 0.190f),
+    Offset(0.00f, 0.55f),
+    Offset(0.16f, 0.53f),
+    Offset(0.34f, 0.49f),
+    Offset(0.52f, 0.42f),
+    Offset(0.66f, 0.48f),
+    Offset(0.82f, 0.55f),
+    Offset(1.00f, 0.54f),
 )
