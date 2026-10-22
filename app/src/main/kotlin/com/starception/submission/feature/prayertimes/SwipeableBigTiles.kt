@@ -138,6 +138,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
+import com.starception.submission.core.designsystem.component.insightWidthExpansionProgress
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
@@ -1885,16 +1886,17 @@ internal fun SwipeableBigTiles(
                 normalCardWidth.value +
                     ((compactCardWidth.value - normalCardWidth.value) * compactProgress)
                 ).dp
+            val widthExpansion = insightWidthExpansionProgress(expansionProgress)
             val cardWidth = (
                 restingCardWidth.value +
-                    ((maxWidth.value - restingCardWidth.value) * expansionProgress)
+                    ((maxWidth.value - restingCardWidth.value) * widthExpansion)
                 ).dp
             val restingPageSpacing = if (isLandscape) 10.dp else (14f - (4f * compactProgress)).dp
-            val pageSpacing = (restingPageSpacing.value * (1f - expansionProgress)).dp
+            val pageSpacing = (restingPageSpacing.value * (1f - widthExpansion)).dp
             val endContentPadding = if (isLandscape) {
                 0.dp
             } else {
-                (18f * (1f - expansionProgress)).dp
+                (18f * (1f - widthExpansion)).dp
             }
 
             HorizontalPager(
@@ -2470,6 +2472,7 @@ internal fun SwipeableBigTiles(
                         InsightResizeCornerHandle(
                             isStart = start,
                             expansionExtent = expansionExtent,
+                            isResizing = isResizeDragging,
                             onDragStart = {
                                 isResizeDragging = true
                                 isAutomaticallySized = false

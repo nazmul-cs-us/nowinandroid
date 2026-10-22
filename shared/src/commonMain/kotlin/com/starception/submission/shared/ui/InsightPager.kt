@@ -97,6 +97,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
+import com.starception.submission.core.designsystem.component.insightWidthExpansionProgress
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -561,14 +562,15 @@ fun InsightPager(
                     .coerceAtMost(minOf(maxWidth * 0.64f, boundedPageWidth))
                     .coerceAtLeast(140.dp)
             }
+            val widthExpansion = insightWidthExpansionProgress(layoutExpansionProgress)
             val pageWidth = restingPageWidth +
-                ((boundedPageWidth - restingPageWidth) * layoutExpansionProgress)
+                ((boundedPageWidth - restingPageWidth) * widthExpansion)
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(pageWidth),
-                pageSpacing = 14.dp * (1f - layoutExpansionProgress),
+                pageSpacing = 14.dp * (1f - widthExpansion),
                 contentPadding = PaddingValues(
-                    end = if (fullWidthPage) 0.dp else 18.dp * (1f - layoutExpansionProgress),
+                    end = if (fullWidthPage) 0.dp else 18.dp * (1f - widthExpansion),
                 ),
                 beyondViewportPageCount = if (isExpanded) 0 else 1,
                 modifier = Modifier
@@ -1061,6 +1063,7 @@ fun InsightPager(
                         InsightResizeCornerHandle(
                             isStart = start,
                             expansionExtent = normalizedExtent,
+                            isResizing = isResizeDragging,
                             onDragStart = {
                                 isResizeDragging = true
                                 isAutomaticallySized = false

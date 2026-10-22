@@ -17,6 +17,10 @@
 package com.starception.submission.core.designsystem.component
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -30,9 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -43,7 +45,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
-/** Folded-corner grip. The host clips both grips to the focused card's shape. */
+/** Transparent corner grip; only the two diagonal strokes are painted. */
 @Composable
 fun InsightResizeCornerHandle(
     isStart: Boolean,
@@ -54,6 +56,7 @@ fun InsightResizeCornerHandle(
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
+    isResizing: Boolean = false,
 ) {
     var isActive by remember { mutableStateOf(false) }
     val activeProgress by animateFloatAsState(
@@ -62,17 +65,49 @@ fun InsightResizeCornerHandle(
         label = "insightCornerGripPress",
     )
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val foldColor = if (dark) Color(0xFF354232) else Color(0xFFDDE6D5)
-    val pressedColor = if (dark) Color(0xFF46583E) else Color(0xFFC9D8BD)
     val strokeColor = if (dark) Color(0xFFBDD0AE) else Color(0xFF61785B)
+    // Two gentle outward/downward nudges, then a long rest. The hint pauses
+    // during either corner's drag and when there is no more room to expand.
+    val hintProgress = if (!isActive && !isResizing && expansionExtent > 0f && expansionExtent < 0.98f) {
+        val transition = rememberInfiniteTransition(label = "insightResizeHint")
+        val progress by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 0f,
+            animationSpec = infiniteRepeatable(
+                animation = keyframes {
+                    durationMillis = 8_000
+                    0f at 0
+                    0f at 5_000
+                    1f at 5_600
+                    0f at 6_200
+                    1f at 6_800
+                    0f at 7_400
+                    0f at 8_000
+                },
+            ),
+            label = "insightResizeHintOffset",
+        )
+        progress
+    } else {
+        0f
+    }
     Canvas(
         modifier = modifier
             .size(56.dp)
             .pointerInput(isStart) {
                 detectDragGestures(
-                    onDragStart = { isActive = true; onDragStart() },
-                    onDragEnd = { isActive = false; onDragEnd() },
-                    onDragCancel = { isActive = false; onDragEnd() },
+                    onDragStart = {
+                        isActive = true
+                        onDragStart()
+                    },
+                    onDragEnd = {
+                        isActive = false
+                        onDragEnd()
+                    },
+                    onDragCancel = {
+                        isActive = false
+                        onDragEnd()
+                    },
                 ) { change, delta ->
                     change.consume()
                     val outwardX = if (isStart) -delta.x else delta.x
@@ -92,22 +127,21 @@ fun InsightResizeCornerHandle(
                 )
             },
     ) {
-        // Mirroring the same geometry keeps both folds and strokes symmetric.
+        // Equal-length parallel strokes, separated perpendicular to their
+        // diagonal. Mirror both their angle and movement at the right corner.
+        val nudge = hintProgress * 2f
         fun point(x: Float, y: Float) = Offset(
-            if (isStart) x.dp.toPx() else size.width - x.dp.toPx(),
-            size.height - y.dp.toPx(),
+            if (isStart) (x - nudge).dp.toPx() else size.width - (x - nudge).dp.toPx(),
+            size.height - (y - nudge).dp.toPx(),
         )
-        val fold = Path().apply {
-            val corner = point(0f, 0f)
-            moveTo(corner.x, corner.y)
-            val top = point(0f, 56f)
-            lineTo(top.x, top.y)
-            val inner = point(56f, 0f)
-            lineTo(inner.x, inner.y)
-            close()
-        }
-        drawPath(fold, lerp(foldColor, pressedColor, activeProgress))
-        drawLine(strokeColor, point(15f, 17f), point(21f, 11f), 1.8.dp.toPx(), StrokeCap.Round)
-        drawLine(strokeColor, point(19f, 22f), point(27f, 14f), 1.8.dp.toPx(), StrokeCap.Round)
+        val stroke = (1.8f + activeProgress * 0.2f).dp.toPx()
+        drawLine(strokeColor, point(16f, 18f), point(23f, 11f), stroke, StrokeCap.Round)
+        drawLine(strokeColor, point(18.5f, 20.5f), point(25.5f, 13.5f), stroke, StrokeCap.Round)
     }
+}
+
+/** Give expanded content a broad reading surface before it becomes tall. */
+fun insightWidthExpansionProgress(expansion: Float): Float {
+    val remaining = 1f - expansion.coerceIn(0f, 1f)
+    return 1f - remaining * remaining * remaining
 }
