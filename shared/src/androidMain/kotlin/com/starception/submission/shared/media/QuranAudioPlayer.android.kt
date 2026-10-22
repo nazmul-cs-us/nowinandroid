@@ -19,7 +19,7 @@ package com.starception.submission.shared.audio
 actual suspend fun resolveQuranAudioUrl(
     surahNumber: Int,
     translationCode: String,
-): String = quranAudioUrl(surahNumber)
+): String? = quranAudioUrl(surahNumber)
 
 /** The shared module is not the Android app's media owner. */
 actual class QuranAudioPlayer actual constructor() {

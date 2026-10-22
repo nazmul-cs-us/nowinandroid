@@ -219,7 +219,7 @@ fun PrayerTimesScreen(
     var showAllPrayers by remember { mutableStateOf(initialShowAllPrayers) }
     var expandedInsightPage by remember { mutableStateOf<Int?>(initialExpandedInsight) }
     var insightExpansionExtent by rememberSaveable(initialExpandedInsight) {
-        mutableFloatStateOf(if (initialExpandedInsight != null) 1f else 0f)
+        mutableFloatStateOf(if (initialExpandedInsight != null) 0.35f else 0f)
     }
     val isInsightImmersive = insightExpansionExtent >= 0.995f
     LaunchedEffect(isInsightImmersive) {
@@ -488,8 +488,12 @@ fun PrayerTimesScreen(
                     ).coerceIn(96.dp, 132.dp)
                 // The extent is normalized, while this measured viewport turns
                 // it into pixels independently on each device and orientation.
-                // Room is retained for safe insets and the pager's own title row.
-                val insightViewportHeight = (maxHeight - 96.dp).coerceAtLeast(220.dp)
+                // On phones retain the header, pager title, one usable prayer row
+                // with its controls, location row, and navigation clearance.
+                // The weighted schedule below allocates all remaining height.
+                val insightViewportHeight = (
+                    maxHeight - if (isTablet) 96.dp else 380.dp
+                    ).coerceAtLeast(220.dp)
                 val renderInsightPager: @Composable (Dp, Boolean, Dp?) -> Unit =
                     { restingHeight, fullWidth, pageMaxWidth ->
                         InsightPager(
@@ -700,32 +704,37 @@ fun PrayerTimesScreen(
                             ) {
                                 renderInsightPager(portraitInsightHeight, false, null)
                                 if (!isInsightImmersive) {
-                                    PrayerScheduleSection(
-                                        day = day,
-                                        offsets = offsets,
-                                        showAllPrayers = showAllPrayers,
-                                        onToggleExpanded = { showAllPrayers = !showAllPrayers },
-                                        onAdjustPrayer = onAdjustPrayer,
-                                        onTogglePrayerAdhan = onTogglePrayerAdhan,
-                                        onAdhanVolumeChange = onAdhanVolumeChange,
-                                        onOpenAdhanVolume = { name, volume ->
-                                            activeAdhanVolume = name to volume
-                                        },
-                                        isTuning = isTuningSchedule,
-                                        onToggleTuning = { isTuningSchedule = !isTuningSchedule },
-                                        notifications = notifications,
-                                        onTogglePrayerNotification = onTogglePrayerNotification,
-                                        showExpandControl = true,
-                                        compact = showAllPrayers || expandedInsightPage != null,
-                                        cardMinHeight = when {
-                                            expandedInsightPage != null -> 96.dp
-                                            showAllPrayers -> 84.dp
-                                            else -> null
-                                        },
-                                        collapsedRows = if (expandedInsightPage != null) 1 else 2,
-                                        showFooterLocationPin = showAllPrayers,
-                                        onFooterLocationClick = { showAllPrayers = false },
-                                    )
+                                    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                                        val scheduleLayout = homePrayerScheduleLayout(
+                                            maxHeight.value,
+                                            showAllPrayers,
+                                            day.dashboardSlots().size,
+                                        )
+                                        PrayerScheduleSection(
+                                            modifier = Modifier.fillMaxSize()
+                                                .verticalScroll(rememberScrollState()),
+                                            day = day,
+                                            offsets = offsets,
+                                            showAllPrayers = showAllPrayers,
+                                            onToggleExpanded = { showAllPrayers = !showAllPrayers },
+                                            onAdjustPrayer = onAdjustPrayer,
+                                            onTogglePrayerAdhan = onTogglePrayerAdhan,
+                                            onAdhanVolumeChange = onAdhanVolumeChange,
+                                            onOpenAdhanVolume = { name, volume ->
+                                                activeAdhanVolume = name to volume
+                                            },
+                                            isTuning = isTuningSchedule,
+                                            onToggleTuning = { isTuningSchedule = !isTuningSchedule },
+                                            notifications = notifications,
+                                            onTogglePrayerNotification = onTogglePrayerNotification,
+                                            showExpandControl = true,
+                                            compact = true,
+                                            cardMinHeight = scheduleLayout.rowHeight.dp,
+                                            collapsedRows = scheduleLayout.rows,
+                                            showFooterLocationPin = showAllPrayers,
+                                            onFooterLocationClick = { showAllPrayers = false },
+                                        )
+                                    }
                                     // Keep location in normal flow directly below
                                     // the reduced schedule while resizing.
                                     AnimatedVisibility(
@@ -1503,6 +1512,7 @@ private fun PrayerScheduleSection(
     collapsedRows: Int = 2,
     showFooterLocationPin: Boolean = false,
     onFooterLocationClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     var revealedCard by remember { mutableStateOf<RevealedPrayerCard?>(null) }
 
@@ -1510,7 +1520,7 @@ private fun PrayerScheduleSection(
         if (!isTuning) revealedCard = null
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
             horizontalArrangement = Arrangement.SpaceBetween,

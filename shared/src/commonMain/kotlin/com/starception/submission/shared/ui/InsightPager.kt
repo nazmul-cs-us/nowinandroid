@@ -174,7 +174,7 @@ import kotlin.math.sin
 import kotlin.time.Clock
 
 /** Content-sized automatic reading height; corner grips remain fully free-form. */
-private fun preferredInsightExpansionExtent(
+internal fun preferredInsightExpansionExtent(
     logicalPage: Int,
     restingHeight: Dp,
     maximumHeight: Dp,
@@ -193,7 +193,13 @@ private fun preferredInsightExpansionExtent(
     val targetHeight = measuredHeight?.coerceAtMost(heightCap)
         ?: if (logicalPage == 0) restingHeight else heightCap
     val boundedTarget = targetHeight.coerceIn(restingHeight, boundedMaximum)
-    return ((boundedTarget.value - restingHeight.value) / availableGrowth).coerceIn(0f, 1f)
+    // Keep expanded content visible even when its natural height fits inside
+    // the compact card (Prayer Now often does). Android uses the same 88dp floor.
+    val minimumGrowth = minOf(88f, availableGrowth)
+    return ((boundedTarget.value - restingHeight.value).coerceAtLeast(minimumGrowth) / availableGrowth)
+        // Automatic sizing stays in Home; only a manual full expansion
+        // should hide the schedule and navigation in immersive mode.
+        .coerceIn(0f, 0.98f)
 }
 
 /** The swipeable insight tiles at the top of the home page. */
@@ -276,21 +282,30 @@ fun InsightPager(
             onExpansionExtentChange(0f)
         }
     }
-    var lastExpandedLogicalPage by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(pagerState.settledPage, normalizedExtent) {
-        if (isExpanded && lastExpandedLogicalPage != null &&
-            lastExpandedLogicalPage != settledLogicalPage && isAutomaticallySized
-        ) {
+    // Re-evaluate after content measurement and viewport changes, not just
+    // swipes. Never replace a height chosen with the corner grips.
+    val expandedHeightHint = expandedHeightHints[settledLogicalPage]
+    LaunchedEffect(
+        settledLogicalPage,
+        isExpanded,
+        expandedHeightHint,
+        contentAwareRestingHeight,
+        boundedMaxTileHeight,
+        isAutomaticallySized,
+        isResizeDragging,
+    ) {
+        if (isExpanded && isAutomaticallySized && !isResizeDragging) {
             onExpansionExtentChange(
                 preferredInsightExpansionExtent(
                     settledLogicalPage,
                     contentAwareRestingHeight,
                     boundedMaxTileHeight,
-                    expandedHeightHints[settledLogicalPage],
+                    expandedHeightHint,
                 ),
             )
         }
-        lastExpandedLogicalPage = settledLogicalPage.takeIf { isExpanded }
+    }
+    LaunchedEffect(expandedLogicalPage) {
         onExpandedPageChange(expandedLogicalPage)
     }
     val effectiveTileHeight = animatedRestingHeight +
