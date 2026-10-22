@@ -28,6 +28,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
+import com.starception.submission.core.designsystem.component.homeLocationNeedsCollapse
 import com.starception.submission.core.designsystem.component.resolveHomePrayerRows
 import com.starception.submission.core.designsystem.component.PrayerTileContent
 import androidx.compose.animation.AnimatedContent
@@ -3433,6 +3434,15 @@ fun PrayerTimesScreen(
                                             prayerContentHeights.values.maxOrNull()
                                                 ?: (104f * fontScale.coerceAtLeast(1f)).dp,
                                         )
+                                        val collapseLocation = showAllPrayers || homeLocationNeedsCollapse(
+                                            insightExpanded = insightTileExpanded,
+                                            availableHeight = with(dashboardDensity) {
+                                                val header = if (prayerHeaderHeightPx > 0) prayerHeaderHeightPx.toDp() else 52.dp
+                                                (homeViewport.height.toDp() - insightHeightPx.toDp() - header - 12.dp).value
+                                            },
+                                            prayerSectionMinimumHeight = minimumPrayerHeight.value * 2,
+                                            fullLocationHeight = 92f,
+                                        )
                                         val rowLayout = resolveHomePrayerRows(
                                             availableHeight = remainingHeight.value,
                                             prayerCount = 6,
@@ -3440,6 +3450,7 @@ fun PrayerTimesScreen(
                                             minimumRowHeight = minimumPrayerHeight.value,
                                             readableRowHeight = minimumPrayerHeight.value,
                                             maximumRowHeight = 140f * fontScale.coerceAtLeast(1f),
+                                            collapsedRows = 2,
                                             sectionChromeHeight = 0f,
                                             rowSpacing = 0f,
                                         )
@@ -3925,9 +3936,13 @@ fun PrayerTimesScreen(
                                         BoxWithConstraints(
                                             modifier = Modifier.fillMaxWidth().onSizeChanged { homeFooterHeightPx = it.height },
                                         ) {
-                                            // The location morph and row-3 expansion share the same state,
-                                            // duration and easing so neither can lead or catch up to the other.
-                                            val locationControlHeight by dashboardTransition.animateDp(
+                                            // Use the same location-to-pin morph for Show All and for
+                                            // reclaiming space while the insight grows above two prayer rows.
+                                            val locationTransition = updateTransition(
+                                                targetState = collapseLocation,
+                                                label = "homeLocationCompaction",
+                                            )
+                                            val locationControlHeight by locationTransition.animateDp(
                                                 transitionSpec = {
                                                     tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
@@ -3935,7 +3950,7 @@ fun PrayerTimesScreen(
                                             ) { expanded ->
                                                 if (expanded) 40.dp else 92.dp
                                             }
-                                            val locationCardWidth by dashboardTransition.animateDp(
+                                            val locationCardWidth by locationTransition.animateDp(
                                                 transitionSpec = {
                                                     tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
@@ -3943,7 +3958,7 @@ fun PrayerTimesScreen(
                                             ) { expanded ->
                                                 if (expanded) 40.dp else maxWidth
                                             }
-                                            val locationCardHeight by dashboardTransition.animateDp(
+                                            val locationCardHeight by locationTransition.animateDp(
                                                 transitionSpec = {
                                                     tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
@@ -3951,7 +3966,7 @@ fun PrayerTimesScreen(
                                             ) { expanded ->
                                                 if (expanded) 40.dp else 52.dp
                                             }
-                                            val locationCardOffsetY by dashboardTransition.animateDp(
+                                            val locationCardOffsetY by locationTransition.animateDp(
                                                 transitionSpec = {
                                                     tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
@@ -3963,7 +3978,7 @@ fun PrayerTimesScreen(
                                                 // clearance without changing the dashboard's total height.
                                                 if (expanded) 0.dp else 36.dp
                                             }
-                                            val locationCardEndInset by dashboardTransition.animateDp(
+                                            val locationCardEndInset by locationTransition.animateDp(
                                                 transitionSpec = {
                                                     tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
@@ -3971,7 +3986,7 @@ fun PrayerTimesScreen(
                                             ) { expanded ->
                                                 if (expanded) 12.dp else 0.dp
                                             }
-                                            val locationCardCornerRadius by dashboardTransition.animateDp(
+                                            val locationCardCornerRadius by locationTransition.animateDp(
                                                 transitionSpec = {
                                                     tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
@@ -3979,7 +3994,7 @@ fun PrayerTimesScreen(
                                             ) { expanded ->
                                                 if (expanded) 20.dp else 16.dp
                                             }
-                                            val locationMarkerInset by dashboardTransition.animateDp(
+                                            val locationMarkerInset by locationTransition.animateDp(
                                                 transitionSpec = {
                                                     tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
@@ -4078,7 +4093,7 @@ fun PrayerTimesScreen(
                                                     // needs an edge to separate from the background. In light it was
                                                     // the one outlined card on the screen, and primary at 20% renders
                                                     // a cool blue hairline against these warm surfaces.
-                                                    border = if (showAllPrayers) {
+                                                    border = if (collapseLocation) {
                                                         BorderStroke(
                                                             1.dp,
                                                             MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
@@ -4091,7 +4106,7 @@ fun PrayerTimesScreen(
                                                     } else {
                                                         null
                                                     },
-                                                    shadowElevation = if (showAllPrayers) {
+                                                    shadowElevation = if (collapseLocation) {
                                                         3.dp
                                                     } else if (LocalDarkTheme.current) {
                                                         0.dp
@@ -4119,7 +4134,7 @@ fun PrayerTimesScreen(
                                                         )
 
                                                         androidx.compose.animation.AnimatedVisibility(
-                                                            visible = !showAllPrayers,
+                                                            visible = !collapseLocation,
                                                             enter = fadeIn(
                                                                 animationSpec = tween(durationMillis = 220, delayMillis = 150),
                                                             ),

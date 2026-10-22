@@ -26,6 +26,7 @@ internal fun homePrayerScheduleLayout(
         availableHeight = availableHeight,
         prayerCount = prayerCount,
         showAll = showAllPrayers,
+        collapsedRows = 2,
         minimumRowHeight = minimumHeight,
         readableRowHeight = minimumHeight,
         maximumRowHeight = 132f * fontScale.coerceAtLeast(1f),

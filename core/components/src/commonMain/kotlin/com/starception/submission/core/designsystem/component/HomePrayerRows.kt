@@ -24,6 +24,7 @@ fun resolveHomePrayerRows(
     sectionChromeHeight: Float = 92f,
     rowSpacing: Float = 8f,
     maximumRowHeight: Float = 140f,
+    collapsedRows: Int? = null,
 ): HomePrayerRows {
     val totalRows = ((prayerCount + 1) / 2).coerceAtLeast(1)
     val budget = (availableHeight - sectionChromeHeight).coerceAtLeast(0f)
@@ -31,8 +32,8 @@ fun resolveHomePrayerRows(
     val maximumHeight = maxOf(minimumHeight, maximumRowHeight)
     // Add a row before stretching existing cards beyond the comfortable height.
     // Preserve natural content height and allow scrolling if that row cannot fully fit.
-    val rowCount = if (showAll) totalRows else
-        ceil(budget / (maximumHeight + rowSpacing)).toInt().coerceIn(1, totalRows)
+    val rowCount = if (showAll) totalRows else if (collapsedRows != null)
+        collapsedRows.coerceIn(1, totalRows) else ceil(budget / (maximumHeight + rowSpacing)).toInt().coerceIn(1, totalRows)
     val height = (budget / rowCount - rowSpacing)
         .coerceIn(minimumHeight, maximumHeight)
     return HomePrayerRows(
@@ -41,3 +42,11 @@ fun resolveHomePrayerRows(
         needsScrolling = rowCount * (height + rowSpacing) > budget + 0.5f,
     )
 }
+
+/** Collapse location before sacrificing the readable prayer rows during manual expansion. */
+fun homeLocationNeedsCollapse(
+    insightExpanded: Boolean,
+    availableHeight: Float,
+    prayerSectionMinimumHeight: Float,
+    fullLocationHeight: Float,
+): Boolean = insightExpanded && availableHeight < prayerSectionMinimumHeight + fullLocationHeight

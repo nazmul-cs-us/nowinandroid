@@ -11,6 +11,7 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.component.homeLocationNeedsCollapse
 import com.starception.submission.core.designsystem.component.resolveHomePrayerRows
 import com.starception.submission.core.designsystem.component.insightStageHeight
 import kotlin.test.Test
@@ -34,12 +35,14 @@ class InsightLayoutTest {
     }
 
     @Test
-    fun scheduleAddsRowsAndUsesRemainingHeight() {
-        for ((height, expectedRows) in listOf(200f to 1, 300f to 2, 400f to 3)) {
+    fun homeKeepsTwoPrayerRowsAsInsightHeightChanges() {
+        for (height in listOf(160f, 200f, 300f, 400f)) {
             val layout = homePrayerScheduleLayout(height, false, 6)
-            assertEquals(expectedRows, layout.rows)
-            assertEquals(height, 92f + layout.rows * (layout.rowHeight + 8f), 0.001f)
+            assertEquals(2, layout.rows)
+            assertTrue(layout.rowHeight in 88f..132f)
         }
+        val layout = homePrayerScheduleLayout(300f, false, 6)
+        assertEquals(300f, 92f + layout.rows * (layout.rowHeight + 8f), 0.001f)
     }
 
     @Test
@@ -148,5 +151,22 @@ class InsightLayoutTest {
         assertEquals(130f, result.rowHeight)
         assertEquals(260f, result.rows * result.rowHeight)
         assertTrue(!result.needsScrolling)
+    }
+    @Test
+    fun locationCollapsesOnlyWhenExpandedInsightNeedsTheSpace() {
+        assertTrue(!homeLocationNeedsCollapse(false, 200f, 208f, 92f))
+        assertTrue(!homeLocationNeedsCollapse(true, 300f, 208f, 92f))
+        assertTrue(homeLocationNeedsCollapse(true, 299f, 208f, 92f))
+        assertTrue(!homeLocationNeedsCollapse(true, 320f, 208f, 92f))
+    }
+
+    @Test
+    fun fixedHomeRowsRemainReadableAndShowAllStillRevealsThirdRow() {
+        val compact = resolveHomePrayerRows(140f, 6, false, 104f, 104f, 0f, 0f, collapsedRows = 2)
+        assertEquals(2, compact.rows)
+        assertEquals(104f, compact.rowHeight)
+        assertTrue(compact.needsScrolling)
+        val all = resolveHomePrayerRows(360f, 6, true, 104f, 104f, 0f, 0f, collapsedRows = 2)
+        assertEquals(3, all.rows)
     }
 }

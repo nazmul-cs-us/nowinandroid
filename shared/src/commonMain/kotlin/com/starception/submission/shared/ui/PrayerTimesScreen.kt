@@ -144,6 +144,7 @@ import io.github.alexzhirkevich.cupertino.theme.CupertinoTheme
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.painterResource
 import com.starception.submission.core.designsystem.component.PrayerTileContent
+import com.starception.submission.core.designsystem.component.homeLocationNeedsCollapse
 import kotlin.math.roundToInt
 import com.starception.submission.core.images.resources.Res as ImageRes
 
@@ -713,18 +714,24 @@ fun PrayerTimesScreen(
                                 var phoneInsightHeight by remember { mutableStateOf(0.dp) }
                                 var phoneLocationHeight by remember { mutableStateOf(58.dp) }
                                 val scale = phoneDensity.fontScale.coerceAtLeast(1f)
-                                // Reserve one readable prayer row plus its controls,
-                                // location, pager title and gaps inside this real viewport.
+                                // Keep two readable prayer rows. Location can fold into
+                                // the existing pin beside Show All as the insight grows.
                                 val minimumPrayerHeight = maxOf(
                                     88.dp,
                                     prayerContentHeights.values.maxOrNull() ?: (88f * scale).dp,
                                 )
-                                val minimumSchedule = minimumPrayerHeight + (100f * scale).dp
-                                val phoneMaximumInsight = (maxHeight - minimumSchedule - 114.dp)
+                                val minimumSchedule = minimumPrayerHeight * 2 + (100f * scale).dp
+                                val phoneMaximumInsight = (maxHeight - minimumSchedule - 56.dp)
                                     .coerceAtLeast(140.dp)
                                 val phoneRestingInsight = minOf(portraitInsightHeight, phoneMaximumInsight - 44.dp)
                                     .coerceAtLeast(96.dp)
                                 val sectionGap = if (expandedInsightPage != null) 2.dp else 8.dp
+                                val collapseLocation = showAllPrayers || homeLocationNeedsCollapse(
+                                    insightExpanded = expandedInsightPage != null,
+                                    availableHeight = (maxHeight - phoneInsightHeight - sectionGap * 3 - 4.dp).value,
+                                    prayerSectionMinimumHeight = minimumSchedule.value,
+                                    fullLocationHeight = 58f,
+                                )
                                 val scheduleHeight = (maxHeight - phoneInsightHeight -
                                     (if (showAllPrayers) 0.dp else phoneLocationHeight) -
                                     sectionGap * 3 - 4.dp).coerceAtLeast(0.dp)
@@ -770,8 +777,10 @@ fun PrayerTimesScreen(
                                                 }
                                             },
                                             collapsedRows = scheduleLayout.rows,
-                                            showFooterLocationPin = showAllPrayers,
-                                            onFooterLocationClick = { showAllPrayers = false },
+                                            showFooterLocationPin = collapseLocation,
+                                            onFooterLocationClick = {
+                                                if (showAllPrayers) showAllPrayers = false else onRefresh()
+                                            },
                                         )
                                         // Keep location in normal flow directly below
                                         // the reduced schedule while resizing.
@@ -779,7 +788,7 @@ fun PrayerTimesScreen(
                                             modifier = Modifier.onSizeChanged {
                                                 phoneLocationHeight = with(phoneDensity) { it.height.toDp() }
                                             },
-                                            visible = !showAllPrayers,
+                                            visible = !collapseLocation,
                                             enter = expandVertically(
                                                 animationSpec = tween(
                                                     durationMillis = 840,
