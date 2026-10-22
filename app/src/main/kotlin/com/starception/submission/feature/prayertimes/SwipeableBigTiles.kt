@@ -137,6 +137,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
@@ -2462,13 +2463,13 @@ internal fun SwipeableBigTiles(
                         .align(Alignment.TopStart)
                         .width(cardWidth)
                         .fillMaxHeight()
+                        .clip(ContinuousCornerShape(focusedCardCornerExtent))
                         .zIndex(3f),
                 ) {
                     listOf(Alignment.BottomStart to true, Alignment.BottomEnd to false).forEach { (alignment, start) ->
                         InsightResizeCornerHandle(
                             isStart = start,
                             expansionExtent = expansionExtent,
-                            cornerRadius = focusedCardCornerExtent,
                             onDragStart = {
                                 isResizeDragging = true
                                 isAutomaticallySized = false
@@ -2827,142 +2828,6 @@ internal fun formatPrayerForecastMetrics(summary: String?): String? {
         .distinct()
         .joinToString(" · ")
         .takeIf(String::isNotBlank)
-}
-
-@Composable
-private fun InsightResizeCornerHandle(
-    isStart: Boolean,
-    expansionExtent: Float,
-    // Matches the focused card's own ContinuousCornerShape radius so the
-    // handle's cut-corner fold fully covers the card's rounded corner
-    // instead of leaving a sliver of it peeking out past a fixed-size cut.
-    cornerRadius: Dp,
-    onDragStart: () -> Unit,
-    onDrag: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onExpand: () -> Unit,
-    onCollapse: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var isActive by remember { mutableStateOf(false) }
-    val activeProgress by animateFloatAsState(
-        targetValue = if (isActive) 1f else 0f,
-        animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing),
-        label = "insightResizeHandleActive",
-    )
-    Box(
-        modifier = modifier
-            .size(48.dp)
-            .pointerInput(isStart) {
-                detectDragGestures(
-                    onDragStart = {
-                        isActive = true
-                        onDragStart()
-                    },
-                    onDragEnd = {
-                        isActive = false
-                        onDragEnd()
-                    },
-                    onDragCancel = {
-                        isActive = false
-                        onDragEnd()
-                    },
-                ) { change, dragAmount ->
-                    change.consume()
-                    val outwardX = if (isStart) -dragAmount.x else dragAmount.x
-                    onDrag((dragAmount.y + outwardX) * 0.70710677f)
-                }
-            }
-            .semantics {
-                contentDescription = if (isStart) {
-                    "Resize insight from bottom left"
-                } else {
-                    "Resize insight from bottom right"
-                }
-                stateDescription = "${(expansionExtent * 100).roundToInt()} percent expanded"
-                customActions = listOf(
-                    CustomAccessibilityAction("Expand insight") { onExpand(); true },
-                    CustomAccessibilityAction("Collapse insight") { onCollapse(); true },
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        // This card is a photo surface, not a themed content card (see the
-        // Hadith panel and label chip elsewhere in this composable, which use
-        // the same translucent-black-on-white convention). A light Material
-        // token such as surfaceVariant can land as a jarring, oddly-tinted
-        // patch against the photo depending on the active color scheme, so
-        // the fold instead follows that existing black-scrim convention.
-        val gripSurfaceColor = Color.Black.copy(alpha = 0.34f)
-        val gripContentColor = Color.White.copy(alpha = 0.82f)
-        Canvas(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = 1f + (activeProgress * 0.14f)
-                    scaleY = scaleX
-                },
-        ) {
-            // ContinuousCornerShape's cubic Bezier curve meets the straight
-            // edge at exactly cornerRadius along each axis (same reach as a
-            // plain circular radius, just with gentler curve interpolation).
-            // Matching that distance exactly means the fold's straight edges
-            // land precisely where the card's own curve ends: any smaller
-            // and the card's rounded corner peeks out past the fold; any
-            // larger and the opaque fold overshoots past the real curve,
-            // squaring off what should still read as a rounded corner.
-            val fold = cornerRadius.toPx()
-            val foldPath = Path().apply {
-                if (isStart) {
-                    moveTo(0f, size.height)
-                    lineTo(0f, size.height - fold)
-                    lineTo(fold, size.height)
-                } else {
-                    moveTo(size.width, size.height)
-                    lineTo(size.width, size.height - fold)
-                    lineTo(size.width - fold, size.height)
-                }
-                close()
-            }
-            drawPath(
-                path = foldPath,
-                color = gripSurfaceColor.copy(alpha = 0.86f + (activeProgress * 0.08f)),
-            )
-
-            val stroke = (1.2.dp + (activeProgress * 0.55f).dp).toPx()
-            val color = gripContentColor.copy(alpha = 0.72f + (0.20f * activeProgress))
-            if (activeProgress > 0f) {
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.14f * activeProgress),
-                    radius = size.minDimension * 0.48f,
-                )
-            }
-            // Two short strokes sit inside the folded corner.
-            val inset = 10.dp.toPx()
-            val length = 8.dp.toPx()
-            val spacing = 7.dp.toPx()
-            for (index in 0..1) {
-                val y = size.height - inset - (index * spacing)
-                if (isStart) {
-                    drawLine(
-                        color,
-                        Offset(inset + (index * 3.dp.toPx()), y - length),
-                        Offset(inset + length + (index * 3.dp.toPx()), y),
-                        stroke,
-                        StrokeCap.Round,
-                    )
-                } else {
-                    drawLine(
-                        color,
-                        Offset(size.width - inset - (index * 3.dp.toPx()), y - length),
-                        Offset(size.width - inset - length - (index * 3.dp.toPx()), y),
-                        stroke,
-                        StrokeCap.Round,
-                    )
-                }
-            }
-        }
-    }
 }
 
 /**

@@ -41,7 +41,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -97,6 +96,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -1045,11 +1045,17 @@ fun InsightPager(
                 }
             }
             if (!pagerState.isScrollInProgress) {
+                val focusedCornerRadius by animateDpAsState(
+                    targetValue = if (isExpanded) 32.dp else 26.dp,
+                    animationSpec = tween(360),
+                    label = "insightGripCornerRadius",
+                )
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .width(pageWidth)
-                        .height(effectiveTileHeight),
+                        .height(effectiveTileHeight)
+                        .clip(RoundedCornerShape(focusedCornerRadius)),
                 ) {
                     listOf(Alignment.BottomStart to true, Alignment.BottomEnd to false).forEach { (alignment, start) ->
                         InsightResizeCornerHandle(
@@ -1087,123 +1093,6 @@ fun InsightPager(
                                  ),
                         )
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InsightResizeCornerHandle(
-    isStart: Boolean,
-    expansionExtent: Float,
-    onDragStart: () -> Unit,
-    onDrag: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onExpand: () -> Unit,
-    onCollapse: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var isActive by remember { mutableStateOf(false) }
-    val activeProgress by animateFloatAsState(
-        targetValue = if (isActive) 1f else 0f,
-        animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing),
-        label = "insightResizeHandleActive",
-    )
-    Box(
-        modifier = modifier
-            .size(48.dp)
-            .pointerInput(isStart) {
-                detectDragGestures(
-                    onDragStart = {
-                        isActive = true
-                        onDragStart()
-                    },
-                    onDragEnd = {
-                        isActive = false
-                        onDragEnd()
-                    },
-                    onDragCancel = {
-                        isActive = false
-                        onDragEnd()
-                    },
-                ) { change, dragAmount ->
-                    change.consume()
-                    val outwardX = if (isStart) -dragAmount.x else dragAmount.x
-                    onDrag((dragAmount.y + outwardX) * 0.70710677f)
-                }
-            }
-            .semantics {
-                contentDescription = if (isStart) {
-                    "Resize insight from bottom left"
-                } else {
-                    "Resize insight from bottom right"
-                }
-                stateDescription = "${(expansionExtent * 100).roundToInt()} percent expanded"
-                customActions = listOf(
-                    CustomAccessibilityAction("Expand insight") { onExpand(); true },
-                    CustomAccessibilityAction("Collapse insight") { onCollapse(); true },
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        val gripSurfaceColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
-        val gripContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
-        Canvas(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = 1f + (activeProgress * 0.14f)
-                    scaleY = scaleX
-                },
-        ) {
-            val fold = 22.dp.toPx()
-            val foldPath = Path().apply {
-                if (isStart) {
-                    moveTo(0f, size.height)
-                    lineTo(0f, size.height - fold)
-                    lineTo(fold, size.height)
-                } else {
-                    moveTo(size.width, size.height)
-                    lineTo(size.width, size.height - fold)
-                    lineTo(size.width - fold, size.height)
-                }
-                close()
-            }
-            drawPath(
-                path = foldPath,
-                color = gripSurfaceColor.copy(alpha = 0.86f + (activeProgress * 0.08f)),
-            )
-
-            val stroke = (1.2.dp + (activeProgress * 0.55f).dp).toPx()
-            val color = gripContentColor.copy(alpha = 0.72f + (0.20f * activeProgress))
-            if (activeProgress > 0f) {
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.14f * activeProgress),
-                    radius = size.minDimension * 0.48f,
-                )
-            }
-            val inset = 10.dp.toPx()
-            val length = 8.dp.toPx()
-            val spacing = 7.dp.toPx()
-            for (index in 0..1) {
-                val y = size.height - inset - (index * spacing)
-                if (isStart) {
-                    drawLine(
-                        color,
-                        Offset(inset + (index * 3.dp.toPx()), y - length),
-                        Offset(inset + length + (index * 3.dp.toPx()), y),
-                        stroke,
-                        StrokeCap.Round,
-                    )
-                } else {
-                    drawLine(
-                        color,
-                        Offset(size.width - inset - (index * 3.dp.toPx()), y - length),
-                        Offset(size.width - inset - length - (index * 3.dp.toPx()), y),
-                        stroke,
-                        StrokeCap.Round,
-                    )
                 }
             }
         }
