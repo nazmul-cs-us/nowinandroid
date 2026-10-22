@@ -2084,6 +2084,7 @@ internal fun SwipeableBigTiles(
                         )
 
                         1 -> InsightPreviewCard(
+                            useEditorialExpandedLayout = true,
                             label = "Today's salah",
                             title = when {
                                 prayedCount == totalPrayers -> "All prayers complete"
@@ -2171,6 +2172,7 @@ internal fun SwipeableBigTiles(
                         )
 
                         2 -> InsightPreviewCard(
+                            useEditorialExpandedLayout = true,
                             label = if (isDrivingMode) "Driving · Listen" else "Today's reading",
                             title = if (isExpandedCard) {
                                 ""
@@ -2187,7 +2189,7 @@ internal fun SwipeableBigTiles(
                                 dailySurah.nameArabic
                             },
                             footerText = if (isExpandedCard) {
-                                "Surah ${dailySurah.number} · ${dailySurah.nameEnglish} · ${dailySurah.nameArabic}"
+                                dailySurah.nameArabic
                             } else if (isDrivingMode) {
                                 "Surah ${dailySurah.number} · Keep your eyes on the road"
                             } else {
@@ -2256,6 +2258,7 @@ internal fun SwipeableBigTiles(
                         )
 
                         3 -> InsightPreviewCard(
+                            useEditorialExpandedLayout = true,
                             label = "Qibla",
                             // Expanded mode carries its full hierarchy inside the
                             // live instrument. Repeating the bearing and action
@@ -2336,6 +2339,7 @@ internal fun SwipeableBigTiles(
                             val groundedNudge = modelKnowledgeCandidate?.nudge
                                 ?.takeIf { isExpandedCard }
                             InsightPreviewCard(
+                            useEditorialExpandedLayout = true,
                             label = if (isDrivingMode) "Driving · Listen" else "AI suggested",
                             // The expanded source panel replaces the compact
                             // recommendation summary. Rendering both caused the
@@ -3003,6 +3007,7 @@ private fun InsightPreviewCard(
     compactProgress: Float,
     expansionProgress: Float = 0f,
     isExpanded: Boolean = false,
+    useEditorialExpandedLayout: Boolean = false,
     onLongPress: (() -> Unit)? = null,
     longPressLabel: String? = null,
     fullDayEffect: Boolean = false,
@@ -3039,6 +3044,7 @@ private fun InsightPreviewCard(
     // card's long-press detector flashes before the scroll takes control.
     disableCardGesturesWhenExpanded: Boolean = false,
 ) {
+    val editorialExpanded = isExpanded && useEditorialExpandedLayout
     val density = LocalDensity.current
     var suppressClickUntilMs by remember { mutableLongStateOf(0L) }
     val cardInteractionSource = remember { MutableInteractionSource() }
@@ -3181,8 +3187,10 @@ private fun InsightPreviewCard(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val cardMaxWidth = maxWidth
-            val tagInset = (11f - (5f * compactProgress) + (3f * expansionProgress)).dp
-            val labelFontSize = (11f - (3f * compactProgress) + expansionProgress).sp
+            val tagInset = if (editorialExpanded) 10.dp else
+                (11f - (5f * compactProgress) + (3f * expansionProgress)).dp
+            val labelFontSize = if (editorialExpanded) 12.sp else
+                (11f - (3f * compactProgress) + expansionProgress).sp
             // Enlarged cards prioritize their Surah/Hadith payload over the
             // repeated metadata footer. Keep the resting card unchanged, but
             // make the expanded footer denser and wider so it wraps less.
@@ -3191,7 +3199,9 @@ private fun InsightPreviewCard(
             val defaultHorizontalPadding = (
                 22f - (10f * compactProgress) - (4f * expansionProgress)
                 ).dp
-            val titleHorizontalPadding = if (hasPrayerContext && maxWidth < 240.dp) {
+            val titleHorizontalPadding = if (editorialExpanded) {
+                22.dp
+            } else if (hasPrayerContext && maxWidth < 240.dp) {
                 // A half-width insight card cannot afford desktop-like 22dp side
                 // insets. Preserve the original footer composition while giving
                 // the prayer countdown enough room to remain complete.
@@ -3200,11 +3210,17 @@ private fun InsightPreviewCard(
                 defaultHorizontalPadding
             }
             val titleBottomPadding = (16f - (7f * compactProgress) - (4f * expansionProgress)).dp
-            val contentSpacing = (7f - (4f * compactProgress) - (2f * expansionProgress)).dp
+            val contentSpacing = if (editorialExpanded) {
+                14.dp
+            } else {
+                (7f - (4f * compactProgress) - (2f * expansionProgress)).dp
+            }
             val supportingFontSize = (13f - (3f * compactProgress)).sp
             val supportingLineHeight = (17f - (4f * compactProgress) - expansionProgress).sp
-            val footerFontSize = (12f - (3f * compactProgress) - expansionProgress).sp
-            val footerLineHeight = (16f - (4f * compactProgress) - (2f * expansionProgress)).sp
+            val footerFontSize = if (editorialExpanded) 14.sp else
+                (12f - (3f * compactProgress) - expansionProgress).sp
+            val footerLineHeight = if (editorialExpanded) 20.sp else
+                (16f - (4f * compactProgress) - (2f * expansionProgress)).sp
             val recapIndicatorSize = (24f - (7f * compactProgress)).dp
             val recapFontSize = (11f - (3f * compactProgress)).sp
             // Keep the editorial payload sharp while gently defocusing the busy
@@ -3707,7 +3723,7 @@ private fun InsightPreviewCard(
                 Surface(
                     onClick = onClick ?: {},
                     shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.34f),
+                    color = if (editorialExpanded) Color.Transparent else Color.Black.copy(alpha = 0.34f),
                     shadowElevation = 0.dp,
                     // TextButton, which this replaced, applied these minimums and
                     // this content padding. Keep them so the pill holds its old
@@ -3952,12 +3968,12 @@ private fun InsightPreviewCard(
                         end = titleHorizontalPadding,
                         // The visual grip is small; keep only compact breathing
                         // room while its larger touch target overlays the corner.
-                        bottom = titleBottomPadding + 8.dp,
+                        bottom = if (editorialExpanded) 30.dp else titleBottomPadding + 8.dp,
                     )
                     // A measured header zone keeps every expanded payload out
                     // of the top controls. The weighted middle absorbs banner
                     // compression; the metadata below retains natural height.
-                    .padding(top = tagInset + if (isExpanded) 50.dp else 44.dp),
+                    .padding(top = if (editorialExpanded) 70.dp else tagInset + if (isExpanded) 50.dp else 44.dp),
                 verticalArrangement = Arrangement.spacedBy(contentSpacing),
             ) {
                 if (isExpanded && expandedLeadingContent != null) {
@@ -3965,25 +3981,23 @@ private fun InsightPreviewCard(
                         modifier = Modifier
                             .requiredWidth(
                                 cardMaxWidth - (titleHorizontalPadding * 2) +
-                                    (expandedContentHorizontalBleed * 2),
+                                    (if (editorialExpanded) 0.dp else expandedContentHorizontalBleed * 2),
                             )
                             .weight(1f),
                         contentAlignment = Alignment.Center,
                     ) {
-                        // Give the expanded payload a consistent editorial frame. The
-                        // tile-specific stages provide the artwork and controls, while
-                        // this quiet inner surface separates them from the card chrome.
+                        // Editorial content sits directly over the artwork. Keep the
+                        // same inset as its metadata rather than nesting another card.
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(Color.Black.copy(alpha = 0.14f))
-                                .border(
-                                    width = 1.dp,
-                                    color = Color.White.copy(alpha = 0.18f),
-                                    shape = RoundedCornerShape(20.dp),
-                                )
-                                .padding(1.dp),
+                                .then(
+                                    if (editorialExpanded) Modifier else Modifier
+                                        .background(Color.Black.copy(alpha = 0.14f))
+                                        .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(20.dp))
+                                        .padding(1.dp),
+                                ),
                         ) {
                             expandedLeadingContent()
                         }
@@ -4962,16 +4976,6 @@ private fun EditorialQuranReadingStage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                brush = Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.18f to Color.Black.copy(alpha = 0.10f),
-                    0.78f to Color.Black.copy(alpha = 0.42f),
-                    1f to Color.Black.copy(alpha = 0.12f),
-                ),
-                shape = RoundedCornerShape(22.dp),
-            ),
     ) {
         Column(
             modifier = Modifier
@@ -4990,8 +4994,8 @@ private fun EditorialQuranReadingStage(
                 Text(
                     text = "SURAH ${surah.number} · ${surah.nameEnglish.uppercase()}",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.5.sp,
-                        lineHeight = 12.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
                         letterSpacing = 1.3.sp,
                     ),
                     color = Color.White.copy(alpha = 0.68f),
@@ -5004,8 +5008,8 @@ private fun EditorialQuranReadingStage(
                 Text(
                     text = if (isPlaying) "PLAYING" else "${ayahs.size} AYAT",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.sp,
-                        lineHeight = 11.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
                         letterSpacing = 0.8.sp,
                     ),
                     color = HomeReferenceGold.copy(alpha = 0.94f),
@@ -5018,8 +5022,8 @@ private fun EditorialQuranReadingStage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 if (ayahs.isEmpty()) {
                     item {
@@ -5041,14 +5045,7 @@ private fun EditorialQuranReadingStage(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.Black.copy(alpha = 0.18f))
-                            .border(
-                                width = 1.dp,
-                                color = Color.White.copy(alpha = 0.10f),
-                                shape = RoundedCornerShape(14.dp),
-                            )
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                            .padding(vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -5082,8 +5079,8 @@ private fun EditorialQuranReadingStage(
                             Text(
                                 text = translatedText,
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = (12.5f - compression).sp,
-                                    lineHeight = (18f - (2f * compression)).sp,
+                                    fontSize = (15f - compression).sp,
+                                    lineHeight = (23f - (2f * compression)).sp,
                                     letterSpacing = 0.sp,
                                 ),
                                 color = Color.White.copy(alpha = 0.88f),
@@ -5135,28 +5132,7 @@ private fun SalahHadithExpandedStage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                brush = Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.20f to Color.Black.copy(alpha = 0.12f),
-                    0.82f to Color.Black.copy(alpha = 0.44f),
-                    1f to Color.Black.copy(alpha = 0.14f),
-                ),
-                shape = RoundedCornerShape(22.dp),
-            ),
     ) {
-        Text(
-            text = "“",
-            style = MaterialTheme.typography.displaySmall.copy(
-                fontSize = 44.sp,
-                lineHeight = 44.sp,
-            ),
-            color = HomeReferenceGold.copy(alpha = 0.28f),
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 4.dp, top = 14.dp),
-        )
         // Deliberately static: animating this subtree recreated/cross-faded the
         // vertical scroll content when it was touched, which looked like a
         // flash. Only the text and scroll offset change now.
@@ -5164,7 +5140,7 @@ private fun SalahHadithExpandedStage(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    start = 12.dp,
+                    start = 0.dp,
                     end = 0.dp,
                     top = (8f - (2f * compression)).dp,
                     bottom = (7f - (2f * compression)).dp,
@@ -5174,8 +5150,8 @@ private fun SalahHadithExpandedStage(
             Text(
                 text = "HADITH FOR ${displayPrayerName.uppercase()}",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.5.sp,
-                    lineHeight = 12.sp,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
                     letterSpacing = 1.2.sp,
                 ),
                 color = HomeReferenceGold.copy(alpha = 0.94f),
@@ -5195,13 +5171,13 @@ private fun SalahHadithExpandedStage(
                             state = hadithScrollState,
                             overscrollEffect = null,
                         ),
-                    verticalArrangement = Arrangement.Center,
+                    verticalArrangement = Arrangement.Top,
                 ) {
                     Text(
                         text = body,
                         style = MaterialTheme.typography.titleSmall.copy(
-                            fontSize = (17.5f - (4f * compression)).sp,
-                            lineHeight = (25f - (6f * compression)).sp,
+                            fontSize = (19f - (2f * compression)).sp,
+                            lineHeight = (29f - (3f * compression)).sp,
                             letterSpacing = (-0.1).sp,
                         ),
                         color = Color.White.copy(alpha = 0.98f),
@@ -5217,8 +5193,8 @@ private fun SalahHadithExpandedStage(
                 Text(
                     text = source,
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.5.sp,
-                        lineHeight = 12.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
                         letterSpacing = 0.sp,
                     ),
                     color = Color.White.copy(alpha = 0.56f),
@@ -5314,31 +5290,7 @@ private fun QiblaBearingExpandedStage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0f to Color.Transparent,
-                        0.14f to qiblaSurface.copy(alpha = 0.38f),
-                        0.68f to qiblaSurface.copy(alpha = 0.72f),
-                        1f to qiblaSurface.copy(alpha = 0.28f),
-                    ),
-                ),
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0f to Color.Transparent,
-                        0.20f to qiblaForeground.copy(alpha = 0.12f),
-                        0.58f to qiblaAccent.copy(alpha = 0.18f + (0.06f * livePulse)),
-                        0.90f to qiblaForeground.copy(alpha = 0.08f),
-                        1f to Color.Transparent,
-                    ),
-                ),
-                shape = RoundedCornerShape(24.dp),
-            )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(vertical = 12.dp),
     ) {
         Row(
             modifier = Modifier
@@ -5832,18 +5784,6 @@ private fun RecommendationExpandedStage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                // A right-heavy scrim merged with the doorway in the artwork
-                // and looked like a dark block extending below the action pill.
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.62f to Color.Black.copy(alpha = 0.16f),
-                    1f to Color.Black.copy(alpha = 0.42f),
-                ),
-            )
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
     ) {
         // A static state switch avoids recreating and cross-fading the scroll
         // subtree when the user touches it.
@@ -5870,7 +5810,7 @@ private fun RecommendationExpandedStage(
                 val nudge = candidate?.nudge
                 Column(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -5884,7 +5824,7 @@ private fun RecommendationExpandedStage(
                         Text(
                             text = "GROUNDED SUGGESTION",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 9.5.sp,
+                                fontSize = 11.sp,
                                 letterSpacing = 1.1.sp,
                             ),
                             color = Color.White.copy(alpha = 0.64f),
@@ -5917,8 +5857,8 @@ private fun RecommendationExpandedStage(
                                     ?: "A verified $fallbackLabel selected for this moment",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     // This is source text, not another headline.
-                                    fontSize = (14.5f - (2f * compression)).sp,
-                                    lineHeight = (19.5f - (3f * compression)).sp,
+                                    fontSize = (17f - (2f * compression)).sp,
+                                    lineHeight = (26f - (3f * compression)).sp,
                                 ),
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium,
@@ -5993,21 +5933,14 @@ private fun RecommendationExpandedStage(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color.Black.copy(alpha = 0.34f))
-                                .border(
-                                    width = 1.dp,
-                                    color = Color.White.copy(alpha = 0.14f),
-                                    shape = RoundedCornerShape(14.dp),
-                                )
-                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                                .padding(vertical = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(1.dp),
                         ) {
                             Text(
                                 text = "VERIFIED SOURCE",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 8.5.sp,
-                                    lineHeight = 10.sp,
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp,
                                     letterSpacing = 1.1.sp,
                                 ),
                                 color = HomeReferenceGold.copy(alpha = 0.88f),
@@ -6031,8 +5964,8 @@ private fun RecommendationExpandedStage(
                                     Text(
                                         text = sourceLabel,
                                         style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 9.5.sp,
-                                            lineHeight = 12.sp,
+                                            fontSize = 11.sp,
+                                            lineHeight = 16.sp,
                                         ),
                                         color = Color.White.copy(alpha = 0.66f),
                                         maxLines = 1,

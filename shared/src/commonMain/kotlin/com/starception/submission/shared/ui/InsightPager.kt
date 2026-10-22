@@ -111,7 +111,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -797,7 +796,7 @@ fun InsightPager(
                                 title = if (isExpanded) "" else surah.nameEnglish,
                                 subtitle = if (isExpanded) "" else surah.nameArabic,
                                 footerText = if (isExpanded) {
-                                    "Surah ${surah.number} · ${surah.nameEnglish} · ${surah.nameArabic}"
+                                    surah.nameArabic
                                 } else {
                                     surah.subtitle()
                                 },
@@ -1267,12 +1266,12 @@ private fun ExpandedReadingPreview(
             ).coerceIn(if (hasTranslation) 19f else 22f, if (hasTranslation) 29f else 34f).sp
         val readingArabicLineHeight = (readingArabicSize.value * 1.45f).sp
         val bismillahSize = (maxWidth.value * 0.052f).coerceIn(18f, 26f).sp
-        val readingTranslationSize = (maxWidth.value * 0.038f).coerceIn(13f, 18f).sp
+        val readingTranslationSize = (maxWidth.value * 0.038f).coerceIn(15f, 18f).sp
 
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(7.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1282,8 +1281,8 @@ private fun ExpandedReadingPreview(
                 Text(
                     text = "SURAH $surahNumber · ${surahName.uppercase()}",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.sp,
-                        lineHeight = 11.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
                         letterSpacing = 1.sp,
                     ),
                     color = Color.White.copy(alpha = 0.68f),
@@ -1299,8 +1298,8 @@ private fun ExpandedReadingPreview(
                         else -> "${verses.size} AYAT"
                     },
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.sp,
-                        lineHeight = 11.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
                         letterSpacing = 0.8.sp,
                     ),
                     color = ReadingPreviewGold,
@@ -1310,7 +1309,7 @@ private fun ExpandedReadingPreview(
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentPadding = PaddingValues(vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 if (surahNumber != 1 && surahNumber != 9) {
                     item(key = "bismillah") {
@@ -1345,14 +1344,7 @@ private fun ExpandedReadingPreview(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.Black.copy(alpha = 0.18f))
-                            .border(
-                                width = 1.dp,
-                                color = Color.White.copy(alpha = 0.10f),
-                                shape = RoundedCornerShape(14.dp),
-                            )
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                            .padding(vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -1402,14 +1394,7 @@ private fun ReadingTranslationPanel(
         textAlign = TextAlign.Start,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = 0.30f))
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.14f),
-                shape = RoundedCornerShape(12.dp),
-            )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(vertical = 8.dp),
     )
 }
 
@@ -1495,45 +1480,24 @@ private fun ExpandedSalahHadith(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                brush = Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.20f to Color.Black.copy(alpha = 0.12f),
-                    0.82f to Color.Black.copy(alpha = 0.44f),
-                    1f to Color.Black.copy(alpha = 0.14f),
-                ),
-                shape = RoundedCornerShape(22.dp),
-            ),
     ) {
-        Text(
-            text = "\u201C",
-            style = MaterialTheme.typography.displaySmall.copy(
-                fontSize = 44.sp,
-                lineHeight = 44.sp,
-            ),
-            color = ReadingPreviewGold.copy(alpha = 0.28f),
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 4.dp, top = 14.dp),
-        )
         // Deliberately static subtree: only the text and scroll offset change.
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    start = 12.dp,
+                    start = 0.dp,
                     end = 0.dp,
                     top = 8.dp,
                     bottom = 7.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text = "HADITH FOR ${displayName.uppercase()}",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.5.sp,
-                    lineHeight = 12.sp,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
                     letterSpacing = 1.2.sp,
                 ),
                 color = ReadingPreviewGold.copy(alpha = 0.94f),
@@ -1548,13 +1512,13 @@ private fun ExpandedSalahHadith(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(state = hadithScrollState),
-                    verticalArrangement = Arrangement.Center,
+                    verticalArrangement = Arrangement.Top,
                 ) {
                     Text(
                         text = text,
                         style = MaterialTheme.typography.titleSmall.copy(
-                            fontSize = 17.5.sp,
-                            lineHeight = 25.sp,
+                            fontSize = 19.sp,
+                            lineHeight = 29.sp,
                             letterSpacing = (-0.1).sp,
                         ),
                         color = Color.White.copy(alpha = 0.98f),
@@ -1569,8 +1533,8 @@ private fun ExpandedSalahHadith(
             Text(
                 text = source,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.5.sp,
-                    lineHeight = 12.sp,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
                     letterSpacing = 0.sp,
                 ),
                 color = Color.White.copy(alpha = 0.56f),
@@ -1612,7 +1576,7 @@ private fun ExpandedQiblaRadar(
         modifier = modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(24.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(vertical = 12.dp),
     ) {
         Row(
             modifier = Modifier
@@ -2058,8 +2022,8 @@ private fun ExpandedSuggestion(
             Text(
                 text = "GROUNDED SUGGESTION",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.5.sp,
-                    lineHeight = 11.sp,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
                     letterSpacing = 1.1.sp,
                 ),
                 color = Color.White.copy(alpha = 0.64f),
@@ -2345,7 +2309,7 @@ private fun ModelSuggestionStage(
 ) {
     val sourceScrollState = rememberScrollState()
     Column(
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()
             .semantics { contentDescription = "Model-generated suggestion" },
@@ -2362,8 +2326,8 @@ private fun ModelSuggestionStage(
             Text(
                 text = "GROUNDED SUGGESTION",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.5.sp,
-                    lineHeight = 11.sp,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
                     letterSpacing = 1.1.sp,
                 ),
                 color = Color.White.copy(alpha = 0.64f),
@@ -2376,13 +2340,13 @@ private fun ModelSuggestionStage(
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(sourceScrollState),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text = card?.title.orEmpty(),
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 14.5.sp,
-                    lineHeight = 19.5.sp,
+                    fontSize = 17.sp,
+                    lineHeight = 26.sp,
                 ),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
@@ -2412,22 +2376,15 @@ private fun ModelSuggestionStage(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color.Black.copy(alpha = 0.34f))
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(14.dp),
-                )
                 .clickable(onClick = onOpen)
-                .padding(horizontal = 10.dp, vertical = 7.dp),
+                .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
             Text(
                 text = "VERIFIED SOURCE",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 8.5.sp,
-                    lineHeight = 10.sp,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
                     letterSpacing = 1.1.sp,
                 ),
                 color = ReadingPreviewGold,
@@ -2458,14 +2415,7 @@ private fun MissingModelDownloadCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.Black.copy(alpha = 0.36f))
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.14f),
-                shape = RoundedCornerShape(18.dp),
-            )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
@@ -2665,7 +2615,7 @@ private fun ArtworkTile(
             CupertinoSurface(
                 onClick = onClick ?: {},
                 shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.34f),
+                color = if (isExpanded) Color.Transparent else Color.Black.copy(alpha = 0.34f),
                 contentColor = Color.White,
                 modifier = Modifier
                     .padding(11.dp)
@@ -2678,7 +2628,7 @@ private fun ArtworkTile(
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 11.sp,
+                            fontSize = if (isExpanded) 12.sp else 11.sp,
                             letterSpacing = 0.sp,
                         ),
                         color = Color.White,
@@ -2700,42 +2650,13 @@ private fun ArtworkTile(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = 18.dp, top = 68.dp, end = 18.dp, bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                        .padding(start = 22.dp, top = 70.dp, end = 22.dp, bottom = 30.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     content?.let { expandedContent ->
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                // Android's expandedContentHorizontalBleed: the
-                                // detail stage spans 10dp past the metadata's
-                                // inset on each side, so the reading text
-                                // measures wider than the title block below.
-                                // Compose padding must be non-negative, so the
-                                // bleed measures the child 20dp wider and
-                                // places it shifted — reporting the normal
-                                // width keeps the Column's layout intact.
-                                .layout { measurable, constraints ->
-                                    val bleed = 10.dp.roundToPx()
-                                    val placeable = measurable.measure(
-                                        constraints.copy(
-                                            minWidth = 0,
-                                            maxWidth = (constraints.maxWidth + bleed * 2)
-                                                .coerceAtLeast(constraints.minWidth),
-                                        ),
-                                    )
-                                    layout(constraints.maxWidth, placeable.height) {
-                                        placeable.placeRelative(-bleed, 0)
-                                    }
-                                }
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(Color.Black.copy(alpha = 0.14f))
-                                .border(
-                                    width = 1.dp,
-                                    color = Color.White.copy(alpha = 0.18f),
-                                    shape = RoundedCornerShape(20.dp),
-                                )
-                                .padding(1.dp)
                                 .weight(1f)
                                 .graphicsLayer {
                                     alpha = expandedContentEntrance
@@ -2823,8 +2744,8 @@ private fun ArtworkTileMetadata(
         Text(
             text = footerText,
             style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = if (expanded) 11.sp else 12.sp,
-                lineHeight = if (expanded) 14.sp else 16.sp,
+                fontSize = if (expanded) 14.sp else 12.sp,
+                lineHeight = if (expanded) 20.sp else 16.sp,
                 letterSpacing = 0.sp,
             ),
             color = Color.White.copy(alpha = 0.78f),
