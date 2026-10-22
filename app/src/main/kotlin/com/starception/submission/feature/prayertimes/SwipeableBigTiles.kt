@@ -137,6 +137,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.starception.submission.core.designsystem.component.formatInsightHadithText
 import com.starception.submission.core.designsystem.component.InsightContentLayout
 import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
 import com.starception.submission.core.designsystem.component.insightWidthExpansionProgress
@@ -5154,7 +5155,7 @@ private fun SalahHadithExpandedStage(
         "isha" -> "Sahih al-Bukhari · 615"
         else -> "Sahih al-Bukhari · 645"
     }
-    val body = reminder?.text ?: fallbackText
+    val body = formatInsightHadithText(reminder?.text ?: fallbackText)
     val source = listOfNotNull(reminder?.sourceName, reminder?.sourceDetail)
         .filter(String::isNotBlank)
         .joinToString(" · ")
@@ -5210,6 +5211,7 @@ private fun SalahHadithExpandedStage(
                 ) {
                     Text(
                         text = body,
+                        textAlign = TextAlign.Justify,
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontSize = (19f - (2f * compression)).sp,
                             lineHeight = (29f - (3f * compression)).sp,

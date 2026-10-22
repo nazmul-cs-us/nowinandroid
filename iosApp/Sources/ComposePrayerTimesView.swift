@@ -859,6 +859,10 @@ struct NativePrayerTabsView: View {
             // Keep the native tab bar's safe area; only the top artwork extends.
             .ignoresSafeArea(.container, edges: index == 0 ? .top : .all)
             .clipped()
+            // Extend only the painted backdrop into the native tab safe area.
+            // The interactive Home layout still ends above the floating tabs.
+            .backgroundExtensionEffect()
+            .toolbarBackground(.hidden, for: .tabBar)
             .toolbar(insightImmersive ? .hidden : .visible, for: .tabBar)
     }
 

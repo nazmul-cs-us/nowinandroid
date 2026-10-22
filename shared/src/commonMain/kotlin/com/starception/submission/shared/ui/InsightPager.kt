@@ -96,6 +96,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.starception.submission.core.designsystem.component.formatInsightHadithText
 import com.starception.submission.core.designsystem.component.InsightContentLayout
 import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
 import com.starception.submission.core.designsystem.component.insightWidthExpansionProgress
@@ -1473,7 +1474,7 @@ private fun ExpandedSalahHadith(
             candidates[((seed % candidates.size) + candidates.size) % candidates.size]
         }
     }
-    val text = resolvedHadith?.english ?: fallbackText
+    val text = formatInsightHadithText(resolvedHadith?.english ?: fallbackText)
     val source = resolvedHadith?.let { "Sahih al-Bukhari · ${it.id}" } ?: fallbackSource
     // Kept outside AnimatedContent so touch scrolling never recreates the
     // scrollable subtree, matching Android's structure.
@@ -1518,6 +1519,7 @@ private fun ExpandedSalahHadith(
                 ) {
                     Text(
                         text = text,
+                        textAlign = TextAlign.Justify,
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontSize = 19.sp,
                             lineHeight = 29.sp,
