@@ -31,6 +31,10 @@ kotlin {
         compilations.getByName("main").cinterops.create("sqlite3") {
             definitionFile.set(project.file("src/nativeInterop/cinterop/sqlite3.def"))
         }
+        compilations.getByName("main").cinterops.create("vorbis") {
+            definitionFile.set(project.file("src/nativeInterop/cinterop/vorbis.def"))
+            includeDirs(project.file("src/nativeInterop/cinterop/vorbis"))
+        }
         binaries.framework {
             baseName = "Shared"
             isStatic = true

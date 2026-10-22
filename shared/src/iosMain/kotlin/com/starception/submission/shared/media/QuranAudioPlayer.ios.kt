@@ -17,6 +17,7 @@
 package com.starception.submission.shared.audio
 
 import com.starception.submission.shared.assets.iosCloudAssets
+import kotlinx.coroutines.sync.withLock
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AVFAudio.AVAudioEngine
 import platform.AVFAudio.AVAudioFile
@@ -27,27 +28,41 @@ import platform.AVFAudio.setActive
 import platform.Foundation.NSURL
 import kotlin.math.roundToLong
 
+private val audioPreparationMutex = kotlinx.coroutines.sync.Mutex()
+
+@OptIn(ExperimentalForeignApi::class)
 actual suspend fun resolveQuranAudioUrl(
     surahNumber: Int,
     translationCode: String,
 ): String? {
-    val category = when (translationCode) {
-        "bn" -> "quran_audio_bengali"
-        "en" -> "quran_audio_english"
-        "hi" -> "quran_audio_hindi"
-        "ur" -> "quran_audio_urdu"
-        else -> "quran_audio_arabic"
-    }
-    val manifest = iosCloudAssets.loadManifest()
-        ?: return quranAudioUrl(surahNumber)
-    val entry = manifest.getAssetsByCategory(category).firstOrNull { asset ->
-        asset.cdnKey.substringAfterLast('/')
-            .takeWhile(Char::isDigit)
-            .toIntOrNull() == surahNumber
-    } ?: return quranAudioUrl(surahNumber)
-    val resolved = iosCloudAssets.resolveAsset(entry.cdnKey, manifest)
+    val manifest = iosCloudAssets.loadManifest() ?: return null
+    val entry = selectQuranAudioAsset(surahNumber, translationCode, manifest.assets.values)
         ?: return null
-    return NSURL.fileURLWithPath(resolved.absolutePath).absoluteString
+    val resolved = iosCloudAssets.resolveAsset(entry.cdnKey, manifest) ?: return null
+    val localPath = if (entry.cdnKey.endsWith(".ogg", ignoreCase = true)) {
+        // Apple does not read the CDN's Ogg Vorbis files through AVAudioFile.
+        // Cache an AAC rendition keyed by source checksum; never silently play another language.
+        audioPreparationMutex.withLock {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val output = resolved.absolutePath + "." + entry.sha256.take(16) + ".ios.m4a"
+                val files = platform.Foundation.NSFileManager.defaultManager
+                if (!files.fileExistsAtPath(output)) {
+                    val temporary = output + ".partial.m4a"
+                    if (deenly.vorbis.deenly_prepare_vorbis_m4a(resolved.absolutePath, temporary) != 1) {
+                        return@withContext null
+                    }
+                    if (!files.moveItemAtPath(temporary, output, null)) {
+                        files.removeItemAtPath(temporary, null)
+                        return@withContext null
+                    }
+                }
+                output
+            }
+        } ?: return null
+    } else {
+        resolved.absolutePath
+    }
+    return NSURL.fileURLWithPath(localPath).absoluteString
 }
 
 @OptIn(ExperimentalForeignApi::class)

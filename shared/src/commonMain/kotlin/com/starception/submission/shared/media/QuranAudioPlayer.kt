@@ -43,3 +43,22 @@ expect class QuranAudioPlayer() {
     /** Seek to a position in seconds. */
     fun seekTo(seconds: Float)
 }
+
+/** Select the requested recording, matching numeric surah prefixes rather than spelling. */
+internal fun selectQuranAudioAsset(
+    surahNumber: Int,
+    translationCode: String,
+    assets: Collection<com.starception.submission.core.assetcache.AssetEntry>,
+): com.starception.submission.core.assetcache.AssetEntry? {
+    val language = when (translationCode) {
+        "bn" -> "bengali"
+        "en" -> "english"
+        "hi" -> "hindi"
+        "ur" -> "urdu"
+        else -> "arabic"
+    }
+    return assets.firstOrNull { asset ->
+        asset.category == "quran_audio_$language" &&
+            asset.cdnKey.substringAfterLast('/').takeWhile(Char::isDigit).toIntOrNull() == surahNumber
+    }
+}

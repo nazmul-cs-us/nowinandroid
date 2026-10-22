@@ -257,6 +257,8 @@ targets:
           - -framework
           - Shared
     dependencies:
+      # The iOS Vorbis adapter writes a compact AAC cache before AVAudioEngine playback.
+      - sdk: AudioToolbox.framework
       - package: SherpaOnnx
         product: sherpa-onnx
       - package: Swift3D

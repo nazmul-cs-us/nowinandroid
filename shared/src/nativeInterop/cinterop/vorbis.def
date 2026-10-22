@@ -1,0 +1,4 @@
+headers = vorbis_audio.h
+headerFilter = vorbis_audio.h
+linkerOpts = -framework AudioToolbox -framework CoreFoundation
+package = deenly.vorbis

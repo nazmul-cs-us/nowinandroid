@@ -189,6 +189,8 @@ import com.starception.submission.shared.quran.tajweedAnnotatedString
 import com.starception.submission.shared.translation.SharedTranslationService
 import com.starception.submission.shared.voice.PlatformSpeechSynthesizer
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
@@ -494,26 +496,48 @@ internal fun QuranDetailScreen(
         }
     }
 
-    suspend fun playSelectedAudio(): Boolean {
-        val url = resolveQuranAudioUrl(number, translationLanguage.code) ?: return false
-        val started = player.play(url)
-        if (started) {
-            com.starception.submission.shared.media.QuranPlaybackBus.startSurah(
-                player = player,
-                surahNumber = number,
-                audioUrl = url,
-            )
+    var audioJob by remember(number) { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var audioError by remember(number) { mutableStateOf<String?>(null) }
+
+    fun startSelectedAudio() {
+        val requestedLanguage = translationLanguage.code
+        audioJob?.cancel()
+        player.pause()
+        playing = false
+        audioLoading = true
+        audioError = null
+        showAudioPlayer = true
+        audioJob = playbackScope.launch {
+            try {
+                val url = resolveQuranAudioUrl(number, requestedLanguage)
+                    ?: error("Audio is unavailable for this language. Check your connection and try again.")
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                check(player.play(url)) { "Unable to play this audio. Please try again." }
+                com.starception.submission.shared.media.QuranPlaybackBus.startSurah(
+                    player = player,
+                    surahNumber = number,
+                    audioUrl = url,
+                )
+                playing = true
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                audioError = failure.message ?: "Unable to prepare audio. Please try again."
+                playing = false
+            } finally {
+                // A cancelled old language request must not clear the new request's loading state.
+                if (kotlinx.coroutines.currentCoroutineContext().isActive) audioLoading = false
+            }
         }
-        return started
     }
 
+    androidx.compose.runtime.DisposableEffect(number) {
+        onDispose { audioJob?.cancel() }
+    }
     LaunchedEffect(number) {
         if (store.quranAutoplayPending()) {
             store.saveQuranAutoplayPending(false)
-            audioLoading = true
-            playing = playSelectedAudio()
-            audioLoading = false
-            showAudioPlayer = playing
+            startSelectedAudio()
         }
     }
     var loadAttempt by remember(number) { mutableStateOf(0) }
@@ -606,12 +630,7 @@ internal fun QuranDetailScreen(
             player.pause()
             playing = false
         } else if (!audioLoading) {
-            playbackScope.launch {
-                audioLoading = true
-                playing = playSelectedAudio()
-                audioLoading = false
-                if (playing) showAudioPlayer = true
-            }
+            startSelectedAudio()
         }
     }
     val readingSettingsAction = DetailAction(
@@ -633,12 +652,7 @@ internal fun QuranDetailScreen(
             player.pause()
             playing = false
         } else if (!audioLoading) {
-            playbackScope.launch {
-                audioLoading = true
-                playing = playSelectedAudio()
-                audioLoading = false
-                if (playing) showAudioPlayer = true
-            }
+            startSelectedAudio()
         }
     }
     val density = LocalDensity.current
@@ -826,6 +840,15 @@ internal fun QuranDetailScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    if (audioLoading || audioError != null) {
+                        Text(
+                            text = audioError ?: "Preparing ${translationLanguage.displayName} audio…",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (audioError != null) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -839,12 +862,7 @@ internal fun QuranDetailScreen(
                                     player.pause()
                                     playing = false
                                 } else if (!audioLoading) {
-                                    playbackScope.launch {
-                                        audioLoading = true
-                                        playing = playSelectedAudio()
-                                        audioLoading = false
-                                        if (playing) showAudioPlayer = true
-                                    }
+                                    startSelectedAudio()
                                 }
                             },
                         ) {
@@ -1239,8 +1257,18 @@ internal fun QuranDetailScreen(
                     store.saveQuranTajweedEnabled(enabled)
                 },
                 onTranslationLanguageChange = { language ->
-                    translationLanguage = language
-                    store.saveQuranTranslationLanguage(language.code)
+                    if (language != translationLanguage) {
+                        val resume = playing || audioLoading
+                        audioJob?.cancel()
+                        player.stop()
+                        com.starception.submission.shared.media.QuranPlaybackBus.clear()
+                        playing = false
+                        audioLoading = false
+                        audioError = null
+                        translationLanguage = language
+                        store.saveQuranTranslationLanguage(language.code)
+                        if (resume) startSelectedAudio() else showAudioPlayer = false
+                    }
                 },
                 onDismiss = { showReadingSettings = false },
             )
