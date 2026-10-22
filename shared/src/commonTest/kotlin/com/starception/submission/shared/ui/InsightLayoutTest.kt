@@ -11,6 +11,7 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.component.resolveHomePrayerRows
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -53,4 +54,32 @@ class InsightLayoutTest {
         assertEquals(3, layout.rows)
         assertEquals(280f, 92f + layout.rows * (layout.rowHeight + 8f), 0.001f)
     }
+    @Test
+    fun measuredSpaceRevealsWholePrayerRowsDuringResize() {
+        for ((height, rows) in listOf(96f to 1, 192f to 2, 288f to 3)) {
+            val result = resolveHomePrayerRows(height, 6, false, 96f, 88f, 0f, 0f)
+            assertEquals(rows, result.rows)
+            assertEquals(height, result.rows * result.rowHeight, 0.001f)
+            assertTrue(!result.needsScrolling)
+        }
+    }
+
+    @Test
+    fun accessibilityTextReducesRowsInsteadOfClippingContent() {
+        val regular = resolveHomePrayerRows(288f, 6, false, 96f, 88f, 0f, 0f)
+        val largeText = resolveHomePrayerRows(288f, 6, false, 144f, 132f, 0f, 0f)
+        assertEquals(3, regular.rows)
+        assertEquals(2, largeText.rows)
+        assertTrue(largeText.rowHeight >= 132f)
+        assertTrue(!largeText.needsScrolling)
+    }
+
+    @Test
+    fun tinyViewportRetainsReadableRowsWithScrollFallback() {
+        val result = resolveHomePrayerRows(40f, 6, false, 96f, 88f, 0f, 0f)
+        assertEquals(1, result.rows)
+        assertEquals(88f, result.rowHeight)
+        assertTrue(result.needsScrolling)
+    }
+
 }

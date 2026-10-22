@@ -17,17 +17,15 @@ internal fun homePrayerScheduleLayout(
     availableHeight: Float,
     showAllPrayers: Boolean,
     prayerCount: Int,
+    fontScale: Float = 1f,
 ): HomePrayerScheduleLayout {
-    val totalRows = ((prayerCount + 1) / 2).coerceAtLeast(1)
-    // Header (44), control (32), and their fixed section gaps (16).
-    val rowBudget = (availableHeight - 92f).coerceAtLeast(0f)
-    val rows = if (showAllPrayers) {
-        totalRows
-    } else {
-        (rowBudget / (78f + 8f)).toInt().coerceIn(1, totalRows)
-    }
-    return HomePrayerScheduleLayout(
-        rows = rows,
-        rowHeight = (rowBudget / rows - 8f).coerceAtLeast(52f),
+    val layout = com.starception.submission.core.designsystem.component.resolveHomePrayerRows(
+        availableHeight = availableHeight,
+        prayerCount = prayerCount,
+        showAll = showAllPrayers,
+        minimumRowHeight = 78f * fontScale.coerceAtLeast(1f),
+        readableRowHeight = 52f * fontScale.coerceAtLeast(1f),
+        sectionChromeHeight = 92f * fontScale.coerceAtLeast(1f),
     )
+    return HomePrayerScheduleLayout(layout.rows, layout.rowHeight)
 }

@@ -30,6 +30,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -486,46 +487,46 @@ fun PrayerTimesScreen(
                 val portraitCardHeight = (
                     (layoutHeight - 810.dp) / 3
                     ).coerceIn(96.dp, 132.dp)
-                // The extent is normalized, while this measured viewport turns
-                // it into pixels independently on each device and orientation.
-                // On phones retain the header, pager title, one usable prayer row
-                // with its controls, location row, and navigation clearance.
-                // The weighted schedule below allocates all remaining height.
-                val insightViewportHeight = (
-                    maxHeight - if (isTablet) 96.dp else 380.dp
-                    ).coerceAtLeast(220.dp)
-                val renderInsightPager: @Composable (Dp, Boolean, Dp?) -> Unit =
-                    { restingHeight, fullWidth, pageMaxWidth ->
-                        InsightPager(
-                            forceMoonForTesting = forceMoonForTesting,
-                            forceSunForTesting = forceSunForTesting,
-                            initialExpandedPage = initialExpandedInsight,
-                            expansionExtent = insightExpansionExtent,
-                            onExpansionExtentChange = { insightExpansionExtent = it.coerceIn(0f, 1f) },
-                            collapseExpanded = showAllPrayers,
-                            onExpandedPageChange = { expandedInsightPage = it },
-                            onOpenFortressChapter = onOpenFortressChapter,
-                            onOpenBukhariBook = onOpenBukhariBook,
-                            onOpenBukhariHadith = onOpenBukhariHadith,
-                            onOpenShamayelBook = onOpenShamayelBook,
-                            day = day,
-                            placeName = placeName,
-                            salah = salah,
-                            onTogglePrayer = onTogglePrayer,
-                            today = today,
-                            latitude = latitude,
-                            longitude = longitude,
-                            quranPlayer = quranPlayer,
-                            onOpenQuran = onOpenQuran,
-                            onOpenQibla = onOpenQibla,
-                            onOpenRecommendation = onOpenRecommendation,
-                            notifications = notifications,
-                            tileHeight = restingHeight,
-                            maxTileHeight = insightViewportHeight.coerceAtLeast(restingHeight),
-                            fullWidthPage = fullWidth,
-                            maxPageWidth = pageMaxWidth,
-                        )
-                    }
+                // Tablets use their pane's viewport. Portrait phones supply a
+                // separate maximum after measuring their header and navigation.
+                val insightViewportHeight = (maxHeight - 96.dp).coerceAtLeast(220.dp)
+                @Composable
+                fun renderInsightPager(
+                    restingHeight: Dp,
+                    fullWidth: Boolean,
+                    pageMaxWidth: Dp?,
+                    maximumHeight: Dp = insightViewportHeight,
+                ) {
+                    InsightPager(
+                        forceMoonForTesting = forceMoonForTesting,
+                        forceSunForTesting = forceSunForTesting,
+                        initialExpandedPage = initialExpandedInsight,
+                        expansionExtent = insightExpansionExtent,
+                        onExpansionExtentChange = { insightExpansionExtent = it.coerceIn(0f, 1f) },
+                        collapseExpanded = showAllPrayers,
+                        onExpandedPageChange = { expandedInsightPage = it },
+                        onOpenFortressChapter = onOpenFortressChapter,
+                        onOpenBukhariBook = onOpenBukhariBook,
+                        onOpenBukhariHadith = onOpenBukhariHadith,
+                        onOpenShamayelBook = onOpenShamayelBook,
+                        day = day,
+                        placeName = placeName,
+                        salah = salah,
+                        onTogglePrayer = onTogglePrayer,
+                        today = today,
+                        latitude = latitude,
+                        longitude = longitude,
+                        quranPlayer = quranPlayer,
+                        onOpenQuran = onOpenQuran,
+                        onOpenQibla = onOpenQibla,
+                        onOpenRecommendation = onOpenRecommendation,
+                        notifications = notifications,
+                        tileHeight = restingHeight,
+                        maxTileHeight = maximumHeight.coerceAtLeast(restingHeight),
+                        fullWidthPage = fullWidth,
+                        maxPageWidth = pageMaxWidth,
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .widthIn(max = 1200.dp)
@@ -541,6 +542,14 @@ fun PrayerTimesScreen(
                                 if (useTwoPaneLayout) Modifier else syncState.directPullModifier,
                             )
                             .safeDrawingPadding()
+                            .padding(
+                                bottom = if (LocalShowBottomNavigation.current && !useSideNavigation && !isInsightImmersive) {
+                                    72.dp
+                                } else {
+                                    0.dp
+                                },
+                            )
+                            .clipToBounds()
                             .padding(
                                 start = if (useSideNavigation) 80.dp else 24.dp,
                                 end = 24.dp,
@@ -688,86 +697,90 @@ fun PrayerTimesScreen(
                                         compact = false,
                                         onRefresh = onRefresh,
                                     )
-                                    // Keeps the location card clear of the floating pill:
-                                    // 56dp pill + 8dp padding + safe-area breathing room.
-                                    Spacer(Modifier.height(88.dp))
+                                    // Navigation is reserved outside the content viewport.
+                                    Spacer(Modifier.height(8.dp))
                                 }
                             }
                         } else {
                             // Keep the phone viewport fixed while the insight
                             // borrows room from progressively reduced home content.
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(
-                                    if (expandedInsightPage != null) 2.dp else 8.dp,
-                                ),
-                            ) {
-                                renderInsightPager(portraitInsightHeight, false, null)
-                                if (!isInsightImmersive) {
-                                    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                                        val scheduleLayout = homePrayerScheduleLayout(
-                                            maxHeight.value,
-                                            showAllPrayers,
-                                            day.dashboardSlots().size,
-                                        )
-                                        PrayerScheduleSection(
-                                            modifier = Modifier.fillMaxSize()
-                                                .verticalScroll(rememberScrollState()),
-                                            day = day,
-                                            offsets = offsets,
-                                            showAllPrayers = showAllPrayers,
-                                            onToggleExpanded = { showAllPrayers = !showAllPrayers },
-                                            onAdjustPrayer = onAdjustPrayer,
-                                            onTogglePrayerAdhan = onTogglePrayerAdhan,
-                                            onAdhanVolumeChange = onAdhanVolumeChange,
-                                            onOpenAdhanVolume = { name, volume ->
-                                                activeAdhanVolume = name to volume
-                                            },
-                                            isTuning = isTuningSchedule,
-                                            onToggleTuning = { isTuningSchedule = !isTuningSchedule },
-                                            notifications = notifications,
-                                            onTogglePrayerNotification = onTogglePrayerNotification,
-                                            showExpandControl = true,
-                                            compact = true,
-                                            cardMinHeight = scheduleLayout.rowHeight.dp,
-                                            collapsedRows = scheduleLayout.rows,
-                                            showFooterLocationPin = showAllPrayers,
-                                            onFooterLocationClick = { showAllPrayers = false },
-                                        )
+                            BoxWithConstraints(Modifier.fillMaxSize()) {
+                                val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+                                // Reserve one readable prayer row plus its controls,
+                                // location, pager title and gaps inside this real viewport.
+                                val minimumSchedule = (152f * scale).dp
+                                val phoneMaximumInsight = (maxHeight - minimumSchedule - 114.dp)
+                                    .coerceAtLeast(140.dp)
+                                val phoneRestingInsight = minOf(portraitInsightHeight, phoneMaximumInsight - 44.dp)
+                                    .coerceAtLeast(96.dp)
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.spacedBy(
+                                        if (expandedInsightPage != null) 2.dp else 8.dp,
+                                    ),
+                                ) {
+                                    renderInsightPager(phoneRestingInsight, false, null, phoneMaximumInsight)
+                                    if (!isInsightImmersive) {
+                                        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                                            val scheduleLayout = homePrayerScheduleLayout(
+                                                maxHeight.value,
+                                                showAllPrayers,
+                                                day.dashboardSlots().size,
+                                                scale,
+                                            )
+                                            PrayerScheduleSection(
+                                                modifier = Modifier.fillMaxSize()
+                                                    .verticalScroll(rememberScrollState()),
+                                                day = day,
+                                                offsets = offsets,
+                                                showAllPrayers = showAllPrayers,
+                                                onToggleExpanded = { showAllPrayers = !showAllPrayers },
+                                                onAdjustPrayer = onAdjustPrayer,
+                                                onTogglePrayerAdhan = onTogglePrayerAdhan,
+                                                onAdhanVolumeChange = onAdhanVolumeChange,
+                                                onOpenAdhanVolume = { name, volume ->
+                                                    activeAdhanVolume = name to volume
+                                                },
+                                                isTuning = isTuningSchedule,
+                                                onToggleTuning = { isTuningSchedule = !isTuningSchedule },
+                                                notifications = notifications,
+                                                onTogglePrayerNotification = onTogglePrayerNotification,
+                                                showExpandControl = true,
+                                                compact = true,
+                                                cardMinHeight = scheduleLayout.rowHeight.dp,
+                                                collapsedRows = scheduleLayout.rows,
+                                                showFooterLocationPin = showAllPrayers,
+                                                onFooterLocationClick = { showAllPrayers = false },
+                                            )
+                                        }
+                                        // Keep location in normal flow directly below
+                                        // the reduced schedule while resizing.
+                                        AnimatedVisibility(
+                                            visible = !showAllPrayers,
+                                            enter = expandVertically(
+                                                animationSpec = tween(
+                                                    durationMillis = 840,
+                                                    easing = FastOutSlowInEasing,
+                                                ),
+                                            ) + fadeIn(animationSpec = tween(durationMillis = 280)),
+                                            exit = shrinkVertically(
+                                                animationSpec = tween(
+                                                    durationMillis = 680,
+                                                    easing = FastOutSlowInEasing,
+                                                ),
+                                            ) + fadeOut(animationSpec = tween(durationMillis = 180)),
+                                        ) {
+                                            LocationWeatherRow(
+                                                placeName = placeName,
+                                                temperatureCelsius = day.temperatureCelsius,
+                                                conditionLabel = day.conditionLabel,
+                                                isLocating = isLocating,
+                                                compact = false,
+                                                onRefresh = onRefresh,
+                                            )
+                                        }
+                                        Spacer(Modifier.height(8.dp))
                                     }
-                                    // Keep location in normal flow directly below
-                                    // the reduced schedule while resizing.
-                                    AnimatedVisibility(
-                                        visible = !showAllPrayers,
-                                        enter = expandVertically(
-                                            animationSpec = tween(
-                                                durationMillis = 840,
-                                                easing = FastOutSlowInEasing,
-                                            ),
-                                        ) + fadeIn(animationSpec = tween(durationMillis = 280)),
-                                        exit = shrinkVertically(
-                                            animationSpec = tween(
-                                                durationMillis = 680,
-                                                easing = FastOutSlowInEasing,
-                                            ),
-                                        ) + fadeOut(animationSpec = tween(durationMillis = 180)),
-                                    ) {
-                                        LocationWeatherRow(
-                                            placeName = placeName,
-                                            temperatureCelsius = day.temperatureCelsius,
-                                            conditionLabel = day.conditionLabel,
-                                            isLocating = isLocating,
-                                            compact = false,
-                                            onRefresh = onRefresh,
-                                        )
-                                    }
-                                    Spacer(
-                                        Modifier.height(
-                                            // Keep the location card safely above the
-                                            // floating bottom navigation in every state.
-                                            48.dp,
-                                        ),
-                                    )
                                 }
                             }
                         }

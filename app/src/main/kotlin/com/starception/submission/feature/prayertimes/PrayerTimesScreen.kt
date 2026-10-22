@@ -26,6 +26,9 @@ import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
+import com.starception.submission.core.designsystem.component.resolveHomePrayerRows
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -51,7 +54,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollable
@@ -135,7 +137,6 @@ import com.starception.submission.core.designsystem.component.NiaBottomSheetThem
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.component.NiaButton
 import com.starception.submission.core.designsystem.component.NiaTextButton
-import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
@@ -2963,11 +2964,9 @@ fun PrayerTimesScreen(
                 val outerConfiguration = LocalConfiguration.current
                 val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
                 var showAllPrayers by rememberSaveable { mutableStateOf(false) }
-                // An enlarged Insight tile funds its extra height from the prayer
-                // rows: while one is open, the schedule keeps a single row so the
-                // "Show All Prayers" control and the location card stay on screen.
+                // Prayer rows share the measured space left by the insight tile;
+                // resize gestures may reveal one, two, or three readable rows.
                 var insightTileExpanded by remember { mutableStateOf(false) }
-                var insightExpansionProgress by remember { mutableFloatStateOf(0f) }
                 var insightTileImmersive by remember { mutableStateOf(false) }
                 LaunchedEffect(insightTileImmersive) {
                     com.starception.submission.ui.InsightImmersiveBus.update(insightTileImmersive)
@@ -2991,46 +2990,12 @@ fun PrayerTimesScreen(
                     }
                 }
                 val portraitScrollState = rememberScrollState()
-                var keepExpansionScrollEnabled by remember { mutableStateOf(false) }
-                // Insights keeps its full geometry in expanded mode. Follow the added
-                // prayer row with scroll instead of compressing the carousel; the full
-                // location card simultaneously contracts into a compact action.
-                // Row 3 adds 106dp while the location control gives back 52dp
-                // (92dp -> 40dp). Scroll only that 54dp net growth. The previous
-                // 122dp travel made the entering tiles move farther than their reveal,
-                // which looked like a bounce before the layout settled.
-                val expansionScrollDistancePx = with(LocalDensity.current) { 54.dp.toPx() }
-                // A disabled verticalScroll does not dispatch nested-scroll deltas, which
-                // prevents PullToSyncContainer from seeing downward drags while the prayer
-                // list is collapsed. This no-op scrollable keeps the page stationary while
-                // still forwarding those gestures to the pull-to-sync connection.
+                var homeViewport by remember { mutableStateOf(IntSize.Zero) }
+                var insightHeightPx by remember { mutableIntStateOf(0) }
+                var prayerHeaderHeightPx by remember { mutableIntStateOf(0) }
+                var homeFooterHeightPx by remember { mutableIntStateOf(0) }
+                // Content scrolls naturally after the insight reaches its resize limit.
                 val pullGestureScrollState = rememberScrollableState { 0f }
-                LaunchedEffect(showAllPrayers, outerIsLandscape) {
-                    if (!outerIsLandscape) {
-                        if (showAllPrayers) {
-                            // Bring the added row and its controls into view while the
-                            // full-size Insights carousel remains available above.
-                            keepExpansionScrollEnabled = true
-                            withFrameNanos { }
-                            portraitScrollState.animateScrollBy(
-                                value = expansionScrollDistancePx,
-                                animationSpec = tween(
-                                    durationMillis = 840,
-                                    easing = FastOutSlowInEasing,
-                                ),
-                            )
-                        } else if (keepExpansionScrollEnabled) {
-                            portraitScrollState.animateScrollTo(
-                                value = 0,
-                                animationSpec = tween(
-                                    durationMillis = 680,
-                                    easing = FastOutSlowInEasing,
-                                ),
-                            )
-                            keepExpansionScrollEnabled = false
-                        }
-                    }
-                }
                 // Dynamic top inset: full at rest, collapses during pull (Fitbit-style)
                 val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
                     .asPaddingValues().calculateTopPadding()
@@ -3050,17 +3015,21 @@ fun PrayerTimesScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
+                            .padding(
+                                bottom = if (!outerIsLandscape && !insightTileImmersive) {
+                                    navigationBarInset + 72.dp
+                                } else {
+                                    0.dp
+                                },
+                            )
+                            .clipToBounds()
+                            .onSizeChanged { homeViewport = it }
                             .then(syncState.pullModifier)
                             .then(
-                                if (!outerIsLandscape && (showAllPrayers || keepExpansionScrollEnabled)) {
-                                    Modifier.verticalScroll(
-                                        state = portraitScrollState,
-                                    )
+                                if (!outerIsLandscape) {
+                                    Modifier.verticalScroll(portraitScrollState)
                                 } else {
-                                    Modifier.scrollable(
-                                        state = pullGestureScrollState,
-                                        orientation = Orientation.Vertical,
-                                    )
+                                    Modifier.scrollable(pullGestureScrollState, Orientation.Vertical)
                                 },
                             ),
                     ) {
@@ -3131,22 +3100,6 @@ fun PrayerTimesScreen(
                                 val syncTopInsetReclaim = (statusBarInset - dynamicTopInset)
                                     .coerceAtLeast(0.dp)
                                     .coerceAtMost(syncState.heldContentInsetTop)
-                                // The floating pill (56dp tall + its 8dp outer inset) tops out
-                                // 64dp above the screen edge, while the resting spacer below
-                                // the location card leaves 86dp. Reclaiming more than 16dp of
-                                // that during the pull slid the location text under the pill;
-                                // 16dp keeps the pull's bottom motion without any clipping.
-                                val syncBottomClearanceReclaim = syncState.heldContentInsetTop.coerceAtMost(
-                                    (FloatingNavClearance - 6.dp) - (FloatingNavClearance - 28.dp) - 6.dp,
-                                )
-                                // The expanded prayer list needs the full bottom clearance as manual
-                                // scroll runway for its added row and the location card beneath it.
-                                val effectiveSyncBottomClearanceReclaim =
-                                    if (showAllPrayers || keepExpansionScrollEnabled) {
-                                        0.dp
-                                    } else {
-                                        syncBottomClearanceReclaim
-                                    }
                                 // Compress flexible Insights by the banner displacement that remains
                                 // after the search chrome gives back its status-bar inset. This keeps
                                 // every control below Insights in normal layout flow.
@@ -3471,23 +3424,27 @@ fun PrayerTimesScreen(
                                             targetState = showAllPrayers,
                                             label = "prayerDashboardExpansion",
                                         )
-                                        // Keep the child measurement stable while row 3 is revealed. If the
-                                        // tiles resize during expandVertically, its moving target produces a
-                                        // visible settle at the end of the entrance.
-                                        val tileHeight = 106.dp
-                                        // While an Insight tile is enlarged, the folded second prayer row
-                                        // returns slightly more height than the carousel takes. Instead of
-                                        // leaving that surplus as empty space above the toggle, the single
-                                        // remaining prayer row grows by the same amount — so the bottom
-                                        // controls keep their exact resting placement.
-                                        val insightStripGrowth = portraitExpandedInsightHeight -
-                                            portraitInsightHeight
-                                        val insightRowCompensation = (tileHeight - insightStripGrowth)
-                                            .coerceAtLeast(0.dp)
-                                        val prayerRowHeight = tileHeight +
-                                            insightRowCompensation * insightExpansionProgress
-                                        val secondaryPrayerRowProgress =
-                                            (1f - insightExpansionProgress).coerceIn(0f, 1f)
+                                        val dashboardDensity = LocalDensity.current
+                                        val chromeHeight = with(dashboardDensity) {
+                                            val header = if (prayerHeaderHeightPx > 0) prayerHeaderHeightPx.toDp() else 52.dp
+                                            val footer = if (homeFooterHeightPx > 0) homeFooterHeightPx.toDp() else 92.dp
+                                            header + footer + 16.dp
+                                        }
+                                        val remainingHeight = with(dashboardDensity) {
+                                            homeViewport.height.toDp() - insightHeightPx.toDp() - chromeHeight
+                                        }
+                                        val rowLayout = resolveHomePrayerRows(
+                                            availableHeight = remainingHeight.value,
+                                            prayerCount = 6,
+                                            showAll = showAllPrayers,
+                                            minimumRowHeight = 96f * fontScale.coerceAtLeast(1f),
+                                            readableRowHeight = 88f * fontScale.coerceAtLeast(1f),
+                                            sectionChromeHeight = 0f,
+                                            rowSpacing = 0f,
+                                        )
+                                        val tileHeight = rowLayout.rowHeight.dp
+                                        val prayerRowHeight = tileHeight
+                                        val secondaryPrayerRowProgress = if (rowLayout.rows >= 2) 1f else 0f
                                         val buttonIconRotation by dashboardTransition.animateFloat(
                                             transitionSpec = {
                                                 tween(durationMillis = 680, easing = FastOutSlowInEasing)
@@ -3499,7 +3456,8 @@ fun PrayerTimesScreen(
                                         // Swipeable Big Tiles
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxWidth(),
+                                                .fillMaxWidth()
+                                                .onSizeChanged { insightHeightPx = it.height },
                                         ) {
                                             SwipeableBigTiles(
                                                 prayerTimes = prayerTimes,
@@ -3578,9 +3536,6 @@ fun PrayerTimesScreen(
                                                     insightTileExpanded = expandedPage != null
                                                     expandedInsightPage = expandedPage
                                                 },
-                                                onExpansionProgressChange = { progress ->
-                                                    insightExpansionProgress = progress
-                                                },
                                                 onImmersiveModeChange = { immersive ->
                                                     insightTileImmersive = immersive
                                                 },
@@ -3605,6 +3560,7 @@ fun PrayerTimesScreen(
                                             Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .onSizeChanged { prayerHeaderHeightPx = it.height }
                                                 .padding(top = 4.dp, bottom = 4.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically,
@@ -3873,38 +3829,7 @@ fun PrayerTimesScreen(
                                         }
                                         }
 
-                                        // The height the folded second prayer row returns beyond
-                                        // what the enlarged Insight tile takes is absorbed by the
-                                        // single remaining prayer row (prayerRowHeight above), so
-                                        // "Show All Prayers" and the location card keep their exact
-                                        // resting placement with no leftover gap.
-
-                                        // Material 3 expressive expandable section with a deliberately
-                                        // unhurried curve; this avoids the abrupt accordion-like jump.
-                                        AnimatedVisibility(
-                                            visible = showAllPrayers,
-                                            enter = expandVertically(
-                                                animationSpec = tween(
-                                                    durationMillis = 840,
-                                                    easing = FastOutSlowInEasing,
-                                                ),
-                                                expandFrom = Alignment.Top,
-                                            ) + fadeIn(
-                                                animationSpec = tween(
-                                                    durationMillis = 500,
-                                                    delayMillis = 40,
-                                                ),
-                                            ),
-                                            exit = shrinkVertically(
-                                                animationSpec = tween(
-                                                    durationMillis = 680,
-                                                    easing = FastOutSlowInEasing,
-                                                ),
-                                                shrinkTowards = Alignment.Top,
-                                            ) + fadeOut(
-                                                animationSpec = tween(durationMillis = 240),
-                                            ),
-                                        ) {
+                                        if (showAllPrayers || rowLayout.rows >= 3) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -3997,7 +3922,7 @@ fun PrayerTimesScreen(
                                         // resize and round into the floating pin instead of cross-fading
                                         // between two unrelated components.
                                         BoxWithConstraints(
-                                            modifier = Modifier.fillMaxWidth(),
+                                            modifier = Modifier.fillMaxWidth().onSizeChanged { homeFooterHeightPx = it.height },
                                         ) {
                                             // The location morph and row-3 expansion share the same state,
                                             // duration and easing so neither can lead or catch up to the other.
@@ -4536,14 +4461,7 @@ fun PrayerTimesScreen(
                                             }
                                         }
 
-                                        Spacer(
-                                            modifier = Modifier.height(
-                                                // The floating bar already includes its own 8dp outer inset.
-                                                // Reserving another 10dp here left a large visible gutter
-                                                // below the final dashboard action in both layout states.
-                                                FloatingNavClearance - 6.dp - effectiveSyncBottomClearanceReclaim,
-                                            ),
-                                        )
+                                        Spacer(Modifier.height(8.dp))
                                         }
                                     }
                                 } // End of portrait layout else block

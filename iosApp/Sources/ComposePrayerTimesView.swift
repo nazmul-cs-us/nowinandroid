@@ -856,7 +856,9 @@ struct NativePrayerTabsView: View {
 
     private func tabContent(_ index: Int) -> some View {
         ComposePrayerTimesTabView(tabIndex: index, onSelectTab: selectContentTab)
-            .ignoresSafeArea(.all)
+            // Keep the native tab bar's safe area; only the top artwork extends.
+            .ignoresSafeArea(.container, edges: index == 0 ? .top : .all)
+            .clipped()
             .toolbar(insightImmersive ? .hidden : .visible, for: .tabBar)
     }
 
