@@ -137,6 +137,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.starception.submission.core.designsystem.component.InsightContentLayout
 import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
 import com.starception.submission.core.designsystem.component.insightWidthExpansionProgress
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -2333,6 +2334,7 @@ internal fun SwipeableBigTiles(
                                  null
                              },
                             expandedContentHorizontalBleed = 10.dp,
+                            minimumExpandedContentHeight = 320.dp,
                         )
 
                         else -> {
@@ -3037,6 +3039,7 @@ private fun InsightPreviewCard(
     onCompactContentHeightChange: (Dp) -> Unit = {},
     // Editorial content joined to the bottom stack only while enlarged.
     expandedLeadingContent: (@Composable () -> Unit)? = null,
+    minimumExpandedContentHeight: Dp = 240.dp,
     // Expanded editorial panels may reclaim part of the metadata footer's
     // horizontal inset without changing the footer alignment itself.
     expandedContentHorizontalBleed: Dp = 0.dp,
@@ -3937,45 +3940,7 @@ private fun InsightPreviewCard(
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxSize()
-                    // A scrolling descendant inside a persistent alpha layer
-                    // flickers on Samsung's hardware renderer. Keep the layer
-                    // only for the independent entrance tween, then remove it
-                    // at 100% so scrolling remains layer-free.
-                    .then(
-                        if (isExpanded) {
-                            if (expandedContentEntrance.value < 0.999f) {
-                                Modifier.graphicsLayer {
-                                    val reveal = expandedContentEntrance.value.coerceIn(0f, 1f)
-                                    alpha = reveal
-                                    translationY = (1f - reveal) * 10.dp.toPx()
-                                }
-                            } else {
-                                Modifier
-                            }
-                        } else {
-                            Modifier.graphicsLayer {
-                                alpha = bottomContentReveal
-                                translationY = (1f - bottomContentReveal) * 12.dp.toPx()
-                            }
-                        },
-                    )
-                    .padding(
-                        start = titleHorizontalPadding,
-                        end = titleHorizontalPadding,
-                        // The visual grip is small; keep only compact breathing
-                        // room while its larger touch target overlays the corner.
-                        bottom = if (editorialExpanded) 30.dp else titleBottomPadding + 8.dp,
-                    )
-                    // A measured header zone keeps every expanded payload out
-                    // of the top controls. The weighted middle absorbs banner
-                    // compression; the metadata below retains natural height.
-                    .padding(top = if (editorialExpanded) 70.dp else tagInset + if (isExpanded) 50.dp else 44.dp),
-                verticalArrangement = Arrangement.spacedBy(contentSpacing),
-            ) {
+            val stageContent: @Composable () -> Unit = {
                 if (isExpanded && expandedLeadingContent != null) {
                     Box(
                         modifier = Modifier
@@ -3983,7 +3948,7 @@ private fun InsightPreviewCard(
                                 cardMaxWidth - (titleHorizontalPadding * 2) +
                                     (if (editorialExpanded) 0.dp else expandedContentHorizontalBleed * 2),
                             )
-                            .weight(1f),
+                            .fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         // Editorial content sits directly over the artwork. Keep the
@@ -4003,9 +3968,10 @@ private fun InsightPreviewCard(
                         }
                     }
                 } else {
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.fillMaxSize())
                 }
-
+            }
+            val metadataContent: @Composable () -> Unit = {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -4143,7 +4109,7 @@ private fun InsightPreviewCard(
                         ),
                         color = Color.White,
                         fontWeight = FontWeight.Medium,
-                        maxLines = if (hasPrayerContext) 2 else 3,
+                        maxLines = if (editorialExpanded) Int.MAX_VALUE else if (hasPrayerContext) 2 else 3,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -4158,7 +4124,7 @@ private fun InsightPreviewCard(
                         ),
                         color = Color.White.copy(alpha = 0.88f),
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = if (isExpanded) 2 else 1,
+                        maxLines = if (editorialExpanded) Int.MAX_VALUE else if (isExpanded) 2 else 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -4420,10 +4386,79 @@ private fun InsightPreviewCard(
                             ),
                             color = Color.White.copy(alpha = 0.78f),
                             fontWeight = FontWeight.Medium,
-                            maxLines = 2,
+                            maxLines = if (editorialExpanded) Int.MAX_VALUE else 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                }
+            }
+            if (editorialExpanded) {
+                val roomy = ((maxHeight.value - 240f) / 200f).coerceIn(0f, 1f)
+                InsightContentLayout(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (expandedContentEntrance.value < 0.999f) {
+                                Modifier.graphicsLayer {
+                                    alpha = expandedContentEntrance.value.coerceIn(0f, 1f)
+                                }
+                            } else Modifier,
+                        )
+                        .padding(
+                            start = titleHorizontalPadding,
+                            end = titleHorizontalPadding,
+                            top = (58f + 12f * roomy).dp,
+                            bottom = (22f + 8f * roomy).dp,
+                        ),
+                    spacing = (8f + 6f * roomy).dp,
+                    minimumStageHeight = minimumExpandedContentHeight,
+                    stage = stageContent,
+                    metadata = metadataContent,
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxSize()
+                        // A scrolling descendant inside a persistent alpha layer
+                        // flickers on Samsung's hardware renderer. Keep the layer
+                        // only for the independent entrance tween, then remove it
+                        // at 100% so scrolling remains layer-free.
+                        .then(
+                            if (isExpanded) {
+                                if (expandedContentEntrance.value < 0.999f) {
+                                    Modifier.graphicsLayer {
+                                        val reveal = expandedContentEntrance.value.coerceIn(0f, 1f)
+                                        alpha = reveal
+                                        translationY = (1f - reveal) * 10.dp.toPx()
+                                    }
+                                } else {
+                                    Modifier
+                                }
+                            } else {
+                                Modifier.graphicsLayer {
+                                    alpha = bottomContentReveal
+                                    translationY = (1f - bottomContentReveal) * 12.dp.toPx()
+                                }
+                            },
+                        )
+                        .padding(
+                            start = titleHorizontalPadding,
+                            end = titleHorizontalPadding,
+                            // The visual grip is small; keep only compact breathing
+                            // room while its larger touch target overlays the corner.
+                            bottom = titleBottomPadding + 8.dp,
+                        )
+                        // A measured header zone keeps every expanded payload out
+                        // of the top controls. The weighted middle absorbs banner
+                        // compression; the metadata below retains natural height.
+                        .padding(top = tagInset + if (isExpanded) 50.dp else 44.dp),
+                    verticalArrangement = Arrangement.spacedBy(contentSpacing),
+                ) {
+                    Box(Modifier.weight(1f), propagateMinConstraints = true) {
+                        stageContent()
+                    }
+                    metadataContent()
                 }
             }
         }

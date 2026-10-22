@@ -12,6 +12,7 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.component.resolveHomePrayerRows
+import com.starception.submission.core.designsystem.component.insightStageHeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -82,4 +83,33 @@ class InsightLayoutTest {
         assertTrue(result.needsScrolling)
     }
 
+    @Test
+    fun shrinkingInsightRetainsReadableStageAndReachableFooter() {
+        val footerHeight = 104
+        val gap = 14
+        val minimumStage = 240
+        for (viewport in listOf(600, 400, 260, 180, 80, 0)) {
+            val stage = insightStageHeight(viewport, footerHeight, gap, minimumStage)
+            assertTrue(stage >= minimumStage)
+            val scrollableHeight = stage + gap + footerHeight
+            assertTrue(scrollableHeight >= viewport)
+            // When it fits, use all the available height without unnecessary scrolling.
+            if (viewport >= minimumStage + gap + footerHeight) {
+                assertEquals(viewport, scrollableHeight)
+            }
+        }
+    }
+
+    @Test
+    fun wrappingMetadataCannotSqueezeReadingStageToZero() {
+        val stage = insightStageHeight(280, 380, 8, 240)
+        assertEquals(240, stage)
+        assertEquals(628, stage + 380 + 8)
+    }
+
+    @Test
+    fun largeTextAndCompassRetainTheirMinimumReadableHeight() {
+        assertEquals(480, insightStageHeight(300, 160, 14, 480))
+        assertEquals(320, insightStageHeight(200, 0, 0, 320))
+    }
 }

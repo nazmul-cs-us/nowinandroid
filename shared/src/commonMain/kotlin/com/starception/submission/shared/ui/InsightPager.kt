@@ -96,6 +96,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.starception.submission.core.designsystem.component.InsightContentLayout
 import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
 import com.starception.submission.core.designsystem.component.insightWidthExpansionProgress
 import androidx.compose.ui.draw.blur
@@ -922,6 +923,7 @@ fun InsightPager(
                                 subtitle = if (isExpanded) "" else qiblaCardinalDirection(qiblaBearing),
                                 footerText = if (isExpanded) null else "Open the live compass and 3D globe",
                                 tileHeight = effectiveTileHeight,
+                                minimumExpandedContentHeight = 320.dp,
                                 onClick = onOpenQibla,
                                 onLongClick = onLongClick,
                                 onCompactContentHeightChange = { measured ->
@@ -1538,8 +1540,6 @@ private fun ExpandedSalahHadith(
                     letterSpacing = 0.sp,
                 ),
                 color = Color.White.copy(alpha = 0.56f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.then(
                     resolvedHadith?.let { hadith ->
                         Modifier.clickable { onOpenHadith(hadith.id) }
@@ -2009,7 +2009,10 @@ private fun ExpandedSuggestion(
     supportingText: String,
     footerText: String?,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -2039,8 +2042,6 @@ private fun ExpandedSuggestion(
             ),
             color = Color.White,
             fontWeight = FontWeight.Medium,
-            maxLines = 4,
-            overflow = TextOverflow.Ellipsis,
         )
         footerText?.let {
             Text(
@@ -2050,8 +2051,6 @@ private fun ExpandedSuggestion(
                     lineHeight = 14.sp,
                 ),
                 color = Color.White.copy(alpha = 0.66f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
         }
         Text(
@@ -2414,7 +2413,8 @@ private fun MissingModelDownloadCard(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -2490,6 +2490,7 @@ private fun ArtworkTile(
     title: String,
     subtitle: String,
     tileHeight: Dp,
+    minimumExpandedContentHeight: Dp = 240.dp,
     modifier: Modifier = Modifier,
     footerText: String? = null,
     topEndContent: @Composable (() -> Unit)? = null,
@@ -2647,38 +2648,48 @@ private fun ArtworkTile(
                 }
             }
             if (isExpanded) {
-                Column(
+                val roomy = ((tileHeight.value - 240f) / 200f).coerceIn(0f, 1f)
+                InsightContentLayout(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = 22.dp, top = 70.dp, end = 22.dp, bottom = 30.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    content?.let { expandedContent ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .graphicsLayer {
-                                    alpha = expandedContentEntrance
-                                    // Keep the content's center fixed while its
-                                    // alpha/scale entrance runs; translating it
-                                    // here makes it visibly drop into place.
-                                    translationY = 0f
-                                },
-                            // Android centers the expanded stage inside its
-                            // weighted zone instead of pinning it to the top.
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            expandedContent()
+                        .padding(
+                            start = 22.dp, end = 22.dp,
+                            top = (58f + 12f * roomy).dp,
+                            bottom = (22f + 8f * roomy).dp,
+                        ),
+                    spacing = (8f + 6f * roomy).dp,
+                    minimumStageHeight = minimumExpandedContentHeight,
+                    stage = {
+                        content?.let { expandedContent ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        alpha = expandedContentEntrance
+                                        // Keep the content's center fixed while its
+                                        // alpha/scale entrance runs; translating it
+                                        // here makes it visibly drop into place.
+                                        translationY = 0f
+                                    },
+                                // Android centers the expanded stage inside its
+                                // weighted zone instead of pinning it to the top.
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                expandedContent()
+                            }
                         }
-                    }
-                    ArtworkTileMetadata(
-                        title = title,
-                        subtitle = subtitle,
-                        footerText = footerText,
-                        expanded = true,
-                    )
-                }
+                    },
+                    metadata = {
+                        Column(verticalArrangement = Arrangement.spacedBy((8f + 6f * roomy).dp)) {
+                            ArtworkTileMetadata(
+                                title = title,
+                                subtitle = subtitle,
+                                footerText = footerText,
+                                expanded = true,
+                            )
+                        }
+                    },
+                )
             } else {
                 Column(
                     modifier = Modifier
@@ -2722,7 +2733,7 @@ private fun ArtworkTileMetadata(
             ),
             fontWeight = FontWeight.Medium,
             color = Color.White,
-            maxLines = 3,
+            maxLines = if (expanded) Int.MAX_VALUE else 3,
             overflow = TextOverflow.Ellipsis,
         )
     }
@@ -2736,7 +2747,7 @@ private fun ArtworkTileMetadata(
             ),
             color = Color.White.copy(alpha = 0.88f),
             fontWeight = FontWeight.SemiBold,
-            maxLines = if (expanded) 2 else 1,
+            maxLines = if (expanded) Int.MAX_VALUE else 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
@@ -2750,7 +2761,7 @@ private fun ArtworkTileMetadata(
             ),
             color = Color.White.copy(alpha = 0.78f),
             fontWeight = FontWeight.Medium,
-            maxLines = 2,
+            maxLines = if (expanded) Int.MAX_VALUE else 2,
             overflow = TextOverflow.Ellipsis,
         )
     }
