@@ -16,6 +16,7 @@
 
 package com.starception.submission.core.designsystem.component
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -77,10 +78,10 @@ fun InsightResizeCornerHandle(
                 animation = keyframes {
                     durationMillis = 8_000
                     0f at 0
-                    0f at 5_000
-                    1f at 5_600
-                    0f at 6_200
-                    1f at 6_800
+                    0f at 5_000 using FastOutSlowInEasing
+                    1f at 5_600 using FastOutSlowInEasing
+                    0f at 6_200 using FastOutSlowInEasing
+                    1f at 6_800 using FastOutSlowInEasing
                     0f at 7_400
                     0f at 8_000
                 },
@@ -127,16 +128,17 @@ fun InsightResizeCornerHandle(
                 )
             },
     ) {
-        // Equal-length parallel strokes, separated perpendicular to their
-        // diagonal. Mirror both their angle and movement at the right corner.
-        val nudge = hintProgress * 2f
+        // A compact, graduated corner grip: the shorter outer stroke nests
+        // against the longer inner one, with aligned ends and a fine gap.
+        val nudge = hintProgress * 1.25f
         fun point(x: Float, y: Float) = Offset(
             if (isStart) (x - nudge).dp.toPx() else size.width - (x - nudge).dp.toPx(),
             size.height - (y - nudge).dp.toPx(),
         )
-        val stroke = (1.8f + activeProgress * 0.2f).dp.toPx()
-        drawLine(strokeColor, point(16f, 18f), point(23f, 11f), stroke, StrokeCap.Round)
-        drawLine(strokeColor, point(18.5f, 20.5f), point(25.5f, 13.5f), stroke, StrokeCap.Round)
+        val stroke = (1.35f + activeProgress * 0.15f).dp.toPx()
+        val ink = strokeColor.copy(alpha = 0.8f + activeProgress * 0.2f)
+        drawLine(ink, point(16f, 17f), point(21f, 12f), stroke, StrokeCap.Round)
+        drawLine(ink, point(16f, 21f), point(25f, 12f), stroke, StrokeCap.Round)
     }
 }
 
