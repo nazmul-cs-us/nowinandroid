@@ -1369,6 +1369,7 @@ internal fun SwipeableBigTiles(
     onExpandedPageChange: ((Int?) -> Unit)? = null,
     onExpansionProgressChange: (Float) -> Unit = {},
     onImmersiveModeChange: (Boolean) -> Unit = {},
+    onHeaderHeightChange: (Dp) -> Unit = {},
     collapseExpandedTileRequest: Int = 0,
 ) {
     val insightPageCount = INSIGHT_PAGE_COUNT
@@ -1806,6 +1807,7 @@ internal fun SwipeableBigTiles(
         if (!isImmersive) Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .onSizeChanged { onHeaderHeightChange(with(density) { it.height.toDp() }) }
                 .padding(bottom = headerBottomPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,

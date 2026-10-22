@@ -21,12 +21,15 @@ fun resolveHomePrayerRows(
     readableRowHeight: Float = 52f,
     sectionChromeHeight: Float = 92f,
     rowSpacing: Float = 8f,
+    maximumRowHeight: Float = 140f,
 ): HomePrayerRows {
     val totalRows = ((prayerCount + 1) / 2).coerceAtLeast(1)
     val budget = (availableHeight - sectionChromeHeight).coerceAtLeast(0f)
+    val minimumHeight = maxOf(minimumRowHeight, readableRowHeight)
     val rowCount = if (showAll) totalRows else
-        (budget / (minimumRowHeight + rowSpacing)).toInt().coerceIn(1, totalRows)
-    val height = (budget / rowCount - rowSpacing).coerceAtLeast(readableRowHeight)
+        (budget / (minimumHeight + rowSpacing)).toInt().coerceIn(1, totalRows)
+    val height = (budget / rowCount - rowSpacing)
+        .coerceIn(minimumHeight, maxOf(minimumHeight, maximumRowHeight))
     return HomePrayerRows(
         rows = rowCount,
         rowHeight = height,

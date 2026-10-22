@@ -29,6 +29,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import com.starception.submission.core.designsystem.component.resolveHomePrayerRows
+import com.starception.submission.core.designsystem.component.PrayerTileContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -118,6 +119,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1937,6 +1939,8 @@ fun PrayerTimesScreen(
         }
     }
 
+    val prayerContentHeights = remember(LocalDensity.current.fontScale) { mutableStateMapOf<String, Dp>() }
+
     // INTERACTIVE PRAYER CARD HELPER - Creates prayer card with long-press dial functionality
     @Composable
     fun InteractivePrayerCard(
@@ -2309,7 +2313,7 @@ fun PrayerTimesScreen(
                             )
                         },
                 ) {
-                    Column(
+                    PrayerTileContent(
                         modifier = Modifier
                             .fillMaxSize()
                             .drawBehind {
@@ -2325,7 +2329,12 @@ fun PrayerTimesScreen(
                                 top = if (compactTile) 5.dp else 8.dp,
                                 bottom = if (compactTile) 6.dp else 8.dp,
                             ),
-                        verticalArrangement = Arrangement.SpaceBetween,
+                        verticalPadding = if (compactTile) 11.dp else 16.dp,
+                        onMinimumHeightChange = { minimum ->
+                            if (!compactTile && prayerContentHeights[prayerName] != minimum) {
+                                prayerContentHeights[prayerName] = minimum
+                            }
+                        },
                     ) {
                         // Keep names and time in the same vertical layout. The
                         // selected Arabic font can paint outside its nominal line
@@ -2469,33 +2478,19 @@ fun PrayerTimesScreen(
                             if (!compactTile) {
                                 Text(
                                     text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
-                                    // PDMS Saleem has tall marks and descenders. A slightly
-                                    // tighter measured line leaves a real visual safety gap
-                                    // above the time without making the Arabic hard to read.
+                                    // Retain the font's full marks and descenders; the measured
+                                    // content height now reserves their space in every row.
                                     style = MaterialTheme.typography.bodyLarge.copy(
                                         fontFamily = getSelectedArabicFontFamily(screenContext),
                                         fontSize = 15.sp,
                                         letterSpacing = 0.4.sp,
-                                        lineHeight = 17.sp,
-                                        platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                        lineHeightStyle = LineHeightStyle(
-                                            alignment = LineHeightStyle.Alignment.Center,
-                                            trim = LineHeightStyle.Trim.Both,
-                                        ),
+                                        lineHeight = 20.sp,
+                                        platformStyle = PlatformTextStyle(includeFontPadding = true),
                                     ),
                                     color = supportingColor,
                                     fontWeight = FontWeight.Normal,
                                     overflow = TextOverflow.Ellipsis,
                                     maxLines = 1,
-                                    // The name shares its Row with a 24dp IconButton,
-                                    // which is taller than the name's own line box and
-                                    // therefore sets the Row height, centring the name
-                                    // and stranding dead space beneath it. That space
-                                    // belongs to the Row, so no lineHeight or
-                                    // LineHeightStyle on this text can reclaim it —
-                                    // measured pixel-identical when tried. Close the
-                                    // distance to the name it translates directly.
-                                    modifier = Modifier.offset(y = (-6).dp),
                                 )
                             }
                         }
@@ -2992,6 +2987,7 @@ fun PrayerTimesScreen(
                 val portraitScrollState = rememberScrollState()
                 var homeViewport by remember { mutableStateOf(IntSize.Zero) }
                 var insightHeightPx by remember { mutableIntStateOf(0) }
+                var insightHeaderHeight by remember { mutableStateOf(58.dp) }
                 var prayerHeaderHeightPx by remember { mutableIntStateOf(0) }
                 var homeFooterHeightPx by remember { mutableIntStateOf(0) }
                 // Content scrolls naturally after the insight reaches its resize limit.
@@ -3017,7 +3013,7 @@ fun PrayerTimesScreen(
                             .fillMaxSize()
                             .padding(
                                 bottom = if (!outerIsLandscape && !insightTileImmersive) {
-                                    navigationBarInset + 72.dp
+                                    navigationBarInset + 64.dp
                                 } else {
                                     0.dp
                                 },
@@ -3412,7 +3408,8 @@ fun PrayerTimesScreen(
                                     // PORTRAIT LAYOUT: Original vertical layout
                                     Column(
                                         modifier = Modifier
-                                            .fillMaxSize()
+                                            .fillMaxWidth()
+                                            .height(with(LocalDensity.current) { homeViewport.height.toDp() })
                                             .padding(horizontal = 24.dp)
                                             .padding(
                                                 top = 8.dp,
@@ -3428,17 +3425,23 @@ fun PrayerTimesScreen(
                                         val chromeHeight = with(dashboardDensity) {
                                             val header = if (prayerHeaderHeightPx > 0) prayerHeaderHeightPx.toDp() else 52.dp
                                             val footer = if (homeFooterHeightPx > 0) homeFooterHeightPx.toDp() else 92.dp
-                                            header + footer + 16.dp
+                                            header + footer + 12.dp
                                         }
                                         val remainingHeight = with(dashboardDensity) {
                                             homeViewport.height.toDp() - insightHeightPx.toDp() - chromeHeight
                                         }
+                                        val minimumPrayerHeight = maxOf(
+                                            88.dp,
+                                            prayerContentHeights.values.maxOrNull()
+                                                ?: (104f * fontScale.coerceAtLeast(1f)).dp,
+                                        )
                                         val rowLayout = resolveHomePrayerRows(
                                             availableHeight = remainingHeight.value,
                                             prayerCount = 6,
                                             showAll = showAllPrayers,
-                                            minimumRowHeight = 96f * fontScale.coerceAtLeast(1f),
-                                            readableRowHeight = 88f * fontScale.coerceAtLeast(1f),
+                                            minimumRowHeight = minimumPrayerHeight.value,
+                                            readableRowHeight = minimumPrayerHeight.value,
+                                            maximumRowHeight = 140f * fontScale.coerceAtLeast(1f),
                                             sectionChromeHeight = 0f,
                                             rowSpacing = 0f,
                                         )
@@ -3452,6 +3455,17 @@ fun PrayerTimesScreen(
                                             label = "prayerToggleRotation",
                                         ) { expanded ->
                                             if (expanded) 180f else 0f
+                                        }
+                                        val maximumInsightHeight = if (insightTileImmersive || homeViewport.height == 0) {
+                                            portraitImmersiveInsightHeight
+                                        } else {
+                                            // Retain one complete prayer row and location until immersive mode.
+                                            minOf(
+                                                portraitImmersiveInsightHeight,
+                                                (with(dashboardDensity) { homeViewport.height.toDp() } -
+                                                    chromeHeight - minimumPrayerHeight - insightHeaderHeight)
+                                                    .coerceAtLeast(portraitInsightHeight),
+                                            )
                                         }
                                         // Swipeable Big Tiles
                                         Box(
@@ -3518,7 +3532,8 @@ fun PrayerTimesScreen(
                                                 },
                                                 timeOffsets = storedOffsets,
                                                 portraitStripHeight = portraitInsightHeight,
-                                                portraitExpandedStripHeight = portraitImmersiveInsightHeight,
+                                                portraitExpandedStripHeight = maximumInsightHeight,
+                                                onHeaderHeightChange = { insightHeaderHeight = it },
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
                                                  compactForExpandedPrayers = false,
@@ -3555,6 +3570,10 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileImmersive) {
+                                        Column(
+                                            Modifier.weight(1f).fillMaxWidth()
+                                                .verticalScroll(rememberScrollState()),
+                                        ) {
                                             // Treat adjustment guidance as part of the prayer section
                                             // header instead of a separate dashboard banner.
                                             Row(
@@ -3917,6 +3936,8 @@ fun PrayerTimesScreen(
                                                 }
                                             }
                                         }
+
+                                        } // Prayer rows scroll within their remaining viewport.
 
                                         // Keep the toggle and location in one layout so the card can travel,
                                         // resize and round into the floating pin instead of cross-fading
@@ -4461,7 +4482,7 @@ fun PrayerTimesScreen(
                                             }
                                         }
 
-                                        Spacer(Modifier.height(8.dp))
+                                        Spacer(Modifier.height(4.dp))
                                         }
                                     }
                                 } // End of portrait layout else block

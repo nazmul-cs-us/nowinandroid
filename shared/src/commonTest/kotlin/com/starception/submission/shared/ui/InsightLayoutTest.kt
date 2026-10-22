@@ -35,7 +35,7 @@ class InsightLayoutTest {
 
     @Test
     fun scheduleAddsRowsAndUsesRemainingHeight() {
-        for ((height, expectedRows) in listOf(200f to 1, 280f to 2, 400f to 3)) {
+        for ((height, expectedRows) in listOf(200f to 1, 300f to 2, 400f to 3)) {
             val layout = homePrayerScheduleLayout(height, false, 6)
             assertEquals(expectedRows, layout.rows)
             assertEquals(height, 92f + layout.rows * (layout.rowHeight + 8f), 0.001f)
@@ -46,14 +46,14 @@ class InsightLayoutTest {
     fun shortViewportKeepsPrayerRowsReadableForScrolling() {
         val layout = homePrayerScheduleLayout(100f, true, 6)
         assertEquals(3, layout.rows)
-        assertEquals(52f, layout.rowHeight)
+        assertEquals(88f, layout.rowHeight)
     }
 
     @Test
     fun showAllFitsEveryPrayerIntoRemainingHeight() {
-        val layout = homePrayerScheduleLayout(280f, true, 6)
+        val layout = homePrayerScheduleLayout(400f, true, 6)
         assertEquals(3, layout.rows)
-        assertEquals(280f, 92f + layout.rows * (layout.rowHeight + 8f), 0.001f)
+        assertEquals(400f, 92f + layout.rows * (layout.rowHeight + 8f), 0.001f)
     }
     @Test
     fun measuredSpaceRevealsWholePrayerRowsDuringResize() {
@@ -79,7 +79,7 @@ class InsightLayoutTest {
     fun tinyViewportRetainsReadableRowsWithScrollFallback() {
         val result = resolveHomePrayerRows(40f, 6, false, 96f, 88f, 0f, 0f)
         assertEquals(1, result.rows)
-        assertEquals(88f, result.rowHeight)
+        assertEquals(96f, result.rowHeight)
         assertTrue(result.needsScrolling)
     }
 
@@ -111,5 +111,32 @@ class InsightLayoutTest {
     fun largeTextAndCompassRetainTheirMinimumReadableHeight() {
         assertEquals(480, insightStageHeight(300, 160, 14, 480))
         assertEquals(320, insightStageHeight(200, 0, 0, 320))
+    }
+    @Test
+    fun rowsNeverStretchPastTheirComfortableMaximumDuringResize() {
+        for (height in 0..900) {
+            val result = resolveHomePrayerRows(
+                height.toFloat(), 6, false, 104f, 104f, 0f, 0f,
+                maximumRowHeight = 140f,
+            )
+            assertTrue(result.rows in 1..3)
+            assertTrue(result.rowHeight in 104f..140f)
+            if (height >= 104) assertTrue(!result.needsScrolling)
+        }
+    }
+
+    @Test
+    fun measuredPrayerTextOverridesAnUnsafeRequestedRowHeight() {
+        val layout = homePrayerScheduleLayout(300f, false, 6, measuredMinimumHeight = 136f)
+        assertEquals(1, layout.rows)
+        assertEquals(136f, layout.rowHeight)
+    }
+
+    @Test
+    fun showingAllPrayersOnShortScreensPreservesTextAndScrolls() {
+        val result = resolveHomePrayerRows(180f, 6, true, 104f, 104f, 0f, 0f)
+        assertEquals(3, result.rows)
+        assertEquals(104f, result.rowHeight)
+        assertTrue(result.needsScrolling)
     }
 }

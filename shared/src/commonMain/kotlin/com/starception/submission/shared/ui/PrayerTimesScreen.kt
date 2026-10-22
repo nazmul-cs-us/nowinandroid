@@ -79,6 +79,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -141,6 +142,7 @@ import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
 import io.github.alexzhirkevich.cupertino.theme.CupertinoTheme
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.painterResource
+import com.starception.submission.core.designsystem.component.PrayerTileContent
 import kotlin.math.roundToInt
 import com.starception.submission.core.images.resources.Res as ImageRes
 
@@ -217,6 +219,7 @@ fun PrayerTimesScreen(
     forceSunForTesting: Boolean = false,
     onInsightImmersiveChange: (Boolean) -> Unit = {},
 ) {
+    val prayerContentHeights = remember(LocalDensity.current.fontScale) { mutableStateMapOf<String, Dp>() }
     var showAllPrayers by remember { mutableStateOf(initialShowAllPrayers) }
     var expandedInsightPage by remember { mutableStateOf<Int?>(initialExpandedInsight) }
     var insightExpansionExtent by rememberSaveable(initialExpandedInsight) {
@@ -708,7 +711,11 @@ fun PrayerTimesScreen(
                                 val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
                                 // Reserve one readable prayer row plus its controls,
                                 // location, pager title and gaps inside this real viewport.
-                                val minimumSchedule = (152f * scale).dp
+                                val minimumPrayerHeight = maxOf(
+                                    88.dp,
+                                    prayerContentHeights.values.maxOrNull() ?: (88f * scale).dp,
+                                )
+                                val minimumSchedule = minimumPrayerHeight + (100f * scale).dp
                                 val phoneMaximumInsight = (maxHeight - minimumSchedule - 114.dp)
                                     .coerceAtLeast(140.dp)
                                 val phoneRestingInsight = minOf(portraitInsightHeight, phoneMaximumInsight - 44.dp)
@@ -727,6 +734,7 @@ fun PrayerTimesScreen(
                                                 showAllPrayers,
                                                 day.dashboardSlots().size,
                                                 scale,
+                                                prayerContentHeights.values.maxOrNull()?.value ?: 0f,
                                             )
                                             PrayerScheduleSection(
                                                 modifier = Modifier.fillMaxSize()
@@ -748,6 +756,11 @@ fun PrayerTimesScreen(
                                                 showExpandControl = true,
                                                 compact = true,
                                                 cardMinHeight = scheduleLayout.rowHeight.dp,
+                                                onMinimumCardHeightChange = { name, height ->
+                                                    if (prayerContentHeights[name] != height) {
+                                                        prayerContentHeights[name] = height
+                                                    }
+                                                },
                                                 collapsedRows = scheduleLayout.rows,
                                                 showFooterLocationPin = showAllPrayers,
                                                 onFooterLocationClick = { showAllPrayers = false },
@@ -779,7 +792,7 @@ fun PrayerTimesScreen(
                                                 onRefresh = onRefresh,
                                             )
                                         }
-                                        Spacer(Modifier.height(8.dp))
+                                        Spacer(Modifier.height(4.dp))
                                     }
                                 }
                             }
@@ -1522,6 +1535,7 @@ private fun PrayerScheduleSection(
     compact: Boolean,
     columns: Int = 2,
     cardMinHeight: Dp? = null,
+    onMinimumCardHeightChange: (String, Dp) -> Unit = { _, _ -> },
     collapsedRows: Int = 2,
     showFooterLocationPin: Boolean = false,
     onFooterLocationClick: (() -> Unit)? = null,
@@ -1690,6 +1704,7 @@ private fun PrayerScheduleSection(
                 onOpenAdhanVolume = onOpenAdhanVolume,
                 compact = compact,
                 cardMinHeight = cardMinHeight,
+                onMinimumCardHeightChange = onMinimumCardHeightChange,
             )
         }
         AnimatedVisibility(
@@ -1716,6 +1731,7 @@ private fun PrayerScheduleSection(
                         onOpenAdhanVolume = onOpenAdhanVolume,
                         compact = compact,
                         cardMinHeight = cardMinHeight,
+                        onMinimumCardHeightChange = onMinimumCardHeightChange,
                     )
                 }
             }
@@ -1781,6 +1797,7 @@ private fun PrayerCardRow(
     onOpenAdhanVolume: (String, Int) -> Unit = { _, _ -> },
     compact: Boolean,
     cardMinHeight: Dp? = null,
+    onMinimumCardHeightChange: (String, Dp) -> Unit = { _, _ -> },
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         slots.forEach { slot ->
@@ -1805,6 +1822,7 @@ private fun PrayerCardRow(
                 onOpenAdhanVolume = onOpenAdhanVolume,
                 compact = compact,
                 minHeight = cardMinHeight,
+                onMinimumHeightChange = { onMinimumCardHeightChange(slot.name, it) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -1829,6 +1847,7 @@ private fun PrayerCard(
     onOpenAdhanVolume: (String, Int) -> Unit = { _, _ -> },
     compact: Boolean,
     minHeight: Dp? = null,
+    onMinimumHeightChange: (Dp) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -2034,7 +2053,7 @@ private fun PrayerCard(
             },
             tonalElevation = if (isDarkTheme) 1.dp else 0.dp,
         ) {
-            Column(
+            PrayerTileContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .drawBehind {
@@ -2050,7 +2069,8 @@ private fun PrayerCard(
                         top = if (compact) 6.dp else 8.dp,
                         bottom = if (compact) 6.dp else 8.dp,
                     ),
-                verticalArrangement = Arrangement.SpaceBetween,
+                verticalPadding = if (compact) 12.dp else 16.dp,
+                onMinimumHeightChange = onMinimumHeightChange,
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(

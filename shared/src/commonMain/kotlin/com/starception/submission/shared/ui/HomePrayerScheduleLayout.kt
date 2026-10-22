@@ -18,13 +18,17 @@ internal fun homePrayerScheduleLayout(
     showAllPrayers: Boolean,
     prayerCount: Int,
     fontScale: Float = 1f,
+    measuredMinimumHeight: Float = 0f,
 ): HomePrayerScheduleLayout {
+    val minimumHeight = if (measuredMinimumHeight > 0f) maxOf(88f, measuredMinimumHeight)
+        else 88f * fontScale.coerceAtLeast(1f)
     val layout = com.starception.submission.core.designsystem.component.resolveHomePrayerRows(
         availableHeight = availableHeight,
         prayerCount = prayerCount,
         showAll = showAllPrayers,
-        minimumRowHeight = 78f * fontScale.coerceAtLeast(1f),
-        readableRowHeight = 52f * fontScale.coerceAtLeast(1f),
+        minimumRowHeight = minimumHeight,
+        readableRowHeight = minimumHeight,
+        maximumRowHeight = 132f * fontScale.coerceAtLeast(1f),
         sectionChromeHeight = 92f * fontScale.coerceAtLeast(1f),
     )
     return HomePrayerScheduleLayout(layout.rows, layout.rowHeight)
