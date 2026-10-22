@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -60,6 +61,11 @@ fun InsightResizeCornerHandle(
     isResizing: Boolean = false,
 ) {
     var isActive by remember { mutableStateOf(false) }
+    // Keep the pointer coroutine alive across layout changes, while using the
+    // current resize range and callbacks for every event of the gesture.
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     val activeProgress by animateFloatAsState(
         targetValue = if (isActive) 1f else 0f,
         animationSpec = tween(140),
@@ -99,20 +105,20 @@ fun InsightResizeCornerHandle(
                 detectDragGestures(
                     onDragStart = {
                         isActive = true
-                        onDragStart()
+                        currentOnDragStart()
                     },
                     onDragEnd = {
                         isActive = false
-                        onDragEnd()
+                        currentOnDragEnd()
                     },
                     onDragCancel = {
                         isActive = false
-                        onDragEnd()
+                        currentOnDragEnd()
                     },
                 ) { change, delta ->
                     change.consume()
                     val outwardX = if (isStart) -delta.x else delta.x
-                    onDrag((delta.y + outwardX) * 0.70710677f)
+                    currentOnDrag((delta.y + outwardX) * 0.70710677f)
                 }
             }
             .semantics {

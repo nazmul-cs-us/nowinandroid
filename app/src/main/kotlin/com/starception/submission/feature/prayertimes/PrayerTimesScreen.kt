@@ -2987,7 +2987,6 @@ fun PrayerTimesScreen(
                 val portraitScrollState = rememberScrollState()
                 var homeViewport by remember { mutableStateOf(IntSize.Zero) }
                 var insightHeightPx by remember { mutableIntStateOf(0) }
-                var insightHeaderHeight by remember { mutableStateOf(58.dp) }
                 var prayerHeaderHeightPx by remember { mutableIntStateOf(0) }
                 var homeFooterHeightPx by remember { mutableIntStateOf(0) }
                 // Content scrolls naturally after the insight reaches its resize limit.
@@ -3408,8 +3407,7 @@ fun PrayerTimesScreen(
                                     // PORTRAIT LAYOUT: Original vertical layout
                                     Column(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(with(LocalDensity.current) { homeViewport.height.toDp() })
+                                            .fillMaxSize()
                                             .padding(horizontal = 24.dp)
                                             .padding(
                                                 top = 8.dp,
@@ -3455,17 +3453,6 @@ fun PrayerTimesScreen(
                                             label = "prayerToggleRotation",
                                         ) { expanded ->
                                             if (expanded) 180f else 0f
-                                        }
-                                        val maximumInsightHeight = if (insightTileImmersive || homeViewport.height == 0) {
-                                            portraitImmersiveInsightHeight
-                                        } else {
-                                            // Retain one complete prayer row and location until immersive mode.
-                                            minOf(
-                                                portraitImmersiveInsightHeight,
-                                                (with(dashboardDensity) { homeViewport.height.toDp() } -
-                                                    chromeHeight - minimumPrayerHeight - insightHeaderHeight)
-                                                    .coerceAtLeast(portraitInsightHeight),
-                                            )
                                         }
                                         // Swipeable Big Tiles
                                         Box(
@@ -3532,8 +3519,7 @@ fun PrayerTimesScreen(
                                                 },
                                                 timeOffsets = storedOffsets,
                                                 portraitStripHeight = portraitInsightHeight,
-                                                portraitExpandedStripHeight = maximumInsightHeight,
-                                                onHeaderHeightChange = { insightHeaderHeight = it },
+                                                portraitExpandedStripHeight = portraitImmersiveInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
                                                  compactForExpandedPrayers = false,
@@ -3570,10 +3556,6 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileImmersive) {
-                                        Column(
-                                            Modifier.weight(1f).fillMaxWidth()
-                                                .verticalScroll(rememberScrollState()),
-                                        ) {
                                             // Treat adjustment guidance as part of the prayer section
                                             // header instead of a separate dashboard banner.
                                             Row(
@@ -3936,8 +3918,6 @@ fun PrayerTimesScreen(
                                                 }
                                             }
                                         }
-
-                                        } // Prayer rows scroll within their remaining viewport.
 
                                         // Keep the toggle and location in one layout so the card can travel,
                                         // resize and round into the floating pin instead of cross-fading

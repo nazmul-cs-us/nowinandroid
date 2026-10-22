@@ -10,6 +10,8 @@
 
 package com.starception.submission.core.designsystem.component
 
+import kotlin.math.ceil
+
 data class HomePrayerRows(val rows: Int, val rowHeight: Float, val needsScrolling: Boolean)
 
 /** Fit whole rows into the measured viewport, retaining readable cards on short screens. */
@@ -26,10 +28,13 @@ fun resolveHomePrayerRows(
     val totalRows = ((prayerCount + 1) / 2).coerceAtLeast(1)
     val budget = (availableHeight - sectionChromeHeight).coerceAtLeast(0f)
     val minimumHeight = maxOf(minimumRowHeight, readableRowHeight)
+    val maximumHeight = maxOf(minimumHeight, maximumRowHeight)
+    // Add a row before stretching existing cards beyond the comfortable height.
+    // Preserve natural content height and allow scrolling if that row cannot fully fit.
     val rowCount = if (showAll) totalRows else
-        (budget / (minimumHeight + rowSpacing)).toInt().coerceIn(1, totalRows)
+        ceil(budget / (maximumHeight + rowSpacing)).toInt().coerceIn(1, totalRows)
     val height = (budget / rowCount - rowSpacing)
-        .coerceIn(minimumHeight, maxOf(minimumHeight, maximumRowHeight))
+        .coerceIn(minimumHeight, maximumHeight)
     return HomePrayerRows(
         rows = rowCount,
         rowHeight = height,

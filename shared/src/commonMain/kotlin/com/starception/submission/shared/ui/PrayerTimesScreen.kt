@@ -97,6 +97,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -708,7 +709,10 @@ fun PrayerTimesScreen(
                             // Keep the phone viewport fixed while the insight
                             // borrows room from progressively reduced home content.
                             BoxWithConstraints(Modifier.fillMaxSize()) {
-                                val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+                                val phoneDensity = LocalDensity.current
+                                var phoneInsightHeight by remember { mutableStateOf(0.dp) }
+                                var phoneLocationHeight by remember { mutableStateOf(58.dp) }
+                                val scale = phoneDensity.fontScale.coerceAtLeast(1f)
                                 // Reserve one readable prayer row plus its controls,
                                 // location, pager title and gaps inside this real viewport.
                                 val minimumPrayerHeight = maxOf(
@@ -720,55 +724,61 @@ fun PrayerTimesScreen(
                                     .coerceAtLeast(140.dp)
                                 val phoneRestingInsight = minOf(portraitInsightHeight, phoneMaximumInsight - 44.dp)
                                     .coerceAtLeast(96.dp)
+                                val sectionGap = if (expandedInsightPage != null) 2.dp else 8.dp
+                                val scheduleHeight = (maxHeight - phoneInsightHeight -
+                                    (if (showAllPrayers) 0.dp else phoneLocationHeight) -
+                                    sectionGap * 3 - 4.dp).coerceAtLeast(0.dp)
                                 Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.spacedBy(
-                                        if (expandedInsightPage != null) 2.dp else 8.dp,
-                                    ),
+                                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(sectionGap),
                                 ) {
-                                    renderInsightPager(phoneRestingInsight, false, null, phoneMaximumInsight)
+                                    Box(Modifier.onSizeChanged {
+                                        phoneInsightHeight = with(phoneDensity) { it.height.toDp() }
+                                    }) {
+                                        renderInsightPager(phoneRestingInsight, false, null, phoneMaximumInsight)
+                                    }
                                     if (!isInsightImmersive) {
-                                        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                                            val scheduleLayout = homePrayerScheduleLayout(
-                                                maxHeight.value,
-                                                showAllPrayers,
-                                                day.dashboardSlots().size,
-                                                scale,
-                                                prayerContentHeights.values.maxOrNull()?.value ?: 0f,
-                                            )
-                                            PrayerScheduleSection(
-                                                modifier = Modifier.fillMaxSize()
-                                                    .verticalScroll(rememberScrollState()),
-                                                day = day,
-                                                offsets = offsets,
-                                                showAllPrayers = showAllPrayers,
-                                                onToggleExpanded = { showAllPrayers = !showAllPrayers },
-                                                onAdjustPrayer = onAdjustPrayer,
-                                                onTogglePrayerAdhan = onTogglePrayerAdhan,
-                                                onAdhanVolumeChange = onAdhanVolumeChange,
-                                                onOpenAdhanVolume = { name, volume ->
-                                                    activeAdhanVolume = name to volume
-                                                },
-                                                isTuning = isTuningSchedule,
-                                                onToggleTuning = { isTuningSchedule = !isTuningSchedule },
-                                                notifications = notifications,
-                                                onTogglePrayerNotification = onTogglePrayerNotification,
-                                                showExpandControl = true,
-                                                compact = true,
-                                                cardMinHeight = scheduleLayout.rowHeight.dp,
-                                                onMinimumCardHeightChange = { name, height ->
-                                                    if (prayerContentHeights[name] != height) {
-                                                        prayerContentHeights[name] = height
-                                                    }
-                                                },
-                                                collapsedRows = scheduleLayout.rows,
-                                                showFooterLocationPin = showAllPrayers,
-                                                onFooterLocationClick = { showAllPrayers = false },
-                                            )
-                                        }
+                                        val scheduleLayout = homePrayerScheduleLayout(
+                                            scheduleHeight.value,
+                                            showAllPrayers,
+                                            day.dashboardSlots().size,
+                                            scale,
+                                            prayerContentHeights.values.maxOrNull()?.value ?: 0f,
+                                        )
+                                        PrayerScheduleSection(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            day = day,
+                                            offsets = offsets,
+                                            showAllPrayers = showAllPrayers,
+                                            onToggleExpanded = { showAllPrayers = !showAllPrayers },
+                                            onAdjustPrayer = onAdjustPrayer,
+                                            onTogglePrayerAdhan = onTogglePrayerAdhan,
+                                            onAdhanVolumeChange = onAdhanVolumeChange,
+                                            onOpenAdhanVolume = { name, volume ->
+                                                activeAdhanVolume = name to volume
+                                            },
+                                            isTuning = isTuningSchedule,
+                                            onToggleTuning = { isTuningSchedule = !isTuningSchedule },
+                                            notifications = notifications,
+                                            onTogglePrayerNotification = onTogglePrayerNotification,
+                                            showExpandControl = true,
+                                            compact = true,
+                                            cardMinHeight = scheduleLayout.rowHeight.dp,
+                                            onMinimumCardHeightChange = { name, height ->
+                                                if (prayerContentHeights[name] != height) {
+                                                    prayerContentHeights[name] = height
+                                                }
+                                            },
+                                            collapsedRows = scheduleLayout.rows,
+                                            showFooterLocationPin = showAllPrayers,
+                                            onFooterLocationClick = { showAllPrayers = false },
+                                        )
                                         // Keep location in normal flow directly below
                                         // the reduced schedule while resizing.
                                         AnimatedVisibility(
+                                            modifier = Modifier.onSizeChanged {
+                                                phoneLocationHeight = with(phoneDensity) { it.height.toDp() }
+                                            },
                                             visible = !showAllPrayers,
                                             enter = expandVertically(
                                                 animationSpec = tween(

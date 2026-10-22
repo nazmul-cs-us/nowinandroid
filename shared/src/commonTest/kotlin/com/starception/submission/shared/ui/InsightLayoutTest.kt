@@ -121,14 +121,16 @@ class InsightLayoutTest {
             )
             assertTrue(result.rows in 1..3)
             assertTrue(result.rowHeight in 104f..140f)
-            if (height >= 104) assertTrue(!result.needsScrolling)
+            val usedHeight = result.rows * result.rowHeight
+            assertEquals(usedHeight > height + 0.5f, result.needsScrolling)
+            if (height <= 420) assertTrue(usedHeight >= height)
         }
     }
 
     @Test
     fun measuredPrayerTextOverridesAnUnsafeRequestedRowHeight() {
         val layout = homePrayerScheduleLayout(300f, false, 6, measuredMinimumHeight = 136f)
-        assertEquals(1, layout.rows)
+        assertEquals(2, layout.rows)
         assertEquals(136f, layout.rowHeight)
     }
 
@@ -138,5 +140,13 @@ class InsightLayoutTest {
         assertEquals(3, result.rows)
         assertEquals(104f, result.rowHeight)
         assertTrue(result.needsScrolling)
+    }
+    @Test
+    fun addPrayerRowInsteadOfLeavingUnusedSpaceBelowCappedCards() {
+        val result = resolveHomePrayerRows(260f, 6, false, 104f, 104f, 0f, 0f)
+        assertEquals(2, result.rows)
+        assertEquals(130f, result.rowHeight)
+        assertEquals(260f, result.rows * result.rowHeight)
+        assertTrue(!result.needsScrolling)
     }
 }
