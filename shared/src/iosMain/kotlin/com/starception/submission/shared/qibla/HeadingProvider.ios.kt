@@ -19,6 +19,9 @@ package com.starception.submission.shared.qibla
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.CoreLocation.CLHeading
 import platform.CoreLocation.CLLocationManager
+import platform.CoreLocation.kCLAuthorizationStatusAuthorizedAlways
+import platform.CoreLocation.kCLAuthorizationStatusAuthorizedWhenInUse
+import platform.CoreLocation.kCLLocationAccuracyKilometer
 import platform.CoreLocation.CLLocationManagerDelegateProtocol
 import platform.Foundation.NSError
 import platform.darwin.NSObject
@@ -35,14 +38,23 @@ actual class HeadingProvider actual constructor() {
         }
         val handler = object : NSObject(), CLLocationManagerDelegateProtocol {
             override fun locationManager(manager: CLLocationManager, didUpdateHeading: CLHeading) {
-                val degrees = didUpdateHeading.trueHeading.takeIf { it >= 0.0 }
+                if (didUpdateHeading.headingAccuracy < 0.0) {
+                    onReading(HeadingReading(unavailableReason = "Compass needs calibration. Move your phone in a figure-8."))
+                    return
+                }
+                val degrees = didUpdateHeading.trueHeading.takeIf { it.isFinite() && it >= 0.0 }
                     ?: didUpdateHeading.magneticHeading
+                if (!degrees.isFinite() || degrees < 0.0) return
                 onReading(
                     HeadingReading(
                         headingDegrees = degrees,
                         accuracyDegrees = didUpdateHeading.headingAccuracy.takeIf { it >= 0.0 },
                     ),
                 )
+            }
+
+            override fun locationManager(manager: CLLocationManager, didUpdateLocations: List<*>) {
+                // Location is consumed by Core Location to correct magnetic north.
             }
 
             override fun locationManagerShouldDisplayHeadingCalibration(
@@ -55,12 +67,21 @@ actual class HeadingProvider actual constructor() {
         }
         delegate = handler
         manager.delegate = handler
+        // Core Location needs location updates on this manager to report true
+        // north, which is the reference used by the geographic Qibla bearing.
+        // Reuse the app's existing permission; do not request another prompt.
+        val status = CLLocationManager.authorizationStatus()
+        if (status == kCLAuthorizationStatusAuthorizedWhenInUse || status == kCLAuthorizationStatusAuthorizedAlways) {
+            manager.desiredAccuracy = kCLLocationAccuracyKilometer
+            manager.startUpdatingLocation()
+        }
         manager.headingFilter = 1.0
         manager.startUpdatingHeading()
     }
 
     actual fun stop() {
         manager.stopUpdatingHeading()
+        manager.stopUpdatingLocation()
         manager.delegate = null
         delegate = null
     }

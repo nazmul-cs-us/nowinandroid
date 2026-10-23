@@ -121,7 +121,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -182,9 +181,7 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.roundToInt
-import kotlin.math.sin
 import kotlin.time.Clock
 
 /** Content-sized automatic reading height; corner grips remain fully free-form. */
@@ -951,7 +948,10 @@ fun InsightPager(
                                 },
                                 content = if (isExpanded) {
                                     {
-                                        ExpandedQiblaRadar(
+                                        ExpandedQiblaGlobe(
+                                            latitude = latitude,
+                                            longitude = longitude,
+                                            headingAccuracyDegrees = heading.accuracyDegrees,
                                             bearing = qiblaBearing,
                                             headingDegrees = heading.headingDegrees?.toFloat(),
                                             onOpenQibla = onOpenQibla,
@@ -1642,16 +1642,19 @@ private fun ExpandedSalahHadith(
     }
 }
 
-/** Android's complete expanded Qibla hierarchy and perspective instrument. */
+/** Live WorldWind globe and turn guidance, matching Android's expanded Qibla tile. */
 @Composable
-private fun ExpandedQiblaRadar(
+private fun ExpandedQiblaGlobe(
+    latitude: Double,
+    longitude: Double,
+    headingAccuracyDegrees: Double?,
     bearing: Int,
     headingDegrees: Float?,
     onOpenQibla: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val turn = headingDegrees?.let { shortestBearingDelta(it, bearing.toFloat()) }
-    val isAligned = turn != null && abs(turn) < 6f
+    val isAligned = turn != null && abs(turn) <= 5f
     val instruction = when {
         turn == null -> "Finding your direction"
         isAligned -> "You are facing the Qibla"
@@ -1660,9 +1663,7 @@ private fun ExpandedQiblaRadar(
     }
     val direction = qiblaCardinalDirection(bearing).substringBefore(" from your location")
     val pulse = 0.5f
-    val radarSweep = 0f
     val foreground = Color.White
-    val surface = Color(0xFF171816)
     val accent = ReadingPreviewGold
 
     Column(
@@ -1724,329 +1725,16 @@ private fun ExpandedQiblaRadar(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentAlignment = Alignment.Center,
         ) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .widthIn(max = 286.dp)
-                    .fillMaxWidth()
-                    .aspectRatio(286f / 174f)
-                    .semantics {
-                        contentDescription = when {
-                            turn == null -> "Qibla compass. Waiting for your device heading."
-                            isAligned -> "Aligned with Qibla"
-                            else -> "Qibla compass, ${turn.roundToInt()} degrees to turn"
-                        }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                val density = LocalDensity.current
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val radarCenter = Offset(center.x, center.y + 11.dp.toPx())
-                    val radiusX = (size.width / 2f) - 21.dp.toPx()
-                    val radiusY = (size.height / 2f) - 34.dp.toPx()
-                    val radarTopLeft = Offset(radarCenter.x - radiusX, radarCenter.y - radiusY)
-                    val radarSize = Size(radiusX * 2f, radiusY * 2f)
-
-                    repeat(2) { index ->
-                        val expansion = (8f + (index * 8f)).dp.toPx()
-                        drawArc(
-                            color = foreground.copy(alpha = if (index == 0) 0.08f else 0.04f),
-                            startAngle = 198f,
-                            sweepAngle = 144f,
-                            useCenter = false,
-                            topLeft = Offset(
-                                radarCenter.x - radiusX - expansion,
-                                radarCenter.y - radiusY - (expansion * 0.28f),
-                            ),
-                            size = Size(
-                                (radiusX + expansion) * 2f,
-                                (radiusY + (expansion * 0.28f)) * 2f,
-                            ),
-                            style = Stroke(width = 0.8.dp.toPx()),
-                        )
-                    }
-                    drawOval(
-                        color = Color.Black.copy(alpha = 0.28f),
-                        topLeft = radarTopLeft + Offset(0f, 7.dp.toPx()),
-                        size = radarSize,
-                    )
-                    drawOval(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(surface.copy(alpha = 0.64f), surface.copy(alpha = 0.88f)),
-                            startY = radarTopLeft.y,
-                            endY = radarTopLeft.y + radarSize.height,
-                        ),
-                        topLeft = radarTopLeft,
-                        size = radarSize,
-                    )
-                    drawOval(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                accent.copy(alpha = if (isAligned) 0.15f else 0.06f),
-                                Color.Transparent,
-                            ),
-                            center = radarCenter,
-                            radius = radiusX,
-                        ),
-                        topLeft = radarTopLeft,
-                        size = radarSize,
-                    )
-                    drawArc(
-                        color = foreground.copy(alpha = 0.20f),
-                        startAngle = 202f,
-                        sweepAngle = 136f,
-                        useCenter = false,
-                        topLeft = radarTopLeft,
-                        size = radarSize,
-                        style = Stroke(width = 0.8.dp.toPx()),
-                    )
-                    listOf(1f, 0.62f, 0.30f).forEachIndexed { index, scale ->
-                        drawOval(
-                            color = foreground.copy(alpha = if (index == 0) 0.22f else 0.10f),
-                            topLeft = Offset(
-                                radarCenter.x - (radiusX * scale),
-                                radarCenter.y - (radiusY * scale),
-                            ),
-                            size = Size(radiusX * 2f * scale, radiusY * 2f * scale),
-                            style = Stroke(width = if (index == 0) 1.2.dp.toPx() else 0.8.dp.toPx()),
-                        )
-                    }
-                    val headingCone = Path().apply {
-                        moveTo(radarCenter.x, radarCenter.y - (radiusY * 0.72f))
-                        lineTo(radarCenter.x - 13.dp.toPx(), radarCenter.y + 5.dp.toPx())
-                        quadraticTo(
-                            radarCenter.x,
-                            radarCenter.y + 10.dp.toPx(),
-                            radarCenter.x + 13.dp.toPx(),
-                            radarCenter.y + 5.dp.toPx(),
-                        )
-                        close()
-                    }
-                    drawPath(
-                        path = headingCone,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                foreground.copy(alpha = 0.13f),
-                                foreground.copy(alpha = 0.01f),
-                            ),
-                            startY = radarCenter.y - radiusY,
-                            endY = radarCenter.y + 10.dp.toPx(),
-                        ),
-                    )
-                    val roseHeading = headingDegrees ?: 0f
-                    repeat(4) { index ->
-                        val angle = radians((index * 90f - roseHeading).toDouble())
-                        drawLine(
-                            color = foreground.copy(alpha = 0.07f),
-                            start = radarCenter,
-                            end = Offset(
-                                radarCenter.x + cos(angle).toFloat() * radiusX,
-                                radarCenter.y + sin(angle).toFloat() * radiusY,
-                            ),
-                            strokeWidth = 0.7.dp.toPx(),
-                        )
-                    }
-                    drawArc(
-                        color = foreground.copy(alpha = 0.035f),
-                        startAngle = radarSweep,
-                        sweepAngle = 42f,
-                        useCenter = true,
-                        topLeft = radarTopLeft,
-                        size = radarSize,
-                    )
-                    if (turn != null) {
-                        drawArc(
-                            color = accent.copy(alpha = if (isAligned) 0.92f else 0.58f),
-                            startAngle = -90f,
-                            sweepAngle = if (isAligned) 360f else turn.coerceIn(-180f, 180f),
-                            useCenter = false,
-                            topLeft = radarTopLeft,
-                            size = radarSize,
-                            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
-                        )
-                    }
-                    repeat(48) { index ->
-                        val angle = radians(
-                            (index * 7.5f - roseHeading - 90f).toDouble(),
-                        )
-                        val x = cos(angle).toFloat()
-                        val y = sin(angle).toFloat()
-                        val major = index % 6 == 0
-                        drawLine(
-                            color = foreground.copy(alpha = if (major) 0.68f else 0.28f),
-                            start = Offset(
-                                radarCenter.x + x * radiusX * (if (major) 0.90f else 0.95f),
-                                radarCenter.y + y * radiusY * (if (major) 0.90f else 0.95f),
-                            ),
-                            end = Offset(
-                                radarCenter.x + x * radiusX,
-                                radarCenter.y + y * radiusY,
-                            ),
-                            strokeWidth = if (major) 1.4.dp.toPx() else 0.7.dp.toPx(),
-                            cap = StrokeCap.Round,
-                        )
-                    }
-                    repeat(30) { index ->
-                        val angle = radians(
-                            (index * 12f + (roseHeading * 0.42f) - 90f).toDouble(),
-                        )
-                        val x = cos(angle).toFloat()
-                        val y = sin(angle).toFloat()
-                        drawLine(
-                            color = if (index % 5 == 0) {
-                                accent.copy(alpha = 0.32f)
-                            } else {
-                                foreground.copy(alpha = 0.11f)
-                            },
-                            start = Offset(
-                                radarCenter.x + (x * radiusX * 0.65f),
-                                radarCenter.y + (y * radiusY * 0.62f),
-                            ),
-                            end = Offset(
-                                radarCenter.x + (x * radiusX * 0.70f),
-                                radarCenter.y + (y * radiusY * 0.67f),
-                            ),
-                            strokeWidth = if (index % 5 == 0) 1.dp.toPx() else 0.55.dp.toPx(),
-                            cap = StrokeCap.Round,
-                        )
-                    }
-
-                    val qiblaAngle = radians(((turn ?: 0f) - 90f).toDouble())
-                    val qiblaPoint = Offset(
-                        radarCenter.x + cos(qiblaAngle).toFloat() * radiusX * 0.64f,
-                        radarCenter.y + sin(qiblaAngle).toFloat() * radiusY * 0.64f,
-                    )
-                    val routeDelta = qiblaPoint - radarCenter
-                    val perspectiveScale = radiusY / radiusX
-                    val routeNormal = Offset(
-                        x = -sin(qiblaAngle).toFloat(),
-                        y = cos(qiblaAngle).toFloat() * perspectiveScale,
-                    )
-                    val counterPoint = Offset(
-                        radarCenter.x - (routeDelta.x * 0.62f),
-                        radarCenter.y - (routeDelta.y * 0.62f),
-                    )
-                    val shadowOffset = 1.5.dp.toPx() * perspectiveScale
-                    val handShadow = Path().apply {
-                        moveTo(
-                            radarCenter.x + (routeNormal.x * 7.dp.toPx()),
-                            radarCenter.y + (routeNormal.y * 7.dp.toPx()) + shadowOffset,
-                        )
-                        lineTo(qiblaPoint.x, qiblaPoint.y + shadowOffset)
-                        lineTo(
-                            radarCenter.x - (routeNormal.x * 7.dp.toPx()),
-                            radarCenter.y - (routeNormal.y * 7.dp.toPx()) + shadowOffset,
-                        )
-                        lineTo(counterPoint.x, counterPoint.y + shadowOffset)
-                        close()
-                    }
-                    drawPath(handShadow, Color.Black.copy(alpha = 0.34f))
-                    val qiblaLeft = Path().apply {
-                        moveTo(radarCenter.x, radarCenter.y)
-                        lineTo(
-                            radarCenter.x + (routeNormal.x * 5.5.dp.toPx()),
-                            radarCenter.y + (routeNormal.y * 5.5.dp.toPx()),
-                        )
-                        lineTo(qiblaPoint.x, qiblaPoint.y)
-                        close()
-                    }
-                    drawPath(qiblaLeft, accent)
-                    val qiblaRight = Path().apply {
-                        moveTo(radarCenter.x, radarCenter.y)
-                        lineTo(qiblaPoint.x, qiblaPoint.y)
-                        lineTo(
-                            radarCenter.x - (routeNormal.x * 5.5.dp.toPx()),
-                            radarCenter.y - (routeNormal.y * 5.5.dp.toPx()),
-                        )
-                        close()
-                    }
-                    drawPath(qiblaRight, accent.copy(alpha = 0.68f))
-                    val counterLeft = Path().apply {
-                        moveTo(radarCenter.x, radarCenter.y)
-                        lineTo(
-                            radarCenter.x + (routeNormal.x * 5.5.dp.toPx()),
-                            radarCenter.y + (routeNormal.y * 5.5.dp.toPx()),
-                        )
-                        lineTo(counterPoint.x, counterPoint.y)
-                        close()
-                    }
-                    drawPath(counterLeft, foreground.copy(alpha = 0.92f))
-                    val counterRight = Path().apply {
-                        moveTo(radarCenter.x, radarCenter.y)
-                        lineTo(counterPoint.x, counterPoint.y)
-                        lineTo(
-                            radarCenter.x - (routeNormal.x * 5.5.dp.toPx()),
-                            radarCenter.y - (routeNormal.y * 5.5.dp.toPx()),
-                        )
-                        close()
-                    }
-                    drawPath(counterRight, foreground.copy(alpha = 0.56f))
-                    drawCircle(
-                        color = accent.copy(alpha = 0.12f + (0.08f * pulse)),
-                        radius = 12.dp.toPx(),
-                        center = qiblaPoint,
-                    )
-                    drawCircle(surface, radius = 2.2.dp.toPx(), center = radarCenter)
-
-                    val headingMarker = Path().apply {
-                        moveTo(radarCenter.x, radarTopLeft.y - 7.dp.toPx())
-                        lineTo(radarCenter.x - 4.dp.toPx(), radarTopLeft.y - 13.dp.toPx())
-                        lineTo(radarCenter.x + 4.dp.toPx(), radarTopLeft.y - 13.dp.toPx())
-                        close()
-                    }
-                    drawPath(headingMarker, accent)
-                }
-
-                listOf("N", "E", "S", "W").forEachIndexed { index, label ->
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 9.sp,
-                            lineHeight = 10.sp,
-                        ),
-                        color = if (label == "N") {
-                            accent
-                        } else {
-                            foreground.copy(alpha = 0.62f)
-                        },
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .graphicsLayer {
-                                val angle = radians(
-                                    (index * 90f - (headingDegrees ?: 0f) - 90f).toDouble(),
-                                )
-                                translationX = cos(angle).toFloat() *
-                                    (maxWidth.toPx() / 2f - 21.dp.toPx()) * 0.79f
-                                translationY = 11.dp.toPx() + sin(angle).toFloat() *
-                                    (maxHeight.toPx() / 2f - 34.dp.toPx()) * 0.76f
-                            },
-                    )
-                }
-                if (turn != null) {
-                    Text(
-                        text = "KAABA",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 9.sp,
-                            lineHeight = 10.sp,
-                            letterSpacing = 1.1.sp,
-                        ),
-                        color = accent,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .graphicsLayer {
-                                val angle = radians((turn - 90f).toDouble())
-                                translationX = cos(angle).toFloat() *
-                                    (maxWidth.toPx() / 2f - 21.dp.toPx()) * 0.64f
-                                translationY = 11.dp.toPx() + sin(angle).toFloat() *
-                                    (maxHeight.toPx() / 2f - 34.dp.toPx()) * 0.64f -
-                                    41.dp.toPx()
-                            },
-                    )
-                }
-            }
-
+            PlatformWorldWindGlobe(
+                latitude = latitude,
+                longitude = longitude,
+                headingDegrees = headingDegrees?.toDouble(),
+                headingAccuracyDegrees = headingAccuracyDegrees,
+                qiblaBearing = qiblaBearing(latitude, longitude),
+                expanded = true,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp))
+                    .semantics { contentDescription = "WorldWind Qibla globe showing your location and the Kaaba" },
+            )
         }
         Row(
             modifier = Modifier

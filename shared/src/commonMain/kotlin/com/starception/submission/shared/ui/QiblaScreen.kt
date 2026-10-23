@@ -243,6 +243,19 @@ private fun QiblaCupertinoPage(
                             contentDescription = "WorldWind Qibla globe from your location to Makkah"
                         },
                 )
+                Spacer(Modifier.height(12.dp))
+                CupertinoText(
+                    text = "${bearing.roundToInt()}° ${cardinalDirection(bearing)}",
+                    style = CupertinoTheme.typography.title3,
+                    fontWeight = FontWeight.Bold,
+                )
+                CupertinoText(
+                    text = qiblaGuidance(bearing, reading),
+                    style = CupertinoTheme.typography.subhead,
+                    color = colors.secondaryLabel,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
                 Spacer(Modifier.height(17.dp))
                 CupertinoCalibrationCard(reading)
             }

@@ -18,9 +18,9 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.viewinterop.UIKitInteropInteractionMode
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitView
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -28,6 +28,9 @@ import platform.CoreGraphics.CGRectMake
 import platform.Foundation.NSURL
 import platform.UIKit.UIColor
 import platform.WebKit.WKWebView
+import platform.WebKit.WKNavigation
+import platform.WebKit.WKNavigationDelegateProtocol
+import platform.darwin.NSObject
 import platform.WebKit.WKWebViewConfiguration
 
 private const val WORLDWIND_SCRIPT =
@@ -38,7 +41,7 @@ private const val WORLDWIND_SCRIPT =
  *
  * WorldWind Kotlin's native iOS module starts at a newer Kotlin/Compose
  * toolchain than this app currently uses. Web WorldWind is the same globe
- * engine family and gives the existing iOS target a real interactive globe
+ * engine family and gives the existing iOS target a sensor-driven globe
  * without forcing an app-wide Kotlin, AGP and Compose migration.
  */
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalForeignApi::class)
@@ -59,12 +62,28 @@ internal actual fun PlatformWorldWindGlobe(
         worldWindHtml(latitude, longitude, qiblaBearing, expanded)
     }
 
+    val latestHeading = rememberUpdatedState(headingDegrees)
+    val latestAccuracy = rememberUpdatedState(headingAccuracyDegrees)
+    // A heading may arrive before the external WorldWind script has loaded.
+    // Replay the latest reading once navigation finishes, even if the phone is still.
+    val navigationDelegate = remember {
+        object : NSObject(), WKNavigationDelegateProtocol {
+            override fun webView(webView: WKWebView, didFinishNavigation: WKNavigation?) {
+                webView.evaluateJavaScript(
+                    compassUpdateScript(latestHeading.value, latestAccuracy.value),
+                    completionHandler = null,
+                )
+            }
+        }
+    }
+
     UIKitView(
         factory = {
             WKWebView(
                 frame = CGRectMake(0.0, 0.0, 1.0, 1.0),
                 configuration = WKWebViewConfiguration(),
             ).apply {
+                this.navigationDelegate = navigationDelegate
                 opaque = false
                 backgroundColor = UIColor.clearColor
                 scrollView.scrollEnabled = false
@@ -79,23 +98,29 @@ internal actual fun PlatformWorldWindGlobe(
                 webView.tag = pageKey.hashCode().toLong()
                 webView.loadHTMLString(html, NSURL.URLWithString("https://unpkg.com"))
             } else {
-                val heading = headingDegrees?.toString() ?: "null"
-                val accuracy = headingAccuracyDegrees?.toString() ?: "null"
                 webView.evaluateJavaScript(
-                    "window.updateCompassHeading && window.updateCompassHeading($heading, $accuracy)",
+                    compassUpdateScript(headingDegrees, headingAccuracyDegrees),
                     completionHandler = null,
                 )
             }
         },
         onRelease = { webView ->
+            webView.navigationDelegate = null
             webView.stopLoading()
             webView.loadHTMLString("", null)
         },
         properties = UIKitInteropProperties(
-            interactionMode = UIKitInteropInteractionMode.NonCooperative,
+            interactionMode = null,
             isNativeAccessibilityEnabled = true,
         ),
     )
+}
+
+private fun compassUpdateScript(heading: Double?, accuracy: Double?): String {
+    val validHeading = heading?.takeIf { it.isFinite() }?.toString() ?: "null"
+    val validAccuracy = accuracy?.takeIf { it.isFinite() && it >= 0 }?.toString() ?: "null"
+    return "window.pendingCompassReading = [$validHeading, $validAccuracy]; " +
+        "window.updateCompassHeading && window.updateCompassHeading($validHeading, $validAccuracy)"
 }
 
 private fun worldWindHtml(
@@ -113,7 +138,7 @@ private fun worldWindHtml(
     #shell { position:relative; width:100%; height:100%; overflow:hidden; border-radius:${if (expanded) "24px" else "50%"};
       background:#07121d; }
     #globe { position:absolute; inset:0; z-index:1; display:block; width:100%; height:100%;
-      touch-action:none; background:#07121d; border-radius:inherit; }
+      touch-action:none; pointer-events:none; background:#07121d; border-radius:inherit; }
     #status { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
       padding:20px; color:#dce8f2; background:#07121d; font:600 14px -apple-system,sans-serif;
       text-align:center; z-index:4; }
@@ -141,6 +166,9 @@ private fun worldWindHtml(
       const wwd = new WorldWind.WorldWindow('globe');
       wwd.addLayer(new WorldWind.BMNGOneImageLayer());
       wwd.addLayer(new WorldWind.BMNGLayer());
+      const atmosphere = new WorldWind.AtmosphereLayer();
+      atmosphere.time = new Date();
+      wwd.addLayer(atmosphere);
 
       const userLat = $latitude;
       const userLon = $longitude;
@@ -160,7 +188,7 @@ private fun worldWindHtml(
         };
         const first = point(start);
         const last = point(end);
-        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><defs><radialGradient id="beam" cx="50%" cy="50%" r="45%"><stop offset="0" stop-color="${'$'}{color}" stop-opacity="1"/><stop offset=".2" stop-color="${'$'}{color}" stop-opacity=".8"/><stop offset=".55" stop-color="${'$'}{color}" stop-opacity=".4"/><stop offset="1" stop-color="${'$'}{color}" stop-opacity="0"/></radialGradient></defs><path d="M200 200 L${'$'}{first[0]} ${'$'}{first[1]} A${'$'}{radius} ${'$'}{radius} 0 0 1 ${'$'}{last[0]} ${'$'}{last[1]} Z" fill="url(#beam)"/><circle cx="200" cy="200" r="21" fill="white"/><circle cx="200" cy="200" r="16.8" fill="${'$'}{color}"/></svg>`;
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><defs><radialGradient id="beam" cx="50%" cy="50%" r="45%"><stop offset="0" stop-color="${'$'}{color}" stop-opacity="1"/><stop offset=".2" stop-color="${'$'}{color}" stop-opacity=".8"/><stop offset=".55" stop-color="${'$'}{color}" stop-opacity=".4"/><stop offset="1" stop-color="${'$'}{color}" stop-opacity="0"/></radialGradient></defs><path d="M200 200 L${'$'}{first[0]} ${'$'}{first[1]} A${'$'}{radius} ${'$'}{radius} 0 0 1 ${'$'}{last[0]} ${'$'}{last[1]} Z" fill="url(#beam)" opacity="${'$'}{heading === null ? 0 : 1}"/><circle cx="200" cy="200" r="21" fill="white"/><circle cx="200" cy="200" r="16.8" fill="${'$'}{color}"/></svg>`;
       }
       const kaabaSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144"><polygon points="30,38 70,20 114,35 74,55" fill="#4b4a47"/><polygon points="30,38 74,55 74,119 30,98" fill="#292929"/><polygon points="74,55 114,35 114,98 74,119" fill="#111111"/><polygon points="30,58 74,75 74,87 30,70" fill="#d4af37"/><polygon points="74,75 114,57 114,69 74,87" fill="#f0cb52"/><rect x="88" y="84" width="14" height="28" rx="2" fill="#b99028"/></svg>`;
       function placemark(lat, lon, image, label, scale) {
@@ -178,13 +206,15 @@ private fun worldWindHtml(
           new WorldWind.Position(lat, lon, 0), false, attributes
         );
         marker.altitudeMode = WorldWind.CLAMP_TO_GROUND;
+        marker.label = label;
+        marker.eyeDistanceScaling = false;
         markerLayer.addRenderable(marker);
         return marker;
       }
       const userPlacemark = placemark(
         userLat,
         userLon,
-        userMarkerSvg(qiblaBearing, '#10b981'),
+        userMarkerSvg(null, '#94a3b8'),
         'You',
         0.5
       );
@@ -266,22 +296,52 @@ private fun worldWindHtml(
         new ResizeObserver(function () { fitRoute(); }).observe(document.getElementById('shell'));
       }
 
-      window.updateCompassHeading = function (heading, accuracy) {
-        const hasHeading = heading !== null && Number.isFinite(heading);
-        const color = accuracy === null ? '#ffffff' :
-          accuracy <= 10 ? '#10b981' : accuracy <= 25 ? '#ffa500' : '#ff4444';
-        const ringColor = color === '#ffffff' ? '#72d9bd' : color;
-        accuracyRing.setAttribute('stroke', ringColor);
-        accuracyRing.style.filter = 'drop-shadow(0 0 5px ' + ringColor + ')';
+      let displayedHeading = null;
+      let targetHeading = null;
+      let markerColor = '#94a3b8';
+      let animationFrame = null;
+      let lastFrameTime = null;
+      function shortestTurn(from, to) { return ((to - from + 540) % 360) - 180; }
+      function drawHeading(time) {
+        const elapsed = lastFrameTime === null ? 16 : Math.min(64, time - lastFrameTime);
+        lastFrameTime = time;
+        const delta = shortestTurn(displayedHeading, targetHeading);
+        displayedHeading = (displayedHeading + delta * (1 - Math.exp(-elapsed / 100)) + 360) % 360;
+        if (Math.abs(delta) < 0.1) displayedHeading = targetHeading;
+        // The camera points along the Qibla route. Billboards use screen angles,
+        // so north-referenced headings must be made relative to Qibla, as on Android.
         userPlacemark.attributes.imageSource = imageUri(
-          userMarkerSvg(
-            hasHeading ? heading : qiblaBearing,
-            color === '#ffffff' ? '#10b981' : color
-          )
+          userMarkerSvg(shortestTurn(qiblaBearing, displayedHeading), markerColor)
         );
         wwd.redraw();
+        animationFrame = displayedHeading === targetHeading ? null : requestAnimationFrame(drawHeading);
+      }
+      window.updateCompassHeading = function (heading, accuracy) {
+        const hasHeading = heading !== null && Number.isFinite(heading);
+        const hasAccuracy = hasHeading && accuracy !== null && Number.isFinite(accuracy) && accuracy >= 0;
+        const aligned = hasHeading && Math.abs(shortestTurn(qiblaBearing, heading)) <= 5;
+        markerColor = !hasAccuracy ? '#94a3b8' :
+          accuracy <= 10 ? (aligned ? '#00c853' : '#10b981') : accuracy <= 25 ? '#ffa500' : '#ff4444';
+        accuracyRing.setAttribute('stroke', markerColor);
+        accuracyRing.style.filter = 'drop-shadow(0 0 5px ' + markerColor + ')';
+        if (!hasHeading) {
+          if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+          animationFrame = null;
+          displayedHeading = null;
+          lastFrameTime = null;
+          userPlacemark.attributes.imageSource = imageUri(userMarkerSvg(null, markerColor));
+          wwd.redraw();
+          return;
+        }
+        targetHeading = ((heading % 360) + 360) % 360;
+        if (displayedHeading === null) displayedHeading = targetHeading;
+        if (animationFrame === null) {
+          lastFrameTime = null;
+          animationFrame = requestAnimationFrame(drawHeading);
+        }
       };
-      window.updateCompassHeading(null, null);
+      const initialReading = window.pendingCompassReading || [null, null];
+      window.updateCompassHeading(initialReading[0], initialReading[1]);
       status.style.display = 'none';
       wwd.redraw();
     } catch (error) {
