@@ -5052,10 +5052,7 @@ private fun EditorialQuranReadingStage(
                     64.dp,
                 ),
                 translation?.let {
-                    InsightTextBlock(it, MaterialTheme.typography.bodySmall.copy(
-                        fontSize = (15f - compression).sp, lineHeight = (23f - 2f * compression).sp,
-                        letterSpacing = 0.sp,
-                    ), 10.dp)
+                    InsightTextBlock(it, insightReaderBodyStyle(compression), 10.dp)
                 },
             )
         }
@@ -5172,11 +5169,7 @@ private fun EditorialQuranReadingStage(
                         translation?.let { translatedText ->
                             Text(
                                 text = translatedText,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = (15f - compression).sp,
-                                    lineHeight = (23f - (2f * compression)).sp,
-                                    letterSpacing = 0.sp,
-                                ),
+                                style = insightReaderBodyStyle(compression),
                                 color = Color.White.copy(alpha = 0.88f),
                                 textAlign = TextAlign.Start,
                                 modifier = Modifier.fillMaxWidth(),
@@ -5187,6 +5180,17 @@ private fun EditorialQuranReadingStage(
             }
         }
     }
+}
+
+/** Shared prose metrics for the expanded Hadith, translation and suggestion readers. */
+@Composable
+private fun insightReaderBodyStyle(compactProgress: Float): TextStyle {
+    val compression = compactProgress.coerceIn(0f, 1f)
+    return MaterialTheme.typography.bodyLarge.copy(
+        fontSize = (17f - 2f * compression).sp,
+        lineHeight = (26f - 3f * compression).sp,
+        letterSpacing = 0.sp,
+    )
 }
 
 /** A sourced hadith selected for the next prayer, shown only in enlarged Salah. */
@@ -5298,11 +5302,7 @@ private fun SalahHadithExpandedStage(
                         text = body,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Justify,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontSize = (19f - (2f * compression)).sp,
-                            lineHeight = (29f - (3f * compression)).sp,
-                            letterSpacing = 0.sp,
-                        ),
+                        style = insightReaderBodyStyle(compression),
                         color = Color.White.copy(alpha = 0.98f),
                         fontWeight = FontWeight.Medium,
                         onTextLayout = { result ->
@@ -5967,11 +5967,7 @@ private fun RecommendationExpandedStage(
                                 text = nudge?.supportingText?.takeIf(String::isNotBlank)
                                     ?: nudge?.label?.takeIf(String::isNotBlank)
                                     ?: "A verified $fallbackLabel selected for this moment",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    // This is source text, not another headline.
-                                    fontSize = (17f - (2f * compression)).sp,
-                                    lineHeight = (26f - (3f * compression)).sp,
-                                ),
+                                style = insightReaderBodyStyle(compression),
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium,
                             )
