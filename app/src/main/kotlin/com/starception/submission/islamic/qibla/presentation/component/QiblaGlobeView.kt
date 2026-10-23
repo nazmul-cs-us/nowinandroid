@@ -26,7 +26,6 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -74,6 +73,9 @@ import earth.worldwind.layer.BlueMarbleLandsatLayer
 import earth.worldwind.layer.RenderableLayer
 import earth.worldwind.layer.atmosphere.AtmosphereLayer
 import earth.worldwind.render.image.ImageSource
+import com.starception.submission.core.designsystem.component.rememberSmoothCompassHeading
+import kotlinx.coroutines.flow.collect
+import earth.worldwind.shape.OrientationMode
 import earth.worldwind.shape.Placemark
 import earth.worldwind.shape.Polygon
 import android.content.Context as AndroidContext
@@ -124,14 +126,7 @@ fun QiblaGlobeView(
         var deviceHeading by remember { mutableFloatStateOf(0f) }
         var lastUpdatedHeading by remember { mutableFloatStateOf(0f) } // Track last heading used for update
 
-        val animatedHeading by animateFloatAsState(
-            targetValue = deviceHeading,
-            animationSpec = spring(
-                dampingRatio = 0.75f,
-                stiffness = Spring.StiffnessMedium,
-            ),
-            label = "smoothBeamHeading",
-        )
+        var hasHeading by remember { mutableStateOf(false) }
         var worldWindowRef by remember { mutableStateOf<WorldWindow?>(null) }
         var qiblaLayerRef by remember { mutableStateOf<RenderableLayer?>(null) }
         val lifecycleObservers = remember(lifecycleOwner) {
@@ -175,9 +170,12 @@ fun QiblaGlobeView(
         }
 
         // Check if user is facing Qibla (within ±5 degrees)
-        val angularDiff = kotlin.math.abs(deviceHeading - qiblaDirection)
+        val smoothedHeading by rememberSmoothCompassHeading(deviceHeading.takeIf { hasHeading && isInForeground && isActiveTile })
+        val animatedHeading by rememberUpdatedState(smoothedHeading ?: deviceHeading)
+
+        val angularDiff = kotlin.math.abs(animatedHeading - qiblaDirection)
         val normalizedDiff = if (angularDiff > 180f) 360f - angularDiff else angularDiff
-        val isAlignedWithQibla = normalizedDiff <= 5f
+        val isAlignedWithQibla = hasHeading && normalizedDiff <= 5f
 
         // Debug logging to compare with QiblaCompass
         android.util.Log.d("QiblaGlobeAlignment", "deviceHeading=$deviceHeading, qiblaDirection=$qiblaDirection, normalizedDiff=$normalizedDiff, isAligned=$isAlignedWithQibla, declination=$magneticDeclination")
@@ -217,13 +215,15 @@ fun QiblaGlobeView(
                     lastSensorUpdateTime = currentTime
 
                     // Get pre-filtered heading from TYPE_ORIENTATION (much more stable than manual calculation)
-                    val rawHeading = event.values[0] + magneticDeclination
+                    val rawHeading = ((event.values[0] + magneticDeclination) % 360f + 360f) % 360f
+                    if (!rawHeading.isFinite()) return
 
-                    // Only update heading if change is significant (3° threshold like Smart Prediction)
+                    // Suppress sensor noise without quantizing deliberate turns into 3° steps.
                     val headingDiff = kotlin.math.abs(rawHeading - lastUpdatedHeading)
                     val normalizedHeadingDiff = if (headingDiff > 180f) 360f - headingDiff else headingDiff
 
-                    if (normalizedHeadingDiff > 3f) {
+                    if (!hasHeading || normalizedHeadingDiff > 0.35f) {
+                        hasHeading = true
                         deviceHeading = rawHeading
                         lastUpdatedHeading = rawHeading
                         // The marker bitmap (heading + accuracy color + breathing pulse) is
@@ -292,7 +292,7 @@ fun QiblaGlobeView(
                     (1f - DOT_PULSE_MIN) *
                     (0.5f - 0.5f * kotlin.math.cos(2.0 * Math.PI * phase).toFloat())
                 userMarkerPlacemark?.let { placemark ->
-                    val relativeHeading = deviceHeading - qiblaDirection
+                    val relativeHeading = animatedHeading - qiblaDirection
                     val aligned = kotlin.math.abs(relativeHeading) <= 5f ||
                         kotlin.math.abs(relativeHeading) >= 355f
                     val color = when {
@@ -302,11 +302,26 @@ fun QiblaGlobeView(
                         sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 0xFFFF6B6B.toInt()
                         else -> 0xFFFF4444.toInt()
                     }
-                    val bmp = createUserMarkerWithHeadingShadow(relativeHeading, color, dotScale)
+                    val bmp = createUserMarkerWithHeadingShadow(0f, color, dotScale)
                     placemark.attributes.imageSource = ImageSource.fromBitmap(bmp)
                     worldWindowRef?.requestRedraw()
                 }
                 kotlinx.coroutines.delay(50)
+            }
+        }
+
+        // Rotate the existing texture at display cadence; pulse/color textures
+        // keep their separate, slower cadence to avoid per-frame bitmap allocation.
+        LaunchedEffect(isInForeground, isActiveTile, qiblaDirection) {
+            if (!isInForeground || !isActiveTile) return@LaunchedEffect
+            snapshotFlow { userMarkerPlacemark to animatedHeading }.collect { (marker, heading) ->
+                marker?.let {
+                    val rotation = (heading - qiblaDirection).toDouble()
+                    if (kotlin.math.abs(it.imageRotation.inDegrees - rotation) > 0.01) {
+                        it.imageRotation = rotation.degrees
+                        worldWindowRef?.requestRedraw()
+                    }
+                }
             }
         }
 
@@ -851,6 +866,7 @@ private fun createWorldWindow(
         ImageSource.fromBitmap(userMarkerBitmap),
     ).apply {
         attributes.imageScale = 1.0
+        imageRotationReference = OrientationMode.RELATIVE_TO_SCREEN
         altitudeMode = AltitudeMode.ABSOLUTE
     }
     qiblaLayer.addRenderable(userPlacemark)

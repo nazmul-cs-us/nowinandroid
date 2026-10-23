@@ -305,6 +305,9 @@ private fun worldWindHtml(
       let displayedHeading = null;
       let targetHeading = null;
       let markerColor = '#94a3b8';
+      let lastMarkerColor = null;
+      let markerVisible = false;
+      userPlacemark.imageRotationReference = WorldWind.RELATIVE_TO_SCREEN;
       let animationFrame = null;
       let lastFrameTime = null;
       function shortestTurn(from, to) { return ((to - from + 540) % 360) - 180; }
@@ -312,14 +315,12 @@ private fun worldWindHtml(
         const elapsed = lastFrameTime === null ? 16 : Math.min(64, time - lastFrameTime);
         lastFrameTime = time;
         const delta = shortestTurn(displayedHeading, targetHeading);
-        displayedHeading = (displayedHeading + delta * (1 - Math.exp(-elapsed / 100)) + 360) % 360;
-        if (Math.abs(delta) < 0.1) displayedHeading = targetHeading;
+        if (Math.abs(delta) <= 0.35) targetHeading = displayedHeading;
+        else displayedHeading = (displayedHeading + delta * (1 - Math.exp(-elapsed / 140)) + 360) % 360;
         // Android's circular globe uses device heading minus CAMERA heading.
         // The midpoint's north differs from the user's north on a curved Earth;
         // subtracting the initial user-to-Kaaba bearing rotates this beam incorrectly.
-        userPlacemark.attributes.imageSource = imageUri(
-          userMarkerSvg(shortestTurn(cameraHeading, displayedHeading), markerColor)
-        );
+        userPlacemark.imageRotation = shortestTurn(cameraHeading, displayedHeading);
         wwd.redraw();
         animationFrame = displayedHeading === targetHeading ? null : requestAnimationFrame(drawHeading);
       }
@@ -336,12 +337,16 @@ private fun worldWindHtml(
           aligned ? '✓ QIBLA · Aligned' :
           'Turn ' + (turn > 0 ? 'right ' : 'left ') + Math.round(Math.abs(turn)) + '°';
         accuracyRing.style.filter = 'drop-shadow(0 0 5px ' + markerColor + ')';
+        if (markerVisible !== hasHeading || lastMarkerColor !== markerColor) {
+          userPlacemark.attributes.imageSource = imageUri(userMarkerSvg(hasHeading ? 0 : null, markerColor));
+          markerVisible = hasHeading;
+          lastMarkerColor = markerColor;
+        }
         if (!hasHeading) {
           if (animationFrame !== null) cancelAnimationFrame(animationFrame);
           animationFrame = null;
           displayedHeading = null;
           lastFrameTime = null;
-          userPlacemark.attributes.imageSource = imageUri(userMarkerSvg(null, markerColor));
           wwd.redraw();
           return;
         }

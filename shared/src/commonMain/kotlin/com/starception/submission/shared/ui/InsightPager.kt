@@ -31,6 +31,7 @@ import com.starception.submission.core.designsystem.component.rememberInsightRea
 import com.starception.submission.core.designsystem.component.insightReaderChromeProgress
 import com.starception.submission.core.designsystem.component.InsightReaderControlsButton
 import com.starception.submission.prayer.model.prayerHadithContext
+import com.starception.submission.core.designsystem.component.rememberSmoothCompassHeading
 import com.starception.submission.core.designsystem.component.InsightMotion
 import com.starception.submission.core.designsystem.component.insightReadingEdges
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -912,23 +913,8 @@ fun InsightPager(
                             val rawRotation = normalizeBearing(
                                 qiblaBearing - (heading.headingDegrees?.toFloat() ?: 0f),
                             )
-                            var continuousRotation by remember(qiblaBearing) {
-                                mutableFloatStateOf(rawRotation)
-                            }
-                            LaunchedEffect(rawRotation) {
-                                continuousRotation += shortestBearingDelta(
-                                    continuousRotation,
-                                    rawRotation,
-                                )
-                            }
-                            val arrowRotation by animateFloatAsState(
-                                targetValue = continuousRotation,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMediumLow,
-                                ),
-                                label = "liveQiblaDirection",
-                            )
+                            val smoothRotation by rememberSmoothCompassHeading(rawRotation.takeIf { heading.headingDegrees != null })
+                            val arrowRotation = smoothRotation ?: rawRotation
                             ArtworkTile(
                                 backgroundPageOffset = { pageOffset },
                                 artwork = Res.drawable.insight_qibla_background,

@@ -48,6 +48,7 @@ import com.starception.submission.core.designsystem.component.rememberInsightRea
 import com.starception.submission.core.designsystem.component.insightReaderChromeProgress
 import com.starception.submission.core.designsystem.component.InsightReaderControlsButton
 import com.starception.submission.prayer.model.prayerHadithContext
+import com.starception.submission.core.designsystem.component.rememberSmoothCompassHeading
 import com.starception.submission.core.designsystem.component.InsightMotion
 import com.starception.submission.core.designsystem.component.insightReadingEdges
 import androidx.compose.animation.AnimatedContent
@@ -3083,25 +3084,10 @@ private fun InsightPreviewCard(
     val shape = ContinuousCornerShape(cornerExtent)
     val shadowElevation = (6f - (2f * compactProgress) + (4f * expansionProgress)).dp
     val rawDirectionalRotation = directionalHintBearing?.let { bearing ->
-        normalizeDegrees(bearing - (deviceHeadingDegrees ?: 0f))
+        deviceHeadingDegrees?.let { normalizeDegrees(bearing - it) }
     }
-    var continuousDirectionalRotation by remember(directionalHintBearing) {
-        mutableFloatStateOf(rawDirectionalRotation ?: 0f)
-    }
-    LaunchedEffect(rawDirectionalRotation) {
-        rawDirectionalRotation?.let { target ->
-            val shortestDelta = shortestAngleDelta(continuousDirectionalRotation, target)
-            continuousDirectionalRotation += shortestDelta
-        }
-    }
-    val animatedDirectionalRotation by animateFloatAsState(
-        targetValue = continuousDirectionalRotation,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
-        label = "liveQiblaDirection",
-    )
+    val directionalRotation by rememberSmoothCompassHeading(rawDirectionalRotation)
+    val animatedDirectionalRotation = directionalRotation ?: directionalHintBearing?.toFloat() ?: 0f
     val animatedSkyTop by animateColorAsState(
         targetValue = skyTintTop ?: Color.Transparent,
         animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
@@ -5351,28 +5337,8 @@ private fun QiblaBearingExpandedStage(
 ) {
     val view = LocalView.current
     val compression = compactProgress.coerceIn(0f, 1f)
-    val latestHeading by rememberUpdatedState(heading)
-    var animatedHeading by remember { mutableFloatStateOf(heading ?: 0f) }
-    LaunchedEffect(heading) {
-        animatedHeading = latestHeading ?: return@LaunchedEffect
-        var previousFrameNanos = withFrameNanos { it }
-        while (latestHeading != null) {
-            withFrameNanos { frameNanos ->
-                val elapsedSeconds = ((frameNanos - previousFrameNanos) / 1_000_000_000f)
-                    .coerceIn(0f, 0.05f)
-                previousFrameNanos = frameNanos
-                val target = latestHeading ?: return@withFrameNanos
-                val delta = shortestAngleDelta(animatedHeading, target)
-                if (kotlin.math.abs(delta) > 0.02f) {
-                    // Frame-paced exponential interpolation stays smooth when
-                    // the sensor target changes many times during one turn.
-                    val response = if (kotlin.math.abs(delta) > 35f) 10f else 7f
-                    val blend = 1f - kotlin.math.exp(-response * elapsedSeconds)
-                    animatedHeading = normalizeDegrees(animatedHeading + (delta * blend))
-                }
-            }
-        }
-    }
+    val smoothHeading by rememberSmoothCompassHeading(heading)
+    val animatedHeading = smoothHeading ?: 0f
     // Every moving element derives from one heading. Independent springs made
     // the rose and destination briefly disagree while both chased sensor data.
     val relativeTurn = if (bearing != null && heading != null) {
