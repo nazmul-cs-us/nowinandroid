@@ -42,7 +42,6 @@ import com.starception.submission.shared.content.CONTEXTUAL_DUA_CHAPTER_IDS
 import com.starception.submission.shared.content.createSharedFortressRepository
 import com.starception.submission.shared.content.contextualRecommendation
 import com.starception.submission.feature.quran.dailyReading
-import com.starception.submission.shared.audio.quranAudioUrl
 import com.starception.submission.shared.qibla.qiblaBearing
 import com.starception.submission.shared.salah.FARD_PRAYERS
 import kotlin.time.Clock
@@ -191,7 +190,10 @@ internal fun TruckHomeDashboard(
         qiblaBearing(latitude, longitude).toInt()
     }
     val readingSurah = remember(today) { dailyReading(today) }
-    var isReadingAudio by remember { mutableStateOf(false) }
+    val readingPlayback = rememberReadingTilePlayback(quranPlayer, readingSurah.number) {
+        onOpenQuran(readingSurah.number)
+    }
+    val isReadingAudio = readingPlayback.playing
 
     androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
         columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(340.dp),
@@ -266,38 +268,19 @@ internal fun TruckHomeDashboard(
                 accent = MaterialTheme.colorScheme.secondary,
                 trailing = {
                     Surface(
-                        onClick = {
-                            quranPlayer.stop()
-                            com.starception.submission.shared.media.QuranPlaybackBus.clear()
-                            if (isReadingAudio) {
-                                isReadingAudio = false
-                            } else {
-                                isReadingAudio = quranPlayer.play(quranAudioUrl(readingSurah.number))
-                                if (isReadingAudio) {
-                                    com.starception.submission.shared.media.QuranPlaybackBus.startSurah(
-                                        player = quranPlayer,
-                                        surahNumber = readingSurah.number,
-                                    )
-                                }
-                            }
-                        },
+                        onClick = readingPlayback.toggle,
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(30.dp),
                     ) {
                         Text(
-                            if (isReadingAudio) "❚❚" else "▶",
+                            if (readingPlayback.preparing) "…" else if (isReadingAudio) "❚❚" else "▶",
                             style = MaterialTheme.typography.labelMedium,
                         )
                     }
                 },
-                onHeaderClick = {
-                    quranPlayer.stop()
-                    com.starception.submission.shared.media.QuranPlaybackBus.clear()
-                    isReadingAudio = false
-                    onOpenQuran(readingSurah.number)
-                },
+                onHeaderClick = readingPlayback.openSurah,
             ) {
                 Text(
                     readingSurah.nameEnglish,
@@ -307,7 +290,7 @@ internal fun TruckHomeDashboard(
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    readingSurah.nameArabic,
+                    readingPlayback.error ?: if (readingPlayback.preparing) "Preparing audio…" else readingSurah.nameArabic,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
