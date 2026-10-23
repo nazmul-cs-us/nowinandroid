@@ -21,12 +21,14 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.Layout
@@ -54,6 +56,8 @@ fun InsightContentLayout(
     spacing: Dp = 14.dp,
     minimumStageHeight: Dp = 240.dp,
     onPreferredHeightChange: (Dp) -> Unit = {},
+    readerChrome: InsightReaderChromeState? = null,
+    chromeProgress: Float = 0f,
     stage: @Composable () -> Unit,
     metadata: @Composable () -> Unit,
 ) {
@@ -72,17 +76,28 @@ fun InsightContentLayout(
         Layout(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
             content = {
-                Box(propagateMinConstraints = true) { stage() }
-                Box(Modifier.onSizeChanged { metadataHeight = it.height }) { metadata() }
+                Box(
+                    modifier = if (readerChrome != null) Modifier.nestedScroll(readerChrome.connection) else Modifier,
+                    propagateMinConstraints = true,
+                ) {
+                    CompositionLocalProvider(LocalInsightReaderChromeProgress provides chromeProgress) { stage() }
+                }
+                Box(
+                    Modifier.insightChromeVisibility(chromeProgress)
+                        .onSizeChanged { metadataHeight = it.height },
+                ) { metadata() }
             },
         ) { measurables, constraints ->
             val metadataPlaceable = measurables[1].measure(
                 constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity),
             )
-            val gap = if (metadataPlaceable.height > 0) spacingPx else 0
-            val stageHeight = insightStageHeight(
+            val gap = if (metadataPlaceable.height > 0) (spacingPx * (1f - chromeProgress)).toInt() else 0
+            val naturalStageHeight = insightStageHeight(
                 viewportHeight, metadataPlaceable.height, gap, minimumStagePx,
             )
+            val availableReaderHeight = (viewportHeight - metadataPlaceable.height - gap).coerceAtLeast(1)
+            val stageHeight = (naturalStageHeight +
+                (availableReaderHeight - naturalStageHeight) * chromeProgress).toInt()
             val stagePlaceable = measurables[0].measure(
                 constraints.copy(minHeight = stageHeight, maxHeight = stageHeight),
             )

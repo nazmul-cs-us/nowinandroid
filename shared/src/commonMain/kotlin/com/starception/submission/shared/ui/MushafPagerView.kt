@@ -16,7 +16,6 @@
 
 package com.starception.submission.shared.ui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +33,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -136,38 +142,15 @@ private fun MushafPageView(
                 )
             }
         }
-        if (showTranslation) {
-            items(count = page.verses.size, key = { "ayah-${page.verses[it].numberInSurah}" }) { index ->
-                val verse = page.verses[index]
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MushafPageFlow(
-                        page = page.copy(verses = listOf(verse)),
-                        arabicFont = arabicFont,
-                        arabicFontSize = arabicFontSize,
-                        textAlignment = textAlignment,
-                        tajweedAnnotations = tajweedAnnotations,
-                    )
-                    if (verse.translation.isNotBlank()) {
-                        Text(
-                            text = verse.translation,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Justify,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
-                    }
-                }
-            }
-        } else {
-            item(key = "flow") {
-                MushafPageFlow(
-                    page = page,
-                    arabicFont = arabicFont,
-                    arabicFontSize = arabicFontSize,
-                    textAlignment = textAlignment,
-                    tajweedAnnotations = tajweedAnnotations,
-                )
-            }
+        item(key = "flow") {
+            MushafPageFlow(
+                page = page,
+                arabicFont = arabicFont,
+                arabicFontSize = arabicFontSize,
+                showTranslation = showTranslation,
+                textAlignment = textAlignment,
+                tajweedAnnotations = tajweedAnnotations,
+            )
         }
     }
 }
@@ -178,44 +161,15 @@ private fun MushafPageFlow(
     page: MushafPage,
     arabicFont: String,
     arabicFontSize: Float,
+    showTranslation: Boolean,
     textAlignment: String,
     tajweedAnnotations: Map<Int, List<SharedTajweedAnnotation>>?,
 ) {
     val fontFamily = QuranArabicFonts.fontFamily(arabicFont)
     val chipIdPrefix = "ayah-marker-${page.page}-"
-    val annotated = remember(page, arabicFontSize, tajweedAnnotations) {
-        // Tajweed spans are authored against each ayah's own text, so rebase
-        // their ranges onto the page flow by the running cursor. Styles apply
-        // only after the whole string is built — builder ranges are validated
-        // against the current length at addStyle time.
-        val tajweedSpans = mutableListOf<Triple<Long, Int, Int>>()
-        buildAnnotatedString {
-            page.verses.forEachIndexed { index, verse ->
-                if (index > 0) append(" ")
-                val verseStart = length
-                val rules = tajweedAnnotations?.get(verse.numberInSurah).orEmpty()
-                rules.filter { it.startIndex < it.endIndex }
-                    .sortedBy { it.startIndex }
-                    .forEach { annotation ->
-                        val color = SharedTajweedRules.colors[annotation.ruleKey] ?: return@forEach
-                        val start = (verseStart + annotation.startIndex)
-                            .coerceIn(verseStart, verseStart + verse.arabicText.length)
-                        val end = (verseStart + annotation.endIndex)
-                            .coerceIn(verseStart, verseStart + verse.arabicText.length)
-                        if (start < end) {
-                            tajweedSpans.add(Triple(color, start, end))
-                        }
-                    }
-                append(verse.arabicText)
-                append(" ")
-                pushStringAnnotation(tag = "ayah", annotation = verse.numberInSurah.toString())
-                appendInlineContent(id = "$chipIdPrefix${verse.numberInSurah}", alternateText = "﴿${verse.numberInSurah}﴾")
-                pop()
-            }
-            tajweedSpans.forEach { (color, start, end) ->
-                addStyle(SpanStyle(color = androidx.compose.ui.graphics.Color(color)), start, end)
-            }
-        }
+    val translationColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f)
+    val annotated = remember(page, arabicFontSize, showTranslation, translationColor, tajweedAnnotations) {
+        buildMushafFlowText(page, arabicFontSize, showTranslation, translationColor, tajweedAnnotations)
     }
     Box(
         modifier = Modifier
@@ -247,6 +201,63 @@ private fun MushafPageFlow(
                         )
                 },
             )
+        }
+    }
+}
+
+/** One typeset flow: Arabic, its marker, its translation, then the next ayah. */
+internal fun buildMushafFlowText(
+    page: MushafPage,
+    arabicFontSize: Float,
+    showTranslation: Boolean,
+    translationColor: Color,
+    tajweedAnnotations: Map<Int, List<SharedTajweedAnnotation>>? = null,
+): AnnotatedString {
+    val translationStyle = SpanStyle(
+        fontFamily = FontFamily.Serif,
+        fontSize = (arabicFontSize * 0.65f).sp,
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.sp,
+        color = translationColor,
+    )
+    val translationParagraph = ParagraphStyle(
+        textDirection = TextDirection.Content,
+        textAlign = TextAlign.Start,
+        lineHeight = (arabicFontSize * 0.65f * 1.28f).sp,
+    )
+    val separatorParagraph = ParagraphStyle(
+        textDirection = TextDirection.Content,
+        lineHeight = (arabicFontSize * 0.12f).sp,
+    )
+    val separatorStyle = SpanStyle(fontSize = (arabicFontSize * 0.12f).sp, fontFamily = FontFamily.Default)
+    return buildAnnotatedString {
+        page.verses.forEachIndexed { index, verse ->
+            if (index > 0) append(" ")
+            pushStringAnnotation("ayah", verse.numberInSurah.toString())
+            val arabicStart = length
+            append(verse.arabicText)
+            tajweedAnnotations?.get(verse.numberInSurah).orEmpty().forEach { annotation ->
+                val color = SharedTajweedRules.colors[annotation.ruleKey]
+                val start = (arabicStart + annotation.startIndex).coerceIn(arabicStart, length)
+                val end = (arabicStart + annotation.endIndex).coerceIn(start, length)
+                if (color != null && start < end) addStyle(SpanStyle(color = Color(color)), start, end)
+            }
+            append('\u2060') // Keep the marker attached to its Arabic ayah.
+            appendInlineContent("ayah-marker-${page.page}-${verse.numberInSurah}", "﴿${verse.numberInSurah}﴾")
+            pop()
+            if (showTranslation && verse.translation.isNotBlank()) {
+                pushStringAnnotation("translation", verse.numberInSurah.toString())
+                withStyle(separatorParagraph) { withStyle(separatorStyle) { append('\u2028') } }
+                withStyle(translationParagraph) {
+                    withStyle(translationStyle) {
+                        append('\u2068') // Each language chooses its own direction within the RTL flow.
+                        append(verse.translation.trim())
+                        append('\u2069')
+                    }
+                }
+                withStyle(separatorParagraph) { withStyle(separatorStyle) { append('\u2028') } }
+                pop()
+            }
         }
     }
 }

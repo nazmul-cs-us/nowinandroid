@@ -42,6 +42,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.starception.submission.core.designsystem.component.contentSizedInsightExtent
 import com.starception.submission.core.designsystem.component.InsightTextBlock
 import com.starception.submission.core.designsystem.component.insightTextHeight
+import com.starception.submission.core.designsystem.component.LocalInsightReaderChromeProgress
+import com.starception.submission.core.designsystem.component.insightChromeVisibility
+import com.starception.submission.core.designsystem.component.rememberInsightReaderChrome
+import com.starception.submission.core.designsystem.component.insightReaderChromeProgress
+import com.starception.submission.core.designsystem.component.InsightReaderControlsButton
 import com.starception.submission.core.designsystem.component.InsightMotion
 import com.starception.submission.core.designsystem.component.insightReadingEdges
 import androidx.compose.animation.AnimatedContent
@@ -3062,6 +3067,8 @@ private fun InsightPreviewCard(
     disableCardGesturesWhenExpanded: Boolean = false,
 ) {
     val editorialExpanded = isExpanded && useEditorialExpandedLayout
+    val readerChrome = rememberInsightReaderChrome(editorialExpanded)
+    val chromeProgress = insightReaderChromeProgress(readerChrome, editorialExpanded)
     val density = LocalDensity.current
     var suppressClickUntilMs by remember { mutableLongStateOf(0L) }
     val cardInteractionSource = remember { MutableInteractionSource() }
@@ -3726,8 +3733,12 @@ private fun InsightPreviewCard(
             val showHeaderActions = compactProgress < 0.5f &&
                 (onClick != null || onReadingPlayPause != null || directionalHintBearing != null || onPrayerUndo != null)
 
-            Row(
+            if (chromeProgress < 0.999f) Row(
                 modifier = Modifier
+                    .graphicsLayer {
+                        alpha = 1f - chromeProgress
+                        translationY = -12.dp.toPx() * chromeProgress
+                    }
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
                     .padding(tagInset),
@@ -3952,6 +3963,13 @@ private fun InsightPreviewCard(
                         }
                     }
                 }
+            }
+
+            if (editorialExpanded) {
+                InsightReaderControlsButton(
+                    readerChrome,
+                    Modifier.align(Alignment.TopEnd).padding(end = 8.dp),
+                )
             }
 
             val stageContent: @Composable () -> Unit = {
@@ -4422,14 +4440,16 @@ private fun InsightPreviewCard(
                         .padding(
                             start = titleHorizontalPadding,
                             end = titleHorizontalPadding,
-                            top = 64.dp,
-                            bottom = 24.dp,
+                            top = (64f - 16f * chromeProgress).dp,
+                            bottom = (24f - 16f * chromeProgress).dp,
                         ),
                     spacing = 12.dp,
                     minimumStageHeight = minimumExpandedContentHeight,
                     onPreferredHeightChange = { height ->
                         onPreferredHeightChange(height + 88.dp)
                     },
+                    readerChrome = readerChrome,
+                    chromeProgress = chromeProgress,
                     stage = stageContent,
                     metadata = metadataContent,
                 )
@@ -5061,39 +5081,41 @@ private fun EditorialQuranReadingStage(
             verticalArrangement = Arrangement.spacedBy((6f - (2f * compression)).dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, end = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "SURAH ${surah.number} · ${surah.nameEnglish.uppercase()}",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        letterSpacing = 1.3.sp,
-                    ),
-                    color = Color.White.copy(alpha = 0.68f),
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = if (isPlaying) "PLAYING" else "${ayahs.size} AYAT",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        letterSpacing = 0.8.sp,
-                    ),
-                    color = HomeReferenceGold.copy(alpha = 0.94f),
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false,
-                )
+            Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "SURAH ${surah.number} · ${surah.nameEnglish.uppercase()}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            letterSpacing = 1.3.sp,
+                        ),
+                        color = Color.White.copy(alpha = 0.68f),
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = if (isPlaying) "PLAYING" else "${ayahs.size} AYAT",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            letterSpacing = 0.8.sp,
+                        ),
+                        color = HomeReferenceGold.copy(alpha = 0.94f),
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
             }
             LazyColumn(
                 modifier = Modifier
@@ -5230,16 +5252,18 @@ private fun SalahHadithExpandedStage(
                 ),
             verticalArrangement = Arrangement.spacedBy((5f - (2f * compression)).dp),
         ) {
-            Text(
-                text = "HADITH FOR ${displayPrayerName.uppercase()}",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
-                    letterSpacing = 1.2.sp,
-                ),
-                color = HomeReferenceGold.copy(alpha = 0.94f),
-                fontWeight = FontWeight.Bold,
-            )
+            Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+                Text(
+                    text = "HADITH FOR ${displayPrayerName.uppercase()}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        letterSpacing = 1.2.sp,
+                    ),
+                    color = HomeReferenceGold.copy(alpha = 0.94f),
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -5279,17 +5303,19 @@ private fun SalahHadithExpandedStage(
                 }
             }
             if (compression < 0.50f) {
-                Text(
-                    text = source,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        letterSpacing = 0.sp,
-                    ),
-                    color = Color.White.copy(alpha = 0.56f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+                    Text(
+                        text = source,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = Color.White.copy(alpha = 0.56f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

@@ -25,6 +25,11 @@ import androidx.compose.animation.core.Spring
 import com.starception.submission.core.designsystem.component.contentSizedInsightExtent
 import com.starception.submission.core.designsystem.component.InsightTextBlock
 import com.starception.submission.core.designsystem.component.insightTextHeight
+import com.starception.submission.core.designsystem.component.LocalInsightReaderChromeProgress
+import com.starception.submission.core.designsystem.component.insightChromeVisibility
+import com.starception.submission.core.designsystem.component.rememberInsightReaderChrome
+import com.starception.submission.core.designsystem.component.insightReaderChromeProgress
+import com.starception.submission.core.designsystem.component.InsightReaderControlsButton
 import com.starception.submission.core.designsystem.component.InsightMotion
 import com.starception.submission.core.designsystem.component.insightReadingEdges
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -1364,33 +1369,35 @@ private fun ExpandedReadingPreview(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                InsightSectionLabel("SURAH $surahNumber")
-                Text(
-                    text = surahName,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = when {
-                        loading -> "Preparing passage…"
-                        loadFailed -> "Passage unavailable"
-                        isPlaying -> "PLAYING"
-                        mushafMode -> "MUSHAF · ${verses.size} AYAT"
-                        else -> "${verses.size} AYAT"
-                    },
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        letterSpacing = 0.8.sp,
-                    ),
-                    color = ReadingPreviewGold,
-                    fontWeight = FontWeight.Bold,
-                )
+            Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    InsightSectionLabel("SURAH $surahNumber")
+                    Text(
+                        text = surahName,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = when {
+                            loading -> "Preparing passage…"
+                            loadFailed -> "Passage unavailable"
+                            isPlaying -> "PLAYING"
+                            mushafMode -> "MUSHAF · ${verses.size} AYAT"
+                            else -> "${verses.size} AYAT"
+                        },
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            letterSpacing = 0.8.sp,
+                        ),
+                        color = ReadingPreviewGold,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f)
@@ -1609,7 +1616,9 @@ private fun ExpandedSalahHadith(
                 ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            InsightSectionLabel("HADITH FOR ${displayName.uppercase()}")
+            Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+                InsightSectionLabel("HADITH FOR ${displayName.uppercase()}")
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1643,13 +1652,15 @@ private fun ExpandedSalahHadith(
                     )
                 }
             }
-            InsightSourceAction(reference = source) {
-                val fallbackId = when (prayerName?.lowercase()) {
-                    "fajr", "asr" -> 574
-                    "isha" -> 615
-                    else -> 645
+            Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+                InsightSourceAction(reference = source) {
+                    val fallbackId = when (prayerName?.lowercase()) {
+                        "fajr", "asr" -> 574
+                        "isha" -> 615
+                        else -> 645
+                    }
+                    onOpenHadith(resolvedHadith?.id ?: fallbackId)
                 }
-                onOpenHadith(resolvedHadith?.id ?: fallbackId)
             }
         }
     }
@@ -2554,6 +2565,8 @@ private fun ArtworkTile(
     onCompactContentHeightChange: (Dp) -> Unit = {},
     content: @Composable (() -> Unit)? = null,
 ) {
+    val readerChrome = rememberInsightReaderChrome(isExpanded)
+    val chromeProgress = insightReaderChromeProgress(readerChrome, isExpanded)
     val density = LocalDensity.current
     var expandedLabelHeight by remember(label, density.fontScale) { mutableStateOf(0.dp) }
     // Android's backgroundBaseScale: headroom so the counter-scrolling
@@ -2676,6 +2689,10 @@ private fun ArtworkTile(
                     color = Color.White.copy(alpha = 0.86f),
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
+                        .graphicsLayer {
+                            alpha = 1f - chromeProgress
+                            translationY = -12.dp.toPx() * chromeProgress
+                        }
                         .padding(start = 22.dp, end = 70.dp, top = 20.dp)
                         .onSizeChanged { expandedLabelHeight = with(density) { it.height.toDp() } }
                         .semantics { heading() },
@@ -2707,23 +2724,26 @@ private fun ArtworkTile(
                     }
                 }
             }
-            topEndContent?.let { trailing ->
+            topEndContent?.takeIf { chromeProgress < 0.999f }?.let { trailing ->
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
+                        .graphicsLayer { alpha = 1f - chromeProgress }
                         .padding(top = 11.dp, end = 11.dp),
                 ) {
                     trailing()
                 }
             }
             if (isExpanded) {
+                InsightReaderControlsButton(readerChrome, Modifier.align(Alignment.TopEnd).padding(end = 8.dp))
                 InsightContentLayout(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(
                             start = 22.dp, end = 22.dp,
-                            top = maxOf(64.dp, expandedLabelHeight + 40.dp),
-                            bottom = 24.dp,
+                            top = maxOf(64.dp, expandedLabelHeight + 40.dp) * (1f - chromeProgress) +
+                                48.dp * chromeProgress,
+                            bottom = (24f - 16f * chromeProgress).dp,
                         ),
                     spacing = 12.dp,
                     minimumStageHeight = minimumExpandedContentHeight,
@@ -2732,6 +2752,8 @@ private fun ArtworkTile(
                             maxOf(64.dp, expandedLabelHeight + 40.dp) +
                             24.dp)
                     },
+                    readerChrome = readerChrome,
+                    chromeProgress = chromeProgress,
                     stage = {
                         content?.let { expandedContent ->
                             Box(
