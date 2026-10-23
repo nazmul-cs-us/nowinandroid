@@ -22,7 +22,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
@@ -1780,6 +1779,50 @@ internal fun FortressChapterScreen(
     }
 }
 
+/** Modal presentation shared by all detail-page reading settings. */
+@androidx.compose.runtime.Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+private fun ReadingSettingsModal(
+    onDismiss: () -> Unit,
+    content: @androidx.compose.runtime.Composable ColumnScope.() -> Unit,
+) {
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val dismiss: () -> Unit = {
+        scope.launch {
+            sheetState.hide()
+            onDismiss()
+        }
+        Unit
+    }
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle() },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Reading settings",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = dismiss) { Text("Done") }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 8.dp)
+                .verticalScroll(rememberScrollState()),
+            content = content,
+        )
+    }
+}
+
 /**
  * The reading-settings bottom sheet — Android's floating reading toolbar
  * layout: drag handle, a live preview of the actual first ayah in the chosen
@@ -1811,238 +1854,203 @@ private fun SurahReadingSettingsSheet(
 ) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     var expandedSection by remember { mutableStateOf<String?>(null) }
-    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val dismiss: () -> Unit = {
-        scope.launch {
-            sheetState.hide()
-            onDismiss()
-        }
-        Unit
-    }
-
-    androidx.compose.material3.ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle() },
-    ) {
-        // Keep both the handle and the close action outside the scrolling form.
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    ReadingSettingsModal(onDismiss = onDismiss) {
+        // Food Truck's grouped-form layout: titled sections on cards.
+        SettingsSection(title = "Preview") {
             Text(
-                text = "Reading settings",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
+                text = previewText,
+                fontFamily = com.starception.submission.shared.quran.QuranArabicFonts.fontFamily(selectedFont),
+                fontSize = fontSize.sp,
+                lineHeight = (fontSize * 1.7f).sp,
+                textAlign = when (textAlignment) {
+                    "start" -> TextAlign.Start
+                    "center" -> TextAlign.Center
+                    "end" -> TextAlign.End
+                    else -> TextAlign.Justify
+                },
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
             )
-            TextButton(onClick = dismiss) { Text("Done") }
         }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(bottom = 8.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            // Food Truck's grouped-form layout: titled sections on cards.
-            SettingsSection(title = "Preview") {
-                Text(
-                    text = previewText,
-                    fontFamily = com.starception.submission.shared.quran.QuranArabicFonts.fontFamily(selectedFont),
-                    fontSize = fontSize.sp,
-                    lineHeight = (fontSize * 1.7f).sp,
-                    textAlign = when (textAlignment) {
-                        "start" -> TextAlign.Start
-                        "center" -> TextAlign.Center
-                        "end" -> TextAlign.End
-                        else -> TextAlign.Justify
-                    },
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                )
-            }
 
-            SettingsSection(title = "Text") {
-                // Menu-picker rows — the value with a trailing chevron.
-                SettingsPickerRow(
-                    label = "Arabic font",
-                    value = com.starception.submission.shared.quran.QuranArabicFonts.displayName(selectedFont),
-                    expanded = expandedSection == "font",
-                    onToggle = {
-                        expandedSection = if (expandedSection == "font") null else "font"
-                    },
-                )
-                if (expandedSection == "font") {
-                    com.starception.submission.shared.quran.QuranArabicFonts.selectionOrder.forEach { font ->
-                        SettingsOptionRow(
-                            label = com.starception.submission.shared.quran.QuranArabicFonts.displayName(font),
-                            selected = font == selectedFont,
-                            onClick = {
-                                onFontChange(font)
-                                expandedSection = null
-                            },
-                        )
-                    }
+        SettingsSection(title = "Text") {
+            // Menu-picker rows — the value with a trailing chevron.
+            SettingsPickerRow(
+                label = "Arabic font",
+                value = com.starception.submission.shared.quran.QuranArabicFonts.displayName(selectedFont),
+                expanded = expandedSection == "font",
+                onToggle = {
+                    expandedSection = if (expandedSection == "font") null else "font"
+                },
+            )
+            if (expandedSection == "font") {
+                com.starception.submission.shared.quran.QuranArabicFonts.selectionOrder.forEach { font ->
+                    SettingsOptionRow(
+                        label = com.starception.submission.shared.quran.QuranArabicFonts.displayName(font),
+                        selected = font == selectedFont,
+                        onClick = {
+                            onFontChange(font)
+                            expandedSection = null
+                        },
+                    )
                 }
-                SettingsPickerRow(
-                    label = "Translation",
-                    value = translationLanguage.displayName,
-                    expanded = expandedSection == "language",
-                    onToggle = {
-                        expandedSection = if (expandedSection == "language") null else "language"
-                    },
-                )
-                if (expandedSection == "language") {
-                    com.starception.submission.shared.quran.QuranTranslationLanguage.entries.forEach { language ->
-                        SettingsOptionRow(
-                            label = language.displayName,
-                            selected = language == translationLanguage,
-                            onClick = {
-                                onTranslationLanguageChange(language)
-                                expandedSection = null
-                            },
-                        )
-                    }
+            }
+            SettingsPickerRow(
+                label = "Translation",
+                value = translationLanguage.displayName,
+                expanded = expandedSection == "language",
+                onToggle = {
+                    expandedSection = if (expandedSection == "language") null else "language"
+                },
+            )
+            if (expandedSection == "language") {
+                com.starception.submission.shared.quran.QuranTranslationLanguage.entries.forEach { language ->
+                    SettingsOptionRow(
+                        label = language.displayName,
+                        selected = language == translationLanguage,
+                        onClick = {
+                            onTranslationLanguageChange(language)
+                            expandedSection = null
+                        },
+                    )
                 }
-                SettingsRowDivider()
-                // Food Truck's quantity stepper: −, value, +.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            }
+            SettingsRowDivider()
+            // Food Truck's quantity stepper: −, value, +.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Text size",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Surface(
+                    onClick = {
+                        haptics.performHapticFeedback(
+                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                        )
+                        onFontSizeChange((fontSize - 1f).coerceIn(28f, 60f))
+                    },
+                    enabled = fontSize > 28f,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(30.dp),
                 ) {
                     Text(
-                        "Text size",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
+                        "−",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(0.dp),
                     )
-                    Surface(
-                        onClick = {
-                            haptics.performHapticFeedback(
-                                androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
-                            )
-                            onFontSizeChange((fontSize - 1f).coerceIn(28f, 60f))
-                        },
-                        enabled = fontSize > 28f,
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(30.dp),
-                    ) {
-                        Text(
-                            "−",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(0.dp),
+                }
+                Text(
+                    fontSize.toInt().toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                )
+                Surface(
+                    onClick = {
+                        haptics.performHapticFeedback(
+                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
                         )
-                    }
+                        onFontSizeChange((fontSize + 1f).coerceIn(28f, 60f))
+                    },
+                    enabled = fontSize < 60f,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(30.dp),
+                ) {
                     Text(
-                        fontSize.toInt().toString(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 14.dp),
+                        "+",
+                        style = MaterialTheme.typography.titleMedium,
                     )
-                    Surface(
-                        onClick = {
-                            haptics.performHapticFeedback(
-                                androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
-                            )
-                            onFontSizeChange((fontSize + 1f).coerceIn(28f, 60f))
-                        },
-                        enabled = fontSize < 60f,
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(30.dp),
-                    ) {
-                        Text(
-                            "+",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
                 }
             }
+        }
 
-            SettingsSection(title = "Layout") {
-                val options = listOf(
-                    "Left" to "start",
-                    "Center" to "center",
-                    "Right" to "end",
-                    "Justified" to "justify",
-                )
-                io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget(
-                    material = {
-                        SingleChoiceSegmentedButtonRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                        ) {
-                            options.forEachIndexed { index, (label, value) ->
-                                SegmentedButton(
-                                    selected = textAlignment == value,
-                                    onClick = { onAlignmentChange(value) },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = index,
-                                        count = options.size,
-                                    ),
-                                    icon = {},
-                                ) {
-                                    Text(label, style = MaterialTheme.typography.labelSmall)
-                                }
+        SettingsSection(title = "Layout") {
+            val options = listOf(
+                "Left" to "start",
+                "Center" to "center",
+                "Right" to "end",
+                "Justified" to "justify",
+            )
+            io.github.alexzhirkevich.cupertino.adaptive.AdaptiveWidget(
+                material = {
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    ) {
+                        options.forEachIndexed { index, (label, value) ->
+                            SegmentedButton(
+                                selected = textAlignment == value,
+                                onClick = { onAlignmentChange(value) },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = options.size,
+                                ),
+                                icon = {},
+                            ) {
+                                Text(label, style = MaterialTheme.typography.labelSmall)
                             }
                         }
-                    },
-                    cupertino = {
-                        // The system's segmented control, like Settings.app.
-                        io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl(
-                            selectedTabIndex = options
-                                .indexOfFirst { it.second == textAlignment }
-                                .coerceAtLeast(0),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                        ) {
-                            options.forEach { (label, value) ->
-                                io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab(
-                                    onClick = { onAlignmentChange(value) },
-                                    isSelected = textAlignment == value,
-                                ) {
-                                    Text(label)
-                                }
+                    }
+                },
+                cupertino = {
+                    // The system's segmented control, like Settings.app.
+                    io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl(
+                        selectedTabIndex = options
+                            .indexOfFirst { it.second == textAlignment }
+                            .coerceAtLeast(0),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                    ) {
+                        options.forEach { (label, value) ->
+                            io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab(
+                                onClick = { onAlignmentChange(value) },
+                                isSelected = textAlignment == value,
+                            ) {
+                                Text(label)
                             }
                         }
-                    },
-                )
-            }
+                    }
+                },
+            )
+        }
 
-            SettingsSection(title = "Display") {
-                SettingsSwitchRow(
-                    label = "Mushaf page",
-                    checked = mushafMode,
-                    onCheckedChange = onMushafChange,
-                )
-                SettingsRowDivider()
-                SettingsSwitchRow(
-                    label = "Show translation",
-                    checked = showTranslation,
-                    onCheckedChange = onTranslationChange,
-                )
-                SettingsRowDivider()
-                SettingsSwitchRow(
-                    label = "Tajweed",
-                    checked = tajweed,
-                    available = tajweedAvailable,
-                    onCheckedChange = onTajweedChange,
-                )
-            }
+        SettingsSection(title = "Display") {
+            SettingsSwitchRow(
+                label = "Mushaf page",
+                checked = mushafMode,
+                onCheckedChange = onMushafChange,
+            )
+            SettingsRowDivider()
+            SettingsSwitchRow(
+                label = "Show translation",
+                checked = showTranslation,
+                onCheckedChange = onTranslationChange,
+            )
+            SettingsRowDivider()
+            SettingsSwitchRow(
+                label = "Tajweed",
+                checked = tajweed,
+                available = tajweedAvailable,
+                onCheckedChange = onTajweedChange,
+            )
         }
     }
 }
@@ -2061,147 +2069,92 @@ private fun ReaderReadingSettingsSheet(
 ) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     var expandedFontPicker by remember { mutableStateOf(false) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-
-    Box(Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(onClick = onDismiss),
-        )
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .graphicsLayer { translationY = dragOffset }
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures(
-                        onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            if (dragAmount > 0f) dragOffset += dragAmount
+    ReadingSettingsModal(onDismiss = onDismiss) {
+        SettingsSection(title = "Preview") {
+            Text(
+                text = previewText,
+                fontFamily = QuranArabicFonts.fontFamily(selectedFont),
+                fontSize = fontSize.sp,
+                lineHeight = (fontSize * 1.65f).sp,
+                textAlign = readerTextAlignment(textAlignment),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+            )
+        }
+        SettingsSection(title = "Text") {
+            SettingsPickerRow(
+                label = "Arabic font",
+                value = QuranArabicFonts.displayName(selectedFont),
+                expanded = expandedFontPicker,
+                onToggle = { expandedFontPicker = !expandedFontPicker },
+            )
+            if (expandedFontPicker) {
+                QuranArabicFonts.selectionOrder.forEach { font ->
+                    SettingsOptionRow(
+                        label = QuranArabicFonts.displayName(font),
+                        selected = font == selectedFont,
+                        onClick = {
+                            onFontChange(font)
+                            expandedFontPicker = false
                         },
-                        onDragEnd = {
-                            if (dragOffset > 150f) onDismiss() else dragOffset = 0f
-                        },
-                        onDragCancel = { dragOffset = 0f },
                     )
-                },
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            shadowElevation = 16.dp,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(bottom = 8.dp)
-                    .verticalScroll(rememberScrollState()),
+                }
+            }
+            SettingsRowDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp).height(26.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(36.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.outlineVariant),
-                    )
-                }
-                Text(
-                    text = "Reading settings",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                )
-                SettingsSection(title = "Preview") {
-                    Text(
-                        text = previewText,
-                        fontFamily = QuranArabicFonts.fontFamily(selectedFont),
-                        fontSize = fontSize.sp,
-                        lineHeight = (fontSize * 1.65f).sp,
-                        textAlign = readerTextAlignment(textAlignment),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    )
-                }
-                SettingsSection(title = "Text") {
-                    SettingsPickerRow(
-                        label = "Arabic font",
-                        value = QuranArabicFonts.displayName(selectedFont),
-                        expanded = expandedFontPicker,
-                        onToggle = { expandedFontPicker = !expandedFontPicker },
-                    )
-                    if (expandedFontPicker) {
-                        QuranArabicFonts.selectionOrder.forEach { font ->
-                            SettingsOptionRow(
-                                label = QuranArabicFonts.displayName(font),
-                                selected = font == selectedFont,
-                                onClick = {
-                                    onFontChange(font)
-                                    expandedFontPicker = false
-                                },
-                            )
-                        }
-                    }
-                    SettingsRowDivider()
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("Text size", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Surface(
-                            onClick = {
-                                haptics.performHapticFeedback(
-                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
-                                )
-                                onFontSizeChange((fontSize - 1f).coerceIn(28f, 60f))
-                            },
-                            enabled = fontSize > 28f,
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier.size(30.dp),
-                        ) { Text("−", style = MaterialTheme.typography.titleMedium) }
-                        Text(
-                            fontSize.toInt().toString(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 14.dp),
+                Text("Text size", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Surface(
+                    onClick = {
+                        haptics.performHapticFeedback(
+                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
                         )
-                        Surface(
-                            onClick = {
-                                haptics.performHapticFeedback(
-                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
-                                )
-                                onFontSizeChange((fontSize + 1f).coerceIn(28f, 60f))
-                            },
-                            enabled = fontSize < 60f,
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier.size(30.dp),
-                        ) { Text("+", style = MaterialTheme.typography.titleMedium) }
-                    }
-                }
-                SettingsSection(title = "Alignment") {
-                    val options = listOf(
-                        "Left" to "start",
-                        "Center" to "center",
-                        "Right" to "end",
-                        "Justified" to "justify",
-                    )
-                    io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl(
-                        selectedTabIndex = options.indexOfFirst { it.second == textAlignment }.coerceAtLeast(0),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                    ) {
-                        options.forEach { (label, value) ->
-                            io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab(
-                                onClick = { onAlignmentChange(value) },
-                                isSelected = textAlignment == value,
-                            ) { Text(label) }
-                        }
-                    }
+                        onFontSizeChange((fontSize - 1f).coerceIn(28f, 60f))
+                    },
+                    enabled = fontSize > 28f,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.size(30.dp),
+                ) { Text("−", style = MaterialTheme.typography.titleMedium) }
+                Text(
+                    fontSize.toInt().toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                )
+                Surface(
+                    onClick = {
+                        haptics.performHapticFeedback(
+                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                        )
+                        onFontSizeChange((fontSize + 1f).coerceIn(28f, 60f))
+                    },
+                    enabled = fontSize < 60f,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.size(30.dp),
+                ) { Text("+", style = MaterialTheme.typography.titleMedium) }
+            }
+        }
+        SettingsSection(title = "Alignment") {
+            val options = listOf(
+                "Left" to "start",
+                "Center" to "center",
+                "Right" to "end",
+                "Justified" to "justify",
+            )
+            io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl(
+                selectedTabIndex = options.indexOfFirst { it.second == textAlignment }.coerceAtLeast(0),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            ) {
+                options.forEach { (label, value) ->
+                    io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab(
+                        onClick = { onAlignmentChange(value) },
+                        isSelected = textAlignment == value,
+                    ) { Text(label) }
                 }
             }
         }

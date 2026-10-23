@@ -2272,10 +2272,11 @@ private fun AlbumPlayerTopBar(
     // Get short translation code for display
     val translationDisplay = when (currentTranslation) {
         "ar" -> "AR"
-        "transliteration" -> "TR"
+        "transliteration" -> "LAT"
         "bn" -> "BN"
         "zh" -> "ZH"
         "en" -> "EN"
+        "hi" -> "HI"
         "es" -> "ES"
         "fr" -> "FR"
         "id" -> "ID"
@@ -2312,20 +2313,18 @@ private fun AlbumPlayerTopBar(
 
     // Define icon sizes
     val iconButtonSize = 44.dp
-    val translationButtonSize = 44.dp
+    val translationButtonSize = 48.dp
 
-    // Calculate how many icons can fit (More button is always shown)
-    // Icons: Translation (44dp), Bookmark (44dp), Font (44dp), Tajweed (44dp), More (44dp)
+    // Keep language selection and More available before optional toolbar actions.
     val moreButtonSize = 44.dp
-    val remainingWidth = availableWidthDp - moreButtonSize
-    val maxIconsThatFit = (remainingWidth / iconButtonSize).toInt().coerceAtLeast(0)
-
-    // Translation and font are accessible via the Reading Settings side sheet
-    // (More menu); keep them off the toolbar so it stays uncluttered.
-    val showTranslation = false
-    val showBookmark = maxIconsThatFit >= 2
+    val backButtonSize = 44.dp
+    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - moreButtonSize)
+        .coerceAtLeast(0.dp)
+    val maxIconsThatFit = (remainingWidth / iconButtonSize).toInt()
+    val showTranslation = true
+    val showBookmark = maxIconsThatFit >= 1
     val showFont = false
-    val showTajweedButton = maxIconsThatFit >= 4
+    val showTajweedButton = maxIconsThatFit >= 2
 
     Surface(
         color = backgroundColor,
@@ -2364,11 +2363,15 @@ private fun AlbumPlayerTopBar(
                 horizontalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 if (true) {
-                    // Translation button - shown if space allows (priority 1)
+                    // Open the existing language picker directly from the toolbar.
                     if (showTranslation) {
                         Surface(
                             onClick = onTranslationClick,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier
+                                .size(translationButtonSize)
+                                .semantics {
+                                    contentDescription = "Change translation language, current: $translationDisplay"
+                                },
                             shape = RoundedCornerShape(8.dp),
                             color = contentColor.copy(alpha = 0.12f),
                             contentColor = contentColor,
