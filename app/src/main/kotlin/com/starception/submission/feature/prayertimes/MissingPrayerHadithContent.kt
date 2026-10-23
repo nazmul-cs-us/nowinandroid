@@ -42,7 +42,10 @@ import kotlinx.coroutines.withContext
 
 /** The existing inline asset downloader, offered only after an empty prayer search. */
 @Composable
-internal fun MissingPrayerHadithContent(onDownloadComplete: () -> Unit) {
+internal fun MissingPrayerHadithContent(
+    onDownloadComplete: () -> Unit,
+    forPrayer: Boolean = true,
+) {
     val context = LocalContext.current
     var missing by remember { mutableStateOf<List<HadithCollection>?>(null) }
     var selectedFile by remember { mutableStateOf<String?>(null) }
@@ -54,7 +57,7 @@ internal fun MissingPrayerHadithContent(onDownloadComplete: () -> Unit) {
     }
     val collections = missing ?: return
     if (collections.isEmpty()) {
-        Text("All Hadith collections are available. No matching narration was found for this prayer.", color = Color.White)
+        if (forPrayer) Text("All Hadith collections are available. No matching narration was found for this prayer.", color = Color.White)
         return
     }
     val selected = collections.firstOrNull { it.databaseFile == selectedFile } ?: collections.first()
@@ -76,9 +79,40 @@ internal fun MissingPrayerHadithContent(onDownloadComplete: () -> Unit) {
         MissingContentCard(
             resourceName = selected.name,
             category = selected.downloadCategory,
-            description = "Add this collection to search for a Hadith relevant to the current prayer.",
+            description = if (forPrayer) "Add this collection to search for a Hadith relevant to the current prayer."
+                else "Add this collection to find more source passages for your suggested readings.",
             downloadManager = downloadManager,
             onDownloadComplete = onDownloadComplete,
         )
     }
+}
+
+/** Empty suggestions need source content; a model download alone cannot supply a passage. */
+@Composable
+internal fun MissingKnowledgeSourcesContent(onDownloadComplete: () -> Unit) {
+    val context = LocalContext.current
+    val downloadManager = remember(context) {
+        EntryPointAccessors.fromApplication(context.applicationContext, SherpaOnnxTtsEntryPoint::class.java)
+            .assetDownloadManager()
+    }
+    var needsTranslation by remember { mutableStateOf(false) }
+    LaunchedEffect(context) {
+        needsTranslation = withContext(Dispatchers.IO) {
+            !downloadManager.isAssetAvailable("databases/quran/quran_en.db") &&
+                !runCatching { context.assets.open("databases/quran_en.db").use { it.available() > 0 } }.getOrDefault(false)
+        }
+    }
+    if (needsTranslation) {
+        MissingContentCard(
+            resourceName = "English Quran translation",
+            category = "quran_translation",
+            description = "Download a translation so suggested readings can include Quran passages.",
+            downloadManager = downloadManager,
+            onDownloadComplete = {
+                needsTranslation = false
+                onDownloadComplete()
+            },
+        )
+    }
+    MissingPrayerHadithContent(onDownloadComplete = onDownloadComplete, forPrayer = false)
 }

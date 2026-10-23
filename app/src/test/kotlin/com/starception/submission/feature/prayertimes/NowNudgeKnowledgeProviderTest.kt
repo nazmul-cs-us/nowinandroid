@@ -399,6 +399,7 @@ class NowNudgeKnowledgeProviderTest {
     @Test
     fun missingDatabaseSourceDoesNotInvokeTheModel() = runBlocking {
         var invoked = false
+        val progress = mutableListOf<com.starception.submission.core.model.deenly.InsightSearchProgress>()
         val provider = NowNudgeKnowledgeProvider(
             sourceLoader = GroundedKnowledgeSourceLoader { _, _ -> null },
             decisionGenerator = KnowledgeDecisionGenerator { _, _ ->
@@ -407,7 +408,11 @@ class NowNudgeKnowledgeProviderTest {
             },
         )
 
-        assertNull(provider.load(date))
+        assertNull(provider.load(date, onProgress = { progress += it }))
+        assertTrue(progress.isNotEmpty())
+        assertEquals(progress.last().total, progress.last().completed)
+        assertTrue(progress.last().sources.isEmpty())
+        assertFalse(progress.any { it.title == "Preparing your suggestion" })
         assertEquals(false, invoked)
     }
 

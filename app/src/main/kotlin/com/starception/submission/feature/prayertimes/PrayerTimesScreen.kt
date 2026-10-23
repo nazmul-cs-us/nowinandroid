@@ -1223,6 +1223,7 @@ fun PrayerTimesScreen(
         mutableStateOf<NowNudgeKnowledgeCandidate?>(null)
     }
     var expandedAiProgress by remember(nudgeDay) { mutableStateOf(InsightSearchProgress()) }
+    var expandedAiSearchFailed by remember(nudgeDay) { mutableStateOf(false) }
     var expandedAiLoading by remember { mutableStateOf(false) }
     var aiModelDownloadTick by remember { mutableStateOf(0) }
     var botSourceVariation by rememberSaveable(nudgeDay) { mutableIntStateOf(0) }
@@ -1415,6 +1416,8 @@ fun PrayerTimesScreen(
         if (expandedInsightPage != 4) return@LaunchedEffect
         if (expandedAiLoading || expandedAiCandidate != null) return@LaunchedEffect
         expandedAiLoading = true
+        expandedAiSearchFailed = false
+        expandedAiProgress = InsightSearchProgress()
         val requestDay = nudgeDay
         val appSituation = latestExpandedAppSituation
         val rankingContext = latestExpandedKnowledgeContext
@@ -1423,24 +1426,27 @@ fun PrayerTimesScreen(
         // request; the result is ready when the user returns.
         expandedAiScope.launch {
             try {
-                expandedAiCandidate = runCatching {
-                    nowNudgeKnowledgeProvider.load(
-                        date = LocalDate.parse(requestDay),
-                        variation = 64,
-                        onProgress = { progress ->
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) { expandedAiProgress = progress }
-                        },
-                        appSituation = appSituation,
-                        rankingContext = rankingContext,
-                        task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
-                    )
-                }.getOrNull()
+                expandedAiCandidate = nowNudgeKnowledgeProvider.load(
+                    date = LocalDate.parse(requestDay),
+                    variation = 64,
+                    onProgress = { progress ->
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) { expandedAiProgress = progress }
+                    },
+                    appSituation = appSituation,
+                    rankingContext = rankingContext,
+                    task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
+                )
                 expandedAiCandidate?.let { candidate ->
                     nowNudgeKnowledgeProvider.recordImpression(
                         candidate,
                         LocalDate.parse(requestDay),
                     )
                 }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                android.util.Log.w("InsightRecommendation", "Unable to prepare a source reading", error)
+                expandedAiSearchFailed = true
             } finally {
                 expandedAiLoading = false
             }
@@ -3538,12 +3544,12 @@ fun PrayerTimesScreen(
                                                  compactForExpandedPrayers = false,
                                                   modelKnowledgeCandidate = expandedAiCandidate,
                                                   isModelKnowledgeLoading = expandedAiLoading,
+                                                  modelKnowledgeSearchFailed = expandedAiSearchFailed,
                                                   modelKnowledgeProgress = expandedAiProgress,
                                                   onModelKnowledgeClick = openExpandedAiCandidate,
                                                   onModelKnowledgeDownloadComplete = {
-                                                      // The Now Nudge GGUF finished
-                                                      // downloading; regenerate the
-                                                      // expanded AI suggestion.
+                                                      // Retry after a source/model download or
+                                                      // an explicit request from the empty state.
                                                       expandedAiCandidate = null
                                                       aiModelDownloadTick++
                                                   },

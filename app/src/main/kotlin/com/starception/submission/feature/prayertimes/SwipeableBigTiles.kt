@@ -1364,6 +1364,7 @@ internal fun SwipeableBigTiles(
     weatherThresholds: PrayerWeatherThresholds = PrayerWeatherThresholds(),
     modelKnowledgeCandidate: NowNudgeKnowledgeCandidate? = null,
     isModelKnowledgeLoading: Boolean = false,
+    modelKnowledgeSearchFailed: Boolean = false,
     modelKnowledgeProgress: InsightSearchProgress = InsightSearchProgress(),
     onModelKnowledgeClick: (NowNudgeKnowledgeCandidate) -> Unit = {},
     onModelKnowledgeDownloadComplete: () -> Unit = {},
@@ -2424,14 +2425,7 @@ internal fun SwipeableBigTiles(
                                          onPreferredHeightChange = { stageHeightHints[4] = it },
                                          loading = isModelKnowledgeLoading,
                                          searchProgress = modelKnowledgeProgress,
-                                         fallbackLabel = when (displayedAiRecommendation.target) {
-                                             is ContextualRecommendationTarget.Surah -> "Quran reading"
-                                             is ContextualRecommendationTarget.FortressDua -> "Fortress dua"
-                                             is ContextualRecommendationTarget.Bukhari,
-                                             ContextualRecommendationTarget.BukhariCollection -> "Sahih al-Bukhari"
-                                             is ContextualRecommendationTarget.Shamayel,
-                                             ContextualRecommendationTarget.ShamayelCollection -> "Shama'il"
-                                         },
+                                         searchFailed = modelKnowledgeSearchFailed,
                                          compactProgress = compactProgress,
                                          onModelDownloadComplete = onModelKnowledgeDownloadComplete,
                                      )
@@ -5892,7 +5886,7 @@ private fun RecommendationExpandedStage(
     candidate: NowNudgeKnowledgeCandidate?,
     loading: Boolean,
     searchProgress: InsightSearchProgress,
-    fallbackLabel: String,
+    searchFailed: Boolean,
     compactProgress: Float,
     onModelDownloadComplete: () -> Unit = {},
     onPreferredHeightChange: (Dp) -> Unit = {},
@@ -5911,8 +5905,33 @@ private fun RecommendationExpandedStage(
                 Modifier.fillMaxWidth().verticalScroll(aiScrollState).onSizeChanged { size ->
                     onPreferredHeightChange(with(density) { size.height.toDp() } + 100.dp)
                 })
+        } else if (candidate == null) {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(aiScrollState)
+                    .onSizeChanged { onPreferredHeightChange(with(density) { it.height.toDp() } + 100.dp) },
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(
+                    text = if (searchFailed) "Couldn’t prepare a reading" else "No reading is ready yet",
+                    style = insightReaderBodyStyle(compression), color = Color.White,
+                )
+                Text(
+                    text = if (searchFailed) {
+                        "Something went wrong while preparing your suggestion. Try again."
+                    } else {
+                        "No readable passage was found in the sources checked. Download a Quran translation or Hadith collection, then try again."
+                    },
+                    style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = .8f),
+                )
+                if (!searchFailed && searchProgress.total > 0) {
+                    Text("${searchProgress.completed} of ${searchProgress.total} source checks completed · No passage selected",
+                        style = MaterialTheme.typography.labelMedium, color = HomeReferenceGold)
+                }
+                androidx.compose.material3.TextButton(onClick = onModelDownloadComplete) { Text("Try again") }
+                MissingKnowledgeSourcesContent(onDownloadComplete = onModelDownloadComplete)
+            }
         } else {
-                val nudge = candidate?.nudge
+                val nudge = candidate.nudge
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -5962,24 +5981,12 @@ private fun RecommendationExpandedStage(
                             verticalArrangement = Arrangement.Top,
                         ) {
                             Text(
-                                text = nudge?.supportingText?.takeIf(String::isNotBlank)
-                                    ?: nudge?.label?.takeIf(String::isNotBlank)
-                                    ?: "A verified $fallbackLabel selected for this moment",
+                                text = nudge.supportingText?.takeIf(String::isNotBlank) ?: nudge.label,
                                 style = insightReaderBodyStyle(compression),
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium,
                             )
-                            if (nudge == null) {
-                                // No model-composed card is available; when the Now
-                                // Nudge GGUF itself was never downloaded, offer its
-                                // download instead of leaving only the fallback.
-                                com.starception.submission.download.MissingAiModelCards(
-                                    tasks = setOf(
-                                        com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
-                                    ),
-                                    onDownloadComplete = onModelDownloadComplete,
-                                )
-                            }
+
                         }
                         if (aiScrollState.maxValue > 0) {
                             LinearProgressIndicator(
@@ -5999,7 +6006,7 @@ private fun RecommendationExpandedStage(
                             )
                         }
                     }
-                    if (nudge != null) {
+                    run {
                         val groundedNudge = nudge
                         Column(
                             modifier = Modifier
@@ -6044,66 +6051,8 @@ private fun RecommendationExpandedStage(
                                     )
                                 }
                         }
-                    } else {
-                        PreparingKnowledgeFooter()
                     }
                 }
-        }
-    }
-}
-
-@Composable
-private fun PreparingKnowledgeFooter(modifier: Modifier = Modifier) {
-    val progressSteps = remember {
-        listOf(
-            "Checking Sahih al-Bukhari…",
-            "Checking Sahih Muslim…",
-            "Checking Jami' at-Tirmidhi…",
-            "Checking Shama'il at-Tirmidhi…",
-            "Comparing relevance for this moment…",
-        )
-    }
-    var progressStep by remember { mutableIntStateOf(0) }
-    LaunchedEffect(progressSteps) {
-        while (true) {
-            delay(1_100L)
-            progressStep = (progressStep + 1) % progressSteps.size
-        }
-    }
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 2.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        VoiceNudgeSparkles(
-            color = HomeReferenceGold,
-            morph = 1f,
-            modifier = Modifier.size(24.dp),
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(
-                text = "Finding a verified Hadith for you…",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontSize = 11.sp,
-                    lineHeight = 14.sp,
-                ),
-                color = Color.White.copy(alpha = 0.88f),
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = progressSteps[progressStep],
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.5.sp,
-                    lineHeight = 12.sp,
-                ),
-                color = Color.White.copy(alpha = 0.58f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }
