@@ -63,4 +63,35 @@ class PrayerSceneGeometryTest {
         assertTrue(abs((center - scene.ridgeY(.65f)) * 220f - 20f) < .001f)
         assertEquals(center, scene.bodyCenterY(.65f, -1.5, 40f))
     }
+    @Test
+    fun entireDiscStaysBetweenTreesAndMosqueAcrossCropsAndDirections() {
+        for ((width, height) in listOf(360f to 180f, 360f to 320f, 300f to 600f, 220f to 800f)) {
+            val drawnWidth = maxOf(width, height * .75f)
+            val artworkLeft = (width - drawnWidth) / 2f
+            val treesRight = artworkLeft + .30f * drawnWidth
+            val mosqueLeft = artworkLeft + .60f * drawnWidth
+            for (bias in listOf(0f, .4f)) for (night in listOf(false, true)) {
+                val scene = PrayerSceneGeometry(width, height, night, bias)
+                for (diameter in listOf(34f, 60f)) for (step in 0..20) {
+                    val position = scene.bodyPosition(step / 20f, 45.0, diameter)
+                    val discLeft = position.x * width - diameter / 2f
+                    val discRight = position.x * width + diameter / 2f
+                    assertTrue(discLeft >= treesRight + 5.99f, "Disc overlaps the trees")
+                    assertTrue(discRight <= mosqueLeft - 5.99f, "Disc overlaps the mosque")
+                    assertTrue(discLeft >= 5.99f && discRight <= width - 5.99f)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun bodyTracksLocalMountainRidgeAfterHorizontalPlacement() {
+        val scene = PrayerSceneGeometry(360f, 240f, true, .4f)
+        val west = scene.bodyPosition(0f, 45.0, 40f)
+        val east = scene.bodyPosition(1f, 45.0, 40f)
+        assertTrue(west.x < east.x)
+        assertEquals(scene.bodyCenterY(west.x, 45.0, 40f), west.y)
+        assertEquals(scene.bodyCenterY(east.x, 45.0, 40f), east.y)
+    }
+
 }

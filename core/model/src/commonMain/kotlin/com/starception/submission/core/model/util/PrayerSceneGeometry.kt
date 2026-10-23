@@ -51,6 +51,23 @@ class PrayerSceneGeometry(
         return a.y + (b.y - a.y) * ((x - a.x) / (b.x - a.x))
     }
 
+    /** Maps east/west motion into open mountain sky, clear of trees and mosque towers. */
+    fun bodyPosition(direction: Float, altitudeDegrees: Double, diameter: Float): PrayerScenePoint {
+        val radius = diameter.coerceAtLeast(0f) / 2f
+        val clearance = radius + 6f
+        // Source-image limits, before the artwork's Crop. The mosque starts to
+        // the right of this corridor; the trees extend into the sky on the left.
+        val openLeft = max((left + .30f * drawnWidth + clearance) / viewportWidth, clearance / viewportWidth)
+        val openRight = minOf((left + .60f * drawnWidth - clearance) / viewportWidth, 1f - clearance / viewportWidth)
+        val x = if (openLeft <= openRight) {
+            openLeft + (openRight - openLeft) * direction.coerceIn(0f, 1f)
+        } else {
+            // A viewport too narrow for the disc uses the corridor's center.
+            ((openLeft + openRight) / 2f).coerceIn(0f, 1f)
+        }
+        return PrayerScenePoint(x, bodyCenterY(x, altitudeDegrees, diameter))
+    }
+
     /** Scenic placement: horizon occlusion to at most half a disc of clear sky above the ridge. */
     fun bodyCenterY(x: Float, altitudeDegrees: Double, diameter: Float): Float {
         val radius = diameter.coerceAtLeast(0f) / 2f

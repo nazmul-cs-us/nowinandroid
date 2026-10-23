@@ -20,7 +20,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
@@ -131,11 +132,13 @@ fun PrayerSkyCelestialLayer(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(PrayerNowSkylineShape(geometry)),
+                // Artwork coordinates remain left-to-right in every app language.
+                contentAlignment = AbsoluteAlignment.TopLeft,
             ) {
                 if (forceSunForTesting) {
                     SunBody(
                         modifier = Modifier
-                            .offset(
+                            .absoluteOffset(
                                 x = fieldWidth * moonPosition.x - diameter / 2,
                                 y = fieldHeight * moonPosition.y - diameter / 2,
                             )
@@ -148,7 +151,7 @@ fun PrayerSkyCelestialLayer(
                         waxing = snapshot.moonPhase.waxing,
                         brightLimbRotation = snapshot.moonBrightLimbScreenDeg.toFloat(),
                         modifier = Modifier
-                            .offset(
+                            .absoluteOffset(
                                 x = fieldWidth * moonPosition.x - diameter / 2,
                                 y = fieldHeight * moonPosition.y - diameter / 2,
                             )
@@ -162,7 +165,7 @@ fun PrayerSkyCelestialLayer(
             (forceSunForTesting || snapshot.sunAltAz.altitudeDeg > -1.5)
         ) {
             val displayedSunPosition = if (forceSunForTesting) {
-                Offset(.72f, geometry.bodyCenterY(.72f, 45.0, diameter.value))
+                geometry.bodyPosition(.72f, 45.0, diameter.value).let { Offset(it.x, it.y) }
             } else sunPosition
             SunAtmosphericLight(
                 position = displayedSunPosition,
@@ -173,10 +176,12 @@ fun PrayerSkyCelestialLayer(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(PrayerNowSkylineShape(geometry)),
+                // Artwork coordinates remain left-to-right in every app language.
+                contentAlignment = AbsoluteAlignment.TopLeft,
             ) {
                 SunBody(
                     modifier = Modifier
-                        .offset(
+                        .absoluteOffset(
                                 x = fieldWidth * displayedSunPosition.x - diameter / 2,
                                 y = fieldHeight * displayedSunPosition.y - diameter / 2,
                         )
@@ -579,8 +584,8 @@ private fun mostRecentRiseEpoch(
 private fun scenicPosition(position: AltAz, geometry: PrayerSceneGeometry, diameter: Float): Offset {
     val azimuthRadians = (position.azimuthDeg - 180.0) * PI / 180.0
     // The scene faces south, so west is on the viewer's left and east is on the right.
-    val x = 0.37f - sin(azimuthRadians).toFloat() * 0.29f
-    return Offset(x, geometry.bodyCenterY(x, position.altitudeDeg, diameter))
+    val direction = (1f - sin(azimuthRadians).toFloat()) / 2f
+    return geometry.bodyPosition(direction, position.altitudeDeg, diameter).let { Offset(it.x, it.y) }
 }
 
 private fun illuminatedDiscPath(
