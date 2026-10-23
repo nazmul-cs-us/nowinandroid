@@ -39,6 +39,14 @@ class PrayerHadithSelectionTest {
     }
 
     @Test
+    fun longNarrationsRemainEligibleWhileOnlyThePromptExcerptIsBounded() {
+        val candidate = source("bukhari.db", 1).copy(text = "Friday prayer narration. ".repeat(200))
+        val shortlist = PrayerHadithSelection.shortlist(listOf(candidate), 0)
+        assertEquals(candidate.text, shortlist.single().text)
+        assertTrue(PrayerHadithSelection.prompt("Friday", shortlist).length < 1000)
+    }
+
+    @Test
     fun collectionIdentityPreventsSameNumberFromColliding() {
         val shortlist = PrayerHadithSelection.shortlist(listOf(source("a.db", 1), source("b.db", 1)), 0)
         assertEquals(2, shortlist.size)

@@ -115,7 +115,7 @@ abstract class HadithDatabase : RoomDatabase() {
             } else if (hasBundledAsset(context, databaseFile)) {
                 android.util.Log.d(TAG, "📦 Using bundled asset: $assetPath")
                 builder.createFromAsset(assetPath)
-            } else {
+            } else if (!hasInstalledDatabase(context, databaseFile)) {
                 throw IllegalStateException(
                     "Hadith database missing: $databaseFile. Download the required content assets and try again.",
                 )
@@ -240,7 +240,8 @@ abstract class HadithDatabase : RoomDatabase() {
         }
 
         fun isDatabaseAvailable(context: Context, databaseFile: String): Boolean {
-            return resolveDownloadedDatabaseFile(context, databaseFile) != null ||
+            return hasInstalledDatabase(context, databaseFile) ||
+                resolveDownloadedDatabaseFile(context, databaseFile) != null ||
                 hasBundledAsset(context, databaseFile)
         }
 
@@ -275,6 +276,13 @@ abstract class HadithDatabase : RoomDatabase() {
                         null
                     }
                 }
+        }
+
+        // Room keeps its own copy after importing the downloaded/bundled source.
+        // That installed collection remains readable if the source cache is cleared.
+        private fun hasInstalledDatabase(context: Context, databaseFile: String): Boolean {
+            val installed = context.applicationContext.getDatabasePath("hadith_$databaseFile")
+            return installed.isFile && installed.length() > 0L
         }
 
         private fun hasBundledAsset(context: Context, databaseFile: String): Boolean {

@@ -29,6 +29,13 @@ class QiblaGeometryTest {
     }
 
     @Test
+    fun distanceToKaabaIsStableAtDestinationAndAcrossTheDateLine() {
+        assertEquals(0.0, qiblaDistanceKm(21.4225, 39.8262), 0.001)
+        assertTrue(qiblaDistanceKm(51.5074, -0.1278) in 4700.0..4900.0)
+        assertEquals(qiblaDistanceKm(0.0, 179.9), qiblaDistanceKm(0.0, -180.1), 0.001)
+    }
+
+    @Test
     fun relativeTurnUsesShortestSignedDirection() {
         assertEquals(20.0, relativeQiblaTurn(10.0, 350.0), 0.001)
         assertEquals(-20.0, relativeQiblaTurn(350.0, 10.0), 0.001)

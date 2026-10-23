@@ -40,24 +40,32 @@ internal object PrayerHadithRecommendationRepository {
             }
             val where = prayer.queries.joinToString(" OR ") { "(text_plain LIKE ? OR $arabicSql LIKE ?)" }
             val arguments = prayer.queries.flatMap { listOf("%$it%", "%$it%") }.toTypedArray()
+            var searchFailures = 0
             val candidates = HadithCollections.all
                 .filter { HadithDatabase.isDatabaseAvailable(context, it.databaseFile) }
                 .flatMap { collection ->
                     val hits = try {
                         HadithDatabase.getInstance(context, collection.databaseFile).hadithDao().searchHadithsRanked(
-                            SimpleSQLiteQuery("SELECT * FROM hadiths WHERE $where ORDER BY id ASC LIMIT 12", arguments),
+                            SimpleSQLiteQuery("SELECT * FROM hadiths WHERE ($where) AND LENGTH(COALESCE(NULLIF(TRIM(text_plain), ''), text_arabic)) >= 40 ORDER BY id ASC LIMIT 48", arguments),
                         )
                     } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                    catch (_: Exception) { emptyList() }
+                    catch (error: Exception) {
+                        searchFailures++
+                        android.util.Log.w("PrayerHadithSearch", "Unable to search ${collection.databaseFile}", error)
+                        emptyList()
+                    }
                     hits.mapNotNull { hadith ->
                         val text = hadith.textPlain?.takeIf(String::isNotBlank) ?: hadith.textArabic
-                        text.takeIf { it.length in 40..3000 && prayer.accepts(it) }?.let {
+                        text.takeIf { it.length >= 40 && prayer.accepts(it) }?.let {
                             PrayerHadithCandidate(collection.databaseFile, collection.name, hadith.id, it)
                         }
                     }
                 }
             val shortlist = PrayerHadithSelection.shortlist(candidates, date.toEpochDay().toInt())
-            if (shortlist.isEmpty()) return@withContext null
+            if (shortlist.isEmpty()) {
+                check(searchFailures == 0) { "Unable to search downloaded Hadith collections" }
+                return@withContext null
+            }
             val selected = DeenlyKnowledgeModel(context).selectPrayerHadith(
                 "Local date $date. ${prayer.heading(prayerName)}. Recommend guidance relevant to this prayer.", shortlist,
             )

@@ -652,6 +652,12 @@ private fun createPrayerTimesViewController(
             contentRefreshJob = coroutineScope.launch {
                 val refreshed = loadIosContentStorageState()
                 contentStorageState = refreshed.copy(
+                    categories = refreshed.categories.map { category ->
+                        if (contentDownloadJobs[category.categoryKey]?.isActive == true) {
+                            category.copy(isDownloading = true,
+                                progress = activeDownloadStatuses[category.categoryKey]?.progress ?: 0f)
+                        } else category
+                    },
                     error = message ?: refreshed.error,
                     retryCategoryKey = retryCategory,
                 )
@@ -957,6 +963,13 @@ private fun createPrayerTimesViewController(
                 androidx.compose.foundation.LocalIndication provides
                     com.starception.submission.shared.ui.CirclePressIndication,
                 LocalShowBottomNavigation provides (onSelectBottom == null),
+                LocalContentDownloadState provides contentStorageState,
+                LocalContentDownloadActions provides ContentStorageActions(
+                    onRefresh = { refreshContentStorage() },
+                    onDownloadCategory = ::downloadContentCategory,
+                    onCancelDownload = { category -> contentDownloadJobs[category]?.cancel() },
+                    onDeleteCategory = ::deleteContentCategory,
+                ),
             ) {
             SharedNavHost(
                 startInSettings = startInSettings,

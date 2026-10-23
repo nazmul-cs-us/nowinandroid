@@ -548,7 +548,7 @@ internal fun QuranDetailScreen(
     var tafseerLoading by remember { mutableStateOf(false) }
     var tafseerSelectedBook by remember { mutableStateOf(0) }
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
-    val repository = remember { createQuranVerseRepository() }
+    val repository = remember(loadAttempt) { createQuranVerseRepository() }
     LaunchedEffect(number, translationLanguage, loadAttempt) {
         ayahState = QuranAyahState.Loading
         ayahState = try {
@@ -973,10 +973,24 @@ internal fun QuranDetailScreen(
                             }
                             if (body.isBlank()) {
                                 Text(
-                                    "The enhanced Quran database has no content for this ayah yet.",
+                                    "Tafseer content is unavailable for this ayah.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                MissingContentDownloadCard("quran_core", "Quran Tafseer and word meanings",
+                                    onDownloadComplete = {
+                                        tafseerLoading = true
+                                        tafseerScope.launch {
+                                            try {
+                                                tafseerRequest = tafseerRepository.getTafseer(number, tafseerSheet.ayahNumber)
+                                                    ?: tafseerSheet
+                                            } catch (cancelled: CancellationException) {
+                                                throw cancelled
+                                            } catch (_: Exception) {
+                                                tafseerRequest = tafseerSheet
+                                            } finally { tafseerLoading = false }
+                                        }
+                                    })
                             } else {
                                 Text(
                                     body,
@@ -1000,15 +1014,23 @@ internal fun QuranDetailScreen(
                     )
                 }
                 is QuranAyahState.Error -> Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
                     SupportingCard(title = "Unable to load ayahs", body = state.message)
+                    MissingContentDownloadCard("quran_core", "Holy Quran", onDownloadComplete = { loadAttempt++ })
+                    if (showTranslation) MissingContentDownloadCard("quran_translation", "Quran translations", onDownloadComplete = { loadAttempt++ })
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = { loadAttempt++ }) { Text("Try again") }
                 }
                 is QuranAyahState.Loaded -> {
+                    if (showTranslation && translationLanguage != QuranTranslationLanguage.None &&
+                        state.verses.none { it.translation.isNotBlank() }) {
+                        MissingContentDownloadCard("quran_translation", "Quran translations",
+                            "Download the translation data for the selected reading language.",
+                            onDownloadComplete = { loadAttempt++ })
+                    }
                     val showBismillah = remember(number, state.verses) {
                         number != 1 &&
                             number != 9 &&
@@ -1110,7 +1132,7 @@ internal fun QuranDetailScreen(
                                                     verseId,
                                                 )
                                             }.getOrNull()
-                                            tafseerRequest = tafseer ?: com.starception.submission.shared.quran.AyahTafseer.EMPTY
+                                            tafseerRequest = tafseer ?: com.starception.submission.shared.quran.AyahTafseer.EMPTY.copy(surahNumber = number, ayahNumber = verseId)
                                             tafseerLoading = false
                                         }
                                     },
@@ -2880,11 +2902,12 @@ internal fun BukhariBookDetailScreen(
                 contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator() }
             is HadithsState.Error -> Column(
-                Modifier.fillMaxWidth().weight(1f),
+                Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
                 SupportingCard("Unable to load this book", current.message)
+                MissingContentDownloadCard("hadith_sahih_bukhari", "Sahih al-Bukhari", onDownloadComplete = { loadAttempt++ })
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { loadAttempt++ }) { Text("Try again") }
             }
@@ -2975,7 +2998,8 @@ internal fun BukhariHadithDetailScreen(
     val book = BukhariBooks.findByHadithId(hadithId)
     val repository = remember { createSharedHadithRepository() }
     var state by remember { mutableStateOf<HadithsState>(HadithsState.Loading) }
-    LaunchedEffect(hadithId) {
+    var downloadRevision by remember(hadithId) { mutableIntStateOf(0) }
+    LaunchedEffect(hadithId, downloadRevision) {
         state = HadithsState.Loading
         try {
             val selected = listOfNotNull(repository.getHadith(hadithId))
@@ -3026,6 +3050,7 @@ internal fun BukhariHadithDetailScreen(
         }
         is HadithsState.Error -> SharedDetailScaffold(title = "Sahih al-Bukhari", onBack = onBack) {
             SupportingCard("Unable to load hadith", current.message)
+            MissingContentDownloadCard("hadith_sahih_bukhari", "Sahih al-Bukhari", onDownloadComplete = { downloadRevision++ })
         }
         is HadithsState.Loaded -> {
             val hadiths = current.hadiths
@@ -3418,7 +3443,10 @@ internal fun ShamayelBookDetailScreen(
                 Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator() }
-            is HadithsState.Error -> SupportingCard("Unable to load narrations", current.message)
+            is HadithsState.Error -> Column {
+                SupportingCard("Unable to load narrations", current.message)
+                MissingContentDownloadCard("hadith_shamayele_tirmidhi", "Shama’il At-Tirmidhi", onDownloadComplete = { loadAttempt++ })
+            }
             is HadithsState.Loaded -> {
                 val filtered = remember(current.hadiths, query) {
                     val term = query.trim().lowercase()
@@ -3453,7 +3481,8 @@ internal fun ShamayelHadithDetailScreen(
     val book = com.starception.submission.core.model.data.ShamayelBooks.findByHadithId(hadithId)
     val repository = remember { createSharedHadithRepository() }
     var state by remember { mutableStateOf<HadithsState>(HadithsState.Loading) }
-    LaunchedEffect(hadithId) {
+    var downloadRevision by remember(hadithId) { mutableIntStateOf(0) }
+    LaunchedEffect(hadithId, downloadRevision) {
         state = HadithsState.Loading
         try {
             val selected = listOfNotNull(repository.getShamayelHadith(hadithId))
@@ -3489,6 +3518,7 @@ internal fun ShamayelHadithDetailScreen(
         }
         is HadithsState.Error -> SharedDetailScaffold(title = "Shama'il At-Tirmidhi", onBack = onBack) {
             SupportingCard("Unable to load hadith", current.message)
+            MissingContentDownloadCard("hadith_shamayele_tirmidhi", "Shama’il At-Tirmidhi", onDownloadComplete = { downloadRevision++ })
         }
         is HadithsState.Loaded -> {
             val hadiths = current.hadiths
@@ -5057,6 +5087,7 @@ internal fun TopicNewsScreen(
                 contentPadding = PaddingValues(bottom = 28.dp),
             ) {
                 item { TopicPageHeader(currentTopic) }
+                item { TopicContentDownloadPrompt(topicId, onDownloadComplete = { loadAttempt++ }) }
                 when (val current = state) {
                     TopicNewsState.Loading -> item {
                         Box(
@@ -6342,11 +6373,12 @@ internal fun HadithCollectionBookScreen(
                 contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator() }
             is HadithsState.Error -> Column(
-                Modifier.fillMaxWidth().weight(1f),
+                Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
                 SupportingCard("Unable to load this book", current.message)
+                MissingContentDownloadCard(collection.downloadCategory, collection.name, onDownloadComplete = { loadAttempt++ })
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { loadAttempt++ }) { Text("Try again") }
             }
@@ -6448,7 +6480,8 @@ internal fun HadithCollectionHadithScreen(
     }
     val repository = remember { createSharedHadithRepository() }
     var state by remember(hadithId) { mutableStateOf<HadithsState>(HadithsState.Loading) }
-    LaunchedEffect(databaseFile, hadithId) {
+    var downloadRevision by remember(hadithId) { mutableIntStateOf(0) }
+    LaunchedEffect(databaseFile, hadithId, downloadRevision) {
         state = HadithsState.Loading
         try {
             val selected = listOfNotNull(repository.getCollectionHadith(databaseFile, hadithId))
@@ -6479,6 +6512,7 @@ internal fun HadithCollectionHadithScreen(
         }
         is HadithsState.Error -> SharedDetailScaffold(title = title, onBack = onBack) {
             SupportingCard("Unable to load hadith", current.message)
+            collection?.let { MissingContentDownloadCard(it.downloadCategory, it.name, onDownloadComplete = { downloadRevision++ }) }
         }
         is HadithsState.Loaded -> {
             val hadiths = current.hadiths

@@ -52,3 +52,14 @@ fun cardinalDirection(bearing: Double): String = when (normalizeDegrees(bearing)
 }
 
 private fun Double.toRadians(): Double = this * kotlin.math.PI / 180.0
+
+/** Great-circle distance from the current location to the Kaaba. */
+fun qiblaDistanceKm(latitude: Double, longitude: Double): Double {
+    val start = latitude.toRadians()
+    val end = KAABA_LATITUDE.toRadians()
+    val deltaLatitude = end - start
+    val deltaLongitude = (KAABA_LONGITUDE - longitude).toRadians()
+    val a = (sin(deltaLatitude / 2) * sin(deltaLatitude / 2) +
+        cos(start) * cos(end) * sin(deltaLongitude / 2) * sin(deltaLongitude / 2)).coerceIn(0.0, 1.0)
+    return 6371.0 * 2.0 * atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1.0 - a))
+}

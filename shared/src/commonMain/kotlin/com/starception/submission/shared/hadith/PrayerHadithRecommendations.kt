@@ -28,20 +28,24 @@ internal data class PrayerHadithRecommendation(val source: PrayerHadithCandidate
 internal suspend fun recommendPrayerHadith(prayerName: String?, date: LocalDate): PrayerHadithRecommendation? {
     val context = prayerHadithContext(prayerName, date)
     val repository = createSharedHadithRepository()
+    var searchFailures = 0
     val candidates = repository.availableCollectionDatabaseFiles().flatMap { databaseFile ->
         val collection = HadithCollections.byDatabaseFile(databaseFile) ?: return@flatMap emptyList()
-        val hits = try { repository.searchCollectionHadiths(databaseFile, context.queries, 12) }
+        val hits = try { repository.searchCollectionHadiths(databaseFile, context.queries, 48) }
         catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-        catch (_: Exception) { emptyList() }
+        catch (_: Exception) { searchFailures++; emptyList() }
         hits.distinctBy { it.id }.mapNotNull { hadith ->
             val text = hadith.english.takeIf(String::isNotBlank) ?: hadith.arabic
-            text.takeIf { it.length in 40..3000 && context.accepts(it) }?.let {
+            text.takeIf { it.length >= 40 && context.accepts(it) }?.let {
                 PrayerHadithCandidate(databaseFile, collection.name, hadith.id, it)
             }
         }
     }
     val shortlist = PrayerHadithSelection.shortlist(candidates, date.toEpochDays().toInt())
-    if (shortlist.isEmpty()) return null
+    if (shortlist.isEmpty()) {
+        check(searchFailures == 0) { "Unable to search available Hadith collections" }
+        return null
+    }
     val selected = DeenlyKnowledgeRuntime.selectPrayerHadith(
         "Local date $date. ${context.heading(prayerName ?: "Salah")}. Recommend guidance relevant to this prayer.", shortlist,
     )

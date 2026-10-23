@@ -36,7 +36,7 @@ object PrayerHadithSelection {
 
     /** Round-robin collection coverage avoids filling the model context from the first book alone. */
     fun shortlist(candidates: List<PrayerHadithCandidate>, rotation: Int): List<PrayerHadithCandidate> {
-        val groups = candidates.filter { it.text.length in 40..3000 }
+        val groups = candidates.filter { it.text.length >= 40 }
             .distinctBy { it.sourceId }.groupBy { it.databaseFile }.values.toList()
         if (groups.isEmpty()) return emptyList()
         val start = ((rotation % groups.size) + groups.size) % groups.size

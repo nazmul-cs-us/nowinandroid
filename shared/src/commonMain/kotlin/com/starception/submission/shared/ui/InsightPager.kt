@@ -323,6 +323,11 @@ fun InsightPager(
             }
         }
     }
+    var showQiblaGlobe by remember { mutableStateOf(false) }
+    val openQiblaGlobe = { showQiblaGlobe = true }
+    if (showQiblaGlobe) {
+        QiblaGlobeSheet(latitude, longitude, onDismiss = { showQiblaGlobe = false })
+    }
     val qiblaBearing = remember(latitude, longitude) {
         qiblaBearing(latitude, longitude).roundToInt()
     }
@@ -941,7 +946,7 @@ fun InsightPager(
                                 onPreferredHeightChange = { measuredHeight: Dp ->
                                     expandedHeightHints[3] = measuredHeight
                                 },
-                                onClick = onOpenQibla,
+                                onClick = openQiblaGlobe,
                                 onLongClick = onLongClick,
                                 onCompactContentHeightChange = { measured ->
                                     compactHeightHints[3] = measured
@@ -954,7 +959,7 @@ fun InsightPager(
                                             headingAccuracyDegrees = heading.accuracyDegrees,
                                             bearing = qiblaBearing,
                                             headingDegrees = heading.headingDegrees?.toFloat(),
-                                            onOpenQibla = onOpenQibla,
+                                            onOpenQibla = openQiblaGlobe,
                                         )
                                     }
                                 } else {
@@ -966,7 +971,7 @@ fun InsightPager(
                                     {
                                         Box {
                                             CupertinoSurface(
-                                                onClick = onOpenQibla,
+                                                onClick = openQiblaGlobe,
                                                 shape = CircleShape,
                                                 color = Color.Black.copy(alpha = 0.35f),
                                                 contentColor = Color.White,
@@ -1550,24 +1555,50 @@ private fun ExpandedSalahHadith(
     modifier: Modifier = Modifier,
     modelRevision: Int = 0,
 ) {
+    val availableCollections = LocalContentDownloadState.current.categories
+        .filter { it.categoryKey.startsWith("hadith_") && it.isAvailable }
+        .map { it.categoryKey }
     val hadithContext = prayerHadithContext(prayerName, date)
     val density = LocalDensity.current
     val displayName = prayerName?.replaceFirstChar { it.uppercase() } ?: "Salah"
     var recommendation by remember(prayerName, date) {
         mutableStateOf<com.starception.submission.shared.hadith.PrayerHadithRecommendation?>(null)
     }
+    var downloadRevision by remember { mutableIntStateOf(0) }
     var loading by remember(prayerName, date) { mutableStateOf(true) }
-    LaunchedEffect(prayerName, date, modelRevision) {
+    var searchFailed by remember(prayerName, date) { mutableStateOf(false) }
+    LaunchedEffect(prayerName, date, modelRevision, downloadRevision, availableCollections) {
         loading = true
+        searchFailed = false
         try {
             recommendation = com.starception.submission.shared.hadith.recommendPrayerHadith(prayerName, date)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            searchFailed = true
         } finally {
             loading = false
         }
     }
+    if (!loading && !searchFailed && recommendation == null) {
+        Column(
+            modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp, vertical = 16.dp)
+                .onSizeChanged { size -> onPreferredHeightChange(with(density) { size.height.toDp() } + 40.dp) },
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            InsightSectionLabel(hadithContext.heading(displayName))
+            Text("Download more Hadith collections", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Text("No matching narration was found for this prayer. Download another collection to search more sources.",
+                color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium)
+            MissingHadithCollectionsDownloadCard(onDownloadComplete = { downloadRevision++ })
+        }
+        return
+    }
     val text = formatInsightHadithText(recommendation?.source?.text ?: when {
         loading -> "Selecting a Hadith for this prayer…"
-        hadithContext.isFriday -> "No Friday narration is available in your downloaded books. Download more Hadith collections."
+        searchFailed -> "Unable to read your Hadith collections. Reopen this tile to try again."
+        hadithContext.isFriday -> "No matching Friday narration was found."
         else -> "No matching narration is available in your downloaded books. Download more Hadith collections."
     })
     val source = recommendation?.let {

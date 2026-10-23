@@ -5217,20 +5217,28 @@ private fun SalahHadithExpandedStage(
     val model = remember(context) { com.starception.submission.ml.DeenlyKnowledgeModel(context) }
     val modelAvailable = model.isKnowledgeModelAvailable()
     var recommendation by remember(prayerName, date) { mutableStateOf<PrayerHadithRecommendation?>(null) }
+    var downloadRevision by remember { mutableIntStateOf(0) }
     var loading by remember(prayerName, date) { mutableStateOf(true) }
-    LaunchedEffect(prayerName, date, modelAvailable, refreshKey) {
+    var searchFailed by remember(prayerName, date) { mutableStateOf(false) }
+    LaunchedEffect(prayerName, date, modelAvailable, refreshKey, downloadRevision) {
         if (!refreshKey) return@LaunchedEffect
         loading = true
+        searchFailed = false
         try {
             recommendation = PrayerHadithRecommendationRepository.load(context, prayerName, date)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            searchFailed = true
         } finally {
             loading = false
         }
     }
     val body = formatInsightHadithText(recommendation?.source?.text ?: when {
         loading -> "Selecting a Hadith for this prayer…"
-        hadithContext.isFriday -> "No Friday narration is available in your downloaded books. Download more Hadith collections."
-        else -> "No matching narration is available in your downloaded books. Download more Hadith collections."
+        searchFailed -> "Unable to read your Hadith collections. Reopen this tile to try again."
+        hadithContext.isFriday -> "No matching Friday narration was found in your available collections."
+        else -> "No matching narration was found in your available collections."
     })
     val source = recommendation?.let {
         "${it.source.reference} · ${if (it.selectedByModel) "Model selected" else "Search match"}"
@@ -5251,8 +5259,8 @@ private fun SalahHadithExpandedStage(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    start = 0.dp,
-                    end = 0.dp,
+                    start = 8.dp,
+                    end = 8.dp,
                     top = (8f - (2f * compression)).dp,
                     bottom = (7f - (2f * compression)).dp,
                 ),
@@ -5288,16 +5296,24 @@ private fun SalahHadithExpandedStage(
                             state = hadithScrollState,
                             overscrollEffect = null,
                         )
-                        .padding(vertical = 20.dp),
+                        .padding(horizontal = 4.dp, vertical = 20.dp),
                     verticalArrangement = Arrangement.Top,
                 ) {
-                    Text(
+                    if (!loading && !searchFailed && recommendation == null) {
+                        Column(Modifier.fillMaxWidth().onSizeChanged { size ->
+                            onPreferredHeightChange(with(density) { size.height.toDp() } + 105.dp)
+                        }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(text = body, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                            MissingPrayerHadithContent(onDownloadComplete = { downloadRevision++ })
+                        }
+                    } else Text(
                         text = body,
+                        modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Justify,
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontSize = (19f - (2f * compression)).sp,
                             lineHeight = (29f - (3f * compression)).sp,
-                            letterSpacing = (-0.1).sp,
+                            letterSpacing = 0.sp,
                         ),
                         color = Color.White.copy(alpha = 0.98f),
                         fontWeight = FontWeight.Medium,

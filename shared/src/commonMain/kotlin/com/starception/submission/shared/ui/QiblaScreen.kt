@@ -17,6 +17,9 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -192,7 +195,7 @@ private fun QiblaCupertinoPage(
                 .safeDrawingPadding()
                 .padding(horizontal = 16.dp),
         ) {
-            Spacer(Modifier.height(40.dp))
+            QiblaDismissHandle(onBack)
             Box(
                 modifier = Modifier.fillMaxWidth().height(64.dp),
                 contentAlignment = Alignment.Center,
@@ -260,6 +263,25 @@ private fun QiblaCupertinoPage(
                 CupertinoCalibrationCard(reading)
             }
         }
+    }
+}
+
+@Composable
+private fun QiblaDismissHandle(onDismiss: () -> Unit) {
+    val threshold = with(LocalDensity.current) { 60.dp.toPx() }
+    Box(
+        modifier = Modifier.fillMaxWidth().height(36.dp).pointerInput(onDismiss, threshold) {
+            var dragged = 0f
+            detectVerticalDragGestures(
+                onDragStart = { dragged = 0f },
+                onVerticalDrag = { change, delta -> change.consume(); dragged = (dragged + delta).coerceAtLeast(0f) },
+                onDragEnd = { if (dragged >= threshold) onDismiss() },
+                onDragCancel = { dragged = 0f },
+            )
+        }.semantics { contentDescription = "Swipe down to close Qibla compass" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.width(60.dp).height(6.dp).clip(CircleShape).background(Color.Gray.copy(alpha = 0.5f)))
     }
 }
 

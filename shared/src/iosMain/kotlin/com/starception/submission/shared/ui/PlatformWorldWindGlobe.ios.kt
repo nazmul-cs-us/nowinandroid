@@ -144,6 +144,10 @@ private fun worldWindHtml(
       text-align:center; z-index:4; }
     #overlay { position:absolute; inset:0; z-index:3; width:100%; height:100%; pointer-events:none; }
     #accuracy-ring { transition:stroke 240ms ease, filter 240ms ease; }
+    #guidance { position:absolute; right:12px; top:12px; z-index:5; border-radius:12px;
+      padding:8px 12px; background:rgba(7,11,16,.75); color:white;
+      font:600 12px -apple-system,sans-serif; pointer-events:none; }
+    #guidance:empty { display:none; }
     @keyframes radar-pulse { from { transform:scale(.85); } to { transform:scale(1); } }
   </style>
   <script src="$WORLDWIND_SCRIPT"></script>
@@ -155,6 +159,7 @@ private fun worldWindHtml(
       <circle id="accuracy-ring" cx="150" cy="150" r="145" fill="none" stroke="#72d9bd"
         stroke-width="5" opacity=".72"/>
     </svg>
+    <div id="guidance" role="status"></div>
     <div id="status">Loading WorldWind globe…</div>
   </div>
   <script>
@@ -166,9 +171,11 @@ private fun worldWindHtml(
       const wwd = new WorldWind.WorldWindow('globe');
       wwd.addLayer(new WorldWind.BMNGOneImageLayer());
       wwd.addLayer(new WorldWind.BMNGLayer());
-      const atmosphere = new WorldWind.AtmosphereLayer();
-      atmosphere.time = new Date();
-      wwd.addLayer(atmosphere);
+      if (${expanded}) {
+        const atmosphere = new WorldWind.AtmosphereLayer();
+        atmosphere.time = new Date();
+        wwd.addLayer(atmosphere);
+      }
 
       const userLat = $latitude;
       const userLon = $longitude;
@@ -278,15 +285,14 @@ private fun worldWindHtml(
         const height = Math.max(1, wwd.canvas.clientHeight);
         const aspect = width / height;
         const aspectBoost = aspect < 1 ? Math.sqrt(1 / aspect) : 1;
-        const cameraRange = Math.max(
-          earthRadius * 1.67,
-          nativeEquivalentRange * 0.68 * aspectBoost
-        );
+        // The circular compass uses a fixed full-sphere view on Android.
+        // Only the larger globe sheet varies range with route distance.
+        const cameraRange = ${if (expanded) "Math.max(earthRadius * 1.67, nativeEquivalentRange * 0.68 * aspectBoost)" else "earthRadius * 1.67 * aspectBoost"};
         wwd.navigator.lookAtLocation.latitude = routeMidpoint.latitude;
         wwd.navigator.lookAtLocation.longitude = routeMidpoint.longitude;
         wwd.navigator.range = Math.min(maximumRange, cameraRange);
         wwd.navigator.heading = cameraHeading;
-        wwd.navigator.tilt = ${if (expanded) 18 else 0};
+        wwd.navigator.tilt = ${if (expanded) "width > height ? 12 : 0" else "0"};
         wwd.redraw();
       }
 
@@ -308,10 +314,11 @@ private fun worldWindHtml(
         const delta = shortestTurn(displayedHeading, targetHeading);
         displayedHeading = (displayedHeading + delta * (1 - Math.exp(-elapsed / 100)) + 360) % 360;
         if (Math.abs(delta) < 0.1) displayedHeading = targetHeading;
-        // The camera points along the Qibla route. Billboards use screen angles,
-        // so north-referenced headings must be made relative to Qibla, as on Android.
+        // Android's circular globe uses device heading minus CAMERA heading.
+        // The midpoint's north differs from the user's north on a curved Earth;
+        // subtracting the initial user-to-Kaaba bearing rotates this beam incorrectly.
         userPlacemark.attributes.imageSource = imageUri(
-          userMarkerSvg(shortestTurn(qiblaBearing, displayedHeading), markerColor)
+          userMarkerSvg(shortestTurn(cameraHeading, displayedHeading), markerColor)
         );
         wwd.redraw();
         animationFrame = displayedHeading === targetHeading ? null : requestAnimationFrame(drawHeading);
@@ -322,7 +329,12 @@ private fun worldWindHtml(
         const aligned = hasHeading && Math.abs(shortestTurn(qiblaBearing, heading)) <= 5;
         markerColor = !hasAccuracy ? '#94a3b8' :
           accuracy <= 10 ? (aligned ? '#00c853' : '#10b981') : accuracy <= 25 ? '#ffa500' : '#ff4444';
-        accuracyRing.setAttribute('stroke', markerColor);
+        accuracyRing.setAttribute('stroke', ${if (expanded) "markerColor" else "'#ffffff'"});
+        const turn = hasHeading ? shortestTurn(heading, qiblaBearing) : null;
+        document.getElementById('guidance').textContent = !${expanded} ? '' :
+          !hasHeading ? 'Waiting for compass' :
+          aligned ? '✓ QIBLA · Aligned' :
+          'Turn ' + (turn > 0 ? 'right ' : 'left ') + Math.round(Math.abs(turn)) + '°';
         accuracyRing.style.filter = 'drop-shadow(0 0 5px ' + markerColor + ')';
         if (!hasHeading) {
           if (animationFrame !== null) cancelAnimationFrame(animationFrame);

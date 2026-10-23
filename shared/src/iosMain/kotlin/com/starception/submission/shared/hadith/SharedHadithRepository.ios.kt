@@ -121,7 +121,7 @@ private class IosSharedHadithRepository : SharedHadithRepository {
                 }
                 readCollectionRows(
                     databaseFile, terms.joinToString(" OR ") { "(text_plain LIKE ? OR $arabicSql LIKE ?)" },
-                    terms.flatMap { listOf("%$it%", "%$it%") }, limit.coerceIn(1, 24),
+                    terms.flatMap { listOf("%$it%", "%$it%") }, limit.coerceIn(1, 48),
                 )
             }
         }
