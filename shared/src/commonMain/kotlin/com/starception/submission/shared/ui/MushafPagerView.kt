@@ -136,15 +136,38 @@ private fun MushafPageView(
                 )
             }
         }
-        item(key = "flow") {
-            MushafPageFlow(
-                page = page,
-                arabicFont = arabicFont,
-                arabicFontSize = arabicFontSize,
-                showTranslation = showTranslation,
-                textAlignment = textAlignment,
-                tajweedAnnotations = tajweedAnnotations,
-            )
+        if (showTranslation) {
+            items(count = page.verses.size, key = { "ayah-${page.verses[it].numberInSurah}" }) { index ->
+                val verse = page.verses[index]
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MushafPageFlow(
+                        page = page.copy(verses = listOf(verse)),
+                        arabicFont = arabicFont,
+                        arabicFontSize = arabicFontSize,
+                        textAlignment = textAlignment,
+                        tajweedAnnotations = tajweedAnnotations,
+                    )
+                    if (verse.translation.isNotBlank()) {
+                        Text(
+                            text = verse.translation,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Justify,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+        } else {
+            item(key = "flow") {
+                MushafPageFlow(
+                    page = page,
+                    arabicFont = arabicFont,
+                    arabicFontSize = arabicFontSize,
+                    textAlignment = textAlignment,
+                    tajweedAnnotations = tajweedAnnotations,
+                )
+            }
         }
     }
 }
@@ -155,7 +178,6 @@ private fun MushafPageFlow(
     page: MushafPage,
     arabicFont: String,
     arabicFontSize: Float,
-    showTranslation: Boolean,
     textAlignment: String,
     tajweedAnnotations: Map<Int, List<SharedTajweedAnnotation>>?,
 ) {
@@ -225,25 +247,6 @@ private fun MushafPageFlow(
                         )
                 },
             )
-            if (showTranslation) {
-                androidx.compose.foundation.layout.Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    page.verses.forEach { verse ->
-                        if (verse.translation.isNotBlank()) {
-                            Text(
-                                text = "${verse.translation} (${verse.numberInSurah})",
-                                modifier = Modifier.fillMaxWidth(),
-                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

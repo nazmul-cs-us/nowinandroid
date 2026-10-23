@@ -39,6 +39,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.starception.submission.core.designsystem.component.contentSizedInsightExtent
+import com.starception.submission.core.designsystem.component.InsightTextBlock
+import com.starception.submission.core.designsystem.component.insightTextHeight
+import com.starception.submission.core.designsystem.component.InsightMotion
+import com.starception.submission.core.designsystem.component.insightReadingEdges
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -94,6 +99,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.PagerDefaults
@@ -140,7 +146,6 @@ import androidx.compose.ui.Modifier
 import com.starception.submission.core.designsystem.component.formatInsightHadithText
 import com.starception.submission.core.designsystem.component.InsightContentLayout
 import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
-import com.starception.submission.core.designsystem.component.insightWidthExpansionProgress
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
@@ -1192,20 +1197,7 @@ private fun preferredInsightExpansionExtent(
     maximumHeight: Dp,
     measuredHeight: Dp?,
 ): Float {
-    val heightCap = when (logicalPage) {
-        0 -> 500.dp // Prayer Now: concise status content.
-        1 -> 620.dp // Hadith: allow a comfortable reading block.
-        2 -> 720.dp // Quran: prioritize continuous ayah reading.
-        3 -> 560.dp // Qibla radar fits without taking the full viewport.
-        else -> 660.dp // Recommendation sources vary and often need scrolling.
-    }
-    val boundedMaximum = maxOf(restingHeight, maximumHeight)
-    val availableGrowth = boundedMaximum.value - restingHeight.value
-    if (availableGrowth <= 0f) return 0f
-    val targetHeight = measuredHeight?.coerceAtMost(heightCap)
-        ?: if (logicalPage == 0) restingHeight else heightCap
-    val boundedTarget = targetHeight.coerceIn(restingHeight, boundedMaximum)
-    return ((boundedTarget.value - restingHeight.value) / availableGrowth).coerceIn(0f, 1f)
+    return contentSizedInsightExtent(logicalPage, restingHeight, maximumHeight, measuredHeight)
 }
 
 private data class PrayerSkyPalette(
@@ -1442,6 +1434,7 @@ internal fun SwipeableBigTiles(
     var isAutomaticallySized by remember { mutableStateOf(true) }
     val compactHeightHints = remember { mutableStateMapOf<Int, Dp>() }
     val expandedHeightHints = remember { mutableStateMapOf<Int, Dp>() }
+    val stageHeightHints = remember { mutableStateMapOf<Int, Dp>() }
     var interactionEpoch by remember { mutableIntStateOf(0) }
     var isAutoAdvancing by remember { mutableStateOf(false) }
     // Home intentionally reopens on the last expanded insight. The expansion
@@ -1754,18 +1747,26 @@ internal fun SwipeableBigTiles(
             val settledLogicalPage = pagerState.settledPage % insightPageCount
             if (expandedLogicalPage != settledLogicalPage) {
                 expandedLogicalPage = settledLogicalPage
-                if (!isResizeDragging && isAutomaticallySized) {
-                    // Same resting basis as the automatic resize effect above;
-                    // two different targets in consecutive frames made the strip
-                    // height visibly wobble while the transfer spring ran.
-                    expansionExtent = preferredInsightExpansionExtent(
-                        settledLogicalPage,
-                        contentAwareStripHeight,
-                        expandedStripHeight,
-                        expandedHeightHints[settledLogicalPage],
-                    ).coerceAtLeast(minExpandedExtent)
-                }
             }
+        }
+    }
+    // Coalesce width-dependent text measurements and asynchronous content updates.
+    // Only the settled page may choose a size; corner-grip sizes remain untouched.
+    val focusedSizingPage = pagerState.settledPage % insightPageCount
+    val focusedHeightHint = expandedHeightHints[focusedSizingPage]
+    LaunchedEffect(
+        focusedSizingPage, focusedHeightHint, expandedLogicalPage,
+        contentAwareStripHeight, expandedStripHeight, isAutomaticallySized,
+        isResizeDragging, pagerState.isScrollInProgress,
+    ) {
+        if (expandedLogicalPage == null || !isAutomaticallySized ||
+            isResizeDragging || pagerState.isScrollInProgress) return@LaunchedEffect
+        delay(120L)
+        val target = preferredInsightExpansionExtent(
+            focusedSizingPage, contentAwareStripHeight, expandedStripHeight, focusedHeightHint,
+        )
+        if (kotlin.math.abs(target - expansionExtent) * expansionRangePx > with(density) { 8.dp.toPx() }) {
+            expansionExtent = target
         }
     }
     val animatedExpansionProgress by animateFloatAsState(
@@ -1773,18 +1774,13 @@ internal fun SwipeableBigTiles(
         animationSpec = if (isResizeDragging) {
             snap()
         } else {
-            // Critically damped: the previous underdamped spring (0.82) bounced
-            // the strip past its target and back on every expand/retarget, which
-            // read as the tile oscillating in expanded mode.
-            spring(
-                dampingRatio = 1f,
-                stiffness = 380f,
-            )
+            // A bounded ease gives the frame, artwork and corner radius one
+            // predictable settling time. Direct resizing still follows the finger.
+            tween(durationMillis = InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing)
         },
         label = "insightExpansionProgress",
     )
-    // Critical damping removes overshoot; the clamp is kept as a safeguard for
-    // interpolated layout dimensions.
+    // Keep interpolated layout dimensions within their measured bounds.
     val expansionProgress = animatedExpansionProgress.coerceIn(0f, 1f)
     LaunchedEffect(expansionProgress) {
         onExpansionProgressChange(expansionProgress)
@@ -1888,7 +1884,13 @@ internal fun SwipeableBigTiles(
                 normalCardWidth.value +
                     ((compactCardWidth.value - normalCardWidth.value) * compactProgress)
                 ).dp
-            val widthExpansion = insightWidthExpansionProgress(expansionProgress)
+            // Width follows the mode, not content height. Otherwise a shorter
+            // passage narrows the reader, rewraps the text and grows it again.
+            val widthExpansion by animateFloatAsState(
+                targetValue = if (expandedLogicalPage != null) 1f else 0f,
+                animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
+                label = "insightReadingWidth",
+            )
             val cardWidth = (
                 restingCardWidth.value +
                     ((maxWidth.value - restingCardWidth.value) * widthExpansion)
@@ -2074,9 +2076,7 @@ internal fun SwipeableBigTiles(
                                 // Redundant writes here restarted the auto-resize
                                 // effect on every animation frame while collapsed.
                                 val expandedHint = measured + 76.dp
-                                if ((expandedHeightHints[0] ?: 0.dp) < expandedHint) {
-                                    expandedHeightHints[0] = expandedHint
-                                }
+                                expandedHeightHints[0] = expandedHint
                             },
                             onClick = {
                                 interactionEpoch++
@@ -2155,14 +2155,9 @@ internal fun SwipeableBigTiles(
                                          displayPrayerName = currentPrayerDisplayName,
                                          compactProgress = compactProgress,
                                          onPreferredHeightChange = { measured ->
-                                             // The card widens while it expands, which can make
-                                             // the same text wrap to fewer lines. Never feed that
-                                             // smaller result back into the active height animation,
-                                             // and skip no-growth writes: they restarted the
-                                             // auto-resize effect on every relayout frame.
-                                             if ((expandedHeightHints[1] ?: 0.dp) < measured) {
-                                                 expandedHeightHints[1] = measured
-                                             }
+                                             // Remeasure both shorter and longer passages; the
+                                             // parent coalesces width changes before resizing.
+                                             stageHeightHints[1] = measured
                                          },
                                      )
                                  }
@@ -2170,6 +2165,8 @@ internal fun SwipeableBigTiles(
                                  null
                              },
                             expandedContentHorizontalBleed = 10.dp,
+                            minimumExpandedContentHeight = stageHeightHints[1] ?: 180.dp,
+                            onPreferredHeightChange = { expandedHeightHints[1] = it },
                             disableCardGesturesWhenExpanded = true,
                         )
 
@@ -2249,6 +2246,7 @@ internal fun SwipeableBigTiles(
                                  {
                                  EditorialQuranReadingStage(
                                     surah = dailySurah,
+                                    onPreferredHeightChange = { stageHeightHints[2] = it },
                                     playback = dailyReadingPlayback,
                                     compactProgress = compactProgress,
                                 )
@@ -2260,6 +2258,8 @@ internal fun SwipeableBigTiles(
                         )
 
                         3 -> InsightPreviewCard(
+                            minimumExpandedContentHeight = stageHeightHints[2] ?: 240.dp,
+                            onPreferredHeightChange = { expandedHeightHints[2] = it },
                             useEditorialExpandedLayout = true,
                             label = "Qibla",
                             // Expanded mode carries its full hierarchy inside the
@@ -2336,6 +2336,7 @@ internal fun SwipeableBigTiles(
                              },
                             expandedContentHorizontalBleed = 10.dp,
                             minimumExpandedContentHeight = 320.dp,
+                            onPreferredHeightChange = { expandedHeightHints[3] = it },
                         )
 
                         else -> {
@@ -2402,6 +2403,7 @@ internal fun SwipeableBigTiles(
                                  {
                                      RecommendationExpandedStage(
                                          candidate = modelKnowledgeCandidate,
+                                         onPreferredHeightChange = { stageHeightHints[4] = it },
                                          loading = isModelKnowledgeLoading,
                                          fallbackLabel = when (displayedAiRecommendation.target) {
                                              is ContextualRecommendationTarget.Surah -> "Quran reading"
@@ -2419,6 +2421,8 @@ internal fun SwipeableBigTiles(
                                  null
                              },
                             expandedContentHorizontalBleed = 10.dp,
+                            minimumExpandedContentHeight = stageHeightHints[4] ?: 180.dp,
+                            onPreferredHeightChange = { expandedHeightHints[4] = it },
                             disableCardGesturesWhenExpanded = true,
                             onClick = {
                                 interactionEpoch++
@@ -3041,6 +3045,7 @@ private fun InsightPreviewCard(
     // Editorial content joined to the bottom stack only while enlarged.
     expandedLeadingContent: (@Composable () -> Unit)? = null,
     minimumExpandedContentHeight: Dp = 240.dp,
+    onPreferredHeightChange: (Dp) -> Unit = {},
     // Expanded editorial panels may reclaim part of the metadata footer's
     // horizontal inset without changing the footer alignment itself.
     expandedContentHorizontalBleed: Dp = 0.dp,
@@ -3131,11 +3136,11 @@ private fun InsightPreviewCard(
     }
     LaunchedEffect(isExpanded, expandedContentEntrance) {
         if (isExpanded) {
-            delay(50L)
+            delay(InsightMotion.EntranceDelayMillis)
             expandedContentEntrance.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(
-                    durationMillis = 360,
+                    durationMillis = InsightMotion.EntranceMillis,
                     easing = FastOutSlowInEasing,
                 ),
             )
@@ -3957,9 +3962,9 @@ private fun InsightPreviewCard(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(RoundedCornerShape(20.dp))
                                 .then(
                                     if (editorialExpanded) Modifier else Modifier
+                                        .clip(RoundedCornerShape(20.dp))
                                         .background(Color.Black.copy(alpha = 0.14f))
                                         .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(20.dp))
                                         .padding(1.dp),
@@ -4394,25 +4399,29 @@ private fun InsightPreviewCard(
                 }
             }
             if (editorialExpanded) {
-                val roomy = ((maxHeight.value - 240f) / 200f).coerceIn(0f, 1f)
                 InsightContentLayout(
                     modifier = Modifier
                         .fillMaxSize()
                         .then(
                             if (expandedContentEntrance.value < 0.999f) {
                                 Modifier.graphicsLayer {
-                                    alpha = expandedContentEntrance.value.coerceIn(0f, 1f)
+                                    val reveal = expandedContentEntrance.value.coerceIn(0f, 1f)
+                                    alpha = reveal
+                                    translationY = (1f - reveal) * InsightMotion.EntranceOffset.toPx()
                                 }
                             } else Modifier,
                         )
                         .padding(
                             start = titleHorizontalPadding,
                             end = titleHorizontalPadding,
-                            top = (58f + 12f * roomy).dp,
-                            bottom = (22f + 8f * roomy).dp,
+                            top = 64.dp,
+                            bottom = 24.dp,
                         ),
-                    spacing = (8f + 6f * roomy).dp,
+                    spacing = 12.dp,
                     minimumStageHeight = minimumExpandedContentHeight,
+                    onPreferredHeightChange = { height ->
+                        onPreferredHeightChange(height + 88.dp)
+                    },
                     stage = stageContent,
                     metadata = metadataContent,
                 )
@@ -4936,6 +4945,7 @@ private fun EditorialQuranReadingStage(
     surah: Surah,
     playback: DailyReadingPlaybackState,
     compactProgress: Float,
+    onPreferredHeightChange: (Dp) -> Unit = {},
 ) {
     val context = LocalContext.current
     val quranPrefs = remember(context) {
@@ -5009,10 +5019,33 @@ private fun EditorialQuranReadingStage(
 
     val isPlaying = playback.isPlaying && playback.surahIndex == surah.number - 1
     val compression = compactProgress.coerceIn(0f, 1f)
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
+    val readingScrollState = rememberLazyListState()
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val blocks = ayahs.flatMap { ayah ->
+            val translation = translations[ayah.numberInSurah]?.takeIf(String::isNotBlank)
+            listOfNotNull(
+                InsightTextBlock(
+                    ayah.text.trim(),
+                    MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = arabicFontFamily,
+                        fontSize = (if (translation != null) 23f - 6f * compression else 27f - 8f * compression).sp,
+                        lineHeight = (if (translation != null) 34f - 9f * compression else 41f - 12f * compression).sp,
+                        letterSpacing = 0.sp,
+                    ),
+                    64.dp,
+                ),
+                translation?.let {
+                    InsightTextBlock(it, MaterialTheme.typography.bodySmall.copy(
+                        fontSize = (15f - compression).sp, lineHeight = (23f - 2f * compression).sp,
+                        letterSpacing = 0.sp,
+                    ), 10.dp)
+                },
+            )
+        }
+        val naturalHeight = insightTextHeight(blocks, maxWidth) + 84.dp
+        LaunchedEffect(naturalHeight, ayahs.isEmpty()) {
+            if (ayahs.isNotEmpty()) onPreferredHeightChange(naturalHeight)
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -5057,8 +5090,14 @@ private fun EditorialQuranReadingStage(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(vertical = 12.dp),
+                    .weight(1f)
+                    .insightReadingEdges(
+                        canScrollBackward = { readingScrollState.canScrollBackward },
+                        canScrollForward = { readingScrollState.canScrollForward },
+                    ),
+                state = readingScrollState,
+                overscrollEffect = null,
+                contentPadding = PaddingValues(vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 if (ayahs.isEmpty()) {
@@ -5203,10 +5242,15 @@ private fun SalahHadithExpandedStage(
                         .fillMaxSize()
                         // No overscroll/stretch effect: hitting either edge
                         // must not flash or scale the Hadith panel.
+                        .insightReadingEdges(
+                            canScrollBackward = { hadithScrollState.canScrollBackward },
+                            canScrollForward = { hadithScrollState.canScrollForward },
+                        )
                         .verticalScroll(
                             state = hadithScrollState,
                             overscrollEffect = null,
-                        ),
+                        )
+                        .padding(vertical = 20.dp),
                     verticalArrangement = Arrangement.Top,
                 ) {
                     Text(
@@ -5221,7 +5265,7 @@ private fun SalahHadithExpandedStage(
                         fontWeight = FontWeight.Medium,
                         onTextLayout = { result ->
                             val bodyHeight = with(density) { result.size.height.toDp() }
-                            onPreferredHeightChange(bodyHeight + 168.dp)
+                            onPreferredHeightChange(bodyHeight + 105.dp)
                         },
                     )
                 }
@@ -5815,7 +5859,9 @@ private fun RecommendationExpandedStage(
     fallbackLabel: String,
     compactProgress: Float,
     onModelDownloadComplete: () -> Unit = {},
+    onPreferredHeightChange: (Dp) -> Unit = {},
 ) {
+    val density = LocalDensity.current
     val compression = compactProgress.coerceIn(0f, 1f)
     val aiScrollState = rememberScrollState()
     Box(
@@ -5881,11 +5927,16 @@ private fun RecommendationExpandedStage(
                                 // Edge stretch was remeasuring this small
                                 // overflow range, which looked like a flicker.
                                 // Keep the viewport geometry fixed.
+                                .insightReadingEdges(
+                                    canScrollBackward = { aiScrollState.canScrollBackward },
+                                    canScrollForward = { aiScrollState.canScrollForward },
+                                )
                                 .verticalScroll(
                                     state = aiScrollState,
                                     overscrollEffect = null,
                                 )
-                                .padding(vertical = 3.dp),
+                                .padding(vertical = 20.dp)
+                                .onSizeChanged { onPreferredHeightChange(with(density) { it.height.toDp() } + 140.dp) },
                             verticalArrangement = Arrangement.Top,
                         ) {
                             Text(
@@ -5911,41 +5962,6 @@ private fun RecommendationExpandedStage(
                                     onDownloadComplete = onModelDownloadComplete,
                                 )
                             }
-                        }
-                        if (aiScrollState.canScrollBackward) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopCenter)
-                                    .fillMaxWidth()
-                                    .height(18.dp)
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Black.copy(alpha = 0.48f),
-                                                Color.Transparent,
-                                            ),
-                                        ),
-                                    ),
-                            )
-                        }
-                        if (aiScrollState.canScrollForward) {
-                            // Long sourced passages remain fully scrollable, but
-                            // the fade prevents a clipped baseline from reading as
-                            // accidental truncation at the fixed footer boundary.
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth()
-                                    .height(28.dp)
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.58f),
-                                            ),
-                                        ),
-                                ),
-                            )
                         }
                         if (aiScrollState.maxValue > 0) {
                             LinearProgressIndicator(

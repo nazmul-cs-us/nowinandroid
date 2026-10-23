@@ -22,6 +22,12 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import com.starception.submission.core.designsystem.component.contentSizedInsightExtent
+import com.starception.submission.core.designsystem.component.InsightTextBlock
+import com.starception.submission.core.designsystem.component.insightTextHeight
+import com.starception.submission.core.designsystem.component.InsightMotion
+import com.starception.submission.core.designsystem.component.insightReadingEdges
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -100,7 +106,6 @@ import androidx.compose.ui.Modifier
 import com.starception.submission.core.designsystem.component.formatInsightHadithText
 import com.starception.submission.core.designsystem.component.InsightContentLayout
 import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
-import com.starception.submission.core.designsystem.component.insightWidthExpansionProgress
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -183,26 +188,7 @@ internal fun preferredInsightExpansionExtent(
     maximumHeight: Dp,
     measuredHeight: Dp?,
 ): Float {
-    val heightCap = when (logicalPage) {
-        0 -> 500.dp
-        1 -> 620.dp
-        2 -> 720.dp
-        3 -> 560.dp
-        else -> 660.dp
-    }
-    val boundedMaximum = maxOf(restingHeight, maximumHeight)
-    val availableGrowth = boundedMaximum.value - restingHeight.value
-    if (availableGrowth <= 0f) return 0f
-    val targetHeight = measuredHeight?.coerceAtMost(heightCap)
-        ?: if (logicalPage == 0) restingHeight else heightCap
-    val boundedTarget = targetHeight.coerceIn(restingHeight, boundedMaximum)
-    // Keep expanded content visible even when its natural height fits inside
-    // the compact card (Prayer Now often does). Android uses the same 88dp floor.
-    val minimumGrowth = minOf(88f, availableGrowth)
-    return ((boundedTarget.value - restingHeight.value).coerceAtLeast(minimumGrowth) / availableGrowth)
-        // Automatic sizing stays in Home; only a manual full expansion
-        // should hide the schedule and navigation in immersive mode.
-        .coerceIn(0f, 0.98f)
+    return contentSizedInsightExtent(logicalPage, restingHeight, maximumHeight, measuredHeight)
 }
 
 /** The swipeable insight tiles at the top of the home page. */
@@ -250,12 +236,10 @@ fun InsightPager(
     val boundedMaxTileHeight = maxOf(tileHeight, maxTileHeight)
     val compactHeightHints = remember { mutableStateMapOf<Int, Dp>() }
     val expandedHeightHints = remember { mutableStateMapOf<Int, Dp>() }
+    val stageHeightHints = remember { mutableStateMapOf<Int, Dp>() }
     val settledLogicalPage = visiblePages[pagerState.settledPage % pageCount]
-    val compactHeightFloor = minOf(180.dp, tileHeight)
-    val contentAwareRestingHeight = compactHeightHints[settledLogicalPage]
-        ?.plus(76.dp)
-        ?.coerceIn(compactHeightFloor, tileHeight)
-        ?: tileHeight
+    // Stable carousel baseline: content measurements belong to expanded mode only.
+    val contentAwareRestingHeight = tileHeight
     val animatedRestingHeight by animateDpAsState(
         targetValue = contentAwareRestingHeight,
         animationSpec = spring(dampingRatio = 1f, stiffness = 350f),
@@ -268,7 +252,7 @@ fun InsightPager(
         animationSpec = if (isResizeDragging) {
             snap()
         } else {
-            spring(dampingRatio = 1f, stiffness = 380f)
+            tween(durationMillis = InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing)
         },
         label = "insightExpansionProgress",
     )
@@ -296,16 +280,20 @@ fun InsightPager(
         boundedMaxTileHeight,
         isAutomaticallySized,
         isResizeDragging,
+        pagerState.isScrollInProgress,
     ) {
-        if (isExpanded && isAutomaticallySized && !isResizeDragging) {
-            onExpansionExtentChange(
-                preferredInsightExpansionExtent(
+        if (isExpanded && isAutomaticallySized && !isResizeDragging && !pagerState.isScrollInProgress) {
+            kotlinx.coroutines.delay(120L)
+            val target = preferredInsightExpansionExtent(
                     settledLogicalPage,
                     contentAwareRestingHeight,
                     boundedMaxTileHeight,
                     expandedHeightHint,
-                ),
-            )
+                )
+            if (kotlin.math.abs(target - normalizedExtent) *
+                (boundedMaxTileHeight - contentAwareRestingHeight).value > 8f) {
+                onExpansionExtentChange(target)
+            }
         }
     }
     LaunchedEffect(expandedLogicalPage) {
@@ -568,7 +556,12 @@ fun InsightPager(
                     .coerceAtMost(minOf(maxWidth * 0.64f, boundedPageWidth))
                     .coerceAtLeast(140.dp)
             }
-            val widthExpansion = insightWidthExpansionProgress(layoutExpansionProgress)
+            // Keep text wrapping independent of content-driven height corrections.
+            val widthExpansion by animateFloatAsState(
+                targetValue = if (isExpanded) 1f else 0f,
+                animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
+                label = "insightReadingWidth",
+            )
             val pageWidth = restingPageWidth +
                 ((boundedPageWidth - restingPageWidth) * widthExpansion)
             HorizontalPager(
@@ -737,6 +730,8 @@ fun InsightPager(
                             foregroundScale = 0.84f,
                             foregroundOffsetYFraction = 0.08f,
                             isExpanded = isExpanded,
+                            minimumExpandedContentHeight = stageHeightHints[1] ?: 180.dp,
+                            onPreferredHeightChange = { expandedHeightHints[1] = it },
                             label = "Today's salah",
                             title = when (salah.completedCount) {
                                 FARD_PRAYERS.size -> "All prayers complete"
@@ -763,7 +758,7 @@ fun InsightPager(
                                     date = today,
                                     onOpenHadith = onOpenBukhariHadith,
                                     onPreferredHeightChange = { measured ->
-                                        expandedHeightHints[1] = measured
+                                        stageHeightHints[1] = measured
                                     },
                                     modifier = Modifier.fillMaxSize(),
                                 )
@@ -799,6 +794,8 @@ fun InsightPager(
                                 foregroundScale = 0.74f,
                                 foregroundOffsetYFraction = 0.09f,
                                 isExpanded = isExpanded,
+                                minimumExpandedContentHeight = stageHeightHints[2] ?: 240.dp,
+                                onPreferredHeightChange = { expandedHeightHints[2] = it },
                                 label = "Today's reading",
                                 title = if (isExpanded) "" else surah.nameEnglish,
                                 subtitle = readingPlayback.error
@@ -855,6 +852,7 @@ fun InsightPager(
                                 content = {
                                     if (isExpanded) {
                                         ExpandedReadingPreview(
+                                            onPreferredHeightChange = { stageHeightHints[2] = it },
                                             surahNumber = surah.number,
                                             surahName = surah.nameEnglish,
                                             isPlaying = isReadingAudio,
@@ -932,6 +930,7 @@ fun InsightPager(
                                 footerText = if (isExpanded) null else "Open the live compass and 3D globe",
                                 tileHeight = effectiveTileHeight,
                                 minimumExpandedContentHeight = 320.dp,
+                            onPreferredHeightChange = { expandedHeightHints[3] = it },
                                 onClick = onOpenQibla,
                                 onLongClick = onLongClick,
                                 onCompactContentHeightChange = { measured ->
@@ -1002,6 +1001,8 @@ fun InsightPager(
                                 backgroundPageOffset = { pageOffset },
                                 artwork = Res.drawable.insight_suggestion,
                                 isExpanded = isExpanded,
+                            minimumExpandedContentHeight = stageHeightHints[4] ?: 180.dp,
+                            onPreferredHeightChange = { expandedHeightHints[4] = it },
                                 label = "AI suggested",
                                 title = if (isExpanded) "" else recommendation.title,
                                 subtitle = if (isExpanded) "" else recommendation.supportingText,
@@ -1017,6 +1018,7 @@ fun InsightPager(
                                             modelLoading -> ModelSuggestionLoading()
                                             modelCard != null -> ModelSuggestionStage(
                                                 card = modelCard,
+                                                onPreferredHeightChange = { stageHeightHints[4] = it },
                                                 onOpen = { modelCard?.let(openModelCard) },
                                             )
                                             modelMissing -> MissingModelDownloadCard(
@@ -1060,7 +1062,7 @@ fun InsightPager(
             if (!pagerState.isScrollInProgress) {
                 val focusedCornerRadius by animateDpAsState(
                     targetValue = if (isExpanded) 32.dp else 26.dp,
-                    animationSpec = tween(360),
+                    animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
                     label = "insightGripCornerRadius",
                 )
                 Box(
@@ -1272,6 +1274,7 @@ private fun ExpandedReadingPreview(
     surahName: String,
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
+    onPreferredHeightChange: (Dp) -> Unit = {},
 ) {
     val store = remember { SharedContentStore() }
     // Read on recomposition so returning from Quran settings refreshes the
@@ -1319,6 +1322,7 @@ private fun ExpandedReadingPreview(
     // Scale Arabic from the actual expanded tile width. Fixed 17–23sp text
     // was too small on the iPad/large expanded card and hard to read.
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val readingScrollState = rememberLazyListState()
         val hasTranslation = verses.any { it.translation.isNotBlank() }
         val readingArabicSize = (
             maxWidth.value * if (hasTranslation) 0.064f else 0.075f
@@ -1326,6 +1330,26 @@ private fun ExpandedReadingPreview(
         val readingArabicLineHeight = (readingArabicSize.value * 1.45f).sp
         val bismillahSize = (maxWidth.value * 0.052f).coerceIn(18f, 26f).sp
         val readingTranslationSize = (maxWidth.value * 0.038f).coerceIn(15f, 18f).sp
+        val blocks = verses.flatMap { verse ->
+            listOfNotNull(
+                InsightTextBlock(verse.arabicText.trim(), MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                    fontSize = readingArabicSize, lineHeight = readingArabicLineHeight,
+                    letterSpacing = 0.sp,
+                ), 74.dp),
+                verse.translation.takeIf(String::isNotBlank)?.let {
+                    InsightTextBlock(it, MaterialTheme.typography.bodySmall.copy(
+                        fontSize = readingTranslationSize,
+                        lineHeight = (readingTranslationSize.value * 1.55f).sp,
+                    ), 10.dp)
+                },
+            )
+        }
+        val naturalHeight = insightTextHeight(blocks, maxWidth) + 164.dp
+        LaunchedEffect(naturalHeight, loading) {
+            if (!loading && verses.isNotEmpty()) onPreferredHeightChange(naturalHeight)
+        }
+
 
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -1361,8 +1385,14 @@ private fun ExpandedReadingPreview(
                 )
             }
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().weight(1f)
+                    .insightReadingEdges(
+                        canScrollBackward = { readingScrollState.canScrollBackward },
+                        canScrollForward = { readingScrollState.canScrollForward },
+                    ),
+                state = readingScrollState,
+                overscrollEffect = null,
+                contentPadding = PaddingValues(vertical = InsightMotion.ReadingEdge),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 if (surahNumber != 1 && surahNumber != 9) {
@@ -1580,12 +1610,17 @@ private fun ExpandedSalahHadith(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(state = hadithScrollState),
+                        .insightReadingEdges(
+                            canScrollBackward = { hadithScrollState.canScrollBackward },
+                            canScrollForward = { hadithScrollState.canScrollForward },
+                        )
+                        .verticalScroll(state = hadithScrollState, overscrollEffect = null)
+                        .padding(vertical = InsightMotion.ReadingEdge),
                     verticalArrangement = Arrangement.Top,
                 ) {
                     Text(
                         text = text,
-                        textAlign = TextAlign.Start,
+                        textAlign = TextAlign.Justify,
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontSize = 19.sp,
                             lineHeight = 29.sp,
@@ -1595,7 +1630,7 @@ private fun ExpandedSalahHadith(
                         fontWeight = FontWeight.Medium,
                         onTextLayout = { result ->
                             val bodyHeight = with(density) { result.size.height.toDp() }
-                            onPreferredHeightChange(bodyHeight + 240.dp)
+                            onPreferredHeightChange(bodyHeight + 148.dp)
                         },
                     )
                 }
@@ -2341,7 +2376,9 @@ private fun PreparingKnowledgeFooter(modifier: Modifier = Modifier) {
 private fun ModelSuggestionStage(
     card: DeenlyKnowledgeCard?,
     onOpen: () -> Unit,
+    onPreferredHeightChange: (Dp) -> Unit = {},
 ) {
+    val density = LocalDensity.current
     val sourceScrollState = rememberScrollState()
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -2365,7 +2402,13 @@ private fun ModelSuggestionStage(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .verticalScroll(sourceScrollState),
+                .insightReadingEdges(
+                    canScrollBackward = { sourceScrollState.canScrollBackward },
+                    canScrollForward = { sourceScrollState.canScrollForward },
+                )
+                .verticalScroll(state = sourceScrollState, overscrollEffect = null)
+                .padding(vertical = InsightMotion.ReadingEdge)
+                .onSizeChanged { onPreferredHeightChange(with(density) { it.height.toDp() } + 120.dp) },
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
@@ -2494,6 +2537,7 @@ private fun ArtworkTile(
     subtitle: String,
     tileHeight: Dp,
     minimumExpandedContentHeight: Dp = 240.dp,
+    onPreferredHeightChange: (Dp) -> Unit = {},
     modifier: Modifier = Modifier,
     footerText: String? = null,
     topEndContent: @Composable (() -> Unit)? = null,
@@ -2509,24 +2553,24 @@ private fun ArtworkTile(
     val backgroundBaseScale = 1.065f
     val cornerRadius by animateDpAsState(
         targetValue = if (isExpanded) 32.dp else 26.dp,
-        animationSpec = tween(360),
+        animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
         label = "insightCornerRadius",
     )
     val shadowElevation by animateDpAsState(
         targetValue = if (isExpanded) 10.dp else 6.dp,
-        animationSpec = tween(360),
+        animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
         label = "insightShadowElevation",
     )
     var revealExpandedContent by remember(isExpanded) { mutableStateOf(!isExpanded) }
     LaunchedEffect(isExpanded) {
         if (isExpanded) {
-            kotlinx.coroutines.delay(50L)
+            kotlinx.coroutines.delay(InsightMotion.EntranceDelayMillis)
             revealExpandedContent = true
         }
     }
     val expandedContentEntrance by animateFloatAsState(
         targetValue = if (revealExpandedContent) 1f else 0f,
-        animationSpec = tween(durationMillis = 360),
+        animationSpec = tween(durationMillis = InsightMotion.EntranceMillis, easing = FastOutSlowInEasing),
         label = "expandedContentEntrance",
     )
     val shape = RoundedCornerShape(cornerRadius)
@@ -2665,30 +2709,36 @@ private fun ArtworkTile(
                 }
             }
             if (isExpanded) {
-                val roomy = ((tileHeight.value - 240f) / 200f).coerceIn(0f, 1f)
                 InsightContentLayout(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(
                             start = 22.dp, end = 22.dp,
-                            top = maxOf((58f + 12f * roomy).dp, expandedLabelHeight + 40.dp),
-                            bottom = (22f + 8f * roomy).dp,
+                            top = maxOf(64.dp, expandedLabelHeight + 40.dp),
+                            bottom = 24.dp,
                         ),
-                    spacing = (8f + 6f * roomy).dp,
-                    minimumStageHeight = minimumExpandedContentHeight * density.fontScale.coerceAtLeast(1f),
+                    spacing = 12.dp,
+                    minimumStageHeight = minimumExpandedContentHeight,
+                    onPreferredHeightChange = { height ->
+                        onPreferredHeightChange(height +
+                            maxOf(64.dp, expandedLabelHeight + 40.dp) +
+                            24.dp)
+                    },
                     stage = {
                         content?.let { expandedContent ->
                             Box(
                                 modifier = Modifier
                                     .widthIn(max = 640.dp)
                                     .fillMaxSize()
-                                    .graphicsLayer {
-                                        alpha = expandedContentEntrance
-                                        // Keep the content's center fixed while its
-                                        // alpha/scale entrance runs; translating it
-                                        // here makes it visibly drop into place.
-                                        translationY = 0f
-                                    },
+                                    .then(
+                                        if (expandedContentEntrance < 0.999f) {
+                                            Modifier.graphicsLayer {
+                                                alpha = expandedContentEntrance
+                                                translationY = (1f - expandedContentEntrance) *
+                                                    InsightMotion.EntranceOffset.toPx()
+                                            }
+                                        } else Modifier,
+                                    ),
                                 // Android centers the expanded stage inside its
                                 // weighted zone instead of pinning it to the top.
                                 contentAlignment = Alignment.Center,
@@ -2698,7 +2748,7 @@ private fun ArtworkTile(
                         }
                     },
                     metadata = {
-                        Column(verticalArrangement = Arrangement.spacedBy((8f + 6f * roomy).dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             ArtworkTileMetadata(
                                 title = title,
                                 subtitle = subtitle,

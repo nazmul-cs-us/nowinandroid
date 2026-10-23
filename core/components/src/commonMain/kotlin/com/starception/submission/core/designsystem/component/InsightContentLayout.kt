@@ -22,7 +22,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
@@ -47,21 +53,27 @@ fun InsightContentLayout(
     modifier: Modifier = Modifier,
     spacing: Dp = 14.dp,
     minimumStageHeight: Dp = 240.dp,
+    onPreferredHeightChange: (Dp) -> Unit = {},
     stage: @Composable () -> Unit,
     metadata: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     val minimumStagePx = with(density) {
-        (minimumStageHeight * fontScale.coerceAtLeast(1f)).roundToPx()
+        minimumStageHeight.roundToPx()
     }
     val spacingPx = with(density) { spacing.roundToPx() }
+    var metadataHeight by remember { mutableIntStateOf(0) }
+    LaunchedEffect(metadataHeight, minimumStagePx, spacingPx, density) {
+        val gap = if (metadataHeight > 0) spacingPx else 0
+        onPreferredHeightChange(with(density) { (minimumStagePx + metadataHeight + gap).toDp() })
+    }
     BoxWithConstraints(modifier) {
         val viewportHeight = constraints.maxHeight
         Layout(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
             content = {
                 Box(propagateMinConstraints = true) { stage() }
-                Box { metadata() }
+                Box(Modifier.onSizeChanged { metadataHeight = it.height }) { metadata() }
             },
         ) { measurables, constraints ->
             val metadataPlaceable = measurables[1].measure(

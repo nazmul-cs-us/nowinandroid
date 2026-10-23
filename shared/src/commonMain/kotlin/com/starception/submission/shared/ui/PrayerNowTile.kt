@@ -16,6 +16,8 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import com.starception.submission.core.designsystem.component.InsightMotion
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -118,12 +120,12 @@ fun PrayerNowTile(
     val sceneAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = 0.40f)
     val cornerRadius by animateDpAsState(
         targetValue = if (isExpanded) 32.dp else 26.dp,
-        animationSpec = tween(360),
+        animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
         label = "prayerNowCornerRadius",
     )
     val shadowElevation by animateDpAsState(
         targetValue = if (isExpanded) 10.dp else 6.dp,
-        animationSpec = tween(360),
+        animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
         label = "prayerNowShadowElevation",
     )
     val shape = RoundedCornerShape(cornerRadius)
