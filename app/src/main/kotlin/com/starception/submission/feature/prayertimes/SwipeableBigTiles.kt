@@ -2178,6 +2178,10 @@ internal fun SwipeableBigTiles(
                         )
 
                         2 -> InsightPreviewCard(
+                            minimumExpandedContentHeight = stageHeightHints[2] ?: 240.dp,
+                            onPreferredHeightChange = { measuredHeight: Dp ->
+                                expandedHeightHints[2] = measuredHeight
+                            },
                             useEditorialExpandedLayout = true,
                             label = if (isDrivingMode) "Driving · Listen" else "Today's reading",
                             title = if (isExpandedCard) {
@@ -2265,10 +2269,6 @@ internal fun SwipeableBigTiles(
                         )
 
                         3 -> InsightPreviewCard(
-                            minimumExpandedContentHeight = stageHeightHints[2] ?: 240.dp,
-                            onPreferredHeightChange = { measuredHeight: Dp ->
-                                expandedHeightHints[2] = measuredHeight
-                            },
                             useEditorialExpandedLayout = true,
                             label = "Qibla",
                             // Expanded mode carries its full hierarchy inside the
