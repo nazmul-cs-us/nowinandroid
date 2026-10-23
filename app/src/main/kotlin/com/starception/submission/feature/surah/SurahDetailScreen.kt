@@ -2315,16 +2315,17 @@ private fun AlbumPlayerTopBar(
     val iconButtonSize = 44.dp
     val translationButtonSize = 48.dp
 
-    // Keep language selection and More available before optional toolbar actions.
+    // Keep Save, language selection and More visible; only secondary actions may collapse.
     val moreButtonSize = 44.dp
     val backButtonSize = 44.dp
-    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - moreButtonSize)
+    val bookmarkButtonSize = 44.dp
+    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - bookmarkButtonSize - moreButtonSize)
         .coerceAtLeast(0.dp)
     val maxIconsThatFit = (remainingWidth / iconButtonSize).toInt()
     val showTranslation = true
-    val showBookmark = maxIconsThatFit >= 1
+    val showBookmark = true
     val showFont = false
-    val showTajweedButton = maxIconsThatFit >= 2
+    val showTajweedButton = maxIconsThatFit >= 1
 
     Surface(
         color = backgroundColor,
@@ -2391,7 +2392,7 @@ private fun AlbumPlayerTopBar(
                         }
                     }
 
-                    // Bookmark button - shown if space allows (priority 2)
+                    // Save remains available alongside language selection.
                     if (showBookmark) {
                         IconButton(
                             onClick = onBookmarkClick,
