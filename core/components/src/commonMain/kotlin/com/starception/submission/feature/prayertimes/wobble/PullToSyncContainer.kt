@@ -119,6 +119,8 @@ data class SyncBarRow(
     val isVisible: Boolean,
     /** 0..1 along the strip, or 0 for a row with no notion of progress. */
     val progress: Float = 0f,
+    /** Height needed by the hosted content, including multiline media metadata. */
+    val minimumHeight: Dp = MiniBarRowHeight,
     val content: @Composable (statusText: String?) -> Unit,
 )
 
@@ -378,7 +380,12 @@ fun PullToSyncContainer(
     val barBottomPadding = 4.dp
     // Fixed row, but still allowed to grow with the user's font scale so long
     // labels never clip.
-    val barRowDp = maxOf(MiniBarRowHeight, with(bannerDensity) { 17.sp.toDp() } + 13.dp)
+    val activeRowMinimum = when {
+        mediaBar?.isVisible == true -> mediaBar.minimumHeight
+        mushafBar?.isVisible == true -> mushafBar.minimumHeight
+        else -> MiniBarRowHeight
+    }
+    val barRowDp = maxOf(activeRowMinimum, with(bannerDensity) { 17.sp.toDp() } + 13.dp)
     val standardBarHeightDp = barTopInsetPadding + barRowDp + barBottomPadding
     val isMushafActive = mushafBar?.isVisible == true
 

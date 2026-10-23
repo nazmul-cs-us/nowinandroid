@@ -33,6 +33,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -69,7 +70,10 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -348,6 +352,13 @@ fun PrayerTimesScreen(
     val mediaBar = playback?.let { playing ->
         com.starception.submission.feature.prayertimes.wobble.SyncBarRow(
             isVisible = true,
+            minimumHeight = maxOf(
+                44.dp,
+                with(LocalDensity.current) {
+                    MaterialTheme.typography.labelLarge.lineHeight.toDp() +
+                        MaterialTheme.typography.labelMedium.lineHeight.toDp()
+                } + 12.dp,
+            ),
             progress = if (playing.durationSeconds > 0f) {
                 (playing.positionSeconds / playing.durationSeconds).coerceIn(0f, 1f)
             } else {
@@ -375,6 +386,7 @@ fun PrayerTimesScreen(
                 ) {
                     Text(
                         text = playing.title,
+                        modifier = Modifier.fillMaxWidth().basicMarquee(),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = stripColor,
@@ -382,23 +394,23 @@ fun PrayerTimesScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = if (playing.playing) "Playing" else "Paused",
+                        text = statusText ?: if (playing.playing) "Playing" else "Paused",
                         style = MaterialTheme.typography.labelMedium,
                         color = stripColor.copy(alpha = 0.7f),
                         maxLines = 1,
                     )
                 }
-                Text(
-                    text = if (playing.playing) "❚❚" else "▶",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = stripColor,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .clickable {
-                            com.starception.submission.shared.media.QuranPlaybackBus.toggle()
-                        }
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                )
+                IconButton(
+                    onClick = { com.starception.submission.shared.media.QuranPlaybackBus.toggle() },
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Icon(
+                        imageVector = if (playing.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (playing.playing) "Pause recitation" else "Play recitation",
+                        tint = stripColor,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
             }
         }
     }
@@ -721,9 +733,15 @@ fun PrayerTimesScreen(
                                     prayerContentHeights.values.maxOrNull() ?: (88f * scale).dp,
                                 )
                                 val minimumSchedule = minimumPrayerHeight * 2 + (100f * scale).dp
-                                val phoneMaximumInsight = (maxHeight - minimumSchedule - 56.dp)
-                                    .coerceAtLeast(140.dp)
-                                val phoneRestingInsight = minOf(portraitInsightHeight, phoneMaximumInsight - 44.dp)
+                                // Full expansion hides the schedule, so it must be
+                                // allowed to fill the viewport, including the pager's
+                                // 34dp heading and 8dp gap. Keep the compact budget
+                                // separate so normal Home still fits its prayer rows.
+                                val phoneMaximumInsight = (maxHeight - 42.dp).coerceAtLeast(140.dp)
+                                val phoneRestingInsight = minOf(
+                                    portraitInsightHeight,
+                                    maxHeight - minimumSchedule - 100.dp,
+                                )
                                     .coerceAtLeast(96.dp)
                                 val sectionGap = if (expandedInsightPage != null) 2.dp else 8.dp
                                 val collapseLocation = showAllPrayers || homeLocationNeedsCollapse(

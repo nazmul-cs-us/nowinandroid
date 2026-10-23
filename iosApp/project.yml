@@ -289,6 +289,10 @@ targets:
     sources:
       - path: PrayerLiveActivity
       - path: Shared
+      # Live Activities have their own bundle; reuse the app's current artwork.
+      - path: Sources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
+        buildPhase: resources
+        type: file
     info:
       path: PrayerLiveActivity/Info.plist
       properties:

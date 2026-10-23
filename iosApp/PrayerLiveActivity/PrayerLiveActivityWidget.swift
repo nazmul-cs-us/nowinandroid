@@ -4,6 +4,19 @@ import WidgetKit
 
 private let prayerDeepLink = URL(string: "deenly://prayer-times")!
 
+private struct PrayerBrandIcon: View {
+    var size: CGFloat = 20
+
+    var body: some View {
+        Image("AppIcon-1024")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Phase presentation (Android parity, Apple HIG presentation)
 //
 // The schedule defines five presentation states. Everything the lock screen
@@ -139,10 +152,11 @@ struct PrayerLiveActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     PhaseTimeline(state: context.state) { presentation in
                         VStack(alignment: .leading, spacing: 2) {
-                            Label(
-                                presentation.phase.title,
-                                systemImage: "moon.stars.fill"
-                            )
+                            Label {
+                                Text(presentation.phase.title)
+                            } icon: {
+                                PrayerBrandIcon(size: 16)
+                            }
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(presentation.phase.color)
                             HStack(spacing: 4) {
@@ -215,7 +229,7 @@ struct PrayerLiveActivityWidget: Widget {
                     .widgetURL(prayerDeepLink)
                 }
             } compactLeading: {
-                Image(systemName: "moon.stars.fill")
+                PrayerBrandIcon()
                     .foregroundStyle(.teal)
                     .widgetURL(prayerDeepLink)
             } compactTrailing: {
@@ -242,7 +256,7 @@ struct PrayerLiveActivityWidget: Widget {
                             .font(.caption2.weight(.semibold))
                             .monospacedDigit()
                             .minimumScaleFactor(0.7)
-                        Image(systemName: "moon.stars.fill")
+                        PrayerBrandIcon(size: 16)
                             .font(.caption2.weight(.semibold))
                     }
                     .foregroundStyle(presentation.phase.color)
@@ -277,7 +291,7 @@ private struct LockScreenPrayerActivityView: View {
             let presentation = phasePresentation(for: state, now: timeline.date)
             VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 10) {
-                Image(systemName: "moon.stars.fill")
+                PrayerBrandIcon(size: 30)
                     .font(.title3.weight(.medium))
                     .foregroundStyle(presentation.phase.color)
                 VStack(alignment: .leading, spacing: 2) {
