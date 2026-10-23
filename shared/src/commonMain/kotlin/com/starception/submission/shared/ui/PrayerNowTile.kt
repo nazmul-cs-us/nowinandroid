@@ -188,6 +188,7 @@ fun PrayerNowTile(
             isNight = isNight,
             forceMoonForTesting = forceMoonForTesting,
             forceSunForTesting = forceSunForTesting,
+            sceneVerticalBias = .40f,
         )
         }
 

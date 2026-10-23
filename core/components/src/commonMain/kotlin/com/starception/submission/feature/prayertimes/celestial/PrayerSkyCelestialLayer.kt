@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.model.util.PrayerSceneGeometry
 import com.starception.submission.prayer.sky.AltAz
 import com.starception.submission.prayer.sky.julianDay
 import com.starception.submission.prayer.sky.skySnapshotAt
@@ -83,10 +84,10 @@ fun PrayerSkyCelestialLayer(
     replayKey: Any? = Unit,
     forceSunForTesting: Boolean = false,
     forceMoonForTesting: Boolean = false,
+    sceneVerticalBias: Float = 0f,
 ) {
-    // Keep the body at its real current astronomical position. Only the rays
-    // have a subtle three-second shimmer; there is no sunrise-to-sunset or
-    // moonrise-to-moonset replay when entering the tile.
+    // Astronomy controls visibility, direction and phase. Scenic placement stays
+    // close to the cropped mountain ridge as the tile changes size.
     val snapshot = remember(epochSeconds, latitude, longitude) {
         skySnapshotAt(
             julianDay = julianDay(epochSeconds),
@@ -101,14 +102,13 @@ fun PrayerSkyCelestialLayer(
         val diameter = (min(maxWidth.value, maxHeight.value) * 0.17f)
             .coerceIn(34f, 60f)
             .dp
-        val lightFieldDiameter = diameter * 6f
-        val sunPosition = scenicPosition(snapshot.sunAltAz)
-        val moonPosition = scenicPosition(snapshot.moonAltAz).let { position ->
-            // Keep the visible moon at the mountain horizon. The body is then
-            // occluded by PrayerNowSkylineShape while its soft glow can still
-            // read above the ridge.
-            position.copy(y = position.y.coerceAtLeast(0.42f))
+        // Glow/rays draw on the scene canvas. Measure the body at its own size;
+        // a six-disc wrapper was constrained by short tiles and shifted its center.
+        val geometry = remember(maxWidth, maxHeight, isNight, sceneVerticalBias) {
+            PrayerSceneGeometry(maxWidth.value, maxHeight.value, isNight, sceneVerticalBias)
         }
+        val sunPosition = scenicPosition(snapshot.sunAltAz, geometry, diameter.value)
+        val moonPosition = scenicPosition(snapshot.moonAltAz, geometry, diameter.value)
         val fieldWidth = maxWidth
         val fieldHeight = maxHeight
 
@@ -130,16 +130,16 @@ fun PrayerSkyCelestialLayer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(PrayerNowSkylineShape(isNight)),
+                    .clip(PrayerNowSkylineShape(geometry)),
             ) {
                 if (forceSunForTesting) {
                     SunBody(
                         modifier = Modifier
                             .offset(
-                                x = fieldWidth * moonPosition.x - lightFieldDiameter / 2,
-                                y = fieldHeight * moonPosition.y - lightFieldDiameter / 2,
+                                x = fieldWidth * moonPosition.x - diameter / 2,
+                                y = fieldHeight * moonPosition.y - diameter / 2,
                             )
-                            .size(lightFieldDiameter),
+                            .size(diameter),
                         bodyDiameter = diameter,
                     )
                 } else {
@@ -149,10 +149,10 @@ fun PrayerSkyCelestialLayer(
                         brightLimbRotation = snapshot.moonBrightLimbScreenDeg.toFloat(),
                         modifier = Modifier
                             .offset(
-                                x = fieldWidth * moonPosition.x - lightFieldDiameter / 2,
-                                y = fieldHeight * moonPosition.y - lightFieldDiameter / 2,
+                                x = fieldWidth * moonPosition.x - diameter / 2,
+                                y = fieldHeight * moonPosition.y - diameter / 2,
                             )
-                            .size(lightFieldDiameter),
+                            .size(diameter),
                         bodyDiameter = diameter,
                     )
                 }
@@ -161,7 +161,9 @@ fun PrayerSkyCelestialLayer(
         if (!isNight && !forceMoonForTesting &&
             (forceSunForTesting || snapshot.sunAltAz.altitudeDeg > -1.5)
         ) {
-            val displayedSunPosition = if (forceSunForTesting) Offset(0.72f, 0.20f) else sunPosition
+            val displayedSunPosition = if (forceSunForTesting) {
+                Offset(.72f, geometry.bodyCenterY(.72f, 45.0, diameter.value))
+            } else sunPosition
             SunAtmosphericLight(
                 position = displayedSunPosition,
                 bodyDiameter = diameter,
@@ -170,15 +172,15 @@ fun PrayerSkyCelestialLayer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(PrayerNowSkylineShape(isNight)),
+                    .clip(PrayerNowSkylineShape(geometry)),
             ) {
                 SunBody(
                     modifier = Modifier
                         .offset(
-                                x = fieldWidth * displayedSunPosition.x - lightFieldDiameter / 2,
-                                y = fieldHeight * displayedSunPosition.y - lightFieldDiameter / 2,
+                                x = fieldWidth * displayedSunPosition.x - diameter / 2,
+                                y = fieldHeight * displayedSunPosition.y - diameter / 2,
                         )
-                        .size(lightFieldDiameter),
+                        .size(diameter),
                     bodyDiameter = diameter,
                 )
             }
@@ -574,17 +576,11 @@ private fun mostRecentRiseEpoch(
     return null
 }
 
-private fun scenicPosition(position: AltAz): Offset {
+private fun scenicPosition(position: AltAz, geometry: PrayerSceneGeometry, diameter: Float): Offset {
     val azimuthRadians = (position.azimuthDeg - 180.0) * PI / 180.0
     // The scene faces south, so west is on the viewer's left and east is on the right.
     val x = 0.37f - sin(azimuthRadians).toFloat() * 0.29f
-    // The current wallpaper's mountain ridge sits around y 0.55. Map a
-    // low-altitude body to that horizon so the skyline clip can occlude it.
-    val altitudeRadians = position.altitudeDeg.coerceIn(0.0, 90.0) * PI / 180.0
-    // Give the disc enough lower clearance to disappear completely behind the
-    // ridge at sunset; the separate atmospheric light remains visible.
-    val y = 0.68f - sin(altitudeRadians).toFloat() * 0.42f
-    return Offset(x, y)
+    return Offset(x, geometry.bodyCenterY(x, position.altitudeDeg, diameter))
 }
 
 private fun illuminatedDiscPath(
@@ -622,7 +618,7 @@ private fun illuminatedDiscPath(
     }
 }
 
-private class PrayerNowSkylineShape(private val isNight: Boolean) : Shape {
+private class PrayerNowSkylineShape(private val geometry: PrayerSceneGeometry) : Shape {
     override fun createOutline(
         size: Size,
         layoutDirection: LayoutDirection,
@@ -631,7 +627,7 @@ private class PrayerNowSkylineShape(private val isNight: Boolean) : Shape {
         Path().apply {
             moveTo(0f, 0f)
             lineTo(size.width, 0f)
-            val ridge = if (isNight) NIGHT_RIDGE else DAY_RIDGE
+            val ridge = geometry.ridge
             for (index in ridge.indices.reversed()) {
                 lineTo(ridge[index].x * size.width, ridge[index].y * size.height)
             }
@@ -639,26 +635,3 @@ private class PrayerNowSkylineShape(private val isNight: Boolean) : Shape {
         },
     )
 }
-
-// Traced from the current Prayer Now wallpaper's mountain ridge. The celestial
-// body is clipped to the sky above this path, so a low sun/moon disappears
-// naturally behind the mountains instead of floating at the top of the card.
-private val DAY_RIDGE = listOf(
-    Offset(0.00f, 0.56f),
-    Offset(0.16f, 0.54f),
-    Offset(0.34f, 0.50f),
-    Offset(0.52f, 0.43f),
-    Offset(0.66f, 0.49f),
-    Offset(0.82f, 0.56f),
-    Offset(1.00f, 0.55f),
-)
-
-private val NIGHT_RIDGE = listOf(
-    Offset(0.00f, 0.55f),
-    Offset(0.16f, 0.53f),
-    Offset(0.34f, 0.49f),
-    Offset(0.52f, 0.42f),
-    Offset(0.66f, 0.48f),
-    Offset(0.82f, 0.55f),
-    Offset(1.00f, 0.54f),
-)

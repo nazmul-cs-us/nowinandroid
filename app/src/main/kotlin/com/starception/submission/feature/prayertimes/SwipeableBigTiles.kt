@@ -3511,7 +3511,21 @@ private fun InsightPreviewCard(
             // The celestial bodies are light sources: drawing them above the
             // time-of-day washes keeps the sun's crepuscular wedge vivid against
             // the sky instead of being flattened by the daylight lift.
-            backgroundLayer?.invoke()
+            backgroundLayer?.let { celestialLayer ->
+                Box(Modifier.fillMaxSize().graphicsLayer {
+                    // Match the artwork's crop-space zoom and parallax so the
+                    // celestial anchor and skyline never drift apart.
+                    val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                    val restingMotion = ambientMotion * focusedMotionStrength
+                    val imageScale = backgroundBaseScale + restingMotion * .006f
+                    val requestedTranslationX = backgroundHorizontalBias * size.width - pageOffset * 18.dp.toPx()
+                    val coveredShift = ((size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()).coerceAtLeast(0f)
+                    scaleX = imageScale
+                    scaleY = imageScale
+                    translationX = requestedTranslationX.coerceIn(-coveredShift, coveredShift)
+                    translationY = restingMotion * 4.dp.toPx()
+                }) { celestialLayer() }
+            }
 
             Box(
                 modifier = Modifier
