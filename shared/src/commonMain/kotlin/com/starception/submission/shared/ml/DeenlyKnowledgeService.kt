@@ -16,6 +16,10 @@
 
 package com.starception.submission.shared.ml
 
+import com.starception.submission.core.model.deenly.PrayerHadithCandidate
+import com.starception.submission.core.model.deenly.PrayerHadithSelection
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -111,6 +115,26 @@ object DeenlyKnowledgeRuntime {
     /** True when the KNOWLEDGE task's model file is present. */
     fun isKnowledgeModelAvailable(): Boolean =
         service?.modelPathForTask(DeenlyKnowledgeTasks.KNOWLEDGE) != null
+
+    private val prayerSelectionMutex = Mutex()
+    private val prayerSelections = linkedMapOf<String, String>()
+
+    suspend fun selectPrayerHadith(context: String, candidates: List<PrayerHadithCandidate>): PrayerHadithCandidate? =
+        prayerSelectionMutex.withLock {
+            val engine = service ?: return@withLock null
+            val path = engine.modelPathForTask(DeenlyKnowledgeTasks.KNOWLEDGE) ?: return@withLock null
+            if (candidates.isEmpty()) return@withLock null
+            val prompt = PrayerHadithSelection.prompt(context, candidates)
+            val key = "$path|$prompt"
+            prayerSelections[key]?.let { return@withLock PrayerHadithSelection.selected(it, candidates) }
+            val raw = engine.runSuspending(path, DeenlyKnowledgeTasks.KNOWLEDGE, PrayerHadithSelection.SYSTEM_PROMPT, prompt)
+            val selected = PrayerHadithSelection.selected(raw?.let(::parseKnowledgeTitle), candidates)
+            if (selected != null) {
+                if (prayerSelections.size >= 24) prayerSelections.remove(prayerSelections.keys.first())
+                prayerSelections[key] = selected.sourceId
+            }
+            selected
+        }
 
     /**
      * Runs the KNOWLEDGE task over one grounded source and returns the model's

@@ -6,6 +6,8 @@
 
 package com.starception.submission.ml
 
+import com.starception.submission.core.model.deenly.PrayerHadithCandidate
+import com.starception.submission.core.model.deenly.PrayerHadithSelection
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
@@ -77,9 +79,47 @@ sealed interface DeenlyKnowledgeDecision {
 class DeenlyKnowledgeModel(context: Context) {
     private val appContext = context.applicationContext
 
+    fun isKnowledgeModelAvailable(): Boolean {
+        val task = DeenlyKnowledgeTask.KNOWLEDGE
+        val file = File(appContext.filesDir, "cdn_assets/models/now_nudge/${task.modelFileName}")
+        return file.isFile && file.length() == task.modelSizeBytes
+    }
+
     suspend fun generate(
         task: DeenlyKnowledgeTask,
         source: DeenlySourceEnvelope,
+    ): DeenlyKnowledgeDecision? = generateCompletion(task, source, task.systemPrompt, source.toPrompt(task))
+
+    suspend fun selectPrayerHadith(
+        context: String,
+        candidates: List<PrayerHadithCandidate>,
+    ): PrayerHadithCandidate? = prayerSelectionMutex.withLock {
+        if (candidates.isEmpty()) return@withLock null
+        val prompt = PrayerHadithSelection.prompt(context, candidates)
+        prayerSelections[prompt]?.let { return@withLock PrayerHadithSelection.selected(it, candidates) }
+        val envelope = DeenlySourceEnvelope(
+            collection = "Downloaded Hadith collections",
+            reference = "Prayer-specific source selection",
+            topic = context,
+            sourceText = prompt,
+            sourceTextSha256 = sha256(prompt.toByteArray()),
+        )
+        val decision = generateCompletion(
+            DeenlyKnowledgeTask.KNOWLEDGE, envelope, PrayerHadithSelection.SYSTEM_PROMPT, prompt,
+        ) as? DeenlyKnowledgeDecision.Knowledge
+        val selected = PrayerHadithSelection.selected(decision?.title, candidates)
+        if (selected != null) {
+            if (prayerSelections.size >= 24) prayerSelections.remove(prayerSelections.keys.first())
+            prayerSelections[prompt] = selected.sourceId
+        }
+        selected
+    }
+
+    private suspend fun generateCompletion(
+        task: DeenlyKnowledgeTask,
+        source: DeenlySourceEnvelope,
+        systemPrompt: String,
+        userPrompt: String,
     ): DeenlyKnowledgeDecision? = inferenceMutex.withLock {
         withContext(Dispatchers.IO) {
             if (sha256(source.sourceText.toByteArray()) != source.sourceTextSha256.lowercase()) {
@@ -110,9 +150,9 @@ class DeenlyKnowledgeModel(context: Context) {
                     "--model",
                     modelFile.absolutePath,
                     "-sys",
-                    task.systemPrompt,
+                    systemPrompt,
                     "--prompt",
-                    source.toPrompt(task),
+                    userPrompt,
                     "--single-turn",
                     "--predict",
                     "256",
@@ -303,6 +343,8 @@ citations, rulings, or claims unsupported by the source."""
         private const val QUESTION_JSON_SCHEMA = """{"type":"object","properties":{"contentType":{"const":"question"},"questionKind":{"enum":["person","place","food","color","action","number","description","teaching","outcome","object","time"]},"question":{"type":"string","minLength":8,"maxLength":180},"answer":{"type":"string","minLength":1,"maxLength":96},"evidence":{"type":"string","minLength":1,"maxLength":420},"options":{"type":"array","minItems":4,"maxItems":4,"items":{"type":"string","minLength":1,"maxLength":96}}},"required":["contentType","questionKind","question","answer","evidence","options"],"additionalProperties":false}"""
         private const val ANSWER_JSON_SCHEMA = """{"type":"object","properties":{"contentType":{"enum":["answer","unanswered"]},"answer":{"type":"string","maxLength":96},"evidence":{"type":"string","maxLength":420}},"required":["contentType","answer","evidence"],"additionalProperties":false}"""
         private val inferenceMutex = Mutex()
+        private val prayerSelectionMutex = Mutex()
+        private val prayerSelections = linkedMapOf<String, String>()
 
         internal fun parseDecision(
             rawOutput: String,

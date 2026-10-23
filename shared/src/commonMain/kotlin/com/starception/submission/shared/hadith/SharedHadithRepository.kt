@@ -58,6 +58,11 @@ interface SharedHadithRepository {
         ids: List<Int>,
     ): List<SharedHadith> = emptyList()
 
+    /** Only locally available books; opening the tile must not download the corpus. */
+    suspend fun availableCollectionDatabaseFiles(): List<String> = emptyList()
+
+    suspend fun searchCollectionHadiths(databaseFile: String, queries: List<String>, limit: Int = 12): List<SharedHadith> = emptyList()
+
     /** Full-text Bukhari search over the English text, for search suggestions. */
     suspend fun searchBukhari(query: String, limit: Int = 10): List<SharedHadith> = emptyList()
 }

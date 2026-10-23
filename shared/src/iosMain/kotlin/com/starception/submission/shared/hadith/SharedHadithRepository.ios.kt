@@ -102,6 +102,30 @@ private class IosSharedHadithRepository : SharedHadithRepository {
         return rows
     }
 
+    override suspend fun availableCollectionDatabaseFiles(): List<String> =
+        com.starception.submission.core.model.data.HadithCollections.all.filter { collection ->
+            val key = "databases/hadith/${collection.databaseFile}"
+            com.starception.submission.core.assets.AssetPlatform.cachedPath(key) != null ||
+                com.starception.submission.core.assets.AssetPlatform.bundledPath(key) != null
+        }.map { it.databaseFile }
+
+    override suspend fun searchCollectionHadiths(databaseFile: String, queries: List<String>, limit: Int): List<SharedHadith> =
+        withContext(Dispatchers.Default) {
+            require(com.starception.submission.core.model.data.HadithCollections.byDatabaseFile(databaseFile) != null)
+            val terms = queries.map(String::trim).filter(String::isNotEmpty).take(8)
+            if (databaseFile !in availableCollectionDatabaseFiles() || terms.isEmpty()) emptyList()
+            else {
+                var arabicSql = "COALESCE(text_arabic, '')"
+                ((0x064B..0x0652).map(Int::toChar) + listOf('\u0670', '\u0640')).forEach { mark ->
+                    arabicSql = "replace($arabicSql, '$mark', '')"
+                }
+                readCollectionRows(
+                    databaseFile, terms.joinToString(" OR ") { "(text_plain LIKE ? OR $arabicSql LIKE ?)" },
+                    terms.flatMap { listOf("%$it%", "%$it%") }, limit.coerceIn(1, 24),
+                )
+            }
+        }
+
     override suspend fun getCollectionHadiths(
         databaseFile: String,
         firstId: Int,
@@ -177,6 +201,8 @@ private class IosSharedHadithRepository : SharedHadithRepository {
     private suspend fun readCollectionRows(
         databaseFile: String,
         whereSql: String,
+        whereArgs: List<String> = emptyList(),
+        limit: Int? = null,
     ): List<SharedHadith> {
         val path = resolveDatabaseAsset(
             bundledPath = null,
@@ -195,11 +221,15 @@ private class IosSharedHadithRepository : SharedHadithRepository {
                 FROM hadiths
                 WHERE $whereSql
                 ORDER BY id ASC
+                ${limit?.let { "LIMIT $it" }.orEmpty()}
                 """.trimIndent()
                 check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
                     "Unable to prepare the $databaseFile query: ${database.value.errorMessage()}"
                 }
                 try {
+                    whereArgs.forEachIndexed { index, argument ->
+                        sqlite3_bind_text(statement.value, index + 1, argument, -1, SQLITE_TRANSIENT)
+                    }
                     buildList {
                         while (true) {
                             when (sqlite3_step(statement.value)) {

@@ -30,6 +30,7 @@ import com.starception.submission.core.designsystem.component.insightChromeVisib
 import com.starception.submission.core.designsystem.component.rememberInsightReaderChrome
 import com.starception.submission.core.designsystem.component.insightReaderChromeProgress
 import com.starception.submission.core.designsystem.component.InsightReaderControlsButton
+import com.starception.submission.prayer.model.prayerHadithContext
 import com.starception.submission.core.designsystem.component.InsightMotion
 import com.starception.submission.core.designsystem.component.insightReadingEdges
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -764,6 +765,7 @@ fun InsightPager(
                                     prayerName = day.currentPrayer ?: day.nextPrayer ?: salah.nextUnprayed,
                                     date = today,
                                     onOpenHadith = onOpenBukhariHadith,
+                                    modelRevision = downloadCompleted,
                                     onPreferredHeightChange = { measured ->
                                         stageHeightHints[1] = measured
                                     },
@@ -1535,21 +1537,9 @@ private fun formatTileClock(hour: Int, minute: Int): String {
     return "$h:${minute.toString().padStart(2, '0')} $suffix"
 }
 
-/** Android's prayer-specific Bukhari query order. */
-private fun prayerHadithQueries(prayerName: String?): List<String> = when (prayerName?.lowercase()) {
-    "fajr" -> listOf("Fajr prayer", "morning prayer")
-    "dhuhr" -> listOf("Dhuhr prayer", "midday prayer")
-    "asr" -> listOf("Asr prayer", "afternoon prayer")
-    "maghrib" -> listOf("Maghrib prayer", "sunset prayer")
-    "isha" -> listOf("Isha prayer", "night prayer")
-    else -> listOf("prayer", "congregational prayer")
-}
-
 /**
- * Android's SalahHadithExpandedStage: the staged fallback narration for the
- * next unprayed prayer — a full-bleed gradient overlay (not a floating
- * glass card), a giant quote glyph, the body at Android's 17.5sp reading
- * size in a manually controlled scrollable reading area.
+ * Model-selected prayer narration, shown in the same manually scrollable
+ * reading area as Android's SalahHadithExpandedStage.
  */
 @Composable
 private fun ExpandedSalahHadith(
@@ -1558,44 +1548,31 @@ private fun ExpandedSalahHadith(
     onOpenHadith: (Int) -> Unit,
     onPreferredHeightChange: (Dp) -> Unit,
     modifier: Modifier = Modifier,
+    modelRevision: Int = 0,
 ) {
+    val hadithContext = prayerHadithContext(prayerName, date)
     val density = LocalDensity.current
     val displayName = prayerName?.replaceFirstChar { it.uppercase() } ?: "Salah"
-    val (fallbackText, fallbackSource) = when (prayerName?.lowercase()) {
-        "fajr", "asr" ->
-            "Whoever prays the two cool prayers will enter Paradise." to "Sahih al-Bukhari · 574"
-        "isha" ->
-            "If they knew the reward of the night prayer, they would come to it " +
-                "even if they had to crawl." to "Sahih al-Bukhari · 615"
-        else ->
-            "Prayer in congregation is twenty-seven times superior to prayer " +
-                "offered alone." to "Sahih al-Bukhari · 645"
+    var recommendation by remember(prayerName, date) {
+        mutableStateOf<com.starception.submission.shared.hadith.PrayerHadithRecommendation?>(null)
     }
-    var resolvedHadith by remember(prayerName, date) {
-        mutableStateOf<com.starception.submission.shared.hadith.SharedHadith?>(null)
-    }
-    LaunchedEffect(prayerName, date) {
-        val repository = createSharedHadithRepository()
-        val candidates = prayerHadithQueries(prayerName)
-            .flatMap { query ->
-                runCatching { repository.searchBukhari(query, limit = 24) }
-                    .getOrDefault(emptyList())
-            }
-            .distinctBy { it.id }
-            .filter { hadith ->
-                hadith.english.isNotBlank() && hadith.english.length in 40..1_200
-            }
-            .sortedBy { it.english.length }
-            .take(8)
-        resolvedHadith = if (candidates.isEmpty()) {
-            null
-        } else {
-            val seed = date.toEpochDays().toInt() * 31 + prayerName.orEmpty().lowercase().hashCode()
-            candidates[((seed % candidates.size) + candidates.size) % candidates.size]
+    var loading by remember(prayerName, date) { mutableStateOf(true) }
+    LaunchedEffect(prayerName, date, modelRevision) {
+        loading = true
+        try {
+            recommendation = com.starception.submission.shared.hadith.recommendPrayerHadith(prayerName, date)
+        } finally {
+            loading = false
         }
     }
-    val text = formatInsightHadithText(resolvedHadith?.english ?: fallbackText)
-    val source = resolvedHadith?.let { "Sahih al-Bukhari · ${it.id}" } ?: fallbackSource
+    val text = formatInsightHadithText(recommendation?.source?.text ?: when {
+        loading -> "Selecting a Hadith for this prayer…"
+        hadithContext.isFriday -> "No Friday narration is available in your downloaded books. Download more Hadith collections."
+        else -> "No matching narration is available in your downloaded books. Download more Hadith collections."
+    })
+    val source = recommendation?.let {
+        "${it.source.reference} · ${if (it.selectedByModel) "Model selected" else "Search match"}"
+    }.orEmpty()
     // Kept outside AnimatedContent so touch scrolling never recreates the
     // scrollable subtree, matching Android's structure.
     val hadithScrollState = androidx.compose.foundation.rememberScrollState()
@@ -1617,7 +1594,7 @@ private fun ExpandedSalahHadith(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
-                InsightSectionLabel("HADITH FOR ${displayName.uppercase()}")
+                InsightSectionLabel(hadithContext.heading(displayName))
             }
             Box(
                 modifier = Modifier
@@ -1652,14 +1629,13 @@ private fun ExpandedSalahHadith(
                     )
                 }
             }
-            Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
-                InsightSourceAction(reference = source) {
-                    val fallbackId = when (prayerName?.lowercase()) {
-                        "fajr", "asr" -> 574
-                        "isha" -> 615
-                        else -> 645
-                    }
-                    onOpenHadith(resolvedHadith?.id ?: fallbackId)
+            if (source.isNotBlank()) Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+                val selectedSource = recommendation?.source
+                if (selectedSource?.databaseFile == "sahih_bukhari.db") {
+                    InsightSourceAction(reference = source) { onOpenHadith(selectedSource.hadithNumber) }
+                } else {
+                    Text(text = source, style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.66f))
                 }
             }
         }

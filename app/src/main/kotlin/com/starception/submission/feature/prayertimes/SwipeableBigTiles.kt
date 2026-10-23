@@ -47,6 +47,7 @@ import com.starception.submission.core.designsystem.component.insightChromeVisib
 import com.starception.submission.core.designsystem.component.rememberInsightReaderChrome
 import com.starception.submission.core.designsystem.component.insightReaderChromeProgress
 import com.starception.submission.core.designsystem.component.InsightReaderControlsButton
+import com.starception.submission.prayer.model.prayerHadithContext
 import com.starception.submission.core.designsystem.component.InsightMotion
 import com.starception.submission.core.designsystem.component.insightReadingEdges
 import androidx.compose.animation.AnimatedContent
@@ -277,8 +278,6 @@ import com.starception.submission.feature.quran.Surah
 import com.starception.submission.feature.quran.dailyReading
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.model.DayPrayerTimes
-import com.starception.submission.widget.DailyReminder
-import com.starception.submission.widget.DailyReminderRepository
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.service.EnhancedLocationService
 import dagger.hilt.EntryPoint
@@ -2157,6 +2156,8 @@ internal fun SwipeableBigTiles(
                                  {
                                      SalahHadithExpandedStage(
                                          prayerName = currentPrayerLookupName,
+                                         date = today,
+                                         refreshKey = isResumed,
                                          displayPrayerName = currentPrayerDisplayName,
                                          compactProgress = compactProgress,
                                          onPreferredHeightChange = { measured ->
@@ -5204,31 +5205,36 @@ private fun EditorialQuranReadingStage(
 @Composable
 private fun SalahHadithExpandedStage(
     prayerName: String,
+    date: LocalDate,
+    refreshKey: Boolean,
     displayPrayerName: String,
     compactProgress: Float,
     onPreferredHeightChange: (Dp) -> Unit,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    var reminder by remember(prayerName) { mutableStateOf<DailyReminder?>(null) }
-    LaunchedEffect(prayerName) {
-        reminder = DailyReminderRepository.loadPrayerHadith(context, prayerName)
+    val hadithContext = prayerHadithContext(prayerName, KotlinLocalDate(date.year, date.monthValue, date.dayOfMonth))
+    val model = remember(context) { com.starception.submission.ml.DeenlyKnowledgeModel(context) }
+    val modelAvailable = model.isKnowledgeModelAvailable()
+    var recommendation by remember(prayerName, date) { mutableStateOf<PrayerHadithRecommendation?>(null) }
+    var loading by remember(prayerName, date) { mutableStateOf(true) }
+    LaunchedEffect(prayerName, date, modelAvailable, refreshKey) {
+        if (!refreshKey) return@LaunchedEffect
+        loading = true
+        try {
+            recommendation = PrayerHadithRecommendationRepository.load(context, prayerName, date)
+        } finally {
+            loading = false
+        }
     }
-    val fallbackText = when (prayerName.lowercase()) {
-        "fajr", "asr" -> "Whoever prays the two cool prayers will enter Paradise."
-        "isha" -> "If they knew the reward of the night prayer, they would come to it even if they had to crawl."
-        else -> "Prayer in congregation is twenty-seven times superior to prayer offered alone."
-    }
-    val fallbackSource = when (prayerName.lowercase()) {
-        "fajr", "asr" -> "Sahih al-Bukhari · 574"
-        "isha" -> "Sahih al-Bukhari · 615"
-        else -> "Sahih al-Bukhari · 645"
-    }
-    val body = formatInsightHadithText(reminder?.text ?: fallbackText)
-    val source = listOfNotNull(reminder?.sourceName, reminder?.sourceDetail)
-        .filter(String::isNotBlank)
-        .joinToString(" · ")
-        .ifBlank { fallbackSource }
+    val body = formatInsightHadithText(recommendation?.source?.text ?: when {
+        loading -> "Selecting a Hadith for this prayer…"
+        hadithContext.isFriday -> "No Friday narration is available in your downloaded books. Download more Hadith collections."
+        else -> "No matching narration is available in your downloaded books. Download more Hadith collections."
+    })
+    val source = recommendation?.let {
+        "${it.source.reference} · ${if (it.selectedByModel) "Model selected" else "Search match"}"
+    }.orEmpty()
     val compression = compactProgress.coerceIn(0f, 1f)
     // Manual scrolling keeps reading under user control and participates in
     // the resize-to-reader nested-scroll handoff.
@@ -5254,7 +5260,7 @@ private fun SalahHadithExpandedStage(
         ) {
             Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
                 Text(
-                    text = "HADITH FOR ${displayPrayerName.uppercase()}",
+                    text = hadithContext.heading(displayPrayerName),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 11.sp,
                         lineHeight = 16.sp,
@@ -5302,7 +5308,7 @@ private fun SalahHadithExpandedStage(
                     )
                 }
             }
-            if (compression < 0.50f) {
+            if (compression < 0.50f && source.isNotBlank()) {
                 Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
                     Text(
                         text = source,
