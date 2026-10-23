@@ -6,6 +6,7 @@
 
 package com.starception.submission.feature.prayertimes
 
+import com.starception.submission.core.model.deenly.InsightSearchProgress
 import android.content.Context
 import android.content.SharedPreferences
 import com.starception.submission.core.duadatabase.Dua
@@ -158,6 +159,7 @@ internal class NowNudgeKnowledgeProvider(
         query: String? = null,
         rankingContext: NowNudgeKnowledgeRankingContext = NowNudgeKnowledgeRankingContext(),
         task: DeenlyKnowledgeTask = DeenlyKnowledgeTask.KNOWLEDGE,
+        onProgress: suspend (InsightSearchProgress) -> Unit = {},
     ): NowNudgeKnowledgeCandidate? {
         val sources = withContext(Dispatchers.IO) {
             buildList {
@@ -170,7 +172,23 @@ internal class NowNudgeKnowledgeProvider(
                     QUERY_CANDIDATE_POOL_SIZE
                 }
                 repeat(poolSize) { offset ->
+                    onProgress(InsightSearchProgress(
+                        title = "Finding your next reading",
+                        detail = "Reading downloaded Quran and Hadith passages…",
+                        completed = offset,
+                        total = poolSize,
+                        sources = map { it.collection }.distinct(),
+                        determinate = true,
+                    ))
                     sourceLoader.load(date, variation + offset)?.let(::add)
+                    onProgress(InsightSearchProgress(
+                        title = "Comparing source passages",
+                        detail = "${distinctBy(GroundedKnowledgeSource::id).size} unique source candidates found so far.",
+                        completed = offset + 1,
+                        total = poolSize,
+                        sources = map { it.collection }.distinct(),
+                        determinate = true,
+                    ))
                 }
             }.distinctBy(GroundedKnowledgeSource::id)
         }
@@ -280,6 +298,12 @@ internal class NowNudgeKnowledgeProvider(
                 },
             )
         }
+        onProgress(InsightSearchProgress(
+            title = "Preparing your suggestion",
+            detail = "Working from ${source.reference}. The passage and citation come directly from your downloaded source.",
+            sources = listOf(source.collection),
+            previewText = source.sourceText,
+        ))
         val decision = decisionGenerator.generate(task, envelope)
         return when {
             task == DeenlyKnowledgeTask.QUESTION && decision is DeenlyKnowledgeDecision.GroundedQuestion &&

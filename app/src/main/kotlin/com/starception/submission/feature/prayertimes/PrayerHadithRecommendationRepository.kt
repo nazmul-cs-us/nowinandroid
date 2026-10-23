@@ -16,6 +16,7 @@
 
 package com.starception.submission.feature.prayertimes
 
+import com.starception.submission.core.model.deenly.InsightSearchProgress
 import android.content.Context
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import androidx.sqlite.db.SimpleSQLiteQuery
@@ -31,7 +32,12 @@ import kotlinx.coroutines.withContext
 internal data class PrayerHadithRecommendation(val source: PrayerHadithCandidate, val selectedByModel: Boolean)
 
 internal object PrayerHadithRecommendationRepository {
-    suspend fun load(context: Context, prayerName: String, date: LocalDate): PrayerHadithRecommendation? =
+    suspend fun load(
+        context: Context,
+        prayerName: String,
+        date: LocalDate,
+        onProgress: suspend (InsightSearchProgress) -> Unit = {},
+    ): PrayerHadithRecommendation? =
         withContext(Dispatchers.IO) {
             val prayer = prayerHadithContext(prayerName, kotlinx.datetime.LocalDate(date.year, date.monthValue, date.dayOfMonth))
             var arabicSql = "COALESCE(text_arabic, '')"
@@ -41,30 +47,55 @@ internal object PrayerHadithRecommendationRepository {
             val where = prayer.queries.joinToString(" OR ") { "(text_plain LIKE ? OR $arabicSql LIKE ?)" }
             val arguments = prayer.queries.flatMap { listOf("%$it%", "%$it%") }.toTypedArray()
             var searchFailures = 0
-            val candidates = HadithCollections.all
-                .filter { HadithDatabase.isDatabaseAvailable(context, it.databaseFile) }
-                .flatMap { collection ->
-                    val hits = try {
-                        HadithDatabase.getInstance(context, collection.databaseFile).hadithDao().searchHadithsRanked(
-                            SimpleSQLiteQuery("SELECT * FROM hadiths WHERE ($where) AND LENGTH(COALESCE(NULLIF(TRIM(text_plain), ''), text_arabic)) >= 40 ORDER BY id ASC LIMIT 48", arguments),
-                        )
-                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                    catch (error: Exception) {
-                        searchFailures++
-                        android.util.Log.w("PrayerHadithSearch", "Unable to search ${collection.databaseFile}", error)
-                        emptyList()
-                    }
-                    hits.mapNotNull { hadith ->
-                        val text = hadith.textPlain?.takeIf(String::isNotBlank) ?: hadith.textArabic
-                        text.takeIf { it.length >= 40 && prayer.accepts(it) }?.let {
-                            PrayerHadithCandidate(collection.databaseFile, collection.name, hadith.id, it)
-                        }
+            val collections = HadithCollections.all.filter { HadithDatabase.isDatabaseAvailable(context, it.databaseFile) }
+            val searched = mutableListOf<String>()
+            val candidates = collections.flatMap { collection ->
+                onProgress(InsightSearchProgress(
+                    title = "Finding a Hadith for this prayer",
+                    detail = "Searching ${collection.name}…",
+                    completed = searched.size,
+                    total = collections.size,
+                    sources = searched.toList(),
+                    determinate = true,
+                ))
+                val hits = try {
+                    HadithDatabase.getInstance(context, collection.databaseFile).hadithDao().searchHadithsRanked(
+                        SimpleSQLiteQuery("SELECT * FROM hadiths WHERE ($where) AND LENGTH(COALESCE(NULLIF(TRIM(text_plain), ''), text_arabic)) >= 40 ORDER BY id ASC LIMIT 48", arguments),
+                    )
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    searchFailures++
+                    android.util.Log.w("PrayerHadithSearch", "Unable to search ${collection.databaseFile}", error)
+                    emptyList()
+                }
+                searched += collection.name
+                onProgress(InsightSearchProgress(
+                    title = "Checking prayer narrations",
+                    detail = "Finished ${collection.name}" +
+                        if (searchFailures > 0) " · $searchFailures collection(s) could not be read" else "",
+                    completed = searched.size,
+                    total = collections.size,
+                    sources = searched.toList(),
+                    determinate = true,
+                ))
+                hits.mapNotNull { hadith ->
+                    val text = hadith.textPlain?.takeIf(String::isNotBlank) ?: hadith.textArabic
+                    text.takeIf { it.length >= 40 && prayer.accepts(it) }?.let {
+                        PrayerHadithCandidate(collection.databaseFile, collection.name, hadith.id, it)
                     }
                 }
+            }
             val shortlist = PrayerHadithSelection.shortlist(candidates, date.toEpochDay().toInt())
             if (shortlist.isEmpty()) {
                 check(searchFailures == 0) { "Unable to search downloaded Hadith collections" }
                 return@withContext null
+            }
+            if (DeenlyKnowledgeModel(context).isKnowledgeModelAvailable()) {
+                onProgress(InsightSearchProgress(
+                    title = "Selecting a Hadith for this prayer",
+                    detail = "The model is reviewing ${shortlist.size} matching narrations for relevance.",
+                    sources = searched.toList(),
+                ))
             }
             val selected = DeenlyKnowledgeModel(context).selectPrayerHadith(
                 "Local date $date. ${prayer.heading(prayerName)}. Recommend guidance relevant to this prayer.", shortlist,

@@ -22,6 +22,8 @@ package com.starception.submission.feature.prayertimes
 // It loads through Compose Resources rather than R.drawable, hence the alias:
 // the other painterResource above still serves the ground and foreground layers.
 
+import com.starception.submission.core.components.InsightSearchStatus
+import com.starception.submission.core.model.deenly.InsightSearchProgress
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -1362,6 +1364,7 @@ internal fun SwipeableBigTiles(
     weatherThresholds: PrayerWeatherThresholds = PrayerWeatherThresholds(),
     modelKnowledgeCandidate: NowNudgeKnowledgeCandidate? = null,
     isModelKnowledgeLoading: Boolean = false,
+    modelKnowledgeProgress: InsightSearchProgress = InsightSearchProgress(),
     onModelKnowledgeClick: (NowNudgeKnowledgeCandidate) -> Unit = {},
     onModelKnowledgeDownloadComplete: () -> Unit = {},
     onExpandedPageChange: ((Int?) -> Unit)? = null,
@@ -2420,6 +2423,7 @@ internal fun SwipeableBigTiles(
                                          candidate = modelKnowledgeCandidate,
                                          onPreferredHeightChange = { stageHeightHints[4] = it },
                                          loading = isModelKnowledgeLoading,
+                                         searchProgress = modelKnowledgeProgress,
                                          fallbackLabel = when (displayedAiRecommendation.target) {
                                              is ContextualRecommendationTarget.Surah -> "Quran reading"
                                              is ContextualRecommendationTarget.FortressDua -> "Fortress dua"
@@ -5211,13 +5215,16 @@ private fun SalahHadithExpandedStage(
     var recommendation by remember(prayerName, date) { mutableStateOf<PrayerHadithRecommendation?>(null) }
     var downloadRevision by remember { mutableIntStateOf(0) }
     var loading by remember(prayerName, date) { mutableStateOf(true) }
+    var searchProgress by remember(prayerName, date) { mutableStateOf(InsightSearchProgress()) }
     var searchFailed by remember(prayerName, date) { mutableStateOf(false) }
     LaunchedEffect(prayerName, date, modelAvailable, refreshKey, downloadRevision) {
         if (!refreshKey) return@LaunchedEffect
         loading = true
         searchFailed = false
         try {
-            recommendation = PrayerHadithRecommendationRepository.load(context, prayerName, date)
+            recommendation = PrayerHadithRecommendationRepository.load(context, prayerName, date) { progress ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) { searchProgress = progress }
+            }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -5291,7 +5298,11 @@ private fun SalahHadithExpandedStage(
                         .padding(horizontal = 4.dp, vertical = 20.dp),
                     verticalArrangement = Arrangement.Top,
                 ) {
-                    if (!loading && !searchFailed && recommendation == null) {
+                    if (loading && recommendation == null) {
+                        InsightSearchStatus(searchProgress, Modifier.onSizeChanged { size ->
+                            onPreferredHeightChange(with(density) { size.height.toDp() } + 105.dp)
+                        })
+                    } else if (!loading && !searchFailed && recommendation == null) {
                         Column(Modifier.fillMaxWidth().onSizeChanged { size ->
                             onPreferredHeightChange(with(density) { size.height.toDp() } + 105.dp)
                         }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -5880,6 +5891,7 @@ private fun QiblaBearingExpandedStage(
 private fun RecommendationExpandedStage(
     candidate: NowNudgeKnowledgeCandidate?,
     loading: Boolean,
+    searchProgress: InsightSearchProgress,
     fallbackLabel: String,
     compactProgress: Float,
     onModelDownloadComplete: () -> Unit = {},
@@ -5895,24 +5907,10 @@ private fun RecommendationExpandedStage(
         // A static state switch avoids recreating and cross-fading the scroll
         // subtree when the user touches it.
         if (loading) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(9.dp),
-                ) {
-                    CircularProgressIndicator(
-                        color = HomeReferenceGold,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Text(
-                        text = "Reading your downloaded sources…",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.72f),
-                    )
-                }
-                PreparingKnowledgeFooter(
-                    modifier = Modifier.align(Alignment.BottomStart),
-                )
+            InsightSearchStatus(searchProgress,
+                Modifier.fillMaxWidth().verticalScroll(aiScrollState).onSizeChanged { size ->
+                    onPreferredHeightChange(with(density) { size.height.toDp() } + 100.dp)
+                })
         } else {
                 val nudge = candidate?.nudge
                 Column(

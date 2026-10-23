@@ -34,6 +34,27 @@ class NowNudgeKnowledgeProviderTest {
     )
 
     @Test
+    fun progressTracksActualReadsBeforePreparingTheGroundedSuggestion() = runBlocking {
+        var reads = 0
+        val updates = mutableListOf<com.starception.submission.core.model.deenly.InsightSearchProgress>()
+        val provider = NowNudgeKnowledgeProvider(
+            sourceLoader = GroundedKnowledgeSourceLoader { _, _ -> reads++; source },
+            decisionGenerator = KnowledgeDecisionGenerator { _, _ ->
+                assertEquals("Preparing your suggestion", updates.last().title)
+                null
+            },
+        )
+        provider.load(date, onProgress = { updates += it })
+        val completed = updates.last { it.determinate }
+        assertEquals(reads, completed.completed)
+        assertEquals(reads, completed.total)
+        assertTrue(completed.detail.contains("1 unique"))
+        assertEquals(listOf(source.collection), updates.last().sources)
+        assertTrue(updates.last().detail.contains(source.reference))
+        assertEquals(source.sourceText, updates.last().previewText)
+    }
+
+    @Test
     fun generatedTitleWrapsTheExactSourceAndDestination() = runBlocking {
         var capturedSourceText: String? = null
         var capturedHash: String? = null

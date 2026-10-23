@@ -16,6 +16,8 @@
 
 package com.starception.submission.shared.ui
 
+import com.starception.submission.core.components.InsightSearchStatus
+import com.starception.submission.core.model.deenly.InsightSearchProgress
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -1547,12 +1549,13 @@ private fun ExpandedSalahHadith(
     }
     var downloadRevision by remember { mutableIntStateOf(0) }
     var loading by remember(prayerName, date) { mutableStateOf(true) }
+    var searchProgress by remember(prayerName, date) { mutableStateOf(InsightSearchProgress()) }
     var searchFailed by remember(prayerName, date) { mutableStateOf(false) }
     LaunchedEffect(prayerName, date, modelRevision, downloadRevision, availableCollections) {
         loading = true
         searchFailed = false
         try {
-            recommendation = com.starception.submission.shared.hadith.recommendPrayerHadith(prayerName, date)
+            recommendation = com.starception.submission.shared.hadith.recommendPrayerHadith(prayerName, date) { searchProgress = it }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -1624,7 +1627,11 @@ private fun ExpandedSalahHadith(
                         .padding(vertical = InsightMotion.ReadingEdge),
                     verticalArrangement = Arrangement.Top,
                 ) {
-                    Text(
+                    if (loading && recommendation == null) {
+                        InsightSearchStatus(searchProgress, Modifier.onSizeChanged { size ->
+                            onPreferredHeightChange(with(density) { size.height.toDp() } + 148.dp)
+                        })
+                    } else Text(
                         text = text,
                         textAlign = TextAlign.Justify,
                         style = MaterialTheme.typography.titleSmall.copy(

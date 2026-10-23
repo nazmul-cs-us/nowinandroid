@@ -16,6 +16,7 @@
 
 package com.starception.submission.feature.prayertimes
 
+import com.starception.submission.core.model.deenly.InsightSearchProgress
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -1221,6 +1222,7 @@ fun PrayerTimesScreen(
     var expandedAiCandidate by remember(nudgeDay) {
         mutableStateOf<NowNudgeKnowledgeCandidate?>(null)
     }
+    var expandedAiProgress by remember(nudgeDay) { mutableStateOf(InsightSearchProgress()) }
     var expandedAiLoading by remember { mutableStateOf(false) }
     var aiModelDownloadTick by remember { mutableStateOf(0) }
     var botSourceVariation by rememberSaveable(nudgeDay) { mutableIntStateOf(0) }
@@ -1425,6 +1427,9 @@ fun PrayerTimesScreen(
                     nowNudgeKnowledgeProvider.load(
                         date = LocalDate.parse(requestDay),
                         variation = 64,
+                        onProgress = { progress ->
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) { expandedAiProgress = progress }
+                        },
                         appSituation = appSituation,
                         rankingContext = rankingContext,
                         task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
@@ -3533,6 +3538,7 @@ fun PrayerTimesScreen(
                                                  compactForExpandedPrayers = false,
                                                   modelKnowledgeCandidate = expandedAiCandidate,
                                                   isModelKnowledgeLoading = expandedAiLoading,
+                                                  modelKnowledgeProgress = expandedAiProgress,
                                                   onModelKnowledgeClick = openExpandedAiCandidate,
                                                   onModelKnowledgeDownloadComplete = {
                                                       // The Now Nudge GGUF finished

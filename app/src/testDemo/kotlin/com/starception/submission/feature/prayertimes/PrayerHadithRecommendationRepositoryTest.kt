@@ -61,6 +61,22 @@ class PrayerHadithRecommendationRepositoryTest {
         assertEquals(narration, result!!.source.text)
     }
 
+    @Test
+    fun progressReportsTheInstalledCollectionAndCompletedRead() = runBlocking {
+        installCollection("Friday prayer narration with enough source text for selection.")
+        val updates = mutableListOf<com.starception.submission.core.model.deenly.InsightSearchProgress>()
+        PrayerHadithRecommendationRepository.load(context, "Dhuhr", LocalDate.of(2026, 10, 23)) {
+            updates += it
+        }
+        val reads = updates.filter { it.determinate }
+        assertTrue(reads.isNotEmpty())
+        assertEquals(0, reads.first().completed)
+        assertEquals(1, reads.last().completed)
+        assertEquals(1, reads.last().total)
+        assertTrue(reads.first().detail.contains("Bukhari", ignoreCase = true))
+        assertTrue(reads.last().sources.single().contains("Bukhari", ignoreCase = true))
+    }
+
     private fun installCollection(text: String) {
         HadithDatabase.closeAll()
         val file = context.getDatabasePath("hadith_$databaseFile")
