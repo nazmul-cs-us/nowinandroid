@@ -2166,7 +2166,9 @@ internal fun SwipeableBigTiles(
                              },
                             expandedContentHorizontalBleed = 10.dp,
                             minimumExpandedContentHeight = stageHeightHints[1] ?: 180.dp,
-                            onPreferredHeightChange = { expandedHeightHints[1] = it },
+                            onPreferredHeightChange = { measuredHeight: Dp ->
+                                expandedHeightHints[1] = measuredHeight
+                            },
                             disableCardGesturesWhenExpanded = true,
                         )
 
@@ -2259,7 +2261,9 @@ internal fun SwipeableBigTiles(
 
                         3 -> InsightPreviewCard(
                             minimumExpandedContentHeight = stageHeightHints[2] ?: 240.dp,
-                            onPreferredHeightChange = { expandedHeightHints[2] = it },
+                            onPreferredHeightChange = { measuredHeight: Dp ->
+                                expandedHeightHints[2] = measuredHeight
+                            },
                             useEditorialExpandedLayout = true,
                             label = "Qibla",
                             // Expanded mode carries its full hierarchy inside the
@@ -2336,7 +2340,9 @@ internal fun SwipeableBigTiles(
                              },
                             expandedContentHorizontalBleed = 10.dp,
                             minimumExpandedContentHeight = 320.dp,
-                            onPreferredHeightChange = { expandedHeightHints[3] = it },
+                            onPreferredHeightChange = { measuredHeight: Dp ->
+                                expandedHeightHints[3] = measuredHeight
+                            },
                         )
 
                         else -> {
@@ -2422,7 +2428,9 @@ internal fun SwipeableBigTiles(
                              },
                             expandedContentHorizontalBleed = 10.dp,
                             minimumExpandedContentHeight = stageHeightHints[4] ?: 180.dp,
-                            onPreferredHeightChange = { expandedHeightHints[4] = it },
+                            onPreferredHeightChange = { measuredHeight: Dp ->
+                                expandedHeightHints[4] = measuredHeight
+                            },
                             disableCardGesturesWhenExpanded = true,
                             onClick = {
                                 interactionEpoch++

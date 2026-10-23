@@ -731,7 +731,9 @@ fun InsightPager(
                             foregroundOffsetYFraction = 0.08f,
                             isExpanded = isExpanded,
                             minimumExpandedContentHeight = stageHeightHints[1] ?: 180.dp,
-                            onPreferredHeightChange = { expandedHeightHints[1] = it },
+                            onPreferredHeightChange = { measuredHeight: Dp ->
+                                expandedHeightHints[1] = measuredHeight
+                            },
                             label = "Today's salah",
                             title = when (salah.completedCount) {
                                 FARD_PRAYERS.size -> "All prayers complete"
@@ -795,7 +797,9 @@ fun InsightPager(
                                 foregroundOffsetYFraction = 0.09f,
                                 isExpanded = isExpanded,
                                 minimumExpandedContentHeight = stageHeightHints[2] ?: 240.dp,
-                                onPreferredHeightChange = { expandedHeightHints[2] = it },
+                                onPreferredHeightChange = { measuredHeight: Dp ->
+                                    expandedHeightHints[2] = measuredHeight
+                                },
                                 label = "Today's reading",
                                 title = if (isExpanded) "" else surah.nameEnglish,
                                 subtitle = readingPlayback.error
@@ -930,7 +934,9 @@ fun InsightPager(
                                 footerText = if (isExpanded) null else "Open the live compass and 3D globe",
                                 tileHeight = effectiveTileHeight,
                                 minimumExpandedContentHeight = 320.dp,
-                            onPreferredHeightChange = { expandedHeightHints[3] = it },
+                                onPreferredHeightChange = { measuredHeight: Dp ->
+                                    expandedHeightHints[3] = measuredHeight
+                                },
                                 onClick = onOpenQibla,
                                 onLongClick = onLongClick,
                                 onCompactContentHeightChange = { measured ->
@@ -1001,8 +1007,10 @@ fun InsightPager(
                                 backgroundPageOffset = { pageOffset },
                                 artwork = Res.drawable.insight_suggestion,
                                 isExpanded = isExpanded,
-                            minimumExpandedContentHeight = stageHeightHints[4] ?: 180.dp,
-                            onPreferredHeightChange = { expandedHeightHints[4] = it },
+                                minimumExpandedContentHeight = stageHeightHints[4] ?: 180.dp,
+                                onPreferredHeightChange = { measuredHeight: Dp ->
+                                    expandedHeightHints[4] = measuredHeight
+                                },
                                 label = "AI suggested",
                                 title = if (isExpanded) "" else recommendation.title,
                                 subtitle = if (isExpanded) "" else recommendation.supportingText,
