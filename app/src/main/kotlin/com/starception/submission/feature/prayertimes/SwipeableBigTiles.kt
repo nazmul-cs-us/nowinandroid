@@ -5068,8 +5068,7 @@ private fun EditorialQuranReadingStage(
             Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 4.dp, end = 8.dp),
+                        .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -5252,16 +5251,17 @@ private fun SalahHadithExpandedStage(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    start = 8.dp,
-                    end = 8.dp,
+                    // The tile shell supplies the shared 22dp content margins.
+                    // Keep heading, reading and source on those same edges.
                     top = (8f - (2f * compression)).dp,
                     bottom = (7f - (2f * compression)).dp,
                 ),
             verticalArrangement = Arrangement.spacedBy((5f - (2f * compression)).dp),
         ) {
-            Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+            Box(Modifier.fillMaxWidth().insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
                 Text(
                     text = hadithContext.heading(displayPrayerName),
+                    modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 11.sp,
                         lineHeight = 16.sp,
@@ -5289,7 +5289,7 @@ private fun SalahHadithExpandedStage(
                             state = hadithScrollState,
                             overscrollEffect = null,
                         )
-                        .padding(horizontal = 4.dp, vertical = 20.dp),
+                        .padding(vertical = 20.dp),
                     verticalArrangement = Arrangement.Top,
                 ) {
                     if (loading && recommendation == null) {
@@ -5318,9 +5318,10 @@ private fun SalahHadithExpandedStage(
                 }
             }
             if (compression < 0.50f && source.isNotBlank()) {
-                Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+                Box(Modifier.fillMaxWidth().insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
                     Text(
                         text = source,
+                        modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 11.sp,
                             lineHeight = 16.sp,
@@ -5982,6 +5983,7 @@ private fun RecommendationExpandedStage(
                         ) {
                             Text(
                                 text = nudge.supportingText?.takeIf(String::isNotBlank) ?: nudge.label,
+                                modifier = Modifier.fillMaxWidth(),
                                 style = insightReaderBodyStyle(compression),
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium,
