@@ -52,7 +52,13 @@ fun insightTextHeight(blocks: List<InsightTextBlock>, width: Dp, limit: Dp = 720
 }
 
 /** Content determines the target; the viewport bounds long passages to a scrollable reader. */
-fun contentSizedInsightExtent(page: Int, resting: Dp, maximum: Dp, naturalHeight: Dp?): Float {
+fun contentSizedInsightExtent(
+    page: Int,
+    resting: Dp,
+    maximum: Dp,
+    naturalHeight: Dp?,
+    isLoading: Boolean = false,
+): Float {
     val growth = (maximum - resting).value
     if (growth <= 0f) return 0f
     val readingLimit = when (page) {
@@ -63,14 +69,16 @@ fun contentSizedInsightExtent(page: Int, resting: Dp, maximum: Dp, naturalHeight
         else -> 660.dp
     }
     // A modest loading size avoids opening an almost full-screen tile before text arrives.
-    val initialHeight = when (page) {
+    // Retain a distinct expanded state without reserving reading space for a loader.
+    val minimumGrowth = if (isLoading) 8.dp else 88.dp
+    val initialHeight = if (isLoading) resting + minimumGrowth else when (page) {
         0 -> resting + 88.dp
         2 -> 480.dp
         3 -> 480.dp
         else -> 420.dp
     }
     val height = (naturalHeight ?: initialHeight).coerceAtMost(readingLimit)
-        .coerceIn(minOf(resting + 88.dp, maximum), maximum)
+        .coerceIn(minOf(resting + minimumGrowth, maximum), maximum)
     // Automatic sizing preserves Home navigation; immersive mode is an explicit resize.
     return ((height - resting).value / growth).coerceIn(0f, 0.98f)
 }

@@ -47,4 +47,25 @@ class InsightSizingTest {
     fun conciseContentRetainsAnExplicitExpandedState() {
         assertEquals(88f / 560f, contentSizedInsightExtent(1, 240.dp, 800.dp, 100.dp), 0.001f)
     }
+    @Test
+    fun loadingUsesMeasuredStatusHeightWithoutReadingExpansionFloor() {
+        for (page in listOf(1, 4)) {
+            val extent = contentSizedInsightExtent(page, 240.dp, 800.dp, 270.dp, isLoading = true)
+            assertEquals(270f, 240f + extent * 560f, .01f)
+            assertTrue(extent > 0f)
+            assertTrue(extent < contentSizedInsightExtent(page, 240.dp, 800.dp, 270.dp))
+        }
+    }
+
+    @Test
+    fun unmeasuredLoadingStaysSmallAndFinalPassageCanGrowNormally() {
+        for (page in listOf(1, 4)) {
+            val loading = contentSizedInsightExtent(page, 240.dp, 800.dp, null, isLoading = true)
+            val passage = contentSizedInsightExtent(page, 240.dp, 800.dp, 600.dp)
+            assertTrue(240f + loading * 560f < 260f)
+            assertEquals(600f, 240f + passage * 560f, .01f)
+            assertTrue(loading < passage)
+        }
+    }
+
 }

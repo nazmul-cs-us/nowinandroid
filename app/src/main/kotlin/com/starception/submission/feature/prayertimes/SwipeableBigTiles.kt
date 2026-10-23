@@ -1184,13 +1184,6 @@ private const val INSIGHT_INDICATOR_STYLE_KEY = "insight_indicator_style"
 private const val INSIGHT_EXPANDED_PAGE_KEY = "insight_expanded_logical_page"
 private const val INSIGHT_CONTENT_HEIGHT_VERSION_KEY = "insight_content_height_version"
 /**
- * Smallest growth an explicit expand may open. A content-sized target at or
- * below the resting height otherwise produces an extent of zero, which folds
- * the freshly expanded tile straight back to collapsed.
- */
-private val INSIGHT_MIN_EXPANDED_GROWTH = 88.dp
-
-/**
  * Width : height of a resting insight card, from the reference design at
  * 250x288dp. The carousel sizes cards from the height it is given, so the shape
  * holds on viewports that cannot afford the reference height.
@@ -1203,8 +1196,9 @@ private fun preferredInsightExpansionExtent(
     restingHeight: Dp,
     maximumHeight: Dp,
     measuredHeight: Dp?,
+    isLoading: Boolean = false,
 ): Float {
-    return contentSizedInsightExtent(logicalPage, restingHeight, maximumHeight, measuredHeight)
+    return contentSizedInsightExtent(logicalPage, restingHeight, maximumHeight, measuredHeight, isLoading)
 }
 
 private data class PrayerSkyPalette(
@@ -1445,6 +1439,7 @@ internal fun SwipeableBigTiles(
     val compactHeightHints = remember { mutableStateMapOf<Int, Dp>() }
     val expandedHeightHints = remember { mutableStateMapOf<Int, Dp>() }
     val stageHeightHints = remember { mutableStateMapOf<Int, Dp>() }
+    var isSalahHadithLoading by remember { mutableStateOf(true) }
     var interactionEpoch by remember { mutableIntStateOf(0) }
     var isAutoAdvancing by remember { mutableStateOf(false) }
     // Home intentionally reopens on the last expanded insight. The expansion
@@ -1715,9 +1710,6 @@ internal fun SwipeableBigTiles(
     val expansionRangePx = with(density) {
         (expandedStripHeight - contentAwareStripHeight).coerceAtLeast(1.dp).toPx()
     }
-    val minExpandedExtent = with(density) {
-        (INSIGHT_MIN_EXPANDED_GROWTH.toPx() / expansionRangePx).coerceIn(0f, 1f)
-    }
     fun setExpansionExtent(newExtent: Float) {
         if (isLandscape) return
         val clamped = newExtent.coerceIn(0f, 1f)
@@ -1746,7 +1738,9 @@ internal fun SwipeableBigTiles(
                 contentAwareStripHeight,
                 expandedStripHeight,
                 expandedHeightHints[logicalPage],
-            ).coerceAtLeast(minExpandedExtent),
+                isLoading = (logicalPage == 4 && isModelKnowledgeLoading) ||
+                    (logicalPage == 1 && isSalahHadithLoading),
+            ),
         )
     }
     // Expanded mode remains a carousel. Once a swipe settles, transfer the
@@ -1765,7 +1759,7 @@ internal fun SwipeableBigTiles(
     val focusedSizingPage = pagerState.settledPage % insightPageCount
     val focusedHeightHint = expandedHeightHints[focusedSizingPage]
     LaunchedEffect(
-        focusedSizingPage, focusedHeightHint, expandedLogicalPage,
+        focusedSizingPage, focusedHeightHint, expandedLogicalPage, isModelKnowledgeLoading, isSalahHadithLoading,
         contentAwareStripHeight, expandedStripHeight, isAutomaticallySized,
         isResizeDragging, pagerState.isScrollInProgress,
     ) {
@@ -1774,6 +1768,8 @@ internal fun SwipeableBigTiles(
         delay(120L)
         val target = preferredInsightExpansionExtent(
             focusedSizingPage, contentAwareStripHeight, expandedStripHeight, focusedHeightHint,
+            isLoading = (focusedSizingPage == 4 && isModelKnowledgeLoading) ||
+                (focusedSizingPage == 1 && isSalahHadithLoading),
         )
         if (kotlin.math.abs(target - expansionExtent) * expansionRangePx > with(density) { 8.dp.toPx() }) {
             expansionExtent = target
@@ -2162,6 +2158,7 @@ internal fun SwipeableBigTiles(
                              expandedLeadingContent = if (renderExpandedPayload) {
                                  {
                                      SalahHadithExpandedStage(
+                                         onLoadingChanged = { isSalahHadithLoading = it },
                                          prayerName = currentPrayerLookupName,
                                          date = today,
                                          refreshKey = isResumed,
@@ -5204,6 +5201,21 @@ private fun insightReaderBodyStyle(compactProgress: Float): TextStyle {
     )
 }
 
+@Composable
+private fun SalahHadithSectionLabel(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.fillMaxWidth(),
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+            letterSpacing = 1.2.sp,
+        ),
+        color = HomeReferenceGold.copy(alpha = 0.94f),
+        fontWeight = FontWeight.Bold,
+    )
+}
+
 /** A sourced hadith selected for the next prayer, shown only in enlarged Salah. */
 @Composable
 private fun SalahHadithExpandedStage(
@@ -5213,6 +5225,7 @@ private fun SalahHadithExpandedStage(
     displayPrayerName: String,
     compactProgress: Float,
     onPreferredHeightChange: (Dp) -> Unit,
+    onLoadingChanged: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -5254,6 +5267,29 @@ private fun SalahHadithExpandedStage(
     // the resize-to-reader nested-scroll handoff.
     val hadithScrollState = rememberScrollState()
 
+    val selectingHadith = loading && recommendation == null
+    LaunchedEffect(selectingHadith) { onLoadingChanged(selectingHadith) }
+    if (selectingHadith) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(hadithScrollState)
+                    .onSizeChanged { size ->
+                        // Include the heading and search status once. The tile
+                        // shell measures its recap/footer and outer chrome.
+                        onPreferredHeightChange(with(density) { size.height.toDp() })
+                    }
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Box(Modifier.fillMaxWidth().insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
+                    SalahHadithSectionLabel(hadithContext.heading(displayPrayerName))
+                }
+                InsightSearchStatus(searchProgress)
+            }
+        }
+        return
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -5273,17 +5309,7 @@ private fun SalahHadithExpandedStage(
             verticalArrangement = Arrangement.spacedBy((5f - (2f * compression)).dp),
         ) {
             Box(Modifier.fillMaxWidth().insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
-                Text(
-                    text = hadithContext.heading(displayPrayerName),
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        letterSpacing = 1.2.sp,
-                    ),
-                    color = HomeReferenceGold.copy(alpha = 0.94f),
-                    fontWeight = FontWeight.Bold,
-                )
+                SalahHadithSectionLabel(hadithContext.heading(displayPrayerName))
             }
             Box(
                 modifier = Modifier
@@ -5306,11 +5332,7 @@ private fun SalahHadithExpandedStage(
                         .padding(vertical = 20.dp),
                     verticalArrangement = Arrangement.Top,
                 ) {
-                    if (loading && recommendation == null) {
-                        InsightSearchStatus(searchProgress, Modifier.onSizeChanged { size ->
-                            onPreferredHeightChange(with(density) { size.height.toDp() } + 105.dp)
-                        })
-                    } else if (!loading && !searchFailed && recommendation == null) {
+                    if (!loading && !searchFailed && recommendation == null) {
                         Column(Modifier.fillMaxWidth().onSizeChanged { size ->
                             onPreferredHeightChange(with(density) { size.height.toDp() } + 105.dp)
                         }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -5916,10 +5938,16 @@ private fun RecommendationExpandedStage(
         // A static state switch avoids recreating and cross-fading the scroll
         // subtree when the user touches it.
         if (loading) {
-            InsightSearchStatus(searchProgress,
-                Modifier.fillMaxWidth().verticalScroll(aiScrollState).onSizeChanged { size ->
-                    onPreferredHeightChange(with(density) { size.height.toDp() } + 100.dp)
-                })
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                InsightSearchStatus(
+                    searchProgress,
+                    Modifier.fillMaxWidth().verticalScroll(aiScrollState).onSizeChanged { size ->
+                        // The shell already adds header/footer space. Report only
+                        // the status content, not a placeholder reading allowance.
+                        onPreferredHeightChange(with(density) { size.height.toDp() })
+                    },
+                )
+            }
         } else if (candidate == null) {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(aiScrollState)
