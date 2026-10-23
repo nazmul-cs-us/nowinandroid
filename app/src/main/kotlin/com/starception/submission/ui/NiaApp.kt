@@ -360,19 +360,9 @@ internal fun NiaAppContent(
         onDispose {}
     }
 
-    // When bottom bar should be hidden, render content directly without navigation scaffold
-    if (shouldHideBottomBar) {
-        NiaMainContent(
-            appState = appState,
-            snackbarHostState = snackbarHostState,
-            onTopAppBarActionClick = onTopAppBarActionClick,
-            modifier = modifier,
-            isLandscape = isLandscape,
-            mainViewModel = mainViewModel,
-            deepLinkCourseId = deepLinkCourseId,
-        )
-    } else if (isLandscape) {
-        // In landscape mode, use custom centered NavigationRail layout
+    // Keep the portrait NavHost at one composition location. Hiding its
+    // navigation overlay must not dispose Home and reset the expansion gesture.
+    if (isLandscape && !shouldHideBottomBar) {
         NiaLandscapeLayout(
             appState = appState,
             snackbarHostState = snackbarHostState,
@@ -384,31 +374,26 @@ internal fun NiaAppContent(
             deepLinkCourseId = deepLinkCourseId,
         )
     } else {
-        // Portrait mode: content fills the screen and the navigation is a
-        // floating pill bar (reference design) overlaid at the bottom, with
-        // the circular voice-search button beside it.
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                // Draw the shared main-page canvas at the app-shell level so it
-                // continues behind the floating navigation and gesture inset.
-                .background(mainPageBackgroundBrush()),
+            modifier = Modifier.fillMaxSize().background(mainPageBackgroundBrush()),
         ) {
             NiaMainContent(
                 appState = appState,
                 snackbarHostState = snackbarHostState,
                 onTopAppBarActionClick = onTopAppBarActionClick,
                 modifier = modifier,
-                isLandscape = false,
+                isLandscape = isLandscape,
                 mainViewModel = mainViewModel,
                 deepLinkCourseId = deepLinkCourseId,
             )
-            NiaFloatingBottomBar(
-                appState = appState,
-                unreadDestinations = unreadDestinations,
-                currentDestination = currentDestination,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
+            if (!shouldHideBottomBar) {
+                NiaFloatingBottomBar(
+                    appState = appState,
+                    unreadDestinations = unreadDestinations,
+                    currentDestination = currentDestination,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
         }
     }
 }

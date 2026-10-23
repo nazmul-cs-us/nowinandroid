@@ -2988,6 +2988,7 @@ fun PrayerTimesScreen(
                 val portraitScrollState = rememberScrollState()
                 var homeViewport by remember { mutableStateOf(IntSize.Zero) }
                 var insightHeightPx by remember { mutableIntStateOf(0) }
+                var insightHeaderHeight by remember { mutableStateOf(44.dp) }
                 var prayerHeaderHeightPx by remember { mutableIntStateOf(0) }
                 var homeFooterHeightPx by remember { mutableIntStateOf(0) }
                 // Content scrolls naturally after the insight reaches its resize limit.
@@ -3012,8 +3013,8 @@ fun PrayerTimesScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(
-                                bottom = if (!outerIsLandscape && !insightTileImmersive) {
-                                    navigationBarInset + 64.dp
+                                bottom = if (!outerIsLandscape) {
+                                    navigationBarInset + if (insightTileImmersive) 0.dp else 64.dp
                                 } else {
                                     0.dp
                                 },
@@ -3124,23 +3125,19 @@ fun PrayerTimesScreen(
                                     }
                                 val portraitInsightHeight = (portraitInsightRestingHeight - syncContentCompression)
                                     .coerceAtLeast(portraitInsightMinHeight)
-                                // The enlarged tile previously reapplied a fixed 348dp floor inside
-                                // SwipeableBigTiles, losing the banner compression and forcing the
-                                // prayer controls into floating navigation. Preserve the resting
-                                // expansion geometry, then subtract the same remaining displacement.
-                                val portraitExpandedInsightHeight = (
-                                    maxOf(portraitInsightRestingHeight + 92.dp, 348.dp) -
-                                        syncContentCompression
-                                    ).coerceAtLeast(280.dp)
-                                // The maximum is derived from the window, not a stored pixel
-                                // height. AppTopSearchBar and safe drawing insets retain their
-                                // space while the tile takes the rest of the useful viewport.
-                                val portraitImmersiveInsightHeight = (
-                                    configuration.screenHeightDp.dp -
-                                        dynamicTopInset -
-                                        navigationBarInset -
-                                        156.dp
-                                    ).coerceAtLeast(portraitExpandedInsightHeight)
+                                // The measured viewport already excludes visible bottom navigation.
+                                // Only an explicit immersive resize releases that reserved space.
+                                val measuredInsightViewport = with(LocalDensity.current) { homeViewport.height.toDp() }
+                                val insightViewport = if (homeViewport.height > 0) measuredInsightViewport else (
+                                    configuration.screenHeightDp.dp - dynamicTopInset - navigationBarInset -
+                                        (if (insightTileImmersive) 0.dp else 64.dp) - 156.dp
+                                    )
+                                val portraitImmersiveInsightHeight =
+                                    com.starception.submission.core.designsystem.component.insightMaximumTileHeight(
+                                        viewport = insightViewport,
+                                        header = if (insightTileImmersive) 0.dp else insightHeaderHeight,
+                                    )
+
 
                                 if (isLandscape) {
                                     // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right
@@ -3529,7 +3526,7 @@ fun PrayerTimesScreen(
                                                     showCompassPopup = true
                                                 },
                                                 timeOffsets = storedOffsets,
-                                                portraitStripHeight = portraitInsightHeight,
+                                                portraitStripHeight = portraitInsightHeight.coerceAtMost(portraitImmersiveInsightHeight),
                                                 portraitExpandedStripHeight = portraitImmersiveInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
@@ -3548,6 +3545,7 @@ fun PrayerTimesScreen(
                                                     insightTileExpanded = expandedPage != null
                                                     expandedInsightPage = expandedPage
                                                 },
+                                                onHeaderHeightChange = { insightHeaderHeight = it },
                                                 onImmersiveModeChange = { immersive ->
                                                     insightTileImmersive = immersive
                                                 },

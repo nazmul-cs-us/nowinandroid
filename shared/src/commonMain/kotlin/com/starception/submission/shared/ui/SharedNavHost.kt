@@ -24,6 +24,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.Spring
@@ -183,6 +185,10 @@ fun SharedNavHost(
     // shows in the sync strip of EVERY top page, like Android's app-level
     // PullToSyncContainer.
     val tabPrayerAlert = prayerDay?.prayerAlertState(notifications ?: com.starception.submission.prayer.model.PrayerNotificationPreferences())
+    var showQiblaDirection by remember { mutableStateOf(false) }
+    if (showQiblaDirection) {
+        QiblaGlobeSheet(latitude, longitude, onDismiss = { showQiblaDirection = false })
+    }
     val contentStore = remember { SharedContentStore() }
     val quranPlayer = remember { QuranAudioPlayer() }
     val openNews: (Int) -> Unit = { id ->
@@ -366,7 +372,7 @@ fun SharedNavHost(
                             onOpenQuranicDua = { navController.navigate(DuaDetailRoute(it)) },
                             onOpenFortressChapter = { navController.navigate(FortressChapterRoute(it)) },
                             onOpenShamayelBook = { navController.navigate(ShamayelBookRoute(it)) },
-                            onOpenQibla = { navController.navigate(QiblaRoute) },
+                            onOpenQibla = { showQiblaDirection = true },
                             onOpenRecommendation = { navController.navigate(RecommendationRoute) },
                             onOpenDrivingMode = { navController.navigate(DrivingModeRoute) },
                             onSelectBottom = selectBottom,

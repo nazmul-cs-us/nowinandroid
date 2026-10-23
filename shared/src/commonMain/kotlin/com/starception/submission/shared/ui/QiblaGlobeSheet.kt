@@ -38,6 +38,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,9 +63,11 @@ internal fun QiblaGlobeSheet(latitude: Double, longitude: Double, onDismiss: () 
     }
     val bearing = remember(latitude, longitude) { qiblaBearing(latitude, longitude) }
     val distance = remember(latitude, longitude) { qiblaDistanceKm(latitude, longitude).roundToInt() }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         dragHandle = { BottomSheetDefaults.DragHandle() },
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
@@ -75,7 +79,7 @@ internal fun QiblaGlobeSheet(latitude: Double, longitude: Double, onDismiss: () 
             ) {
                 Row(Modifier.fillMaxWidth()) {
                     Text("Qibla direction", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    TextButton(onClick = onDismiss) { Text("Done") }
+                    TextButton(onClick = { scope.launch { sheetState.hide(); onDismiss() } }) { Text("Done") }
                 }
                 Text(
                     "${bearing.roundToInt()}° ${cardinalDirection(bearing)} · $distance km to Makkah",

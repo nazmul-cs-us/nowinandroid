@@ -212,6 +212,13 @@ final class SettingsParityUITests: XCTestCase {
             "Qibla radar stage did not appear"
         )
         attach("expanded-qibla-radar")
+        XCTAssertFalse(app.staticTexts["3D globe"].exists, "The home tile must show the compass")
+        app.staticTexts["Direction to Makkah"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Qibla direction"].waitForExistence(timeout: 10))
+        attach("qibla-direction-globe")
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Direction to Makkah"].firstMatch.waitForExistence(timeout: 10),
+                      "Closing the globe must preserve the expanded compass tile")
 
         // 5. AI suggested → the grounded suggestion, the model download
         //    card, or the loading beat while the model generates (the

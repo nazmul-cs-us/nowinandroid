@@ -2,11 +2,24 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.component.contentSizedInsightExtent
+import com.starception.submission.core.designsystem.component.insightMaximumTileHeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class InsightSizingTest {
+    @Test
+    fun visibleNavigationAndHeaderAreNeverIncludedInTheTileBudget() {
+        val fullViewport = 760.dp
+        val visibleNavigation = 88.dp
+        val normal = insightMaximumTileHeight(fullViewport - visibleNavigation, 44.dp)
+        assertEquals(612.dp, normal)
+        assertTrue(normal + 44.dp + 16.dp <= fullViewport - visibleNavigation)
+        val immersive = insightMaximumTileHeight(fullViewport, 0.dp)
+        assertEquals(744.dp, immersive)
+        assertTrue(immersive > normal)
+    }
+
     @Test
     fun shortContentShrinksAfterLongContentWithoutRetainingOldHeight() {
         val short = contentSizedInsightExtent(1, 240.dp, 800.dp, 360.dp)

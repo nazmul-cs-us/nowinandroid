@@ -74,3 +74,7 @@ fun contentSizedInsightExtent(page: Int, resting: Dp, maximum: Dp, naturalHeight
     // Automatic sizing preserves Home navigation; immersive mode is an explicit resize.
     return ((height - resting).value / growth).coerceIn(0f, 0.98f)
 }
+
+/** Tile bounds use the host viewport after its visible navigation has been reserved. */
+fun insightMaximumTileHeight(viewport: Dp, header: Dp, spacing: Dp = 16.dp): Dp =
+    (viewport - header - spacing).coerceAtLeast(1.dp)

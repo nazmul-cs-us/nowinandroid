@@ -143,10 +143,11 @@ private fun worldWindHtml(
       padding:20px; color:#dce8f2; background:#07121d; font:600 14px -apple-system,sans-serif;
       text-align:center; z-index:4; }
     #overlay { position:absolute; inset:0; z-index:3; width:100%; height:100%; pointer-events:none; }
-    #accuracy-ring { transition:stroke 240ms ease, filter 240ms ease; }
+    #accuracy-ring { transition:stroke 240ms ease, filter 240ms ease; display:${if (expanded) "none" else "block"}; }
     #guidance { position:absolute; right:12px; top:12px; z-index:5; border-radius:12px;
-      padding:8px 12px; background:rgba(7,11,16,.75); color:white;
-      font:600 12px -apple-system,sans-serif; pointer-events:none; }
+      padding:6px 8px; max-width:32%; box-sizing:border-box; text-align:center;
+      background:rgba(7,11,16,.75); color:white;
+      font:600 11px/1.3 -apple-system,sans-serif; pointer-events:none; }
     #guidance:empty { display:none; }
     @keyframes radar-pulse { from { transform:scale(.85); } to { transform:scale(1); } }
   </style>
@@ -284,15 +285,18 @@ private fun worldWindHtml(
         const width = Math.max(1, wwd.canvas.clientWidth);
         const height = Math.max(1, wwd.canvas.clientHeight);
         const aspect = width / height;
-        const aspectBoost = aspect < 1 ? Math.sqrt(1 / aspect) : 1;
-        // The circular compass uses a fixed full-sphere view on Android.
-        // Only the larger globe sheet varies range with route distance.
-        const cameraRange = ${if (expanded) "Math.max(earthRadius * 1.67, nativeEquivalentRange * 0.68 * aspectBoost)" else "earthRadius * 1.67 * aspectBoost"};
+        // Fit the complete sphere in the narrower viewport dimension. With
+        // zero tilt the eye is range + R from Earth's center; the limb's angular
+        // radius must fit inside both horizontal and vertical field of view.
+        const verticalHalfFov = toRadians(45 / 2);
+        const limitingHalfFov = Math.atan(Math.tan(verticalHalfFov) * Math.min(1, aspect));
+        const fittedRange = earthRadius * (1 / Math.sin(limitingHalfFov) - 1) * 1.12;
+        const cameraRange = ${if (expanded) "Math.max(fittedRange, nativeEquivalentRange * 0.68)" else "fittedRange"};
         wwd.navigator.lookAtLocation.latitude = routeMidpoint.latitude;
         wwd.navigator.lookAtLocation.longitude = routeMidpoint.longitude;
-        wwd.navigator.range = Math.min(maximumRange, cameraRange);
+        wwd.navigator.range = cameraRange;
         wwd.navigator.heading = cameraHeading;
-        wwd.navigator.tilt = ${if (expanded) "width > height ? 12 : 0" else "0"};
+        wwd.navigator.tilt = 0;
         wwd.redraw();
       }
 
