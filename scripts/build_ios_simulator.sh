@@ -27,6 +27,21 @@ for tool in xcodegen xcodebuild; do
 done
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# A plain clone leaves the submodule directory empty. Fail before Xcode or
+# Gradle produce a misleading missing :cupertino-adaptive project error.
+cupertino_root="$repo_root/third_party/compose-cupertino"
+if [[ ! -f "$cupertino_root/settings.gradle.kts" || ! -f "$cupertino_root/cupertino-adaptive/build.gradle.kts" ]]; then
+    cat >&2 <<'SUBMODULE'
+Missing or incomplete third_party/compose-cupertino submodule.
+Run these commands from the repository root, then retry:
+  git submodule sync --recursive
+  git submodule update --init --recursive -- third_party/compose-cupertino
+The submodule uses HTTPS. If Git reports authentication or permission errors,
+use a GitHub account that has access to nazmul-cs-us/compose-cupertino.
+SUBMODULE
+    exit 1
+fi
+
 mkdir -p "$repo_root/work"
 cd "$repo_root/iosApp"
 # Regeneration removes old/manual resource entries, including the obsolete

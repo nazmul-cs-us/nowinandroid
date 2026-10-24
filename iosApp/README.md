@@ -7,6 +7,8 @@ Install Xcode, JDK 21, and XcodeGen, then run from the repository root:
 ```sh
 brew install xcodegen git-lfs
 git lfs install
+git submodule sync --recursive
+git submodule update --init --recursive -- third_party/compose-cupertino
 git lfs pull
 cd iosApp
 xcodegen generate && open iosApp.xcodeproj
@@ -143,6 +145,27 @@ xcodebuild -project iosApp.xcodeproj -scheme iosApp \
   -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
   CODE_SIGNING_ALLOWED=NO build
 ```
+
+## Missing compose-cupertino submodule
+
+The Gradle composite build needs the pinned `third_party/compose-cupertino`
+submodule, including its `cupertino-adaptive` project. A plain clone without
+submodule initialization can fail with `Project with path ':cupertino-adaptive'
+not found in build ':compose-cupertino'`.
+
+From the repository root:
+
+```sh
+git submodule sync --recursive
+git submodule update --init --recursive -- third_party/compose-cupertino
+```
+
+The committed URL uses HTTPS so Git doesn't require SSH-key setup. The sync
+command updates older checkouts that still remember the SSH URL. If Git reports
+that it cannot access the repository, authenticate with an account that has
+access to `nazmul-cs-us/compose-cupertino`. Keep the fork and pinned commit;
+updating a submodule for setup should not switch to an unrelated upstream fork
+or use `--remote`.
 
 ## Troubleshooting generated-project build errors
 
