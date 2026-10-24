@@ -14,7 +14,13 @@ private struct PrayerPresentation {
     let now: Date
 
     init(context: ActivityViewContext<PrayerActivityAttributes>) {
-        self.init(state: context.state, isStale: context.isStale)
+        if #available(iOS 16.2, *) {
+            self.init(state: context.state, isStale: context.isStale)
+        } else {
+            // iOS 16.1 has no isStale signal. hasEnded still checks the
+            // configured deadline whenever the system renders the content.
+            self.init(state: context.state)
+        }
     }
 
     init(state: PrayerActivityAttributes.ContentState, isStale: Bool = false, now: Date = Date()) {
@@ -51,12 +57,22 @@ private struct PrayerCountdown: View {
     let presentation: PrayerPresentation
     var width: CGFloat? = nil
     var showsHours = true
+    var textAlignment: TextAlignment = .trailing
     @ScaledMetric(relativeTo: .title2) private var readableWidth: CGFloat = 100
 
-    init(presentation: PrayerPresentation, width: CGFloat? = nil, showsHours: Bool = true) {
+    init(presentation: PrayerPresentation, width: CGFloat? = nil, showsHours: Bool = true, textAlignment: TextAlignment = .trailing) {
         self.presentation = presentation
         self.width = width
         self.showsHours = showsHours
+        self.textAlignment = textAlignment
+    }
+
+    private var frameAlignment: Alignment {
+        switch textAlignment {
+        case .leading: return .leading
+        case .center: return .center
+        case .trailing: return .trailing
+        }
     }
 
     var body: some View {
@@ -72,32 +88,54 @@ private struct PrayerCountdown: View {
         }
         // Timer text is horizontally flexible in an archived widget. Reserve
         // its full width instead of relying on scale-to-fit or ViewThatFits.
-        .frame(width: width ?? readableWidth, alignment: .trailing)
-        .multilineTextAlignment(.trailing)
+        .frame(width: width ?? readableWidth, alignment: frameAlignment)
+        .multilineTextAlignment(textAlignment)
     }
 }
 
+/// Shared identity anchor: upper leading in both expanded and Lock Screen.
 private struct PrayerIdentity: View {
     let state: PrayerActivityAttributes.ContentState
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        Label {
+            Text(state.prayerName)
+                .lineLimit(1)
+        } icon: {
             PrayerSymbol()
-                .font(.headline)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(state.prayerName)
-                    .font(.headline.weight(.semibold))
-                if !state.prayerArabicName.isEmpty {
-                    Text(state.prayerArabicName)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+        }
+        .font(.headline.weight(.semibold))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Secondary information belongs below the camera, not in a tall side column.
+private struct PrayerActivityDetails: View {
+    let presentation: PrayerPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if presentation.canShowTimer {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Adhan at \(presentation.state.prayerTime)")
+                        if !presentation.state.prayerArabicName.isEmpty {
+                            Text(presentation.state.prayerArabicName)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Text("Window ends in")
+                        .multilineTextAlignment(.trailing)
                 }
-                Text("Adhan at \(state.prayerTime)")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                PrayerWindowProgress(presentation: presentation)
+            } else {
+                Text(presentation.status)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
             }
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -127,57 +165,47 @@ struct PrayerLiveActivityWidget: Widget {
                     PrayerIdentity(state: context.state)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    VStack(alignment: .trailing, spacing: 4) {
-                        PrayerCountdown(presentation: presentation)
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(prayerTint)
-                        Text(presentation.canShowTimer ? "Window ends in" : "Update needed")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                    }
+                    PrayerCountdown(presentation: presentation)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(prayerTint)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    if presentation.canShowTimer {
-                        PrayerWindowProgress(presentation: presentation)
-                    } else {
-                        Text(presentation.status)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
-                    }
+                    PrayerActivityDetails(presentation: presentation)
                 }
             } compactLeading: {
+                // Stay within the smaller 52.33pt reference slot. Keep the
+                // identity against the camera; don't add outer padding.
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 4) {
-                        PrayerSymbol()
-                        Text(context.state.prayerName)
-                            .font(.caption.weight(.semibold))
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
+                    Text(context.state.prayerName)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
+                        .fixedSize()
                     PrayerSymbol()
+                        .font(.caption.weight(.semibold))
                 }
+                .foregroundStyle(prayerTint)
+                .frame(width: 48, alignment: .trailing)
                 .accessibilityLabel("\(context.state.prayerName) prayer")
             } compactTrailing: {
                 if presentation.canShowTimer {
-                    PrayerCountdown(presentation: presentation, width: 56, showsHours: false)
-                        .font(.caption.weight(.semibold))
+                    PrayerCountdown(presentation: presentation, width: 48, showsHours: false, textAlignment: .leading)
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(prayerTint)
                 } else {
                     Image(systemName: "clock.badge.exclamationmark")
                         .foregroundStyle(prayerTint)
+                        .frame(width: 48, alignment: .leading)
                         .accessibilityLabel(presentation.status)
                 }
             } minimal: {
+                // One live value in the detached oval; no miniature card or
+                // unreadable symbol-plus-bar composition. Minutes stay valid
+                // for the full event without needing a scheduled unit switch.
                 if presentation.canShowTimer {
-                    VStack(spacing: 2) {
-                        PrayerSymbol()
-                            .font(.caption.weight(.semibold))
-                        PrayerWindowProgress(presentation: presentation)
-                            .frame(width: 20)
-                    }
-                    .frame(width: 24, height: 24)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(context.state.prayerName) prayer window")
+                    PrayerCountdown(presentation: presentation, width: 40, showsHours: false, textAlignment: .center)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(prayerTint)
+                        .accessibilityLabel("\(context.state.prayerName) prayer window ends in")
                 } else {
                     Image(systemName: "clock.badge.exclamationmark")
                         .foregroundStyle(prayerTint)
@@ -194,49 +222,42 @@ struct PrayerLiveActivityWidget: Widget {
 private struct LockScreenPrayerActivityView: View {
     let presentation: PrayerPresentation
 
-    private var countdown: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            PrayerCountdown(presentation: presentation)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(prayerTint)
-            Text("Window ends in")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-        }
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if presentation.canShowTimer {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 16) {
-                        PrayerIdentity(state: presentation.state)
-                            .fixedSize(horizontal: true, vertical: false)
-                        Spacer(minLength: 8)
-                        countdown
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        PrayerIdentity(state: presentation.state)
-                        countdown
-                    }
+        VStack(alignment: .leading, spacing: 10) {
+            // Same identity-leading / value-trailing anchors as the expanded
+            // island, with the secondary content underneath both anchors.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 16) {
+                    PrayerIdentity(state: presentation.state)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 8)
+                    PrayerCountdown(presentation: presentation)
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(prayerTint)
                 }
-                PrayerWindowProgress(presentation: presentation)
-            } else {
-                PrayerIdentity(state: presentation.state)
-                Text(presentation.status)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    PrayerIdentity(state: presentation.state)
+                    PrayerCountdown(presentation: presentation, textAlignment: .leading)
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(prayerTint)
+                }
             }
+            PrayerActivityDetails(presentation: presentation)
         }
-        // Keep the system material for light/dark, Always-On and StandBy.
-        // Do not disclose precise location or squeeze in a full-day schedule.
+        // The system supplies material, corners and StandBy scaling. Only the
+        // Lock Screen layout owns this 14pt margin; island slots have no padding.
         .padding(14)
     }
 }
 
 #if DEBUG
+@available(iOS 16.2, *)
 private struct PrayerLiveActivityPreviews: PreviewProvider {
     private static let now = Date()
+    private static let attributes = PrayerActivityAttributes(locationName: "Preview")
+    private static var previewState: PrayerActivityAttributes.ContentState {
+        presentation(startOffset: -300, endOffset: 600).state
+    }
 
     private static func presentation(startOffset: TimeInterval, endOffset: TimeInterval, stale: Bool = false) -> PrayerPresentation {
         PrayerPresentation(
@@ -251,6 +272,14 @@ private struct PrayerLiveActivityPreviews: PreviewProvider {
 
     static var previews: some View {
         Group {
+            attributes.previewContext(previewState, viewKind: .dynamicIsland(.compact))
+                .previewDisplayName("Anatomy · Compact (one activity)")
+            attributes.previewContext(previewState, viewKind: .dynamicIsland(.minimal))
+                .previewDisplayName("Anatomy · Minimal (multiple activities)")
+            attributes.previewContext(previewState, viewKind: .dynamicIsland(.expanded))
+                .previewDisplayName("Anatomy · Expanded (long press)")
+            attributes.previewContext(previewState, viewKind: .content)
+                .previewDisplayName("Anatomy · Lock Screen")
             LockScreenPrayerActivityView(presentation: presentation(startOffset: 1200, endOffset: 2100))
                 .preferredColorScheme(.light)
                 .previewDisplayName("Upcoming · Light")
@@ -268,7 +297,6 @@ private struct PrayerLiveActivityPreviews: PreviewProvider {
                 .environment(\.layoutDirection, .rightToLeft)
                 .previewDisplayName("Right to left")
         }
-        .previewLayout(.fixed(width: 360, height: 160))
     }
 }
 #endif

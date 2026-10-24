@@ -78,8 +78,20 @@ It shows one prayer, its adhan time, and a countdown labelled **Window ends in**
 The countdown targets the end of the configured prayer notification window
 (`activeMinutes`), not the adhan itself or a religious ruling about a prayer's
 latest permissible time. The progress indicator represents that same configured
-window. Compact and minimal presentations use the same symbol, teal tint, and
-prayer-window information. All presentations deep-link to the prayer screen.
+window. All presentations share the teal tint, prayer-window information, and
+one deep link to the prayer screen.
+
+| Anatomy | Content | How iOS displays it |
+| --- | --- | --- |
+| Compact | Prayer name (symbol fallback) leading; live countdown trailing; 48pt slots aligned toward the camera | Typically one active Live Activity |
+| Minimal | One centered countdown in a 40pt oval footprint | Multiple active Live Activities; also used in StandBy |
+| Expanded | Identity leading, larger countdown trailing, adhan details and progress below the camera | Touch and hold compact or minimal |
+| Lock Screen | Same identity/countdown anchors, shared details below, 14pt margin | Lock Screen banner; enlarged by the system in StandBy |
+
+The system selects the presentation. The app does not create or manually switch
+between four separate activities. The compact and minimal sizes stay within the
+smaller reference dimensions in Apple's Specifications; actual device rendering
+still needs checking.
 There is no full app icon, precise location, full-day schedule, or percentage-based
 claim about the best time to pray. Timer text uses a bounded system timer and a
 reserved width instead of shrinking to tiny text or counting upward after expiry.
@@ -93,11 +105,17 @@ ActivityKit APNs end events; this local-only implementation doesn't configure a
 per-activity push token when creating an activity.
 
 On a Mac, generate the project and open `PrayerLiveActivityWidget.swift` in Xcode.
-Its preview group covers upcoming, active-window, expired, stale, large-text, and
-right-to-left Lock Screen layouts. Before release, build and test on iPhone:
+Its **Anatomy** preview entries use `ActivityAttributes.previewContext` for real
+compact, minimal, expanded, and Lock Screen presentations (iOS 16.2+ previews).
+These aren't hand-drawn island shapes or plain Lock Screen views. The remaining
+previews cover upcoming, active-window, expired, stale, large-text, and
+right-to-left content. Before release, build and test on iPhone:
 
-- Verify compact, minimal (with another Live Activity), expanded, and Lock Screen
-  presentations, including long prayer names and all supported languages.
+- Leave Deenly to see compact; start a Timer or another Live Activity to check
+  minimal; touch and hold the island to check expanded; lock the phone for the
+  Lock Screen layout. Confirm taps still open the prayer screen.
+- Check long prayer names, all supported languages, and a countdown near the
+  eight-hour limit (three-digit minutes in compact/minimal) for clipping.
 - Check light/dark appearances, Dynamic Type, VoiceOver, StandBy, and Always-On.
 - Background the app across adhan and window expiry: labels must stay factual,
   timers must stop at zero, and stale content must not look like a fresh event.
@@ -124,6 +142,35 @@ xcodegen generate
 xcodebuild -project iosApp.xcodeproj -scheme iosApp \
   -sdk iphonesimulator -arch arm64 CODE_SIGNING_ALLOWED=NO build
 ```
+
+## Troubleshooting generated-project build errors
+
+If Xcode tries to copy `iosApp/AppIcon-1024.png` into
+`PrayerLiveActivityExtension`, its generated project contains an obsolete or
+locally edited resource reference. The current `project.yml` doesn't bundle an
+app icon in that extension. Regenerate the project from the updated spec, rather
+than creating another icon file or editing the generated `.pbxproj`.
+
+From the repository root on your Mac:
+
+```sh
+bash scripts/build_ios_simulator.sh
+```
+
+This regenerates the project, builds the simulator scheme using a separate,
+reusable Derived Data directory under `work/`, and saves the full build output in
+`work/ios-simulator-build.log`. It doesn't delete your existing Xcode Derived
+Data or disable previews. Open the generated `iosApp/iosApp.xcodeproj` afterward.
+
+`Command Ld failed` alone doesn't identify a linker cause. If `__preview.dylib`
+still fails, inspect the complete failed link step for `ld:` diagnostics and
+share those lines with the failing command. `__preview.dylib` is part of Xcode's
+Debug dylib layout, even in ordinary Debug builds; it doesn't by itself prove a
+problem in a preview declaration. `ENABLE_DEBUG_DYLIB=NO` can bypass that layout
+for an affected target, but also makes that executable target ineligible for
+modern previews. Keep it enabled unless a confirmed compatibility issue calls
+for that tradeoff. See Apple's documentation:
+https://developer.apple.com/documentation/xcode/understanding-build-product-layout-changes
 
 ## Device configuration
 
