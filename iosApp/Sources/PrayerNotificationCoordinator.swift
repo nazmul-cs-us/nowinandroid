@@ -2,6 +2,7 @@ import ActivityKit
 import AVFoundation
 import Foundation
 import UserNotifications
+import UIKit
 
 private let prayerSchedulePayloadKey = "ios_prayer_schedule_payload"
 private let prayerNotificationPrefix = "prayer."
@@ -96,14 +97,16 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
 
     func refresh() {
         guard let encoded = UserDefaults.standard.string(forKey: prayerSchedulePayloadKey),
-              encoded != lastPayload,
               let data = encoded.data(using: .utf8),
               let payload = try? JSONDecoder().decode(PrayerSchedulePayload.self, from: data),
               payload.version == 1 else { return }
 
-        lastPayload = encoded
         let prayers = datedPrayers(from: payload)
-        updateLiveActivity(payload: payload, prayers: prayers)
+        // Time advances while the payload stays unchanged. Always reconcile on
+        // foreground entry, even when notification requests need no replacement.
+        updateLiveActivity(payload: payload)
+        guard encoded != lastPayload else { return }
+        lastPayload = encoded
 
         guard payload.notificationsEnabled else {
             removePrayerNotifications()
@@ -309,14 +312,16 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         }
     }
 
-    private func updateLiveActivity(
-        payload: PrayerSchedulePayload,
-        prayers: [DatedPrayer]
-    ) {
+    private func updateLiveActivity(payload: PrayerSchedulePayload) {
+        let now = Date()
+        let eligible = allDatedPrayers(from: payload).filter {
+            $0.entry.enabled && $0.entry.activeMinutes > 0 &&
+                $0.date.addingTimeInterval(TimeInterval(60 * $0.entry.activeMinutes)) > now
+        }
         guard #available(iOS 16.1, *),
-               payload.notificationsEnabled,
+              payload.notificationsEnabled,
               payload.liveActivitiesEnabled ?? true,
-              let next = prayers.first else {
+              let next = eligible.first else {
             if #available(iOS 16.1, *) {
                 Task { [weak self] in
                     self?.activityEndTasks.values.forEach { $0.cancel() }
@@ -330,11 +335,8 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
             return
         }
 
-        // The stale date must stay in the FUTURE or ActivityKit rejects the
-        // whole request (ActivityInput error 0). Filtered-next guarantees
-        // next.date > now, so anchoring staleness at the prayer time is safe;
-        // the prayer window stays in the content state for the widget.
-        guard next.date > Date() else { return }
+        // Include the current prayer while its window is active. Reopening
+        // during that window must not silently skip to the next prayer.
         let state = liveActivityState(payload: payload, next: next)
         Task { [weak self] in
             await self?.reconcileLiveActivity(payload: payload, proposedState: state)
@@ -390,6 +392,7 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         }
 
         guard activity == nil,
+              UIApplication.shared.applicationState == .active,
               proposedState.activeUntil > now,
               proposedState.activeUntil.timeIntervalSince(now) <= 8 * 60 * 60,
               ActivityAuthorizationInfo().areActivitiesEnabled else { return }
@@ -431,14 +434,15 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         attributes: PrayerActivityAttributes,
         state: PrayerActivityAttributes.ContentState
     ) throws -> Activity<PrayerActivityAttributes> {
-        // No pushType: local state drives this event while the process is
-        // available. The stale date and scheduled end share the event boundary.
+        // This is local-only. staleDate marks content outdated; it does NOT
+        // end an activity. The in-process end task is best effort while the app
+        // can run; a guaranteed suspended/terminated end needs an APNs end event.
         if #available(iOS 16.2, *) {
             return try Activity.request(
                 attributes: attributes,
                 content: ActivityContent(
                     state: state,
-                    staleDate: max(state.activeUntil, state.prayerDate),
+                    staleDate: state.activeUntil,
                     relevanceScore: 1
                 )
             )
@@ -458,7 +462,7 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
             await activity.update(
                 ActivityContent(
                     state: state,
-                    staleDate: max(state.activeUntil, state.prayerDate),
+                    staleDate: state.activeUntil,
                     relevanceScore: 1
                 )
             )

@@ -29,6 +29,7 @@ internal data class PrayerHadithRecommendation(val source: PrayerHadithCandidate
 internal suspend fun recommendPrayerHadith(
     prayerName: String?,
     date: LocalDate,
+    variation: Int = 0,
     onProgress: suspend (InsightSearchProgress) -> Unit = {},
 ): PrayerHadithRecommendation? {
     val context = prayerHadithContext(prayerName, date)
@@ -66,7 +67,11 @@ internal suspend fun recommendPrayerHadith(
             }
         }
     }
-    val shortlist = PrayerHadithSelection.shortlist(candidates, date.toEpochDays().toInt())
+    val offset = variation % candidates.size.coerceAtLeast(1)
+    val shortlist = PrayerHadithSelection.shortlist(
+        candidates.drop(offset) + candidates.take(offset),
+        date.toEpochDays().toInt() + variation,
+    )
     if (shortlist.isEmpty()) {
         check(searchFailures == 0) { "Unable to search available Hadith collections" }
         return null
@@ -82,4 +87,24 @@ internal suspend fun recommendPrayerHadith(
         "Local date $date. ${context.heading(prayerName ?: "Salah")}. Recommend guidance relevant to this prayer.", shortlist,
     )
     return PrayerHadithRecommendation(selected ?: shortlist.first(), selected != null)
+}
+
+/** The iOS host keeps this cache alive across navigation and process restarts. */
+internal object PreparedPrayerReadings {
+    private val store by lazy { com.starception.submission.shared.storage.platformKeyValueStore() }
+    val readings by lazy {
+        com.starception.submission.core.model.deenly.InsightReadAhead(
+            scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate),
+            encode = { item: PrayerHadithRecommendation ->
+                com.starception.submission.core.model.deenly.packInsightFields(listOf(item.source.databaseFile, item.source.collection,
+                    item.source.hadithNumber.toString(), item.source.text, item.selectedByModel.toString()))
+            },
+            decode = { value ->
+                val fields = com.starception.submission.core.model.deenly.unpackInsightFields(value)
+                PrayerHadithRecommendation(PrayerHadithCandidate(fields[0], fields[1], fields[2].toInt(), fields[3]), fields[4].toBooleanStrict())
+            },
+            read = { store.getString("prepared_prayer_readings_v1") },
+            write = { store.putString("prepared_prayer_readings_v1", it) },
+        )
+    }
 }

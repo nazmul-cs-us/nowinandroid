@@ -69,9 +69,11 @@ targets:
       - path: ../app/src/main/assets/manifest.json
         buildPhase: resources
         type: file
-      # Reference the Android asset in place so the 6.8 MB database has one
-      # source of truth while Xcode still copies it into the iOS app bundle.
+      # Local database copies are excluded from Git. Bundle them when present;
+      # fresh clones resolve manifest-backed content through the runtime downloader.
+      # Fortress v2 still needs a genuine local database (see README.md).
       - path: ../app/src/main/assets/databases/quran.db
+        optional: true
         buildPhase: resources
         type: file
       # The Interests destination reads the same topic catalog and source
@@ -80,9 +82,11 @@ targets:
         buildPhase: resources
         type: file
       - path: ../app/src/main/assets/databases/quranic_duas.db
+        optional: true
         buildPhase: resources
         type: file
       - path: ../app/src/main/assets/databases/fortress_of_the_muslim_v2.db
+        optional: true
         buildPhase: resources
         type: file
       - path: Sources/salah_detector.onnx
@@ -238,6 +242,7 @@ targets:
         # iPhone and iPad. Required for "Designed for iPad", which is how this
         # ships to Apple Silicon Macs — there is no separate Mac target.
         TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: "YES"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.0"
         # Device builds use automatic signing when DEVELOPMENT_TEAM is supplied
@@ -289,10 +294,6 @@ targets:
     sources:
       - path: PrayerLiveActivity
       - path: Shared
-      # Live Activities have their own bundle; reuse the app's current artwork.
-      - path: Sources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
-        buildPhase: resources
-        type: file
     info:
       path: PrayerLiveActivity/Info.plist
       properties:

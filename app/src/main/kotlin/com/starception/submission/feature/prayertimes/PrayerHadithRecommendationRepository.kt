@@ -36,6 +36,7 @@ internal object PrayerHadithRecommendationRepository {
         context: Context,
         prayerName: String,
         date: LocalDate,
+        variation: Int = 0,
         onProgress: suspend (InsightSearchProgress) -> Unit = {},
     ): PrayerHadithRecommendation? =
         withContext(Dispatchers.IO) {
@@ -85,7 +86,11 @@ internal object PrayerHadithRecommendationRepository {
                     }
                 }
             }
-            val shortlist = PrayerHadithSelection.shortlist(candidates, date.toEpochDay().toInt())
+            val offset = variation % candidates.size.coerceAtLeast(1)
+            val shortlist = PrayerHadithSelection.shortlist(
+                candidates.drop(offset) + candidates.take(offset),
+                date.toEpochDay().toInt() + variation,
+            )
             if (shortlist.isEmpty()) {
                 check(searchFailures == 0) { "Unable to search downloaded Hadith collections" }
                 return@withContext null

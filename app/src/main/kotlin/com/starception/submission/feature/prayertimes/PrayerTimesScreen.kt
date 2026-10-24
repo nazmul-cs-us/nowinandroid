@@ -1219,12 +1219,14 @@ fun PrayerTimesScreen(
     // Always open with the first insight tile in its expanded stage; the
     // pager's collapse control returns to the compact grid for the session.
     var expandedInsightPage by rememberSaveable { mutableStateOf<Int?>(0) }
-    var expandedAiCandidate by remember(nudgeDay) {
-        mutableStateOf<NowNudgeKnowledgeCandidate?>(null)
+    val preparedAiReadings = remember(screenContext.applicationContext) { PreparedInsightReadings.ai(screenContext) }
+    val expandedAiKey = "$nudgeDay|knowledge|${com.starception.submission.ml.DeenlyKnowledgeModel(screenContext).isKnowledgeModelAvailable()}"
+    var expandedAiCandidate by remember(expandedAiKey) {
+        mutableStateOf(preparedAiReadings.peek(expandedAiKey))
     }
     var expandedAiProgress by remember(nudgeDay) { mutableStateOf(InsightSearchProgress()) }
     var expandedAiSearchFailed by remember(nudgeDay) { mutableStateOf(false) }
-    var expandedAiLoading by remember { mutableStateOf(false) }
+    var expandedAiLoading by remember(expandedAiKey) { mutableStateOf(false) }
     var aiModelDownloadTick by remember { mutableStateOf(0) }
     var botSourceVariation by rememberSaveable(nudgeDay) { mutableIntStateOf(0) }
     val nudgePreferences = remember(screenContext) {
@@ -1412,34 +1414,28 @@ fun PrayerTimesScreen(
     val latestExpandedKnowledgeContext by rememberUpdatedState(botKnowledgeRankingContext)
     val latestExpandedAppSituation by rememberUpdatedState(botAppSituation)
     val expandedAiScope = rememberCoroutineScope()
-    LaunchedEffect(expandedInsightPage, nudgeDay, aiModelDownloadTick) {
-        if (expandedInsightPage != 4) return@LaunchedEffect
-        if (expandedAiLoading || expandedAiCandidate != null) return@LaunchedEffect
+    LaunchedEffect(expandedAiKey, aiModelDownloadTick) {
+        if (expandedAiLoading) return@LaunchedEffect
         expandedAiLoading = true
         expandedAiSearchFailed = false
         expandedAiProgress = InsightSearchProgress()
         val requestDay = nudgeDay
         val appSituation = latestExpandedAppSituation
         val rankingContext = latestExpandedKnowledgeContext
-        // Launch from the screen's retained scope rather than this page-keyed
-        // effect. Swiping away no longer cancels and restarts the same model
-        // request; the result is ready when the user returns.
+        // Begin on home entry. The application-owned queue survives this screen;
+        // only delivery to the UI uses its composition scope.
         expandedAiScope.launch {
             try {
-                expandedAiCandidate = nowNudgeKnowledgeProvider.load(
-                    date = LocalDate.parse(requestDay),
-                    variation = 64,
-                    onProgress = { progress ->
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) { expandedAiProgress = progress }
-                    },
-                    appSituation = appSituation,
-                    rankingContext = rankingContext,
-                    task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
-                )
-                expandedAiCandidate?.let { candidate ->
-                    nowNudgeKnowledgeProvider.recordImpression(
-                        candidate,
-                        LocalDate.parse(requestDay),
+                expandedAiCandidate = preparedAiReadings.get(expandedAiKey) { variation ->
+                    nowNudgeKnowledgeProvider.load(
+                        date = LocalDate.parse(requestDay),
+                        variation = 64 + variation,
+                        onProgress = { progress ->
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) { expandedAiProgress = progress }
+                        },
+                        appSituation = appSituation,
+                        rankingContext = rankingContext,
+                        task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
                     )
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -1450,6 +1446,11 @@ fun PrayerTimesScreen(
             } finally {
                 expandedAiLoading = false
             }
+        }
+    }
+    LaunchedEffect(expandedInsightPage, expandedAiCandidate) {
+        if (expandedInsightPage == 4) expandedAiCandidate?.let { candidate ->
+            nowNudgeKnowledgeProvider.recordImpression(candidate, LocalDate.parse(nudgeDay))
         }
     }
     val openExpandedAiCandidate: (NowNudgeKnowledgeCandidate) -> Unit = { candidate ->

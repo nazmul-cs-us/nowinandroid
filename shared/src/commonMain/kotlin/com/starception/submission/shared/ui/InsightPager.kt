@@ -344,6 +344,7 @@ fun InsightPager(
     var fortressInvocations by remember {
         mutableStateOf<Map<Int, List<com.starception.submission.shared.content.FortressInvocation>>>(emptyMap())
     }
+    var fortressLoaded by remember(today) { mutableStateOf(false) }
     var fortressTitles by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
     LaunchedEffect(today) {
         val repository = createSharedFortressRepository()
@@ -361,6 +362,7 @@ fun InsightPager(
         }
         fortressInvocations = invocations
         fortressTitles = titles
+        fortressLoaded = true
     }
     val currentHour = remember(today) {
         Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).hour
@@ -373,18 +375,25 @@ fun InsightPager(
             chapterTitles = fortressTitles,
         )
     }
-    var modelCard by remember(today) { mutableStateOf<DeenlyKnowledgeCard?>(null) }
+    val knowledgeKey = "$today|${SharedContentStore().quranTranslationLanguage()}|${DeenlyKnowledgeRuntime.isKnowledgeModelAvailable()}"
+    var modelCard by remember(knowledgeKey) { mutableStateOf(PreparedKnowledgeReadings.readings.peek(knowledgeKey)) }
+    val prayerReadingName = day.currentPrayer ?: day.nextPrayer ?: salah.nextUnprayed
+    val prayerReadingKey = "$today|$prayerReadingName|${DeenlyKnowledgeRuntime.isKnowledgeModelAvailable()}"
+    LaunchedEffect(prayerReadingKey, DeenlyKnowledgeRuntime.downloadCompleted.collectAsState().value) {
+        com.starception.submission.shared.hadith.PreparedPrayerReadings.readings.warm(prayerReadingKey) { variation ->
+            com.starception.submission.shared.hadith.recommendPrayerHadith(prayerReadingName, today, variation)
+        }
+    }
     var modelLoading by remember(today) { mutableStateOf(false) }
     var modelMissing by remember(today) { mutableStateOf(false) }
     var modelGenerationKey by remember(today) { mutableStateOf<String?>(null) }
     val downloadProgress by DeenlyKnowledgeRuntime.downloadProgress.collectAsState()
     val downloadCompleted by DeenlyKnowledgeRuntime.downloadCompleted.collectAsState()
-    LaunchedEffect(expandedLogicalPage, today, recommendation, downloadCompleted) {
-        if (expandedLogicalPage != 4) return@LaunchedEffect
-        val generationKey = "$today|expanded-knowledge|$downloadCompleted"
+    LaunchedEffect(knowledgeKey, recommendation, downloadCompleted, fortressLoaded) {
+        if (!fortressLoaded) return@LaunchedEffect
+        val generationKey = "$knowledgeKey|expanded-knowledge|$downloadCompleted"
         if (modelGenerationKey == generationKey) return@LaunchedEffect
         modelGenerationKey = generationKey
-        modelCard = null
         modelMissing = false
         if (!DeenlyKnowledgeRuntime.isKnowledgeModelAvailable()) {
             modelLoading = false
@@ -397,11 +406,14 @@ fun InsightPager(
         // when tile 4 leaves the viewport.
         pagerScope.launch {
             val generated = runCatching {
-                generateInsightKnowledgeCard(
-                    date = today,
-                    appSituation = recommendation.supportingText,
-                    fortressInvocations = fortressInvocations,
-                )
+                PreparedKnowledgeReadings.readings.get(knowledgeKey) { variation ->
+                    generateInsightKnowledgeCard(
+                        date = today,
+                        appSituation = recommendation.supportingText,
+                        fortressInvocations = fortressInvocations,
+                        variation = variation,
+                    )
+                }
             }.getOrNull()
             if (modelGenerationKey == generationKey) {
                 modelCard = generated
@@ -1018,7 +1030,7 @@ fun InsightPager(
                                 content = if (isExpanded) {
                                     {
                                         when {
-                                            modelLoading -> ModelSuggestionLoading()
+                                            modelLoading && modelCard == null -> ModelSuggestionLoading()
                                             modelCard != null -> ModelSuggestionStage(
                                                 card = modelCard,
                                                 onPreferredHeightChange = { stageHeightHints[4] = it },
@@ -1544,9 +1556,9 @@ private fun ExpandedSalahHadith(
     val hadithContext = prayerHadithContext(prayerName, date)
     val density = LocalDensity.current
     val displayName = prayerName?.replaceFirstChar { it.uppercase() } ?: "Salah"
-    var recommendation by remember(prayerName, date) {
-        mutableStateOf<com.starception.submission.shared.hadith.PrayerHadithRecommendation?>(null)
-    }
+    val readings = com.starception.submission.shared.hadith.PreparedPrayerReadings.readings
+    val readingKey = "$date|$prayerName|${DeenlyKnowledgeRuntime.isKnowledgeModelAvailable()}"
+    var recommendation by remember(readingKey) { mutableStateOf(readings.peek(readingKey)) }
     var downloadRevision by remember { mutableIntStateOf(0) }
     var loading by remember(prayerName, date) { mutableStateOf(true) }
     var searchProgress by remember(prayerName, date) { mutableStateOf(InsightSearchProgress()) }
@@ -1555,7 +1567,9 @@ private fun ExpandedSalahHadith(
         loading = true
         searchFailed = false
         try {
-            recommendation = com.starception.submission.shared.hadith.recommendPrayerHadith(prayerName, date) { searchProgress = it }
+            recommendation = readings.get(readingKey) { variation ->
+                com.starception.submission.shared.hadith.recommendPrayerHadith(prayerName, date, variation)
+            }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -2179,12 +2193,45 @@ private data class DeenlyKnowledgeCard(
     val target: DeenlyKnowledgeTarget,
 )
 
+private object PreparedKnowledgeReadings {
+    private val store by lazy { com.starception.submission.shared.storage.platformKeyValueStore() }
+    val readings by lazy {
+        com.starception.submission.core.model.deenly.InsightReadAhead(
+            scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate),
+            encode = { card: DeenlyKnowledgeCard ->
+                val target = when (val target = card.target) {
+                    is DeenlyKnowledgeTarget.Surah -> listOf("quran", target.number.toString())
+                    is DeenlyKnowledgeTarget.FortressDua -> listOf("dua", target.chapterId.toString())
+                    is DeenlyKnowledgeTarget.BukhariHadith -> listOf("hadith", target.hadithId.toString())
+                    is DeenlyKnowledgeTarget.ShamayelBook -> listOf("shamayel", target.bookId.toString())
+                }
+                com.starception.submission.core.model.deenly.packInsightFields(listOf(card.title, card.sourceText, card.reference) + target)
+            },
+            decode = { value ->
+                val fields = com.starception.submission.core.model.deenly.unpackInsightFields(value)
+                val id = fields[4].toInt()
+                val target = when (fields[3]) {
+                    "quran" -> DeenlyKnowledgeTarget.Surah(id)
+                    "dua" -> DeenlyKnowledgeTarget.FortressDua(id)
+                    "hadith" -> DeenlyKnowledgeTarget.BukhariHadith(id)
+                    "shamayel" -> DeenlyKnowledgeTarget.ShamayelBook(id)
+                    else -> error("Unknown insight destination")
+                }
+                DeenlyKnowledgeCard(fields[0], fields[1], fields[2], target)
+            },
+            read = { store.getString("prepared_knowledge_readings_v1") },
+            write = { store.putString("prepared_knowledge_readings_v1", it) },
+        )
+    }
+}
+
 private suspend fun generateInsightKnowledgeCard(
     date: LocalDate,
     appSituation: String?,
     fortressInvocations: Map<Int, List<com.starception.submission.shared.content.FortressInvocation>>,
+    variation: Int = 0,
 ): DeenlyKnowledgeCard? {
-    val seed = date.toEpochDays().toInt()
+    val seed = date.toEpochDays().toInt() + variation
     val sources = mutableListOf<DeenlyInsightSource>()
     val quranStore = SharedContentStore()
     val quranLanguage = QuranTranslationLanguage.fromCode(quranStore.quranTranslationLanguage())

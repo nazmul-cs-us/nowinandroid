@@ -1596,6 +1596,13 @@ internal fun SwipeableBigTiles(
     val prayersRemaining = (totalPrayers - prayedCount).coerceAtLeast(0)
     val nextUnmarkedPrayer = prayerRecap.firstOrNull { !it.isPrayed }?.name
     val today = LocalDate.now()
+    val prayerReadings = remember(context.applicationContext) { PreparedInsightReadings.prayer(context) }
+    val prayerReadingKey = "$today|$currentPrayerLookupName|${com.starception.submission.ml.DeenlyKnowledgeModel(context).isKnowledgeModelAvailable()}"
+    LaunchedEffect(prayerReadingKey) {
+        prayerReadings.warm(prayerReadingKey) { variation ->
+            PrayerHadithRecommendationRepository.load(context.applicationContext, currentPrayerLookupName, today, variation)
+        }
+    }
     // The Friday/day-of-year rule lives in shared code so iOS suggests the same
     // surah on the same day; this only converts java.time to kotlinx.
     val dailySurah = remember(today) {
@@ -5232,7 +5239,9 @@ private fun SalahHadithExpandedStage(
     val hadithContext = prayerHadithContext(prayerName, KotlinLocalDate(date.year, date.monthValue, date.dayOfMonth))
     val model = remember(context) { com.starception.submission.ml.DeenlyKnowledgeModel(context) }
     val modelAvailable = model.isKnowledgeModelAvailable()
-    var recommendation by remember(prayerName, date) { mutableStateOf<PrayerHadithRecommendation?>(null) }
+    val readings = remember(context.applicationContext) { PreparedInsightReadings.prayer(context) }
+    val readingKey = "$date|$prayerName|$modelAvailable"
+    var recommendation by remember(readingKey) { mutableStateOf(readings.peek(readingKey)) }
     var downloadRevision by remember { mutableIntStateOf(0) }
     var loading by remember(prayerName, date) { mutableStateOf(true) }
     var searchProgress by remember(prayerName, date) { mutableStateOf(InsightSearchProgress()) }
@@ -5242,8 +5251,8 @@ private fun SalahHadithExpandedStage(
         loading = true
         searchFailed = false
         try {
-            recommendation = PrayerHadithRecommendationRepository.load(context, prayerName, date) { progress ->
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) { searchProgress = progress }
+            recommendation = readings.get(readingKey) { variation ->
+                PrayerHadithRecommendationRepository.load(context.applicationContext, prayerName, date, variation)
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
@@ -5937,7 +5946,7 @@ private fun RecommendationExpandedStage(
     ) {
         // A static state switch avoids recreating and cross-fading the scroll
         // subtree when the user touches it.
-        if (loading) {
+        if (loading && candidate == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 InsightSearchStatus(
                     searchProgress,
