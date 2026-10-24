@@ -140,7 +140,8 @@ Generate and build without signing:
 cd iosApp
 xcodegen generate
 xcodebuild -project iosApp.xcodeproj -scheme iosApp \
-  -sdk iphonesimulator -arch arm64 CODE_SIGNING_ALLOWED=NO build
+  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO build
 ```
 
 ## Troubleshooting generated-project build errors

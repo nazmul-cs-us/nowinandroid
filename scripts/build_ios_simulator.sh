@@ -7,8 +7,9 @@ if [[ "${1:-}" == "--help" ]]; then
 Usage: scripts/build_ios_simulator.sh
 
 Requires macOS, Xcode, XcodeGen, JDK 21, and the project's build dependencies.
-Regenerates iosApp.xcodeproj, then builds the iosApp Debug scheme for an arm64
-simulator without signing. Keeps SwiftUI preview support enabled as configured.
+Regenerates iosApp.xcodeproj, then builds the iosApp Debug scheme for the iOS
+Simulator without signing. Xcode selects the destination architectures.
+Keeps SwiftUI preview support enabled as configured.
 Build products: work/ios-simulator-derived-data
 Full build log: work/ios-simulator-build.log
 HELP
@@ -35,12 +36,12 @@ xcodegen generate --spec project.yml
 build_log="$repo_root/work/ios-simulator-build.log"
 if xcodebuild -project iosApp.xcodeproj -scheme iosApp \
     -configuration Debug -sdk iphonesimulator \
-    -destination 'generic/platform=iOS Simulator' -arch arm64 \
+    -destination 'generic/platform=iOS Simulator' \
     -derivedDataPath "$repo_root/work/ios-simulator-derived-data" \
     CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$build_log"; then
     echo "Simulator build succeeded. Full log: $build_log"
 else
     echo "Simulator build failed. Full log: $build_log" >&2
-    echo "Share the ld: diagnostic and surrounding lines, not only 'Command Ld failed'." >&2
+    echo "Share the first underlying error and surrounding lines from that log, not only the final build-failed summary." >&2
     exit 1
 fi
