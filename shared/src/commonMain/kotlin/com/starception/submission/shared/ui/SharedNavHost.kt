@@ -130,6 +130,7 @@ data class SharedHomeActions(
     val onOpenQuran: (Int) -> Unit,
     val onOpenBukhariBook: (Int) -> Unit = {},
     val onOpenBukhariHadith: (Int) -> Unit = {},
+    val onOpenHadithSource: (String, Int) -> Unit = { _, _ -> },
     val onOpenQuranicDua: (Int) -> Unit = {},
     val onOpenFortressChapter: (Int) -> Unit = {},
     val onOpenShamayelBook: (Int) -> Unit = {},
@@ -369,6 +370,13 @@ fun SharedNavHost(
                             onOpenQuran = { navController.navigate(QuranDetailRoute(it)) },
                             onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
                             onOpenBukhariHadith = { navController.navigate(BukhariHadithRoute(it)) },
+                            onOpenHadithSource = { databaseFile, hadithId ->
+                                when (databaseFile) {
+                                    "sahih_bukhari.db" -> navController.navigate(BukhariHadithRoute(hadithId))
+                                    "shamayele_tirmidhi_complete.db" -> navController.navigate(ShamayelHadithRoute(hadithId))
+                                    else -> navController.navigate(HadithCollectionHadithRoute(databaseFile, hadithId))
+                                }
+                            },
                             onOpenQuranicDua = { navController.navigate(DuaDetailRoute(it)) },
                             onOpenFortressChapter = { navController.navigate(FortressChapterRoute(it)) },
                             onOpenShamayelBook = { navController.navigate(ShamayelBookRoute(it)) },

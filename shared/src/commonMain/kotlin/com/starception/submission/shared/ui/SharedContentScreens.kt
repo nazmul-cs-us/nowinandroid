@@ -3041,7 +3041,10 @@ internal fun BukhariHadithDetailScreen(
     // the screen is visible.
     val narration by com.starception.submission.shared.voice.NarrationQueue.state.collectAsState()
     val narrationBookId = book?.id
-    val narrationOnThisBook = narration.bookId != null && narration.bookId == narrationBookId
+    val narrationOnThisBook =
+        narration.collection == com.starception.submission.shared.voice.NarrationQueue.Collection.BUKHARI &&
+            narration.bookId != null && narration.bookId == narrationBookId
+    var lastObservedNarrationId by remember(hadithId) { mutableStateOf(narration.hadithId) }
     when (val current = state) {
         HadithsState.Loading -> SharedDetailScaffold(title = "Sahih al-Bukhari", onBack = onBack) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -3070,7 +3073,11 @@ internal fun BukhariHadithDetailScreen(
             // visible; manual swipes are not fought, the next hadith simply
             // scrolls back in.
             LaunchedEffect(narration.hadithId) {
-                if (narrationOnThisBook && narration.hadithId != null) {
+                // Opening an explicit source must keep that narration visible.
+                // Follow the audio queue only when it advances after entry.
+                val narrationChanged = lastObservedNarrationId != narration.hadithId
+                lastObservedNarrationId = narration.hadithId
+                if (narrationChanged && narrationOnThisBook && narration.hadithId != null) {
                     val index = hadiths.indexOfFirst { it.id == narration.hadithId }
                     if (index >= 0 && pagerState.currentPage != index) {
                         pagerState.animateScrollToPage(index)
@@ -3510,6 +3517,9 @@ internal fun ShamayelHadithDetailScreen(
     var showReadingSettings by remember { mutableStateOf(false) }
     var translationLanguage by remember { mutableStateOf(store.hadithTranslationLanguage()) }
     var translationProvider by remember { mutableStateOf(store.hadithTranslationProvider()) }
+    var lastObservedNarrationId by remember(hadithId) {
+        mutableStateOf(com.starception.submission.shared.voice.NarrationQueue.state.value.hadithId)
+    }
     when (val current = state) {
         HadithsState.Loading -> SharedDetailScaffold(title = "Shama'il At-Tirmidhi", onBack = onBack) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -3542,7 +3552,11 @@ internal fun ShamayelHadithDetailScreen(
                 narration.collection == com.starception.submission.shared.voice.NarrationQueue.Collection.SHAMAYEL &&
                     narration.bookId != null && narration.bookId == book?.id
             LaunchedEffect(narration.hadithId) {
-                if (narrationOnThisBook && narration.hadithId != null) {
+                // Opening an explicit source must keep that narration visible.
+                // Follow the audio queue only when it advances after entry.
+                val narrationChanged = lastObservedNarrationId != narration.hadithId
+                lastObservedNarrationId = narration.hadithId
+                if (narrationChanged && narrationOnThisBook && narration.hadithId != null) {
                     val index = hadiths.indexOfFirst { it.id == narration.hadithId }
                     if (index >= 0 && pagerState.currentPage != index) {
                         pagerState.animateScrollToPage(index)

@@ -218,6 +218,7 @@ fun InsightPager(
     onOpenFortressChapter: (Int) -> Unit = {},
     onOpenBukhariBook: (Int) -> Unit = {},
     onOpenBukhariHadith: (Int) -> Unit = {},
+    onOpenHadithSource: (String, Int) -> Unit = { _, _ -> },
     onOpenShamayelBook: (Int) -> Unit = {},
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     tileHeight: Dp = 220.dp,
@@ -780,7 +781,7 @@ fun InsightPager(
                                 ExpandedSalahHadith(
                                     prayerName = day.currentPrayer ?: day.nextPrayer ?: salah.nextUnprayed,
                                     date = today,
-                                    onOpenHadith = onOpenBukhariHadith,
+                                    onOpenHadith = onOpenHadithSource,
                                     modelRevision = downloadCompleted,
                                     onPreferredHeightChange = { measured ->
                                         stageHeightHints[1] = measured
@@ -1545,7 +1546,7 @@ private fun formatTileClock(hour: Int, minute: Int): String {
 private fun ExpandedSalahHadith(
     prayerName: String?,
     date: LocalDate,
-    onOpenHadith: (Int) -> Unit,
+    onOpenHadith: (String, Int) -> Unit,
     onPreferredHeightChange: (Dp) -> Unit,
     modifier: Modifier = Modifier,
     modelRevision: Int = 0,
@@ -1664,11 +1665,10 @@ private fun ExpandedSalahHadith(
             }
             if (source.isNotBlank()) Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
                 val selectedSource = recommendation?.source
-                if (selectedSource?.databaseFile == "sahih_bukhari.db") {
-                    InsightSourceAction(reference = source) { onOpenHadith(selectedSource.hadithNumber) }
-                } else {
-                    Text(text = source, style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.66f))
+                if (selectedSource != null) {
+                    InsightSourceAction(reference = source) {
+                        onOpenHadith(selectedSource.databaseFile, selectedSource.hadithNumber)
+                    }
                 }
             }
         }

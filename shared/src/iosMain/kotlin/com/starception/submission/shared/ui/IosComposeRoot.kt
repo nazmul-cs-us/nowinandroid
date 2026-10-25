@@ -1032,6 +1032,7 @@ private fun createPrayerTimesViewController(
                         onOpenQuran = actions.onOpenQuran,
                         onOpenBukhariBook = actions.onOpenBukhariBook,
                         onOpenBukhariHadith = actions.onOpenBukhariHadith,
+                        onOpenHadithSource = actions.onOpenHadithSource,
                         onOpenQuranicDua = actions.onOpenQuranicDua,
                         onOpenFortressChapter = actions.onOpenFortressChapter,
                         onOpenShamayelBook = actions.onOpenShamayelBook,

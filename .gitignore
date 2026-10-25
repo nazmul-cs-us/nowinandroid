@@ -48,6 +48,8 @@ captures/
 # Local visual verification and generated-image working files
 artifacts/screenshots/
 tmp/
+# Local backups, build logs, and Xcode derived data
+/work/
 
 # Kotlin
 .kotlin
