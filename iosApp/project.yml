@@ -290,6 +290,14 @@ targets:
     platform: iOS
     sources:
       - path: PrayerLiveActivity
+        excludes:
+          - Assets.xcassets
+      # Compile the Live Activity mark into the extension bundle. Depending on
+      # implicit resource discovery here can produce a valid extension whose
+      # SwiftUI Image lookup silently finds no asset at runtime.
+      - path: PrayerLiveActivity/Assets.xcassets
+        buildPhase: resources
+        type: file
       - path: Shared
     info:
       path: PrayerLiveActivity/Info.plist

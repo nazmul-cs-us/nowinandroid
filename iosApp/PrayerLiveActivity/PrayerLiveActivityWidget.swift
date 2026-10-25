@@ -90,8 +90,12 @@ private struct PrayerBrandIcon: View {
     var size: CGFloat = 16
 
     var body: some View {
-        Image("DeenlyLiveGlyph")
+        // A Live Activity executes in the widget extension process, so resolve
+        // the mark from that bundle explicitly. Original mode also protects the
+        // transparent brand artwork from the surrounding keyline tint.
+        Image("DeenlyLiveGlyph", bundle: .main)
             .resizable()
+            .renderingMode(.original)
             .scaledToFit()
             .frame(width: size, height: size)
             .accessibilityHidden(true)
