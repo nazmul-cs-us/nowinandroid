@@ -72,21 +72,18 @@ targets:
       # Local database copies are excluded from Git. Bundle them when present;
       # fresh clones resolve manifest-backed content through the runtime downloader.
       # Fortress v2 still needs a genuine local database (see README.md).
-      - path: ../app/src/main/assets/databases/quran.db
+      # XcodeGen only skips missing optional groups; optional file entries still
+      # create copy steps and fail during the build when the file is absent.
+      - path: ../app/src/main/assets/databases
         optional: true
+        includes:
+          - quran.db
+          - quranic_duas.db
+          - fortress_of_the_muslim_v2.db
         buildPhase: resources
-        type: file
       # The Interests destination reads the same topic catalog and source
       # databases used by Android's NewsDbGenerator.
       - path: ../core/contentdatabase/src/main/assets/databases/topics.db
-        buildPhase: resources
-        type: file
-      - path: ../app/src/main/assets/databases/quranic_duas.db
-        optional: true
-        buildPhase: resources
-        type: file
-      - path: ../app/src/main/assets/databases/fortress_of_the_muslim_v2.db
-        optional: true
         buildPhase: resources
         type: file
       - path: Sources/salah_detector.onnx

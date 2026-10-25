@@ -83,7 +83,22 @@ enum DeenlyRunner {
         let startedAt = Date()
         llama_backend_init()
 
-        guard let model = llama_model_load_from_file(modelPath, llama_model_default_params()) else {
+        let loadedModel: OpaquePointer?
+        #if targetEnvironment(simulator)
+        // Simulator Metal exposes a host GPU, but its residency-set support can
+        // abort inside llama.cpp. An empty device list also prevents host-buffer
+        // mapping through Metal; zero GPU layers alone does not guarantee that.
+        var modelParams = llama_model_default_params()
+        modelParams.n_gpu_layers = 0
+        var devices: [ggml_backend_dev_t?] = [nil]
+        loadedModel = devices.withUnsafeMutableBufferPointer { buffer in
+            modelParams.devices = buffer.baseAddress
+            return llama_model_load_from_file(modelPath, modelParams)
+        }
+        #else
+        loadedModel = llama_model_load_from_file(modelPath, llama_model_default_params())
+        #endif
+        guard let model = loadedModel else {
             NSLog("DeenlyRunner: model load failed")
             return nil
         }
@@ -99,6 +114,10 @@ enum DeenlyRunner {
         var contextParams = llama_context_default_params()
         contextParams.n_ctx = 2_048
         contextParams.n_batch = 1_024
+        #if targetEnvironment(simulator)
+        contextParams.offload_kqv = false
+        contextParams.op_offload = false
+        #endif
         guard let context = llama_init_from_model(model, contextParams) else {
             return nil
         }

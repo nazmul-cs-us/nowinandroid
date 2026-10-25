@@ -15,8 +15,11 @@ xcodegen generate && open iosApp.xcodeproj
 ```
 
 The database copies under `app/src/main/assets/databases/` are excluded from
-Git. Their resource entries are optional so a fresh clone can generate the
-project. If genuine local copies exist, XcodeGen includes them; regenerate the
+Git. An optional source directory includes only the three supported databases
+when present, so fresh clones can generate and build the project without missing
+resource copy steps. (`optional: true` on individual files only suppresses
+XcodeGen's validation; it still creates copy steps for absent files.)
+If genuine local copies exist, XcodeGen includes them; regenerate the
 project after adding them. Do not create empty database placeholders.
 
 Quran and Quranic Duas have manifest-backed runtime downloads; first use
@@ -35,6 +38,11 @@ xcodegen generate
 The Fortress builder requires internet and prints any failed chapter downloads;
 check its output before using the resulting database. Project generation alone
 does not verify content availability or complete an Xcode build.
+
+The on-device AI runner uses CPU inference in the iOS Simulator. Simulator
+Metal residency-set allocation can abort during model loading, especially with
+Metal API validation enabled. Physical devices retain llama.cpp's default GPU
+selection. CPU inference in the simulator can take longer than on a device.
 
 ## Apple Silicon Macs
 
