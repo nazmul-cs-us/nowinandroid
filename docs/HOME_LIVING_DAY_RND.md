@@ -2,6 +2,21 @@
 
 ![Living Day home concept](images/home-living-day-concept.png)
 
+## Premium control variant
+
+![Premium control home concept](images/home-premium-control-concept.png)
+
+This refinement applies the hierarchy of a premium device-control app without
+copying automotive branding or imagery. It removes most visible containers,
+makes Prayer Now an edge-to-edge live surface, and places frequent actions in a
+stable control dock. Recommendations become an editorial row and the schedule
+becomes a precise list. Deenly's mosque, Quran, prayer, Qibla, and voice identity
+remain the subject of the experience.
+
+The recommended visual direction is this premium control variant. It is calmer
+than the stacked-card study and gives morphing transitions clearer origins and
+destinations.
+
 ## Product hypothesis
 
 The home page should answer three questions in order:
