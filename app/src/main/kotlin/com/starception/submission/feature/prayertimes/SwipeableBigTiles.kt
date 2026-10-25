@@ -5377,13 +5377,13 @@ private fun SalahHadithExpandedStage(
                             state = hadithScrollState,
                             overscrollEffect = null,
                         )
-                        .padding(vertical = 20.dp),
+                        .padding(vertical = 8.dp),
                     verticalArrangement = Arrangement.Top,
                 ) {
                     if (!loading && !searchFailed && recommendation == null) {
                         Column(Modifier.fillMaxWidth().onSizeChanged { size ->
-                            onPreferredHeightChange(with(density) { size.height.toDp() } + 105.dp)
-                        }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            onPreferredHeightChange(with(density) { size.height.toDp() } + 80.dp)
+                        }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(text = body, color = Color.White, style = MaterialTheme.typography.bodyMedium)
                             MissingPrayerHadithContent(onDownloadComplete = { downloadRevision++ })
                         }
@@ -5396,7 +5396,7 @@ private fun SalahHadithExpandedStage(
                         fontWeight = FontWeight.Medium,
                         onTextLayout = { result ->
                             val bodyHeight = with(density) { result.size.height.toDp() }
-                            onPreferredHeightChange(bodyHeight + 105.dp)
+                            onPreferredHeightChange(bodyHeight + 80.dp)
                         },
                     )
                 }

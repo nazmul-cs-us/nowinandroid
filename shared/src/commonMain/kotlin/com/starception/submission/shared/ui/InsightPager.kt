@@ -1606,9 +1606,9 @@ private fun ExpandedSalahHadith(
     if (!loading && !searchFailed && recommendation == null) {
         Column(
             modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 16.dp)
-                .onSizeChanged { size -> onPreferredHeightChange(with(density) { size.height.toDp() } + 40.dp) },
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 4.dp, vertical = 8.dp)
+                .onSizeChanged { size -> onPreferredHeightChange(with(density) { size.height.toDp() } + 24.dp) },
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             InsightSectionLabel(hadithContext.heading(displayName))
             Text("Download more Hadith collections", color = Color.White, style = MaterialTheme.typography.titleMedium)
@@ -1645,7 +1645,7 @@ private fun ExpandedSalahHadith(
                     top = 8.dp,
                     bottom = 7.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
                 InsightSectionLabel(hadithContext.heading(displayName))
@@ -1663,26 +1663,26 @@ private fun ExpandedSalahHadith(
                             canScrollForward = { hadithScrollState.canScrollForward },
                         )
                         .verticalScroll(state = hadithScrollState, overscrollEffect = null)
-                        .padding(vertical = InsightMotion.ReadingEdge),
+                        .padding(vertical = 10.dp),
                     verticalArrangement = Arrangement.Top,
                 ) {
                     if (loading && recommendation == null) {
                         InsightSearchStatus(searchProgress, Modifier.onSizeChanged { size ->
-                            onPreferredHeightChange(with(density) { size.height.toDp() } + 148.dp)
+                            onPreferredHeightChange(with(density) { size.height.toDp() } + 112.dp)
                         })
                     } else Text(
                         text = text,
                         textAlign = TextAlign.Justify,
                         style = MaterialTheme.typography.titleSmall.copy(
-                            fontSize = 19.sp,
-                            lineHeight = 29.sp,
-                            letterSpacing = (-0.1).sp,
+                            fontSize = 17.sp,
+                            lineHeight = 26.sp,
+                            letterSpacing = 0.sp,
                         ),
                         color = Color.White.copy(alpha = 0.98f),
                         fontWeight = FontWeight.Medium,
                         onTextLayout = { result ->
                             val bodyHeight = with(density) { result.size.height.toDp() }
-                            onPreferredHeightChange(bodyHeight + 148.dp)
+                            onPreferredHeightChange(bodyHeight + 112.dp)
                         },
                     )
                 }
