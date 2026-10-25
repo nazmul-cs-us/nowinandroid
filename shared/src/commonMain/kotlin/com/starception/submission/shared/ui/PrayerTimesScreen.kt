@@ -17,6 +17,7 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -1219,15 +1220,21 @@ internal fun SearchSuggestionsOverlayContent(
     val newsRepository = remember { createSharedNewsRepository() }
 
     // Android's curated empty-state shortcuts, so the staples are one tap away.
-    data class Popular(val label: String, val surah: Int, val ayah: Int? = null)
     val popular = remember {
         listOf(
-            Popular("Ayatul Kursi", 2, 255),
-            Popular("Al-Fatiha", 1),
-            Popular("Ar-Rahman", 55),
-            Popular("Surah Yasin", 36),
-            Popular("Al-Kahf", 18),
-            Popular("Al-Mulk", 67),
+            SearchHighlight(
+                "Ayatul Kursi",
+                "آية الكرسي",
+                2,
+                255,
+                "The Throne Verse — greatest verse in the Quran",
+                "Protection",
+            ),
+            SearchHighlight("Al-Fatiha", "الفاتحة", 1, 1, "The Opening — essential prayer surah", "Prayer"),
+            SearchHighlight("Ar-Rahman", "الرحمن", 55, 1, "The Most Merciful", "Mercy"),
+            SearchHighlight("Surah Yasin", "يس", 36, 1, "The heart of the Quran", "Reflection"),
+            SearchHighlight("Al-Kahf", "الكهف", 18, 1, "The Cave — recommended Friday reading", "Friday"),
+            SearchHighlight("Al-Mulk", "الملك", 67, 1, "The Sovereignty", "Night"),
         )
     }
 
@@ -1287,10 +1294,11 @@ internal fun SearchSuggestionsOverlayContent(
             popular.forEach { suggestion ->
                 val surah = QuranData.surahs.first { it.number == suggestion.surah }
                 SuggestionRow(
-                    badge = suggestion.ayah?.let { "${suggestion.surah}:$it" }
-                        ?: suggestion.surah.toString(),
+                    badge = "${suggestion.surah}:${suggestion.ayah}",
                     title = suggestion.label,
-                    trailing = surah.nameArabic,
+                    arabic = suggestion.arabic.ifBlank { surah.nameArabic },
+                    subtitle = suggestion.description,
+                    tag = suggestion.category,
                     onClick = {
                         onRecordRecent(suggestion.label)
                         onOpenSurah(suggestion.surah)
@@ -1305,7 +1313,8 @@ internal fun SearchSuggestionsOverlayContent(
                         SuggestionRow(
                             badge = "${result.surah.number}",
                             title = result.surah.nameEnglish,
-                            trailing = result.surah.nameArabic,
+                            arabic = result.surah.nameArabic,
+                            tag = "Surah",
                             onClick = {
                                 onRecordRecent(trimmed)
                                 onOpenSurah(result.surah.number)
@@ -1316,6 +1325,7 @@ internal fun SearchSuggestionsOverlayContent(
                         SuggestionRow(
                             badge = "${result.book.id}",
                             title = result.book.nameEnglish,
+                            tag = "Hadith",
                             onClick = {
                                 onRecordRecent(trimmed)
                                 onOpenBukhariBook(result.book.id)
@@ -1334,7 +1344,8 @@ internal fun SearchSuggestionsOverlayContent(
                             SuggestionRow(
                                 badge = searchResultNumber(result),
                                 title = result.title,
-                                trailing = result.source.takeIf(String::isNotBlank),
+                                subtitle = result.source.takeIf(String::isNotBlank),
+                                tag = type,
                                 onClick = {
                                     onRecordRecent(trimmed)
                                     contentStore.markNewsViewed(result.id)
@@ -1352,6 +1363,7 @@ internal fun SearchSuggestionsOverlayContent(
                         badge = "${verse.surahNumber}:${verse.numberInSurah}",
                         title = verse.arabicText,
                         titleArabic = true,
+                        tag = "Quran",
                         onClick = {
                             onRecordRecent(trimmed)
                             onOpenSurah(verse.surahNumber)
@@ -1385,6 +1397,15 @@ private fun searchResultNumber(news: SharedNewsResource): String =
         ?.getOrNull(1)
         ?: news.id.toString()
 
+private data class SearchHighlight(
+    val label: String,
+    val arabic: String,
+    val surah: Int,
+    val ayah: Int,
+    val description: String,
+    val category: String,
+)
+
 @Composable
 private fun SuggestionHeader(label: String) {
     Text(
@@ -1392,7 +1413,7 @@ private fun SuggestionHeader(label: String) {
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 14.dp, bottom = 2.dp),
     )
 }
 
@@ -1402,14 +1423,29 @@ private fun SuggestionChips(items: List<String>, onClick: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items.forEach { item ->
-            androidx.compose.material3.AssistChip(
+            Surface(
                 onClick = { onClick(item) },
-                label = { Text(item, style = MaterialTheme.typography.labelMedium) },
-            )
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                ),
+            ) {
+                Text(
+                    item,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                )
+            }
         }
     }
 }
@@ -1418,40 +1454,112 @@ private fun SuggestionChips(items: List<String>, onClick: (String) -> Unit) {
 private fun SuggestionRow(
     badge: String,
     title: String,
-    trailing: String? = null,
+    arabic: String? = null,
+    subtitle: String? = null,
+    tag: String? = null,
     titleArabic: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            badge,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(end = 12.dp),
-        )
-        Text(
-            title,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = if (titleArabic) TextAlign.End else null,
-            modifier = Modifier.weight(1f),
-        )
-        if (trailing != null) {
-            Spacer(Modifier.width(8.dp))
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.width(48.dp),
+        ) {
             Text(
-                trailing,
+                badge,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 7.dp),
             )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = if (titleArabic) TextAlign.End else null,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (!arabic.isNullOrBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        arabic,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+            AnimatedVisibility(
+                visible = !subtitle.isNullOrBlank(),
+                enter = fadeIn(tween(180)) + scaleIn(
+                    initialScale = 0.96f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                ),
+                exit = fadeOut(tween(120)),
+            ) {
+                Text(
+                    subtitle.orEmpty(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = !tag.isNullOrBlank(),
+            enter = fadeIn(tween(180)) + scaleIn(
+                initialScale = 0.72f,
+                animationSpec = spring(
+                    dampingRatio = 0.76f,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+            ),
+            exit = fadeOut(tween(110)) + scaleOut(targetScale = 0.82f),
+        ) {
+            Row {
+                Spacer(Modifier.width(8.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Text(
+                        tag.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                    )
+                }
+            }
         }
     }
 }
