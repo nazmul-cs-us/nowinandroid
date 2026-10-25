@@ -178,7 +178,7 @@ targets:
       properties:
         CFBundleDisplayName: Deenly
         CFBundleShortVersionString: "0.1.2"
-        CFBundleVersion: "1"
+        CFBundleVersion: "2"
         # Required by Compose Multiplatform, which refuses to start without it:
         # PlistSanityCheck throws IllegalStateException on a background thread and
         # aborts the process. It lifts the 60 Hz cap so Compose can drive
@@ -304,7 +304,7 @@ targets:
       properties:
         CFBundleDisplayName: Prayer Live Update
         CFBundleShortVersionString: "0.1.2"
-        CFBundleVersion: "1"
+        CFBundleVersion: "2"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     configFiles:
@@ -330,7 +330,7 @@ targets:
       properties:
         CFBundleDisplayName: Prayer Widget
         CFBundleShortVersionString: "0.1.2"
-        CFBundleVersion: "1"
+        CFBundleVersion: "2"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:

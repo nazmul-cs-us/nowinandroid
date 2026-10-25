@@ -4143,6 +4143,8 @@ internal fun SavedScreen(
     var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
     var removedForUndo by remember { mutableStateOf<SharedNewsResource?>(null) }
     var loadAttempt by remember { mutableStateOf(0) }
+    var savedSurahNumbers by remember { mutableStateOf(store.bookmarkedSurahs()) }
+    val savedSurahs = QuranData.surahs.filter { it.number in savedSurahNumbers }
     val savedBukhariBooks = BukhariBooks.all.filter { it.id in store.savedBukhariBooks() }
 
     LaunchedEffect(topicRepository) {
@@ -4154,12 +4156,15 @@ internal fun SavedScreen(
             emptyList()
         }
     }
-    LaunchedEffect(newsRepository, loadAttempt) {
-        state = if (bookmarkedIds.isEmpty()) {
+    LaunchedEffect(newsRepository, loadAttempt, bookmarkedIds) {
+        // Surahs have canonical Saved rows below. Their synthetic bookmark IDs
+        // are navigation aliases, not rows in the news database.
+        val newsIds = bookmarkedIds.filterNot { it in 2001..2114 }.toSet()
+        state = if (newsIds.isEmpty()) {
             SharedNewsState.Loaded(emptyList())
         } else {
             try {
-                SharedNewsState.Loaded(newsRepository.newsByIds(bookmarkedIds))
+                SharedNewsState.Loaded(newsRepository.newsByIds(newsIds))
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -4214,12 +4219,24 @@ internal fun SavedScreen(
                 )
             }
             is SharedNewsState.Loaded -> if (
-                current.news.isEmpty() && savedBukhariBooks.isEmpty() && removedForUndo == null
+                current.news.isEmpty() && savedSurahs.isEmpty() &&
+                    savedBukhariBooks.isEmpty() && removedForUndo == null
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     SavedEmptyState(Modifier.height(if (expanded) 520.dp else 420.dp))
                 }
             } else {
+                gridItems(savedSurahs, key = { "saved-surah:${it.number}" }) { surah ->
+                    SurahRow(
+                        surah = surah,
+                        saved = true,
+                        onClick = { onOpenSurah(surah.number) },
+                        onToggleSaved = {
+                            savedSurahNumbers = store.toggleSurah(surah.number)
+                            bookmarkedIds = store.bookmarkedNewsIds()
+                        },
+                    )
+                }
                 gridItems(current.news, key = { "saved:${it.id}" }) { news ->
                     SharedNewsResourceCard(
                         news = news,
