@@ -1,5 +1,6 @@
 import ActivityKit
 import SwiftUI
+import UIKit
 import WidgetKit
 
 private let prayerDeepLink = URL(string: "deenly://prayer-times")!
@@ -54,13 +55,39 @@ private struct PrayerSymbol: View {
 }
 
 private struct CompactPrayerBrandIcon: View {
+    private static let image: UIImage? = {
+        // A Live Activity runs from its extension bundle. Resolve the compiled
+        // icon from the containing app bundle instead of treating AppIcon.appiconset
+        // source files as ordinary extension images.
+        let appURL = Bundle.main.bundleURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        guard let appBundle = Bundle(url: appURL) else { return nil }
+        let icons = appBundle.object(forInfoDictionaryKey: "CFBundleIcons") as? [String: Any]
+        let primary = icons?["CFBundlePrimaryIcon"] as? [String: Any]
+        let iconName = primary?["CFBundleIconName"] as? String
+        let iconFiles = primary?["CFBundleIconFiles"] as? [String] ?? []
+        let candidates = [iconName].compactMap { $0 } + Array(iconFiles.reversed()) + ["AppIcon"]
+        return candidates.lazy.compactMap {
+            UIImage(named: $0, in: appBundle, compatibleWith: nil)
+        }.first
+    }()
+
+    var size: CGFloat = 16
+
     var body: some View {
-        Image("AppIcon-1024")
-            .resizable()
-            .scaledToFit()
-            .frame(width: 20, height: 20)
-            .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
-            .accessibilityHidden(true)
+        Group {
+            if let image = Self.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                PrayerSymbol()
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+        .accessibilityHidden(true)
     }
 }
 
@@ -184,8 +211,15 @@ struct PrayerLiveActivityWidget: Widget {
                     PrayerActivityDetails(presentation: presentation)
                 }
             } compactLeading: {
-                CompactPrayerBrandIcon()
-                .frame(width: 48, alignment: .trailing)
+                HStack(spacing: 3) {
+                    CompactPrayerBrandIcon()
+                    Text(context.state.prayerName)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                }
+                .foregroundStyle(prayerTint)
+                .frame(width: 52, alignment: .trailing)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Deenly, \(context.state.prayerName) prayer")
             } compactTrailing: {

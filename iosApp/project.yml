@@ -291,11 +291,6 @@ targets:
     sources:
       - path: PrayerLiveActivity
       - path: Shared
-      # The extension has its own bundle, so it must carry the Deenly artwork
-      # it renders in the compact Dynamic Island presentation.
-      - path: Sources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
-        buildPhase: resources
-        type: file
     info:
       path: PrayerLiveActivity/Info.plist
       properties:
