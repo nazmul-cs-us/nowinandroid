@@ -17,6 +17,7 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -124,7 +125,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -4209,10 +4214,7 @@ internal fun SavedScreen(
                 current.news.isEmpty() && savedBukhariBooks.isEmpty() && removedForUndo == null
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    SupportingCard(
-                        title = "Nothing saved yet",
-                        body = "News you bookmark will appear here across launches.",
-                    )
+                    SavedEmptyState(Modifier.height(if (expanded) 520.dp else 420.dp))
                 }
             } else {
                 gridItems(current.news, key = { "saved:${it.id}" }) { news ->
@@ -4247,6 +4249,63 @@ internal fun SavedScreen(
                 onClick = { onOpenBukhariBook(book.id) },
             )
         }
+    }
+}
+
+@Composable
+private fun SavedEmptyState(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Canvas(Modifier.size(64.dp)) {
+            val scale = size.minDimension / 64f
+            fun point(value: Float) = value * scale
+            val outline = Brush.linearGradient(
+                colors = listOf(Color(0xFFFFA8FF), Color(0xFFFF8B5E)),
+                start = androidx.compose.ui.geometry.Offset(point(8f), point(8f)),
+                end = androidx.compose.ui.geometry.Offset(point(56f), point(56f)),
+            )
+            val stroke = Stroke(width = point(2f), cap = StrokeCap.Round)
+            val backBookmark = Path().apply {
+                moveTo(point(16f), point(2f))
+                lineTo(point(55f), point(2f))
+                cubicTo(point(57.209f), point(2f), point(59f), point(3.791f), point(59f), point(6f))
+                lineTo(point(59f), point(52f))
+            }
+            val frontBookmark = Path().apply {
+                moveTo(point(45f), point(10f))
+                lineTo(point(9f), point(10f))
+                cubicTo(point(6.791f), point(10f), point(5f), point(11.791f), point(5f), point(14f))
+                lineTo(point(5f), point(55.854f))
+                cubicTo(point(5f), point(59.177f), point(8.817f), point(61.051f), point(11.446f), point(59.019f))
+                lineTo(point(24.554f), point(48.89f))
+                cubicTo(point(25.995f), point(47.777f), point(28.005f), point(47.777f), point(29.446f), point(48.89f))
+                lineTo(point(42.554f), point(59.019f))
+                cubicTo(point(45.183f), point(61.051f), point(49f), point(59.177f), point(49f), point(55.854f))
+                lineTo(point(49f), point(14f))
+                cubicTo(point(49f), point(11.791f), point(47.209f), point(10f), point(45f), point(10f))
+                close()
+            }
+            drawPath(backBookmark, brush = outline, style = stroke)
+            drawPath(frontBookmark, brush = outline, style = stroke)
+        }
+        Spacer(Modifier.height(48.dp))
+        Text(
+            text = "No saved updates",
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Updates you save will be stored here\nto read later",
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
