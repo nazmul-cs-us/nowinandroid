@@ -4143,9 +4143,8 @@ internal fun SavedScreen(
     var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
     var removedForUndo by remember { mutableStateOf<SharedNewsResource?>(null) }
     var loadAttempt by remember { mutableStateOf(0) }
-    var savedSurahNumbers by remember { mutableStateOf(store.bookmarkedSurahs()) }
-    val savedSurahs = QuranData.surahs.filter { it.number in savedSurahNumbers }
-    val savedBukhariBooks = BukhariBooks.all.filter { it.id in store.savedBukhariBooks() }
+    var savedBukhariBookIds by remember { mutableStateOf(store.savedBukhariBooks()) }
+    val savedBukhariBooks = BukhariBooks.all.filter { it.id in savedBukhariBookIds }
 
     LaunchedEffect(topicRepository) {
         topics = try {
@@ -4157,14 +4156,13 @@ internal fun SavedScreen(
         }
     }
     LaunchedEffect(newsRepository, loadAttempt, bookmarkedIds) {
-        // Surahs have canonical Saved rows below. Their synthetic bookmark IDs
-        // are navigation aliases, not rows in the news database.
-        val newsIds = bookmarkedIds.filterNot { it in 2001..2114 }.toSet()
-        state = if (newsIds.isEmpty()) {
+        // Saved Surahs use the same generated news IDs as Android (2001..2114),
+        // so they retain the full feed-card presentation on this screen.
+        state = if (bookmarkedIds.isEmpty()) {
             SharedNewsState.Loaded(emptyList())
         } else {
             try {
-                SharedNewsState.Loaded(newsRepository.newsByIds(newsIds))
+                SharedNewsState.Loaded(newsRepository.newsByIds(bookmarkedIds))
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -4219,24 +4217,12 @@ internal fun SavedScreen(
                 )
             }
             is SharedNewsState.Loaded -> if (
-                current.news.isEmpty() && savedSurahs.isEmpty() &&
-                    savedBukhariBooks.isEmpty() && removedForUndo == null
+                current.news.isEmpty() && savedBukhariBooks.isEmpty() && removedForUndo == null
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     SavedEmptyState(Modifier.height(if (expanded) 520.dp else 420.dp))
                 }
             } else {
-                gridItems(savedSurahs, key = { "saved-surah:${it.number}" }) { surah ->
-                    SurahRow(
-                        surah = surah,
-                        saved = true,
-                        onClick = { onOpenSurah(surah.number) },
-                        onToggleSaved = {
-                            savedSurahNumbers = store.toggleSurah(surah.number)
-                            bookmarkedIds = store.bookmarkedNewsIds()
-                        },
-                    )
-                }
                 gridItems(current.news, key = { "saved:${it.id}" }) { news ->
                     SharedNewsResourceCard(
                         news = news,
@@ -4263,14 +4249,37 @@ internal fun SavedScreen(
             }
         }
         gridItems(savedBukhariBooks, key = { "saved-bukhari:${it.id}" }) { book ->
-            BukhariBookRow(
-                book = book,
-                saved = true,
+            SharedNewsResourceCard(
+                news = book.savedNewsResource(),
+                topicsById = topicsById,
+                bookmarked = true,
+                viewed = true,
+                onToggleBookmark = {
+                    savedBukhariBookIds = store.toggleBukhariBook(book.id)
+                },
                 onClick = { onOpenBukhariBook(book.id) },
+                onTopicClick = onOpenTopic,
+                compact = expanded,
             )
         }
     }
 }
+
+private fun BukhariBook.savedNewsResource() = SharedNewsResource(
+    id = 3_000 + id,
+    title = "Sahih al-Bukhari · $nameEnglish",
+    content = buildString {
+        if (nameArabic.isNotBlank()) append("**Arabic:** $nameArabic\n\n")
+        append("**Collection:** Sahih al-Bukhari\n\n")
+        append("$hadithCount narrations · Hadith $firstHadithId–$lastHadithId")
+    },
+    url = "hadith-book://sahih_bukhari/$id",
+    headerImageUrl = "drawable://topic_sahih_bukhari",
+    publishDate = "",
+    type = "Hadith collection",
+    source = "Sahih al-Bukhari",
+    topicIds = setOf(8),
+)
 
 @Composable
 private fun SavedEmptyState(modifier: Modifier = Modifier) {
