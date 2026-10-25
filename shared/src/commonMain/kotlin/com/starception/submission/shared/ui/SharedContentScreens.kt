@@ -19,6 +19,7 @@ package com.starception.submission.shared.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -3951,6 +3952,7 @@ internal fun ForYouScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
+        onOpenQuran = onOpenSurah,
         isRefreshing = pullRefreshing,
         onRefresh = {
             pullRefreshing = true
@@ -4174,6 +4176,7 @@ internal fun SavedScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
+        onOpenQuran = onOpenSurah,
         onRefresh = { },
         prayerAlert = prayerAlert,
         adaptiveGrid = true,
@@ -4349,6 +4352,7 @@ internal fun CourseScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
+        onOpenQuran = onOpenSurah,
         onRefresh = { },
         prayerAlert = prayerAlert,
     ) { _ ->
@@ -4756,6 +4760,7 @@ internal fun InterestsScreen(
     store: SharedContentStore,
     onSelectBottom: (Int) -> Unit,
     onOpenTopic: (Int) -> Unit,
+    onOpenSurah: (Int) -> Unit = {},
     searchController: SharedSearchController? = null,
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
@@ -4814,6 +4819,7 @@ internal fun InterestsScreen(
         searchController = searchController,
         onOpenSettings = onOpenSettings,
         onOpenProfile = onOpenProfile,
+        onOpenQuran = onOpenSurah,
         isRefreshing = pullRefreshing || globalRefreshing,
         syncResultText = globalSyncResultText,
         onRefresh = {
@@ -5925,6 +5931,7 @@ private fun TopLevelScaffold(
     searchController: SharedSearchController? = null,
     onOpenSettings: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    onOpenQuran: (Int) -> Unit = {},
     isRefreshing: Boolean = false,
     syncResultText: String? = null,
     onRefresh: (() -> Unit)? = null,
@@ -6035,10 +6042,75 @@ private fun TopLevelScaffold(
                 isOffline = !isOnline,
                 prayerAlertState = prayerAlert
                     ?: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
+                mediaBar = QuranPlaybackSyncBar(onOpenQuran),
                 modifier = Modifier.fillMaxSize(),
             ) { _ -> page() }
         } else {
             page()
+        }
+    }
+}
+
+@Composable
+internal fun QuranPlaybackSyncBar(
+    onOpenQuran: (Int) -> Unit,
+): com.starception.submission.feature.prayertimes.wobble.SyncBarRow? {
+    val playback by com.starception.submission.shared.media.QuranPlaybackBus.state.collectAsState()
+    val playing = playback ?: return null
+    return com.starception.submission.feature.prayertimes.wobble.SyncBarRow(
+        isVisible = true,
+        minimumHeight = maxOf(
+            44.dp,
+            with(LocalDensity.current) {
+                MaterialTheme.typography.labelLarge.lineHeight.toDp() +
+                    MaterialTheme.typography.labelMedium.lineHeight.toDp()
+            } + 12.dp,
+        ),
+        progress = if (playing.durationSeconds > 0f) {
+            (playing.positionSeconds / playing.durationSeconds).coerceIn(0f, 1f)
+        } else {
+            0f
+        },
+    ) { statusText ->
+        val stripColor = MaterialTheme.colorScheme.onPrimaryContainer
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f).let { body ->
+                    playing.surahNumber?.let { number ->
+                        body.clickable { onOpenQuran(number) }
+                    } ?: body
+                },
+            ) {
+                Text(
+                    text = playing.title,
+                    modifier = Modifier.fillMaxWidth().basicMarquee(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = stripColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = statusText ?: if (playing.playing) "Playing" else "Paused",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = stripColor.copy(alpha = 0.7f),
+                    maxLines = 1,
+                )
+            }
+            IconButton(
+                onClick = { com.starception.submission.shared.media.QuranPlaybackBus.toggle() },
+                modifier = Modifier.size(44.dp),
+            ) {
+                Icon(
+                    imageVector = if (playing.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (playing.playing) "Pause recitation" else "Play recitation",
+                    tint = stripColor,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
         }
     }
 }

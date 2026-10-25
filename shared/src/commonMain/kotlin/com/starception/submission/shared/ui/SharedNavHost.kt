@@ -17,6 +17,7 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -42,6 +43,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.starception.submission.shared.audio.QuranAudioPlayer
@@ -284,7 +286,25 @@ fun SharedNavHost(
             ?.takeIf { it > 0 }
             ?.let { navController.navigate(BukhariHadithRoute(it)) }
     }
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+    val ownsSyncContainer = currentRoute in tabRouteNames ||
+        currentRoute == PrayerSettingsRoute::class.qualifiedName
+    val detailMediaBar = if (ownsSyncContainer) {
+        null
+    } else {
+        QuranPlaybackSyncBar { surahNumber ->
+            navController.navigate(QuranDetailRoute(surahNumber)) { launchSingleTop = true }
+        }
+    }
     Box(modifier) {
+        com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer(
+            isRefreshing = false,
+            onRefresh = {},
+            mediaBar = detailMediaBar,
+            enabled = false,
+            modifier = Modifier.fillMaxSize(),
+        ) { _ ->
         NavHost(
             navController = navController,
             startDestination = startInSurah
@@ -404,6 +424,9 @@ fun SharedNavHost(
                         ?: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
                     downloadProgress = downloadStatus?.progress ?: 0f,
                     downloadLabel = downloadStatus?.label.orEmpty(),
+                    mediaBar = QuranPlaybackSyncBar { surahNumber ->
+                        navController.navigate(QuranDetailRoute(surahNumber))
+                    },
                     enabled = false,
                 ) {
                     // popBackStack rather than navigate(home): navigating would push a
@@ -470,6 +493,7 @@ fun SharedNavHost(
                     store = contentStore,
                     onSelectBottom = selectBottom,
                     onOpenTopic = openTopic,
+                    onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
                     searchController = searchController,
                     onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
                     onOpenProfile = { navController.navigate(ProfileRoute) },
@@ -706,6 +730,7 @@ fun SharedNavHost(
                     onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
                 )
             }
+        }
         }
 
         // The shared search surface floats above every destination.

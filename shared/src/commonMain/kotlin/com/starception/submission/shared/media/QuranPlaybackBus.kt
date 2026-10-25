@@ -18,7 +18,7 @@ package com.starception.submission.shared.media
 
 import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.audio.quranAudioUrl
-import com.starception.submission.shared.quran.createQuranVerseRepository
+import com.starception.submission.feature.quran.QuranData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -52,7 +52,6 @@ object QuranPlaybackBus {
     private const val END_EPSILON_SECONDS = 1.5f
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val repository by lazy { createQuranVerseRepository() }
     private val _state = MutableStateFlow<PlaybackState?>(null)
     private var ticker: Job? = null
     private var activePlayer: QuranAudioPlayer? = null
@@ -67,17 +66,12 @@ object QuranPlaybackBus {
         surahNumber: Int,
         audioUrl: String = quranAudioUrl(surahNumber),
     ) {
-        begin(player, audioUrl, "Surah $surahNumber", surahNumber)
-        scope.launch {
-            val name = runCatching {
-                repository.getSurahMetadata(surahNumber)?.nameTranslation
-            }.getOrNull()
-            val title = name?.takeIf(String::isNotBlank) ?: return@launch
-            val current = _state.value
-            if (current?.surahNumber == surahNumber) {
-                _state.value = current.copy(title = title)
-            }
-        }
+        val title = QuranData.surahs
+            .firstOrNull { it.number == surahNumber }
+            ?.nameEnglish
+            ?.takeIf(String::isNotBlank)
+            ?: "Surah $surahNumber"
+        begin(player, audioUrl, title, surahNumber)
     }
 
     /** Reports a Fortress invocation that just started. */
