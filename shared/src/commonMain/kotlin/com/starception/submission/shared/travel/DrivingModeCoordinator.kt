@@ -81,6 +81,8 @@ class DrivingModeCoordinator(
                 val done = kotlinx.coroutines.CompletableDeferred<Unit>()
                 val ok = synthesizer.speak(
                     text = hadith.english,
+                    nowPlayingTitle = "Daily hadith",
+                    nowPlayingAlbum = "Driving mode",
                     onComplete = { done.complete(Unit) },
                 )
                 if (ok) done.await()

@@ -278,18 +278,31 @@ internal fun PrayerSimulationScreen(
                 duaPausedByUser = false
                 duaPlayer.stop()
                 duaPlaying = duaPlayer.play(invocation.audioUrl)
+                if (duaPlaying) {
+                    com.starception.submission.shared.media.QuranPlaybackBus.startFortress(
+                        player = duaPlayer,
+                        audioUrl = invocation.audioUrl,
+                        title = "Dua · ${steps[stepIndex.coerceIn(0, steps.lastIndex)].label}",
+                    )
+                }
             } else {
+                duaPlayer.stop()
+                com.starception.submission.shared.media.QuranPlaybackBus.clear()
                 duaInvocation = null
                 duaPlaying = false
             }
         } else {
             duaPlayer.stop()
+            com.starception.submission.shared.media.QuranPlaybackBus.clear()
             duaPlaying = false
         }
     }
     // Leaving the screen stops the recitation.
     androidx.compose.runtime.DisposableEffect(duaPlayer) {
-        onDispose { duaPlayer.stop() }
+        onDispose {
+            duaPlayer.stop()
+            com.starception.submission.shared.media.QuranPlaybackBus.clear()
+        }
     }
 
     // The step engine: each step runs its duration, easing into the next pose.

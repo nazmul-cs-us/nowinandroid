@@ -22,7 +22,6 @@ import platform.AVFAudio.AVAudioSessionCategoryPlayAndRecord
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.AVAudioSessionModeMeasurement
 import platform.AVFAudio.setActive
-import platform.darwin.DISPATCH_QUEUE_SERIAL
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_queue_create
 import platform.darwin.dispatch_sync
@@ -32,7 +31,7 @@ import platform.darwin.dispatch_sync
 internal object IosAudioSessionController {
     private val queue = dispatch_queue_create(
         "com.starception.submission.audio-session",
-        DISPATCH_QUEUE_SERIAL,
+        null,
     )
 
     fun activatePlayback(): Boolean {

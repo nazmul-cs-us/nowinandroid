@@ -2672,6 +2672,8 @@ internal fun SharedDuaDetailScreen(
                                 if (listening && dua != null) {
                                     val started = speechSynthesizer.speak(
                                         text = displayedTranslation.ifBlank { dua.translation },
+                                        nowPlayingTitle = "Quranic Dua ${dua.duaNumber} · ${dua.title}",
+                                        nowPlayingAlbum = "Quranic Duas",
                                     ) {
                                         listening = false
                                     }

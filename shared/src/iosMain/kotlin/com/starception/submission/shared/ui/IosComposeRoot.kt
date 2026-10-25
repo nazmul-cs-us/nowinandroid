@@ -619,6 +619,8 @@ private fun createPrayerTimesViewController(
                 val started = speechSynthesizer.speak(
                     text = TRAVEL_DUA_ARABIC,
                     language = "ar-SA",
+                    nowPlayingTitle = "Travel dua",
+                    nowPlayingAlbum = "Dua & remembrance",
                 ) { error ->
                     isTravelDuaPlaying = false
                     if (error != null) narrationError = error

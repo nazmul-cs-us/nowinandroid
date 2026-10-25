@@ -17,6 +17,7 @@
 package com.starception.submission.shared.travel
 
 import com.starception.submission.shared.platform.IosAudioSessionController
+import com.starception.submission.shared.voice.NarrationNowPlaying
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVPlayerItemDidPlayToEndTimeNotification
@@ -38,6 +39,7 @@ actual class TravelDuaPlayer actual constructor() {
     private var observer: NSObjectProtocol? = null
     private var onComplete: (() -> Unit)? = null
     private var audioSessionActive = false
+    private var nowPlayingToken: Any? = null
 
     actual fun play(onComplete: () -> Unit) {
         stop()
@@ -53,13 +55,32 @@ actual class TravelDuaPlayer actual constructor() {
             name = AVPlayerItemDidPlayToEndTimeNotification,
             `object` = item,
             queue = NSOperationQueue.mainQueue,
-            usingBlock = { _ -> complete() },
+            usingBlock = { _ -> finishPlayback() },
         )
         avPlayer.play()
         player = avPlayer
+        nowPlayingToken = NarrationNowPlaying.showExternalAudio(
+            title = "Travel dua",
+            albumTitle = "Dua & remembrance",
+            onPlay = { resumeFromRemote() },
+            onPause = { pauseFromRemote() },
+            onStop = { stop() },
+        )
     }
 
     actual fun stop() {
+        onComplete = null
+        releasePlayback()
+    }
+
+    private fun finishPlayback() {
+        val callback = onComplete
+        onComplete = null
+        releasePlayback()
+        callback?.invoke()
+    }
+
+    private fun releasePlayback() {
         observer?.let { NSNotificationCenter.defaultCenter.removeObserver(it) }
         observer = null
         player?.pause()
@@ -68,12 +89,17 @@ actual class TravelDuaPlayer actual constructor() {
             audioSessionActive = false
             IosAudioSessionController.deactivate()
         }
-        complete()
+        NarrationNowPlaying.clearExternalAudio(nowPlayingToken)
+        nowPlayingToken = null
     }
 
-    private fun complete() {
-        val callback = onComplete
-        onComplete = null
-        callback?.invoke()
+    private fun pauseFromRemote() {
+        player?.pause()
+        NarrationNowPlaying.updateExternalAudio(nowPlayingToken, playing = false)
+    }
+
+    private fun resumeFromRemote() {
+        player?.play()
+        NarrationNowPlaying.updateExternalAudio(nowPlayingToken, playing = true)
     }
 }

@@ -155,6 +155,7 @@ actual class PlatformSpeechSynthesizer actual constructor() {
     private var completion: ((String?) -> Unit)? = null
     private var activeUtterance: AVSpeechUtterance? = null
     private var audioSessionActive = false
+    private var nowPlayingToken: Any? = null
     private val delegate = object : NSObject(), AVSpeechSynthesizerDelegateProtocol {
         @ObjCSignatureOverride
         override fun speechSynthesizer(
@@ -186,6 +187,8 @@ actual class PlatformSpeechSynthesizer actual constructor() {
         text: String,
         voiceIdentifier: String?,
         language: String,
+        nowPlayingTitle: String?,
+        nowPlayingAlbum: String,
         onComplete: (String?) -> Unit,
     ): Boolean {
         stop()
@@ -201,6 +204,15 @@ actual class PlatformSpeechSynthesizer actual constructor() {
         }
         activeUtterance = utterance
         synthesizer.speakUtterance(utterance)
+        if (nowPlayingTitle != null) {
+            nowPlayingToken = NarrationNowPlaying.showExternalAudio(
+                title = nowPlayingTitle,
+                albumTitle = nowPlayingAlbum,
+                onPlay = { resume() },
+                onPause = { pause() },
+                onStop = { stop() },
+            )
+        }
         return true
     }
 
@@ -214,6 +226,8 @@ actual class PlatformSpeechSynthesizer actual constructor() {
             audioSessionActive = false
             IosAudioSessionController.deactivate()
         }
+        NarrationNowPlaying.clearExternalAudio(nowPlayingToken)
+        nowPlayingToken = null
     }
 
     actual fun pause() {
@@ -222,6 +236,7 @@ actual class PlatformSpeechSynthesizer actual constructor() {
         // narration to survive the pause.
         if (synthesizer.speaking && !synthesizer.paused) {
             synthesizer.pauseSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
+            NarrationNowPlaying.updateExternalAudio(nowPlayingToken, playing = false)
         }
     }
 
@@ -230,6 +245,7 @@ actual class PlatformSpeechSynthesizer actual constructor() {
             if (IosAudioSessionController.activatePlayback()) {
                 audioSessionActive = true
                 synthesizer.continueSpeaking()
+                NarrationNowPlaying.updateExternalAudio(nowPlayingToken, playing = true)
             }
         }
     }
@@ -242,6 +258,8 @@ actual class PlatformSpeechSynthesizer actual constructor() {
             audioSessionActive = false
             IosAudioSessionController.deactivate()
         }
+        NarrationNowPlaying.clearExternalAudio(nowPlayingToken)
+        nowPlayingToken = null
         target?.invoke(error)
     }
 }

@@ -57,6 +57,8 @@ expect class PlatformSpeechSynthesizer() {
         text: String,
         voiceIdentifier: String? = null,
         language: String = "en-US",
+        nowPlayingTitle: String? = null,
+        nowPlayingAlbum: String = "Spoken audio",
         onComplete: (String?) -> Unit = {},
     ): Boolean
     fun stop()

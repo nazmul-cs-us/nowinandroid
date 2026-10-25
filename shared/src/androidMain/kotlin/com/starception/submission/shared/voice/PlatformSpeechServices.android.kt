@@ -36,6 +36,8 @@ actual class PlatformSpeechSynthesizer actual constructor() {
         text: String,
         voiceIdentifier: String?,
         language: String,
+        nowPlayingTitle: String?,
+        nowPlayingAlbum: String,
         onComplete: (String?) -> Unit,
     ): Boolean {
         onComplete("Speech synthesis is supplied by the Android app")

@@ -94,6 +94,21 @@ object QuranPlaybackBus {
         }
     }
 
+    /** Seeks the active recitation from the system Now Playing scrubber. */
+    fun seekTo(seconds: Float) {
+        val player = activePlayer ?: return
+        val current = _state.value ?: return
+        val target = seconds.coerceIn(0f, current.durationSeconds.coerceAtLeast(0f))
+        player.seekTo(target)
+        _state.value = current.copy(positionSeconds = target)
+    }
+
+    /** Stops the active player and removes its system and in-app playback state. */
+    fun stop() {
+        activePlayer?.stop()
+        clear()
+    }
+
     /** Clears the row — explicit stops and natural end-of-track. */
     fun clear() {
         ticker?.cancel()
@@ -133,6 +148,7 @@ object QuranPlaybackBus {
                 val finished = !playing && duration > 0f &&
                     position >= duration - END_EPSILON_SECONDS
                 if (finished) {
+                    boundPlayer.stop()
                     clear()
                     return@launch
                 }
