@@ -53,6 +53,17 @@ private struct PrayerSymbol: View {
     }
 }
 
+private struct CompactPrayerBrandIcon: View {
+    var body: some View {
+        Image("AppIcon-1024")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 20, height: 20)
+            .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
 private struct PrayerCountdown: View {
     let presentation: PrayerPresentation
     var width: CGFloat? = nil
@@ -173,19 +184,10 @@ struct PrayerLiveActivityWidget: Widget {
                     PrayerActivityDetails(presentation: presentation)
                 }
             } compactLeading: {
-                // Stay within the smaller 52.33pt reference slot. Keep the
-                // identity against the camera; don't add outer padding.
-                ViewThatFits(in: .horizontal) {
-                    Text(context.state.prayerName)
-                        .font(.caption2.weight(.semibold))
-                        .lineLimit(1)
-                        .fixedSize()
-                    PrayerSymbol()
-                        .font(.caption.weight(.semibold))
-                }
-                .foregroundStyle(prayerTint)
+                CompactPrayerBrandIcon()
                 .frame(width: 48, alignment: .trailing)
-                .accessibilityLabel("\(context.state.prayerName) prayer")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Deenly, \(context.state.prayerName) prayer")
             } compactTrailing: {
                 if presentation.canShowTimer {
                     PrayerCountdown(presentation: presentation, width: 48, showsHours: true, textAlignment: .leading)
