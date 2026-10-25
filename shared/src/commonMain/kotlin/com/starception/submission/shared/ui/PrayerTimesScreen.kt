@@ -119,6 +119,7 @@ import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.feature.prayertimes.wobble.AlertPhase
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
+import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.shared.SharedPrayerDay
@@ -1282,7 +1283,22 @@ internal fun SearchSuggestionsOverlayContent(
                     }
                 },
             )
+            SuggestionHeader("SUGGESTED RESULTS")
+            popular.forEach { suggestion ->
+                val surah = QuranData.surahs.first { it.number == suggestion.surah }
+                SuggestionRow(
+                    badge = suggestion.ayah?.let { "${suggestion.surah}:$it" }
+                        ?: suggestion.surah.toString(),
+                    title = suggestion.label,
+                    trailing = surah.nameArabic,
+                    onClick = {
+                        onRecordRecent(suggestion.label)
+                        onOpenSurah(suggestion.surah)
+                    },
+                )
+            }
         } else {
+            if (catalog.isNotEmpty()) SuggestionHeader("SUGGESTED RESULTS")
             catalog.forEach { result ->
                 when (result) {
                     is com.starception.submission.shared.content.CatalogResult.Quran -> {
