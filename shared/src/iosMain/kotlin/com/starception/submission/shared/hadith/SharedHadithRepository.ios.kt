@@ -287,6 +287,8 @@ private class IosSharedHadithRepository : SharedHadithRepository {
                     "Unable to prepare the Shama'il query: ${database.value.errorMessage()}"
                 }
                 try {
+                    sqlite3_bind_int(statement.value, 1, firstId)
+                    sqlite3_bind_int(statement.value, 2, lastId)
                     buildList {
                         while (true) {
                             when (sqlite3_step(statement.value)) {
@@ -399,6 +401,8 @@ private class IosSharedHadithRepository : SharedHadithRepository {
                     "Unable to prepare the Bukhari query: ${database.value.errorMessage()}"
                 }
                 try {
+                    sqlite3_bind_int(statement.value, 1, firstId)
+                    sqlite3_bind_int(statement.value, 2, lastId)
                     buildList {
                         while (true) {
                             when (sqlite3_step(statement.value)) {
