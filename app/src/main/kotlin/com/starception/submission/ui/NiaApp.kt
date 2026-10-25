@@ -32,6 +32,8 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -172,6 +174,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -426,10 +429,7 @@ private fun NiaFloatingBottomBar(
     var nudgeOccupiesNavigation by remember { mutableStateOf(false) }
     val voiceSlotWidth by animateDpAsState(
         targetValue = if (nudgeOccupiesNavigation) 0.dp else 62.dp,
-        animationSpec = tween(
-            durationMillis = NUDGE_MORPH_DURATION_MILLIS,
-            easing = FastOutSlowInEasing,
-        ),
+        animationSpec = NiaMotion.spatialSlow(),
         label = "bottomNavigationVoiceSlotWidth",
     )
 
@@ -516,20 +516,14 @@ private fun NiaFloatingBottomBar(
                             launch {
                                 leadingPosition.animateTo(
                                     targetValue = targetPx,
-                                    animationSpec = tween(
-                                        durationMillis = 280,
-                                        easing = FastOutSlowInEasing,
-                                    ),
+                                    animationSpec = NiaMotion.spatialDefault(),
                                 )
                             }
                             launch {
                                 delay(85)
                                 trailingPosition.animateTo(
                                     targetValue = targetPx,
-                                    animationSpec = tween(
-                                        durationMillis = 280,
-                                        easing = FastOutSlowInEasing,
-                                    ),
+                                    animationSpec = NiaMotion.spatialDefault(),
                                 )
                             }
                         }
@@ -537,7 +531,7 @@ private fun NiaFloatingBottomBar(
                     val bubbleAlpha by animateFloatAsState(
                         // Hidden when no top-level tab is selected (detail screens).
                         targetValue = if (selectedIndex >= 0) 1f else 0f,
-                        animationSpec = tween(200, easing = FastOutSlowInEasing),
+                        animationSpec = NiaMotion.effectsDefault(),
                         label = "navBubbleAlpha",
                     )
                     val bubbleColor = if (darkTheme) {
@@ -581,7 +575,12 @@ private fun NiaFloatingBottomBar(
 
                     // Match the reference's icon-only cells. Destination names remain
                     // available to accessibility through each icon's description.
-                    val itemCell = @Composable { destination: TopLevelDestination, weight: Modifier ->
+                    @Composable
+                    fun ItemCell(
+                        destination: TopLevelDestination,
+                        selected: Boolean,
+                        weight: Modifier,
+                    ) {
                         val hasUnread = latestUnreadDestinations.value.contains(destination)
                         val interactionSource = remember(destination) { MutableInteractionSource() }
                         val contentTint = MaterialTheme.colorScheme.onSurface
@@ -597,12 +596,36 @@ private fun NiaFloatingBottomBar(
                                 .then(if (hasUnread) Modifier.notificationDot() else Modifier),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                imageVector = destination.unselectedIcon,
-                                contentDescription = stringResource(destination.iconTextId),
-                                tint = contentTint,
-                                modifier = Modifier.size(if (vertical) 22.dp else 24.dp),
-                            )
+                            AnimatedContent(
+                                targetState = selected,
+                                transitionSpec = {
+                                    (
+                                        fadeIn(NiaMotion.effectsFast()) +
+                                            scaleIn(
+                                                initialScale = 0.7f,
+                                                animationSpec = NiaMotion.spatialFast(),
+                                            )
+                                        ) togetherWith (
+                                        fadeOut(NiaMotion.effectsFast()) +
+                                            scaleOut(
+                                                targetScale = 0.82f,
+                                                animationSpec = NiaMotion.spatialFast(),
+                                            )
+                                        )
+                                },
+                                label = "floatingNavigationIconMorph",
+                            ) { active ->
+                                Icon(
+                                    imageVector = if (active) {
+                                        destination.selectedIcon
+                                    } else {
+                                        destination.unselectedIcon
+                                    },
+                                    contentDescription = stringResource(destination.iconTextId),
+                                    tint = contentTint,
+                                    modifier = Modifier.size(if (vertical) 22.dp else 24.dp),
+                                )
+                            }
                         }
                     }
 
@@ -611,8 +634,8 @@ private fun NiaFloatingBottomBar(
                             modifier = Modifier.fillMaxSize(),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            destinations.forEach { destination ->
-                                itemCell(destination, Modifier.weight(1f))
+                            destinations.forEachIndexed { index, destination ->
+                                ItemCell(destination, index == selectedIndex, Modifier.weight(1f))
                             }
                         }
                     } else {
@@ -622,8 +645,8 @@ private fun NiaFloatingBottomBar(
                                 .padding(horizontal = horizontalContentInset),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            destinations.forEach { destination ->
-                                itemCell(destination, Modifier.weight(1f))
+                            destinations.forEachIndexed { index, destination ->
+                                ItemCell(destination, index == selectedIndex, Modifier.weight(1f))
                             }
                         }
                     }
@@ -1002,7 +1025,7 @@ private fun VoiceAssistantButton(
             VoiceAssistantSurface.Nudge -> 24.dp
             VoiceAssistantSurface.Quiz -> 28.dp
         },
-        animationSpec = tween(NUDGE_MORPH_DURATION_MILLIS, easing = FastOutSlowInEasing),
+        animationSpec = NiaMotion.spatialDefault(),
         label = "assistantContainerCorner",
     )
     val containerElevation by animateDpAsState(
@@ -1013,7 +1036,7 @@ private fun VoiceAssistantButton(
             VoiceAssistantSurface.Nudge -> 3.dp
             VoiceAssistantSurface.Quiz -> 8.dp
         },
-        animationSpec = tween(NUDGE_MORPH_DURATION_MILLIS, easing = FastOutSlowInEasing),
+        animationSpec = NiaMotion.spatialDefault(),
         label = "assistantContainerElevation",
     )
     val expandedContainerColor = if (LocalDarkTheme.current) {
@@ -1027,7 +1050,7 @@ private fun VoiceAssistantButton(
         } else {
             expandedContainerColor
         },
-        animationSpec = tween(NUDGE_MORPH_DURATION_MILLIS, easing = FastOutSlowInEasing),
+        animationSpec = NiaMotion.effectsDefault(),
         label = "assistantContainerColor",
     )
     SharedTransitionLayout(
