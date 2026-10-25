@@ -351,6 +351,7 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         let now = Date()
         let activities = Activity<PrayerActivityAttributes>.activities
         var activity = activities.first
+        let themeBrand = UserDefaults.standard.string(forKey: "ios_theme_brand") ?? "COASTAL"
 
         // This feature owns exactly one event. Clean up remnants from interrupted
         // debug runs instead of making people cycle between duplicate activities.
@@ -376,8 +377,10 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
                 // don't silently turn one event into the next prayer.
                 scheduleEnd(for: existing, at: currentState.activeUntil)
                 return
-            } else if existing.attributes.locationName != payload.locationName {
-                // Attributes are immutable, so location changes require a new event.
+            } else if existing.attributes.locationName != payload.locationName ||
+                        existing.attributes.themeBrand != themeBrand {
+                // Attributes are immutable, so location or theme changes require
+                // a replacement event while the app is active.
                 activityEndTasks[existing.id]?.cancel()
                 activityEndTasks[existing.id] = nil
                 await Self.end(existing)
@@ -399,7 +402,10 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
 
         do {
             let created = try Self.requestLiveActivity(
-                attributes: PrayerActivityAttributes(locationName: payload.locationName),
+                attributes: PrayerActivityAttributes(
+                    locationName: payload.locationName,
+                    themeBrand: themeBrand
+                ),
                 state: proposedState
             )
             observePushTokens(for: created)

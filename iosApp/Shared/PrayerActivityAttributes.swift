@@ -25,4 +25,28 @@ struct PrayerActivityAttributes: ActivityAttributes {
     }
 
     let locationName: String
+    /// The app theme selected when this activity was created. Live Activity
+    /// extensions cannot read the host app's Compose theme environment.
+    let themeBrand: String
+
+    init(locationName: String, themeBrand: String = "COASTAL") {
+        self.locationName = locationName
+        self.themeBrand = themeBrand
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case locationName, themeBrand
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        locationName = try values.decode(String.self, forKey: .locationName)
+        themeBrand = try values.decodeIfPresent(String.self, forKey: .themeBrand) ?? "COASTAL"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(locationName, forKey: .locationName)
+        try values.encode(themeBrand, forKey: .themeBrand)
+    }
 }
