@@ -188,7 +188,7 @@ struct PrayerLiveActivityWidget: Widget {
                 .accessibilityLabel("\(context.state.prayerName) prayer")
             } compactTrailing: {
                 if presentation.canShowTimer {
-                    PrayerCountdown(presentation: presentation, width: 48, showsHours: false, textAlignment: .leading)
+                    PrayerCountdown(presentation: presentation, width: 48, showsHours: true, textAlignment: .leading)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(prayerTint)
                 } else {
