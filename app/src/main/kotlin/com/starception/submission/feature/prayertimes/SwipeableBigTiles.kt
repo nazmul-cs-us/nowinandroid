@@ -4987,7 +4987,10 @@ private fun EditorialQuranReadingStage(
     var quranPreferenceVersion by remember { mutableIntStateOf(0) }
     DisposableEffect(quranPrefs) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "quran_translation" || key == "show_translation" || key == "arabic_font") {
+            if (
+                key == "quran_translation" || key == "show_translation" ||
+                key == "arabic_font" || key == "show_tajweed"
+            ) {
                 quranPreferenceVersion++
             }
         }
@@ -4996,6 +4999,7 @@ private fun EditorialQuranReadingStage(
     }
     val translationCode = quranPrefs.getString("quran_translation", "ar") ?: "ar"
     val showTranslation = quranPrefs.getBoolean("show_translation", true)
+    val showTajweed = quranPrefs.getBoolean("show_tajweed", false)
     val assetRepository = remember(context) {
         EntryPointAccessors.fromApplication(
             context.applicationContext,
@@ -5004,6 +5008,12 @@ private fun EditorialQuranReadingStage(
     }
     val repository = remember(context, assetRepository) {
         QuranRepository(context, assetRepository)
+    }
+    val tajweedRepository = remember(context, assetRepository) {
+        com.starception.submission.feature.surah.tajweed.TajweedRepository(
+            context.applicationContext,
+            assetRepository,
+        )
     }
     val arabicFontFamily = remember(context, quranPreferenceVersion) {
         when (quranPrefs.getString("arabic_font", "indopak_script")) {
@@ -5016,6 +5026,17 @@ private fun EditorialQuranReadingStage(
     }
     var ayahs by remember(surah.number) { mutableStateOf<List<Ayah>>(emptyList()) }
     var translations by remember(surah.number) { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    var tajweedAnnotations by remember(surah.number) {
+        mutableStateOf<Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>>(emptyMap())
+    }
+    LaunchedEffect(surah.number, showTajweed) {
+        tajweedAnnotations = if (showTajweed) {
+            runCatching { tajweedRepository.getAnnotationsForSurah(surah.number) }
+                .getOrDefault(emptyMap())
+        } else {
+            emptyMap()
+        }
+    }
     LaunchedEffect(surah.number, translationCode, showTranslation) {
         suspend fun openingAyahs(source: QuranRepository): List<Ayah> {
             val resolved = source.getSurahByNumber(surah.number) ?: return emptyList()
@@ -5061,18 +5082,18 @@ private fun EditorialQuranReadingStage(
                     ayah.text.trim(),
                     MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = arabicFontFamily,
-                        fontSize = (if (translation != null) 23f - 6f * compression else 27f - 8f * compression).sp,
-                        lineHeight = (if (translation != null) 34f - 9f * compression else 41f - 12f * compression).sp,
+                        fontSize = (if (translation != null) 21f - 4f * compression else 25f - 6f * compression).sp,
+                        lineHeight = (if (translation != null) 31f - 7f * compression else 37f - 9f * compression).sp,
                         letterSpacing = 0.sp,
                     ),
-                    64.dp,
+                    48.dp,
                 ),
                 translation?.let {
-                    InsightTextBlock(it, insightReaderBodyStyle(compression), 10.dp)
+                    InsightTextBlock(it, insightReadingTranslationStyle(compression), 8.dp)
                 },
             )
         }
-        val naturalHeight = insightTextHeight(blocks, maxWidth) + 84.dp
+        val naturalHeight = insightTextHeight(blocks, maxWidth) + 64.dp
         LaunchedEffect(naturalHeight, ayahs.isEmpty()) {
             if (ayahs.isNotEmpty()) onPreferredHeightChange(naturalHeight)
         }
@@ -5128,8 +5149,8 @@ private fun EditorialQuranReadingStage(
                     ),
                 state = readingScrollState,
                 overscrollEffect = null,
-                contentPadding = PaddingValues(vertical = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
+                contentPadding = PaddingValues(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (ayahs.isEmpty()) {
                     item {
@@ -5151,9 +5172,9 @@ private fun EditorialQuranReadingStage(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         Text(
                             text = "${ayah.numberInSurah}",
@@ -5162,18 +5183,26 @@ private fun EditorialQuranReadingStage(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = ayah.text.trim(),
+                            text = if (showTajweed) {
+                                com.starception.submission.feature.surah.tajweed.TajweedTextApplier
+                                    .applyWithOverlap(
+                                        text = ayah.text.trim(),
+                                        annotations = tajweedAnnotations[ayah.numberInSurah].orEmpty(),
+                                    )
+                            } else {
+                                androidx.compose.ui.text.AnnotatedString(ayah.text.trim())
+                            },
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = arabicFontFamily,
                                 fontSize = if (translation != null) {
-                                    (23f - (6f * compression)).sp
+                                    (21f - (4f * compression)).sp
                                 } else {
-                                    (27f - (8f * compression)).sp
+                                    (25f - (6f * compression)).sp
                                 },
                                 lineHeight = if (translation != null) {
-                                    (34f - (9f * compression)).sp
+                                    (31f - (7f * compression)).sp
                                 } else {
-                                    (41f - (12f * compression)).sp
+                                    (37f - (9f * compression)).sp
                                 },
                                 letterSpacing = 0.sp,
                             ),
@@ -5184,7 +5213,7 @@ private fun EditorialQuranReadingStage(
                         translation?.let { translatedText ->
                             Text(
                                 text = translatedText,
-                                style = insightReaderBodyStyle(compression),
+                                style = insightReadingTranslationStyle(compression),
                                 color = Color.White.copy(alpha = 0.88f),
                                 textAlign = TextAlign.Start,
                                 modifier = Modifier.fillMaxWidth(),
@@ -5195,6 +5224,16 @@ private fun EditorialQuranReadingStage(
             }
         }
     }
+}
+
+@Composable
+private fun insightReadingTranslationStyle(compactProgress: Float): TextStyle {
+    val compression = compactProgress.coerceIn(0f, 1f)
+    return MaterialTheme.typography.bodyMedium.copy(
+        fontSize = (16f - 1.5f * compression).sp,
+        lineHeight = (24f - 2.5f * compression).sp,
+        letterSpacing = 0.sp,
+    )
 }
 
 /** Shared prose metrics for the expanded Hadith, translation and suggestion readers. */

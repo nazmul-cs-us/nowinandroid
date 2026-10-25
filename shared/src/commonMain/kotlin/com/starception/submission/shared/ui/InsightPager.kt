@@ -173,7 +173,10 @@ import com.starception.submission.shared.qibla.qiblaBearing
 import com.starception.submission.shared.quran.QuranArabicFonts
 import com.starception.submission.shared.quran.QuranTranslationLanguage
 import com.starception.submission.shared.quran.QuranVerse
+import com.starception.submission.shared.quran.SharedTajweedAnnotation
+import com.starception.submission.shared.quran.createSharedTajweedRepository
 import com.starception.submission.shared.quran.createQuranVerseRepository
+import com.starception.submission.shared.quran.tajweedAnnotatedString
 import com.starception.submission.shared.salah.FARD_PRAYERS
 import com.starception.submission.shared.salah.SalahProgress
 import io.github.alexzhirkevich.cupertino.CupertinoSurface
@@ -1298,13 +1301,18 @@ private fun ExpandedReadingPreview(
     val mushafMode = store.quranMushafMode()
     val arabicFont = store.quranArabicFont()
     val showTranslation = store.quranShowTranslation()
+    val showTajweed = store.quranTajweedEnabled()
     val translationLanguage = if (showTranslation) {
         QuranTranslationLanguage.fromCode(store.quranTranslationLanguage())
     } else {
         QuranTranslationLanguage.None
     }
     val repository = remember { createQuranVerseRepository() }
+    val tajweedRepository = remember { createSharedTajweedRepository() }
     var verses by remember(surahNumber) { mutableStateOf<List<QuranVerse>>(emptyList()) }
+    var tajweedAnnotations by remember(surahNumber) {
+        mutableStateOf<Map<Int, List<SharedTajweedAnnotation>>>(emptyMap())
+    }
     var loading by remember(surahNumber, translationLanguage) { mutableStateOf(true) }
     var loadFailed by remember(surahNumber, translationLanguage) { mutableStateOf(false) }
     var loadAttempt by remember { mutableIntStateOf(0) }
@@ -1318,6 +1326,15 @@ private fun ExpandedReadingPreview(
         verses = result.getOrDefault(emptyList())
         loadFailed = result.isFailure || verses.isEmpty()
         loading = false
+    }
+    LaunchedEffect(surahNumber, showTajweed) {
+        tajweedAnnotations = if (showTajweed) {
+            runCatching { tajweedRepository.annotationsForSurah(surahNumber) }
+                .getOrNull()
+                .orEmpty()
+        } else {
+            emptyMap()
+        }
     }
 
     // The bismillah breathes with a slow glow instead of a hard shimmer, so
@@ -1341,27 +1358,27 @@ private fun ExpandedReadingPreview(
         val readingScrollState = rememberLazyListState()
         val hasTranslation = verses.any { it.translation.isNotBlank() }
         val readingArabicSize = (
-            maxWidth.value * if (hasTranslation) 0.064f else 0.075f
-            ).coerceIn(if (hasTranslation) 19f else 22f, if (hasTranslation) 29f else 34f).sp
-        val readingArabicLineHeight = (readingArabicSize.value * 1.45f).sp
-        val bismillahSize = (maxWidth.value * 0.052f).coerceIn(18f, 26f).sp
-        val readingTranslationSize = (maxWidth.value * 0.038f).coerceIn(15f, 18f).sp
+            maxWidth.value * if (hasTranslation) 0.058f else 0.068f
+            ).coerceIn(if (hasTranslation) 18f else 21f, if (hasTranslation) 26f else 31f).sp
+        val readingArabicLineHeight = (readingArabicSize.value * 1.35f).sp
+        val bismillahSize = (maxWidth.value * 0.048f).coerceIn(17f, 24f).sp
+        val readingTranslationSize = (maxWidth.value * 0.035f).coerceIn(14f, 17f).sp
         val blocks = verses.flatMap { verse ->
             listOfNotNull(
                 InsightTextBlock(verse.arabicText.trim(), MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = QuranArabicFonts.fontFamily(arabicFont),
                     fontSize = readingArabicSize, lineHeight = readingArabicLineHeight,
                     letterSpacing = 0.sp,
-                ), 74.dp),
+                ), 56.dp),
                 verse.translation.takeIf(String::isNotBlank)?.let {
                     InsightTextBlock(it, MaterialTheme.typography.bodySmall.copy(
                         fontSize = readingTranslationSize,
                         lineHeight = (readingTranslationSize.value * 1.55f).sp,
-                    ), 10.dp)
+                    ), 8.dp)
                 },
             )
         }
-        val naturalHeight = insightTextHeight(blocks, maxWidth) + 164.dp
+        val naturalHeight = insightTextHeight(blocks, maxWidth) + 128.dp
         LaunchedEffect(naturalHeight, loading) {
             if (!loading && verses.isNotEmpty()) onPreferredHeightChange(naturalHeight)
         }
@@ -1370,7 +1387,7 @@ private fun ExpandedReadingPreview(
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
                 Column(
@@ -1410,8 +1427,8 @@ private fun ExpandedReadingPreview(
                     ),
                 state = readingScrollState,
                 overscrollEffect = null,
-                contentPadding = PaddingValues(vertical = InsightMotion.ReadingEdge),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
+                contentPadding = PaddingValues(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (surahNumber != 1 && surahNumber != 9) {
                     item(key = "bismillah") {
@@ -1466,9 +1483,9 @@ private fun ExpandedReadingPreview(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         Text(
                             text = verse.numberInSurah.toArabicIndic(),
@@ -1480,7 +1497,14 @@ private fun ExpandedReadingPreview(
                                 .padding(horizontal = 12.dp, vertical = 5.dp),
                         )
                         Text(
-                            text = verse.arabicText.trim(),
+                            text = if (showTajweed) {
+                                tajweedAnnotatedString(
+                                    verse.arabicText.trim(),
+                                    tajweedAnnotations[verse.numberInSurah],
+                                )
+                            } else {
+                                androidx.compose.ui.text.AnnotatedString(verse.arabicText.trim())
+                            },
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = QuranArabicFonts.fontFamily(arabicFont),
                                 fontSize = readingArabicSize,
@@ -1519,8 +1543,8 @@ private fun ReadingTranslationPanel(
         textAlign = TextAlign.Start,
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
-            .padding(14.dp),
+            .background(Color.Black.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     )
 }
 
