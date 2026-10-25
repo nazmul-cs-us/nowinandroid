@@ -16,6 +16,13 @@
 
 package com.starception.submission.core.designsystem.component
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Icon
@@ -40,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.theme.NiaTheme
 
 /**
@@ -71,7 +79,7 @@ fun RowScope.NiaNavigationBarItem(
     NavigationBarItem(
         selected = selected,
         onClick = onClick,
-        icon = if (selected) selectedIcon else icon,
+        icon = { MorphingNavigationIcon(selected, icon, selectedIcon) },
         modifier = modifier,
         enabled = enabled,
         label = label,
@@ -135,7 +143,7 @@ fun NiaNavigationRailItem(
     NavigationRailItem(
         selected = selected,
         onClick = onClick,
-        icon = if (selected) selectedIcon else icon,
+        icon = { MorphingNavigationIcon(selected, icon, selectedIcon) },
         modifier = modifier,
         enabled = enabled,
         label = label,
@@ -259,16 +267,43 @@ class NiaNavigationSuiteScope internal constructor(
         selected = selected,
         onClick = onClick,
         icon = {
-            if (selected) {
-                selectedIcon()
-            } else {
-                icon()
-            }
+            MorphingNavigationIcon(selected, icon, selectedIcon)
         },
         label = label,
         colors = navigationSuiteItemColors,
         modifier = modifier,
     )
+}
+
+/**
+ * Keeps navigation selection spatially continuous. The icon grows into its
+ * selected form in the same measured slot, so switching tabs reads as one
+ * control transforming instead of two unrelated vectors flashing in place.
+ */
+@Composable
+private fun MorphingNavigationIcon(
+    selected: Boolean,
+    icon: @Composable () -> Unit,
+    selectedIcon: @Composable () -> Unit,
+) {
+    AnimatedContent(
+        targetState = selected,
+        transitionSpec = {
+            (
+                fadeIn(NiaMotion.effectsFast()) +
+                    scaleIn(initialScale = 0.72f, animationSpec = NiaMotion.spatialFast())
+                ) togetherWith (
+                fadeOut(NiaMotion.effectsFast()) +
+                    scaleOut(targetScale = 0.84f, animationSpec = NiaMotion.spatialFast())
+                ) using SizeTransform(
+                    clip = false,
+                    sizeAnimationSpec = { _, _ -> NiaMotion.spatialFast() },
+                )
+        },
+        label = "navigationIconMorph",
+    ) { active ->
+        if (active) selectedIcon() else icon()
+    }
 }
 
 @ThemePreviews

@@ -29,8 +29,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -47,6 +45,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.starception.submission.shared.audio.QuranAudioPlayer
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.shared.content.SharedContentStore
 import kotlinx.datetime.LocalDate
 import kotlinx.coroutines.flow.Flow
@@ -758,12 +757,8 @@ private fun isTabSwitch(state: NavBackStackEntry): Boolean =
     state.destination.route in tabRouteNames
 
 /**
- * The iOS push spring: critically damped with a ~450ms settle, so pushes
- * feel decisive without bouncing, and an interrupted transition hands its
- * velocity over mid-flight instead of restarting.
+ * Uses the same large-surface spring as Android. An interrupted push hands
+ * velocity to the next destination instead of restarting from rest.
  */
 private fun iosPushSpring(): androidx.compose.animation.core.FiniteAnimationSpec<androidx.compose.ui.unit.IntOffset> =
-    spring(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = 550f,
-    )
+    NiaMotion.spatialSlow()

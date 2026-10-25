@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
+import androidx.navigation.NavBackStackEntry
 import com.starception.submission.MainActivityViewModel
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.animation.NiaTransitions
@@ -298,10 +299,34 @@ fun NiaNavHost(
             navController = navController,
             startDestination = PrayerTimesRoute,
             modifier = modifier,
-            enterTransition = { NiaTransitions.fadeThroughEnter() },
-            exitTransition = { NiaTransitions.fadeThroughExit() },
-            popEnterTransition = { NiaTransitions.fadeThroughEnter() },
-            popExitTransition = { NiaTransitions.fadeThroughExit() },
+            enterTransition = {
+                if (initialState.isTopLevelRoute() && targetState.isTopLevelRoute()) {
+                    NiaTransitions.fadeThroughEnter()
+                } else {
+                    NiaTransitions.detailEnter()
+                }
+            },
+            exitTransition = {
+                if (initialState.isTopLevelRoute() && targetState.isTopLevelRoute()) {
+                    NiaTransitions.fadeThroughExit()
+                } else {
+                    NiaTransitions.detailExit()
+                }
+            },
+            popEnterTransition = {
+                if (initialState.isTopLevelRoute() && targetState.isTopLevelRoute()) {
+                    NiaTransitions.fadeThroughEnter()
+                } else {
+                    NiaTransitions.detailPopEnter()
+                }
+            },
+            popExitTransition = {
+                if (initialState.isTopLevelRoute() && targetState.isTopLevelRoute()) {
+                    NiaTransitions.fadeThroughExit()
+                } else {
+                    NiaTransitions.detailPopExit()
+                }
+            },
         ) {
             // ForYou two-pane layout (similar to Interests)
             forYouListDetailScreen(
@@ -684,6 +709,13 @@ fun NiaNavHost(
             )
         }
     }
+}
+
+private val topLevelRouteNames = TopLevelDestination.entries.mapNotNull { it.route.qualifiedName }
+
+private fun NavBackStackEntry.isTopLevelRoute(): Boolean {
+    val routeName = destination.route ?: return false
+    return topLevelRouteNames.any(routeName::startsWith)
 }
 
 /** Opens the exact Fortress invocation in the Dua pager. */

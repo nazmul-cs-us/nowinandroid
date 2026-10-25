@@ -157,33 +157,33 @@ object NiaTransitions {
     fun detailEnter(durationMillis: Int = Duration.MEDIUM_4): EnterTransition =
         slideInHorizontally(
             initialOffsetX = { it },
-            animationSpec = tween(durationMillis, easing = NiaMotion.EmphasizedDecelerate),
+            animationSpec = NiaMotion.spatialSlow(),
         ) + fadeIn(
-            animationSpec = tween(durationMillis / 2, easing = NiaMotion.StandardDecelerate),
+            animationSpec = NiaMotion.effectsSlow(),
         )
 
     fun detailExit(durationMillis: Int = Duration.MEDIUM_4): ExitTransition =
         slideOutHorizontally(
             targetOffsetX = { -it / 5 },
-            animationSpec = tween(durationMillis, easing = NiaMotion.EmphasizedDecelerate),
+            animationSpec = NiaMotion.spatialSlow(),
         ) + fadeOut(
-            animationSpec = tween(durationMillis / 2, easing = NiaMotion.StandardAccelerate),
+            animationSpec = NiaMotion.effectsSlow(),
         )
 
     fun detailPopEnter(durationMillis: Int = Duration.MEDIUM_4): EnterTransition =
         slideInHorizontally(
             initialOffsetX = { -it / 5 },
-            animationSpec = tween(durationMillis, easing = NiaMotion.EmphasizedDecelerate),
+            animationSpec = NiaMotion.spatialSlow(),
         ) + fadeIn(
-            animationSpec = tween(durationMillis / 2, easing = NiaMotion.StandardDecelerate),
+            animationSpec = NiaMotion.effectsSlow(),
         )
 
     fun detailPopExit(durationMillis: Int = Duration.MEDIUM_3): ExitTransition =
         slideOutHorizontally(
             targetOffsetX = { it },
-            animationSpec = tween(durationMillis, easing = NiaMotion.EmphasizedAccelerate),
+            animationSpec = NiaMotion.spatialSlow(),
         ) + fadeOut(
-            animationSpec = tween(durationMillis / 2, easing = NiaMotion.StandardAccelerate),
+            animationSpec = NiaMotion.effectsSlow(),
         )
 
     /** Scale + fade pair for FABs and small floating controls. */
