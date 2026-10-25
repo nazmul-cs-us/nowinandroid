@@ -16,10 +16,9 @@
 
 package com.starception.submission.shared.voice
 
+import com.starception.submission.shared.platform.IosAudioSessionController
 import platform.AVFAudio.AVAudioSession
-import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.outputVolume
-import platform.AVFAudio.setActive
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.pause
 import platform.AVFoundation.play
@@ -50,8 +49,7 @@ actual class SystemVolumeCapture actual constructor() {
             ?: return false
         val url = NSURL.fileURLWithPath(path)
         val session = AVAudioSession.sharedInstance()
-        session.setCategory(AVAudioSessionCategoryPlayback, error = null)
-        session.setActive(true, withOptions = 0u, error = null)
+        if (!IosAudioSessionController.activatePlayback()) return false
         val prepared = AVPlayer(uRL = url)
         prepared.play()
         player = prepared
@@ -79,7 +77,7 @@ actual class SystemVolumeCapture actual constructor() {
         timer = null
         player?.pause()
         player = null
-        AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
+        IosAudioSessionController.deactivate()
         active = false
     }
 }

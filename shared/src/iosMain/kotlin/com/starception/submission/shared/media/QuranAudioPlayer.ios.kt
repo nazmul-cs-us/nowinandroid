@@ -17,14 +17,12 @@
 package com.starception.submission.shared.audio
 
 import com.starception.submission.shared.assets.iosCloudAssets
+import com.starception.submission.shared.platform.IosAudioSessionController
 import kotlinx.coroutines.sync.withLock
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AVFAudio.AVAudioEngine
 import platform.AVFAudio.AVAudioFile
 import platform.AVFAudio.AVAudioPlayerNode
-import platform.AVFAudio.AVAudioSession
-import platform.AVFAudio.AVAudioSessionCategoryPlayback
-import platform.AVFAudio.setActive
 import platform.Foundation.NSURL
 import kotlin.math.roundToLong
 
@@ -75,6 +73,7 @@ actual class QuranAudioPlayer actual constructor() {
     private var segmentStartSeconds = 0.0
     private var completed = false
     private var scheduleGeneration = 0
+    private var audioSessionActive = false
 
     init {
         engine.attachNode(player)
@@ -82,9 +81,10 @@ actual class QuranAudioPlayer actual constructor() {
 
     actual fun play(url: String): Boolean {
         val nsUrl = NSURL.URLWithString(url) ?: return false
-        val session = AVAudioSession.sharedInstance()
-        session.setCategory(AVAudioSessionCategoryPlayback, error = null)
-        session.setActive(true, withOptions = 0u, error = null)
+        if (!audioSessionActive) {
+            if (!IosAudioSessionController.activatePlayback()) return false
+            audioSessionActive = true
+        }
         if (url != currentUrl) {
             stopEngine()
             val file = runCatching { AVAudioFile(forReading = nsUrl, error = null) }.getOrNull()
@@ -122,7 +122,10 @@ actual class QuranAudioPlayer actual constructor() {
         duration = 0.0
         segmentStartSeconds = 0.0
         completed = false
-        AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
+        if (audioSessionActive) {
+            audioSessionActive = false
+            IosAudioSessionController.deactivate()
+        }
     }
 
     actual fun positionSeconds(): Float {

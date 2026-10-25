@@ -16,9 +16,7 @@
 
 package com.starception.submission.shared.travel
 
-import platform.AVFAudio.AVAudioSession
-import platform.AVFAudio.AVAudioSessionCategoryPlayback
-import platform.AVFAudio.setActive
+import com.starception.submission.shared.platform.IosAudioSessionController
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVPlayerItemDidPlayToEndTimeNotification
@@ -39,14 +37,14 @@ actual class TravelDuaPlayer actual constructor() {
     private var player: AVPlayer? = null
     private var observer: NSObjectProtocol? = null
     private var onComplete: (() -> Unit)? = null
+    private var audioSessionActive = false
 
     actual fun play(onComplete: () -> Unit) {
         stop()
         val path = platform.Foundation.NSBundle.mainBundle.pathForResource("travel_dua", ofType = "caf")
             ?: return onComplete()
-        val session = AVAudioSession.sharedInstance()
-        session.setCategory(AVAudioSessionCategoryPlayback, error = null)
-        session.setActive(true, withOptions = 0u, error = null)
+        if (!IosAudioSessionController.activatePlayback()) return onComplete()
+        audioSessionActive = true
         this.onComplete = onComplete
         val url = NSURL.fileURLWithPath(path)
         val item = AVPlayerItem(uRL = url)
@@ -66,7 +64,10 @@ actual class TravelDuaPlayer actual constructor() {
         observer = null
         player?.pause()
         player = null
-        AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
+        if (audioSessionActive) {
+            audioSessionActive = false
+            IosAudioSessionController.deactivate()
+        }
         complete()
     }
 

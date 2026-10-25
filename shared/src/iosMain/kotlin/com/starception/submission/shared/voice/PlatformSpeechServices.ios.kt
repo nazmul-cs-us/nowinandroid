@@ -16,20 +16,17 @@
 
 package com.starception.submission.shared.voice
 
+import com.starception.submission.shared.platform.IosAudioSessionController
 import com.starception.submission.shared.settings.VoiceRecognitionMode
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import platform.AVFAudio.AVAudioEngine
 import platform.AVFAudio.AVAudioSession
-import platform.AVFAudio.AVAudioSessionCategoryPlayAndRecord
-import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.AVSpeechBoundary
-import platform.AVFAudio.AVAudioSessionModeMeasurement
 import platform.AVFAudio.AVSpeechSynthesisVoice
 import platform.AVFAudio.AVSpeechSynthesizer
 import platform.AVFAudio.AVSpeechSynthesizerDelegateProtocol
 import platform.AVFAudio.AVSpeechUtterance
-import platform.AVFAudio.setActive
 import platform.Foundation.NSLocale
 import platform.Speech.SFSpeechAudioBufferRecognitionRequest
 import platform.Speech.SFSpeechRecognitionTask
@@ -47,6 +44,7 @@ actual class PlatformSpeechRecognizer actual constructor() {
     private var task: SFSpeechRecognitionTask? = null
     private var callback: ((SpeechRecognitionEvent) -> Unit)? = null
     private var mode = VoiceRecognitionMode.KEYWORDS
+    private var audioSessionActive = false
 
     actual fun start(
         mode: VoiceRecognitionMode,
@@ -77,14 +75,11 @@ actual class PlatformSpeechRecognizer actual constructor() {
             return
         }
 
-        val session = AVAudioSession.sharedInstance()
-        session.setCategory(
-            AVAudioSessionCategoryPlayAndRecord,
-            mode = AVAudioSessionModeMeasurement,
-            options = 0u,
-            error = null,
-        )
-        session.setActive(true, withOptions = 0u, error = null)
+        if (!IosAudioSessionController.activateRecording()) {
+            fail("The microphone audio session could not be started")
+            return
+        }
+        audioSessionActive = true
 
         val engine = AVAudioEngine()
         val recognitionRequest = SFSpeechAudioBufferRecognitionRequest().apply {
@@ -147,7 +142,10 @@ actual class PlatformSpeechRecognizer actual constructor() {
         task = null
         request = null
         audioEngine = null
-        AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
+        if (audioSessionActive) {
+            audioSessionActive = false
+            IosAudioSessionController.deactivate()
+        }
     }
 }
 
@@ -156,6 +154,7 @@ actual class PlatformSpeechSynthesizer actual constructor() {
     private val synthesizer = AVSpeechSynthesizer()
     private var completion: ((String?) -> Unit)? = null
     private var activeUtterance: AVSpeechUtterance? = null
+    private var audioSessionActive = false
     private val delegate = object : NSObject(), AVSpeechSynthesizerDelegateProtocol {
         @ObjCSignatureOverride
         override fun speechSynthesizer(
@@ -193,9 +192,8 @@ actual class PlatformSpeechSynthesizer actual constructor() {
         val voice = voiceIdentifier?.let(AVSpeechSynthesisVoice::voiceWithIdentifier)
             ?: AVSpeechSynthesisVoice.voiceWithLanguage(language)
             ?: return false
-        val session = AVAudioSession.sharedInstance()
-        session.setCategory(AVAudioSessionCategoryPlayback, error = null)
-        session.setActive(true, withOptions = 0u, error = null)
+        if (!IosAudioSessionController.activatePlayback()) return false
+        audioSessionActive = true
         completion = onComplete
         val utterance = AVSpeechUtterance.speechUtteranceWithString(text).apply {
             this.voice = voice
@@ -212,7 +210,10 @@ actual class PlatformSpeechSynthesizer actual constructor() {
         if (synthesizer.speaking) {
             synthesizer.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
         }
-        AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
+        if (audioSessionActive) {
+            audioSessionActive = false
+            IosAudioSessionController.deactivate()
+        }
     }
 
     actual fun pause() {
@@ -226,10 +227,10 @@ actual class PlatformSpeechSynthesizer actual constructor() {
 
     actual fun resume() {
         if (synthesizer.paused) {
-            val session = AVAudioSession.sharedInstance()
-            session.setCategory(AVAudioSessionCategoryPlayback, error = null)
-            session.setActive(true, withOptions = 0u, error = null)
-            synthesizer.continueSpeaking()
+            if (IosAudioSessionController.activatePlayback()) {
+                audioSessionActive = true
+                synthesizer.continueSpeaking()
+            }
         }
     }
 
@@ -237,7 +238,10 @@ actual class PlatformSpeechSynthesizer actual constructor() {
         val target = completion
         completion = null
         activeUtterance = null
-        AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
+        if (audioSessionActive) {
+            audioSessionActive = false
+            IosAudioSessionController.deactivate()
+        }
         target?.invoke(error)
     }
 }
