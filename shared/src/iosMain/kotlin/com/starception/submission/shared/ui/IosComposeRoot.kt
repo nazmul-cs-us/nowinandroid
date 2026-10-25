@@ -64,6 +64,7 @@ import com.starception.submission.shared.travel.TravelDuaPlayer
 import com.starception.submission.shared.voice.IosSherpaAssetResolver
 import com.starception.submission.shared.voice.IosSherpaEventSink
 import com.starception.submission.shared.voice.IosSherpaService
+import com.starception.submission.shared.voice.IosNowPlayingService
 import com.starception.submission.shared.voice.NarrationVoice
 import com.starception.submission.shared.voice.PlatformSpeechRecognizer
 import com.starception.submission.shared.voice.PlatformSpeechSynthesizer
@@ -377,10 +378,12 @@ fun RequestComposerSuggestions(onReady: (List<String>) -> Unit) {
 @Suppress("FunctionName")
 fun PrayerTimesViewController(
     sherpaService: IosSherpaService? = null,
+    nowPlayingService: IosNowPlayingService? = null,
     salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService? = null,
     salah3DService: Salah3DSceneService? = null,
 ): UIViewController = createPrayerTimesViewController(
     sherpaService = sherpaService,
+    nowPlayingService = nowPlayingService,
     salahTfliteService = salahTfliteService,
     salah3DService = salah3DService,
     startBottomIndex = 0,
@@ -390,12 +393,14 @@ fun PrayerTimesViewController(
 @Suppress("FunctionName", "unused")
 fun PrayerTimesTabViewController(
     sherpaService: IosSherpaService? = null,
+    nowPlayingService: IosNowPlayingService? = null,
     salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService? = null,
     salah3DService: Salah3DSceneService? = null,
     startBottomIndex: Int,
     onSelectBottom: (Int) -> Unit,
 ): UIViewController = createPrayerTimesViewController(
     sherpaService = sherpaService,
+    nowPlayingService = nowPlayingService,
     salahTfliteService = salahTfliteService,
     salah3DService = salah3DService,
     startBottomIndex = startBottomIndex,
@@ -404,11 +409,18 @@ fun PrayerTimesTabViewController(
 
 private fun createPrayerTimesViewController(
     sherpaService: IosSherpaService?,
+    nowPlayingService: IosNowPlayingService?,
     salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService?,
     salah3DService: Salah3DSceneService?,
     startBottomIndex: Int,
     onSelectBottom: ((Int) -> Unit)?,
 ): UIViewController = ComposeUIViewController {
+    // Register system media before the content-setup gate. Playback state can
+    // outlive an individual tab or reader composition.
+    remember(nowPlayingService) {
+        com.starception.submission.shared.voice.NarrationNowPlaying.install(nowPlayingService)
+        true
+    }
     val setupStore = remember { com.starception.submission.shared.content.SharedContentStore() }
     io.github.alexzhirkevich.cupertino.adaptive.AdaptiveTheme(
         target = io.github.alexzhirkevich.cupertino.adaptive.Theme.Cupertino,
@@ -462,11 +474,8 @@ private fun createPrayerTimesViewController(
                 ?.substringAfter('=')
                 ?.toIntOrNull()
         }
-        // Lock-screen and Control Center controls for the detached hadith
-        // narration queue; installing is idempotent so every tab's
-        // composition can call it.
+        // Model download hooks are process-wide and idempotent.
         remember {
-            com.starception.submission.shared.voice.NarrationNowPlaying.install()
             com.starception.submission.shared.assets.installDeenlyModelDownloadHook()
             com.starception.submission.shared.assets.installHadithCategorizerDownloadHook()
             true

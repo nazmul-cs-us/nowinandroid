@@ -17,6 +17,7 @@ struct ComposePrayerTimesView: UIViewControllerRepresentable {
         DeenlyKnowledgeRuntime.shared.service = DeenlyKnowledgeServiceImpl.shared
         return IosComposeRootKt.PrayerTimesViewController(
             sherpaService: SherpaSpeechService.shared,
+            nowPlayingService: NowPlayingService.shared,
             salahTfliteService: SalahTfliteServiceImpl(),
             salah3DService: SalahScene3DHost()
         )
@@ -37,6 +38,7 @@ struct ComposePrayerTimesTabView: UIViewControllerRepresentable {
         DeenlyKnowledgeRuntime.shared.service = DeenlyKnowledgeServiceImpl.shared
         return IosComposeRootKt.PrayerTimesTabViewController(
             sherpaService: SherpaSpeechService.shared,
+            nowPlayingService: NowPlayingService.shared,
             salahTfliteService: SalahTfliteServiceImpl(),
             salah3DService: SalahScene3DHost(),
             startBottomIndex: Int32(tabIndex),

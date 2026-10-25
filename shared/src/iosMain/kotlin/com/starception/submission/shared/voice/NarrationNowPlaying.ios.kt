@@ -56,6 +56,7 @@ object NarrationNowPlaying {
     )
 
     private var installed = false
+    private var nativeService: IosNowPlayingService? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val externalAudio = MutableStateFlow<ExternalAudio?>(null)
     private val commandCenter by lazy { MPRemoteCommandCenter.sharedCommandCenter() }
@@ -63,7 +64,8 @@ object NarrationNowPlaying {
         UIImage.imageNamed("DeenlyNowPlayingArtwork")?.let(::MPMediaItemArtwork)
     }
 
-    fun install() {
+    fun install(service: IosNowPlayingService? = null) {
+        if (service != null) nativeService = service
         if (installed) return
         installed = true
         UIApplication.sharedApplication.beginReceivingRemoteControlEvents()
@@ -229,6 +231,29 @@ object NarrationNowPlaying {
         elapsedSeconds: Double? = null,
         durationSeconds: Double? = null,
     ) {
+        nativeService?.publish(
+            title = title,
+            artist = "Deenly",
+            albumTitle = albumTitle,
+            playing = playing,
+            elapsedSeconds = elapsedSeconds ?: 0.0,
+            durationSeconds = durationSeconds ?: 0.0,
+        ) ?: publishWithKotlinBridge(
+            title = title,
+            albumTitle = albumTitle,
+            playing = playing,
+            elapsedSeconds = elapsedSeconds,
+            durationSeconds = durationSeconds,
+        )
+    }
+
+    private fun publishWithKotlinBridge(
+        title: String,
+        albumTitle: String,
+        playing: Boolean,
+        elapsedSeconds: Double?,
+        durationSeconds: Double?,
+    ) {
         val info = mutableMapOf<Any?, Any?>(
             MPMediaItemPropertyTitle to title,
             MPMediaItemPropertyArtist to "Deenly",
@@ -250,6 +275,10 @@ object NarrationNowPlaying {
 
     private fun clearSystemNowPlaying() {
         configureCommands(hasAudio = false, canSkip = false, canSeek = false)
+        nativeService?.clear() ?: clearWithKotlinBridge()
+    }
+
+    private fun clearWithKotlinBridge() {
         MPNowPlayingInfoCenter.defaultCenter().apply {
             nowPlayingInfo = null
             playbackState = MPNowPlayingPlaybackStateStopped
