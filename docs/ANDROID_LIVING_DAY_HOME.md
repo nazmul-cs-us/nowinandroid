@@ -5,11 +5,12 @@ The existing landscape layout continues to provide its two-column dashboard.
 
 ## Structure
 
-- A day/night prayer image, location, next obligatory prayer, `HH:mm:ss`
-  countdown, and five-prayer status ribbon.
-- Actions for marking an elapsed prayer, opening the compass, playing/pausing
-  today's reading, and opening the complete schedule.
-- A full-width content deck with Reading, Salah, For you, and Qibla tabs.
+- A tall day/night prayer scene with location, next obligatory prayer,
+  `HH:mm:ss` countdown, and five-prayer status ribbon.
+- Actions inside the scene for marking an elapsed prayer, opening the compass,
+  playing/pausing today's reading, and opening the complete schedule.
+- A content deck with Reading, Salah, For you, and Qibla pages. A small page
+  indicator and the next card edge show that the deck can be swiped.
   Content stays selected until the user changes it; this deck does not auto-page.
 - The existing editable schedule appears on request and scrolls into view.
   Prayer notifications, adhan controls, adjustments, and location/weather

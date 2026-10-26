@@ -3590,7 +3590,7 @@ fun PrayerTimesScreen(
                                                     showCompassPopup = true
                                                 },
                                                 timeOffsets = storedOffsets,
-                                                portraitStripHeight = (220f * fontScale.coerceAtLeast(1f)).dp.coerceAtMost(portraitImmersiveInsightHeight),
+                                                portraitStripHeight = (300f * fontScale.coerceAtLeast(1f)).dp.coerceAtMost(portraitImmersiveInsightHeight),
                                                 portraitExpandedStripHeight = portraitImmersiveInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.

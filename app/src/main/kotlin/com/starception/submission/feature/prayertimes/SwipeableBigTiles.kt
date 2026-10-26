@@ -1840,6 +1840,20 @@ internal fun SwipeableBigTiles(
                 modifier = Modifier.weight(1f),
             )
             if (livingDayLayout) {
+                InsightPageIndicator(
+                    style = indicatorStyle,
+                    pageCount = insightPageCount,
+                    currentIndex = pagerState.currentPage % insightPageCount,
+                    progress = autoAdvanceProgress.value,
+                    onSelect = { index ->
+                        isAutomaticallySized = true
+                        setExpansionExtent(0f)
+                        carouselScope.launch {
+                            pagerState.animateScrollToPage(pagerState.currentPage + index - pagerState.currentPage % insightPageCount)
+                        }
+                    },
+                    onLongPress = {},
+                )
                 androidx.compose.material3.TextButton(onClick = {
                     if (expandedLogicalPage == null) expandInsightToPreferred(focusedLogicalPage)
                     else { isAutomaticallySized = true; setExpansionExtent(0f) }
@@ -1877,29 +1891,6 @@ internal fun SwipeableBigTiles(
             }
         }
 
-        if (livingDayLayout && !isImmersive) {
-            androidx.compose.foundation.lazy.LazyRow(
-                modifier = Modifier.fillMaxWidth().onSizeChanged { measuredTabsHeight = with(density) { it.height.toDp() } }.padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(pageIds.size) { index ->
-                    val labels = listOf(R.string.living_day_reading, R.string.living_day_salah,
-                        R.string.living_day_suggested, R.string.living_day_qibla)
-                    androidx.compose.material3.FilterChip(
-                        selected = pagerState.currentPage % insightPageCount == index,
-                        onClick = {
-                            isAutomaticallySized = true
-                            setExpansionExtent(0f)
-                            carouselScope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage + index - pagerState.currentPage % insightPageCount)
-                            }
-                        },
-                        label = { Text(androidx.compose.ui.res.stringResource(labels[index])) },
-                    )
-                }
-            }
-        }
-
         val stripModifier = if (isLandscape) {
             Modifier
                 .fillMaxWidth()
@@ -1911,7 +1902,7 @@ internal fun SwipeableBigTiles(
         }
 
         BoxWithConstraints(modifier = stripModifier) {
-            val normalCardWidth = if (isLandscape || livingDayLayout) {
+            val normalCardWidth = if (isLandscape) {
                 // The split-screen home layout is already narrow enough to signal
                 // that this is a carousel through its indicator. A portrait-style
                 // peek here exposed half of the next card and clipped its copy at
@@ -1951,7 +1942,7 @@ internal fun SwipeableBigTiles(
                 ).dp
             val restingPageSpacing = if (isLandscape) 10.dp else (14f - (4f * compactProgress)).dp
             val pageSpacing = (restingPageSpacing.value * (1f - widthExpansion)).dp
-            val endContentPadding = if (isLandscape || livingDayLayout) {
+            val endContentPadding = if (isLandscape) {
                 0.dp
             } else {
                 (18f * (1f - widthExpansion)).dp

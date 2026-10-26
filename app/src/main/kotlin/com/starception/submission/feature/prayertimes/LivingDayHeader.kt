@@ -23,17 +23,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.R
-import com.starception.submission.core.images.resources.Res
-import com.starception.submission.core.images.resources.prayer_now_insight_day
-import com.starception.submission.core.images.resources.prayer_now_insight_night
 import com.starception.submission.prayer.model.DayPrayerTimes
-import org.jetbrains.compose.resources.painterResource
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -67,31 +65,32 @@ internal fun LivingDayHeader(
     val themeAccent = MaterialTheme.colorScheme.primaryContainer
     val photoAccent = if (themeAccent.luminance() >= .35f) themeAccent else Color.White
 
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column {
         Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))) {
             Image(
-                painterResource(if (isNight) Res.drawable.prayer_now_insight_night else Res.drawable.prayer_now_insight_day),
+                painterResource(if (isNight) R.drawable.prayer_widget_poster_night_moonless_hq_v4
+                    else R.drawable.prayer_widget_poster_day_no_glare_hq_v4),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
             )
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(
-                listOf(Color.Black.copy(alpha = .22f), Color.Black.copy(alpha = .45f), Color.Black.copy(alpha = .86f)),
+                listOf(Color.Black.copy(alpha = .38f), Color.Black.copy(alpha = .27f), Color.Black.copy(alpha = .92f)),
             )))
             Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(day?.location?.getDisplayName().orEmpty().ifBlank { stringResource(R.string.living_day_location) },
                     style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = .85f))
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(56.dp))
                 Text(stringResource(R.string.living_day_next), style = MaterialTheme.typography.labelLarge,
                     color = Color.White.copy(alpha = .8f))
                 Text(next?.first?.let(::display) ?: stringResource(R.string.prayer_times_title),
-                    style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.SemiBold,
                     color = Color.White, modifier = Modifier.semantics { heading() })
                 Text(next?.let { livingDayCountdown(now, it.second) } ?: "—",
-                    style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
+                    style = MaterialTheme.typography.displayMedium.copy(fontFeatureSettings = "tnum", letterSpacing = (-2).sp),
                     color = photoAccent, fontWeight = FontWeight.Medium)
                 next?.let { Text(it.second.format(timeFormat), style = MaterialTheme.typography.bodyLarge, color = Color.White) }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(48.dp))
                 // At large font sizes use rows, keeping complete names and times readable.
                 val columns = if (LocalDensity.current.fontScale > 1.3f) 2 else 5
                 prayers.chunked(columns).forEach { row ->
@@ -118,9 +117,8 @@ internal fun LivingDayHeader(
                         repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
-            }
-        }
-        val actions = listOf(
+                Spacer(Modifier.height(24.dp))
+                val actions = listOf(
             HomeAction(markable?.let { stringResource(R.string.living_day_mark, display(it.first)) }
                 ?: stringResource(R.string.living_day_salah), Icons.Outlined.CheckCircle,
                 { markable?.let { onTogglePrayer(it.first) } ?: onSchedule() }),
@@ -130,18 +128,20 @@ internal fun LivingDayHeader(
             HomeAction(stringResource(if (scheduleExpanded) R.string.living_day_close_schedule else R.string.living_day_schedule),
                 Icons.Outlined.DateRange, onSchedule),
         )
-        val actionColumns = if (LocalDensity.current.fontScale > 1.3f) 2 else 4
-        actions.chunked(actionColumns).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { action ->
-                    Surface(onClick = action.onClick, modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                        Column(Modifier.padding(horizontal = 4.dp, vertical = 12.dp).heightIn(min = 56.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(action.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Text(action.title, style = MaterialTheme.typography.labelMedium,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                val actionColumns = if (LocalDensity.current.fontScale > 1.3f) 2 else 4
+                actions.chunked(actionColumns).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { action ->
+                            Surface(onClick = action.onClick, modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = .48f)) {
+                                Column(Modifier.padding(horizontal = 4.dp, vertical = 12.dp).heightIn(min = 56.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(action.icon, contentDescription = null, tint = photoAccent)
+                                    Text(action.title, style = MaterialTheme.typography.labelMedium, color = Color.White,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                }
+                            }
                         }
                     }
                 }
