@@ -1752,6 +1752,13 @@ internal fun SwipeableBigTiles(
             ),
         )
     }
+    fun openLivingDayCard(logicalPage: Int) {
+        expandInsightToPreferred(logicalPage)
+        // A tap follows the reference's card-to-reader path; Back still returns
+        // directly to the same card in the feed.
+        isAutomaticallySized = false
+        setExpansionExtent(1f)
+    }
     // Expanded mode remains a carousel. Once a swipe settles, transfer the
     // expanded identity to the newly focused logical page so another long press
     // collapses that card and accessibility reports the correct state.
@@ -1902,7 +1909,11 @@ internal fun SwipeableBigTiles(
         }
 
         BoxWithConstraints(modifier = stripModifier) {
-            val normalCardWidth = if (isLandscape) {
+            val normalCardWidth = if (livingDayLayout) {
+                // Let the next card signal horizontal navigation without making
+                // the focused passage too narrow to read.
+                maxWidth * 0.86f
+            } else if (isLandscape) {
                 // The split-screen home layout is already narrow enough to signal
                 // that this is a carousel through its indicator. A portrait-style
                 // peek here exposed half of the next card and clipped its copy at
@@ -2161,6 +2172,9 @@ internal fun SwipeableBigTiles(
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[1] = measured
                             },
+                            onClick = {
+                                if (livingDayLayout && !isExpandedCard) openLivingDayCard(logicalPage)
+                            },
                             isFocused = isFocused,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
@@ -2290,7 +2304,9 @@ internal fun SwipeableBigTiles(
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                if (isDrivingMode) {
+                                if (livingDayLayout && !isExpandedCard) {
+                                    openLivingDayCard(logicalPage)
+                                } else if (isDrivingMode) {
                                     onDailyReadingPlayPause(dailySurah.number - 1)
                                 } else {
                                     onSurahClick(dailySurah.number)
@@ -2373,7 +2389,8 @@ internal fun SwipeableBigTiles(
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                showGlobePopup = true
+                                if (livingDayLayout && !isExpandedCard) openLivingDayCard(logicalPage)
+                                else showGlobePopup = true
                             },
                              expandedLeadingContent = if (renderExpandedPayload) {
                                  {
@@ -2477,7 +2494,9 @@ internal fun SwipeableBigTiles(
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                if (isExpandedCard && modelKnowledgeCandidate != null) {
+                                if (livingDayLayout && !isExpandedCard) {
+                                    openLivingDayCard(logicalPage)
+                                } else if (isExpandedCard && modelKnowledgeCandidate != null) {
                                     onModelKnowledgeClick(modelKnowledgeCandidate)
                                 } else when (val target = displayedAiRecommendation.target) {
                                     is ContextualRecommendationTarget.Surah -> {

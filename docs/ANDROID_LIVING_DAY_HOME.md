@@ -2,6 +2,8 @@
 
 The portrait home now separates the prayer anchor from the content reader.
 The existing landscape layout continues to provide its two-column dashboard.
+Portrait uses a dark canvas and larger image-led cards, drawing on the shared
+card-to-player reference while retaining Deenly's prayer and Quran content.
 
 ## Structure
 
@@ -10,7 +12,8 @@ The existing landscape layout continues to provide its two-column dashboard.
 - Actions inside the scene for marking an elapsed prayer, opening the compass,
   playing/pausing today's reading, and opening the complete schedule.
 - A content deck with Reading, Salah, For you, and Qibla pages. A small page
-  indicator and the next card edge show that the deck can be swiped.
+  indicator and the next card edge show that the deck can be swiped. Tapping a
+  focused card opens its full-screen content; Back returns to the same card.
   Content stays selected until the user changes it; this deck does not auto-page.
 - The existing editable schedule appears on request and scrolls into view.
   Prayer notifications, adhan controls, adjustments, and location/weather
@@ -22,7 +25,7 @@ existing app navigation destinations and pull-to-sync/media strip remain in use.
 
 ## Expansion and accessibility
 
-Expanding a reader folds away the prayer anchor and brings the reader to the
+Opening a reader folds away the prayer anchor and brings the reader to the
 top of the viewport. Collapsing restores the anchor. Reading width is constant;
 content measurements control expanded height. The measured heading and tabs
 are included in the available-height budget above bottom navigation. Existing

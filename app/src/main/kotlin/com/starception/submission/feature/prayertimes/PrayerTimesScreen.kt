@@ -3431,10 +3431,24 @@ fun PrayerTimesScreen(
                                         }
                                     }
                                 } else {
-                                    // PORTRAIT LAYOUT: Original vertical layout
+                                    // The portrait feed uses a single dark canvas so the imagery,
+                                    // recommendation cards, and schedule read as one surface.
+                                    val homeAccent = MaterialTheme.colorScheme.primaryContainer
+                                    val homeTypography = MaterialTheme.typography
+                                    val homeShapes = MaterialTheme.shapes
+                                    androidx.compose.material3.MaterialTheme(
+                                        colorScheme = androidx.compose.material3.darkColorScheme(
+                                            primary = homeAccent,
+                                            background = androidx.compose.ui.graphics.Color(0xFF101713),
+                                            surface = androidx.compose.ui.graphics.Color(0xFF17221B),
+                                        ),
+                                        typography = homeTypography,
+                                        shapes = homeShapes,
+                                    ) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
+                                            .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
                                             .padding(horizontal = 24.dp)
                                             .padding(
                                                 top = 8.dp,
@@ -4548,6 +4562,7 @@ fun PrayerTimesScreen(
 
                                         Spacer(Modifier.height(4.dp))
                                         }
+                                    }
                                     }
                                 } // End of portrait layout else block
                             }
