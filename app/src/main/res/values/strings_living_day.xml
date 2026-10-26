@@ -1,0 +1,19 @@
+<resources>
+    <string name="living_day_location">Your prayer day</string>
+    <string name="living_day_next">Next prayer</string>
+    <string name="living_day_mark">Mark %1$s</string>
+    <string name="living_day_salah">Salah</string>
+    <string name="living_day_qibla">Qibla</string>
+    <string name="living_day_listen">Listen</string>
+    <string name="living_day_schedule">Schedule</string>
+    <string name="living_day_close_schedule">Close schedule</string>
+    <string name="living_day_moment">For this moment</string>
+    <string name="living_day_reading">Reading</string>
+    <string name="living_day_suggested">For you</string>
+    <string name="living_day_expand">Expand</string>
+    <string name="living_day_collapse">Collapse</string>
+    <string name="living_day_pause">Pause</string>
+    <string name="living_day_prayed">%1$s marked as prayed</string>
+    <string name="living_day_is_next">%1$s is next</string>
+    <string name="living_day_not_marked">%1$s not marked</string>
+</resources>

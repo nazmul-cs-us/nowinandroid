@@ -1367,8 +1367,10 @@ internal fun SwipeableBigTiles(
     onImmersiveModeChange: (Boolean) -> Unit = {},
     onHeaderHeightChange: (Dp) -> Unit = {},
     collapseExpandedTileRequest: Int = 0,
+    livingDayLayout: Boolean = false,
 ) {
-    val insightPageCount = INSIGHT_PAGE_COUNT
+    val pageIds = if (livingDayLayout) listOf(2, 1, 4, 3) else (0 until INSIGHT_PAGE_COUNT).toList()
+    val insightPageCount = pageIds.size
     val middleLoopStart = insightPageCount
     val view = LocalView.current
     val context = LocalContext.current
@@ -1376,7 +1378,7 @@ internal fun SwipeableBigTiles(
         context.getSharedPreferences("insight_carousel_preferences", Context.MODE_PRIVATE)
     }
     val persistedExpandedPage = remember {
-        if (carouselPreferences.getInt(INSIGHT_CONTENT_HEIGHT_VERSION_KEY, 0) >= 2) {
+        if (livingDayLayout) null else if (carouselPreferences.getInt(INSIGHT_CONTENT_HEIGHT_VERSION_KEY, 0) >= 2) {
             carouselPreferences.getInt(INSIGHT_EXPANDED_PAGE_KEY, -1)
                 .takeIf { it in 0 until insightPageCount }
         } else {
@@ -1388,7 +1390,7 @@ internal fun SwipeableBigTiles(
         }
     }
     val pagerState = rememberPagerState(
-        initialPage = middleLoopStart + (persistedExpandedPage ?: 0),
+        initialPage = middleLoopStart + pageIds.indexOf(persistedExpandedPage).coerceAtLeast(0),
         pageCount = { insightPageCount * 3 },
     )
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -1478,9 +1480,9 @@ internal fun SwipeableBigTiles(
         ),
         snapPositionalThreshold = 0.24f,
     )
-    var lastSettledPage by remember { mutableIntStateOf(0) }
+    var lastSettledPage by remember { mutableIntStateOf(pageIds.first()) }
     LaunchedEffect(pagerState.settledPage) {
-        val settledLogicalPage = pagerState.settledPage % insightPageCount
+        val settledLogicalPage = pageIds[pagerState.settledPage % insightPageCount]
         if (settledLogicalPage != lastSettledPage && !isAutoAdvancing) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         }
@@ -1632,7 +1634,7 @@ internal fun SwipeableBigTiles(
             calculateQiblaDirection(location.latitude, location.longitude).roundToInt()
         }
     }
-    val focusedLogicalPage = pagerState.settledPage % insightPageCount
+    val focusedLogicalPage = pageIds[pagerState.settledPage % insightPageCount]
     val liveQiblaHeading = rememberLiveCompassHeading(
         enabled = (focusedLogicalPage == 0 || focusedLogicalPage == 3) &&
             isResumed && !showGlobePopup,
@@ -1642,7 +1644,7 @@ internal fun SwipeableBigTiles(
     val dailySurahIsActive = dailyReadingPlayback.surahIndex == dailySurah.number - 1
     val readingKeepsFocus = focusedLogicalPage == 2 && dailySurahIsActive &&
         (dailyReadingPlayback.isPlaying || dailyReadingPlayback.isDownloading || dailyReadingPlayback.isLoading)
-    val autoAdvanceEnabled = autoSwipeEnabled && isResumed && systemAnimationsEnabled && !touchExplorationEnabled &&
+    val autoAdvanceEnabled = !livingDayLayout && autoSwipeEnabled && isResumed && systemAnimationsEnabled && !touchExplorationEnabled &&
         !isUserTouching && (!pagerState.isScrollInProgress || isAutoAdvancing) && !isInteractionBlocked &&
         !showGlobePopup && !showAutoSwipeSettings && pendingPrayerUndo == null && !readingKeepsFocus &&
         expandedLogicalPage == null
@@ -1723,7 +1725,7 @@ internal fun SwipeableBigTiles(
         expansionExtent = clamped
         when {
             clamped > 0f && expandedLogicalPage == null -> {
-                expandedLogicalPage = pagerState.settledPage % insightPageCount
+                expandedLogicalPage = pageIds[pagerState.settledPage % insightPageCount]
             }
             clamped == 0f && expandedLogicalPage != null -> expandedLogicalPage = null
         }
@@ -1755,7 +1757,7 @@ internal fun SwipeableBigTiles(
     // collapses that card and accessibility reports the correct state.
     LaunchedEffect(pagerState.settledPage, expandedLogicalPage) {
         if (expandedLogicalPage != null) {
-            val settledLogicalPage = pagerState.settledPage % insightPageCount
+            val settledLogicalPage = pageIds[pagerState.settledPage % insightPageCount]
             if (expandedLogicalPage != settledLogicalPage) {
                 expandedLogicalPage = settledLogicalPage
             }
@@ -1763,7 +1765,7 @@ internal fun SwipeableBigTiles(
     }
     // Coalesce width-dependent text measurements and asynchronous content updates.
     // Only the settled page may choose a size; corner-grip sizes remain untouched.
-    val focusedSizingPage = pagerState.settledPage % insightPageCount
+    val focusedSizingPage = pageIds[pagerState.settledPage % insightPageCount]
     val focusedHeightHint = expandedHeightHints[focusedSizingPage]
     LaunchedEffect(
         focusedSizingPage, focusedHeightHint, expandedLogicalPage, isModelKnowledgeLoading, isSalahHadithLoading,
@@ -1809,6 +1811,11 @@ internal fun SwipeableBigTiles(
     val headerFontSize = (20f - (4f * compactProgress)).sp
     val headerLineHeight = (24f - (4f * compactProgress)).sp
     val headerBottomPadding = (10f - (4f * compactProgress)).dp
+    var measuredHeadingHeight by remember { mutableStateOf(44.dp) }
+    var measuredTabsHeight by remember { mutableStateOf(0.dp) }
+    LaunchedEffect(measuredHeadingHeight, measuredTabsHeight, isImmersive) {
+        onHeaderHeightChange(if (isImmersive) 0.dp else measuredHeadingHeight + measuredTabsHeight)
+    }
 
     Column(
         modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
@@ -1817,12 +1824,12 @@ internal fun SwipeableBigTiles(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = headerBottomPadding)
-                .onSizeChanged { onHeaderHeightChange(with(density) { it.height.toDp() } + headerBottomPadding) },
+                .onSizeChanged { measuredHeadingHeight = with(density) { it.height.toDp() } + headerBottomPadding },
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Insights",
+                text = if (livingDayLayout) androidx.compose.ui.res.stringResource(R.string.living_day_moment) else "Insights",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontSize = headerFontSize,
                     lineHeight = headerLineHeight,
@@ -1830,8 +1837,18 @@ internal fun SwipeableBigTiles(
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            if (livingDayLayout) {
+                androidx.compose.material3.TextButton(onClick = {
+                    if (expandedLogicalPage == null) expandInsightToPreferred(focusedLogicalPage)
+                    else { isAutomaticallySized = true; setExpansionExtent(0f) }
+                }) {
+                    Text(androidx.compose.ui.res.stringResource(
+                        if (expandedLogicalPage == null) R.string.living_day_expand else R.string.living_day_collapse,
+                    ))
+                }
+            } else Row(verticalAlignment = Alignment.CenterVertically) {
                 InsightPageIndicator(
                     style = indicatorStyle,
                     pageCount = insightPageCount,
@@ -1860,6 +1877,29 @@ internal fun SwipeableBigTiles(
             }
         }
 
+        if (livingDayLayout && !isImmersive) {
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier.fillMaxWidth().onSizeChanged { measuredTabsHeight = with(density) { it.height.toDp() } }.padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(pageIds.size) { index ->
+                    val labels = listOf(R.string.living_day_reading, R.string.living_day_salah,
+                        R.string.living_day_suggested, R.string.living_day_qibla)
+                    androidx.compose.material3.FilterChip(
+                        selected = pagerState.currentPage % insightPageCount == index,
+                        onClick = {
+                            isAutomaticallySized = true
+                            setExpansionExtent(0f)
+                            carouselScope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage + index - pagerState.currentPage % insightPageCount)
+                            }
+                        },
+                        label = { Text(androidx.compose.ui.res.stringResource(labels[index])) },
+                    )
+                }
+            }
+        }
+
         val stripModifier = if (isLandscape) {
             Modifier
                 .fillMaxWidth()
@@ -1871,7 +1911,7 @@ internal fun SwipeableBigTiles(
         }
 
         BoxWithConstraints(modifier = stripModifier) {
-            val normalCardWidth = if (isLandscape) {
+            val normalCardWidth = if (isLandscape || livingDayLayout) {
                 // The split-screen home layout is already narrow enough to signal
                 // that this is a carousel through its indicator. A portrait-style
                 // peek here exposed half of the next card and clipped its copy at
@@ -1911,7 +1951,7 @@ internal fun SwipeableBigTiles(
                 ).dp
             val restingPageSpacing = if (isLandscape) 10.dp else (14f - (4f * compactProgress)).dp
             val pageSpacing = (restingPageSpacing.value * (1f - widthExpansion)).dp
-            val endContentPadding = if (isLandscape) {
+            val endContentPadding = if (isLandscape || livingDayLayout) {
                 0.dp
             } else {
                 (18f * (1f - widthExpansion)).dp
@@ -1973,7 +2013,7 @@ internal fun SwipeableBigTiles(
                         }
                     },
             ) { page ->
-                val logicalPage = page % insightPageCount
+                val logicalPage = pageIds[page % insightPageCount]
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
