@@ -2125,6 +2125,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             longPressLabel = if (isExpandedCard) {
                                 "Collapse Prayer Now"
@@ -2185,6 +2186,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[1] = measured
@@ -2292,6 +2294,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[2] = measured
@@ -2403,6 +2406,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[3] = measured
@@ -2479,6 +2483,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[4] = measured
@@ -3017,6 +3022,7 @@ private fun PrayerPosterInsightCard(
     expansionProgress: Float,
     isExpanded: Boolean,
     fluidFullBleed: Boolean = false,
+    lightHomeArtwork: Boolean = false,
     onLongPress: (() -> Unit)?,
     longPressLabel: String,
     isFocused: Boolean,
@@ -3079,6 +3085,7 @@ private fun PrayerPosterInsightCard(
             expansionProgress = expansionProgress,
             isExpanded = isExpanded,
             fluidFullBleed = fluidFullBleed,
+            lightHomeArtwork = lightHomeArtwork,
             onLongPress = onLongPress,
             longPressLabel = longPressLabel,
             isFocused = isFocused,
@@ -3130,6 +3137,7 @@ private fun InsightPreviewCard(
     expansionProgress: Float = 0f,
     isExpanded: Boolean = false,
     fluidFullBleed: Boolean = false,
+    lightHomeArtwork: Boolean = false,
     useEditorialExpandedLayout: Boolean = false,
     onLongPress: (() -> Unit)? = null,
     longPressLabel: String? = null,
@@ -3302,7 +3310,7 @@ private fun InsightPreviewCard(
                 },
             ),
         shape = shape,
-        color = Color(0xFF635A56),
+        color = if (lightHomeArtwork) Color(0xFFFEFDFF) else Color(0xFF635A56),
         tonalElevation = 0.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -3807,6 +3815,14 @@ private fun InsightPreviewCard(
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = animatedForegroundSceneDarkness)),
                 )
+            }
+
+            if (lightHomeArtwork && !isExpanded) {
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = .42f),
+                    .44f to Color.White.copy(alpha = .08f),
+                    1f to Color.Transparent,
+                )))
             }
 
             Box(

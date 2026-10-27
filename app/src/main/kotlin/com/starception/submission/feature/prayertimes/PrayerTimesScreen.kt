@@ -3039,13 +3039,32 @@ fun PrayerTimesScreen(
                         .50f to Color(0xFF0B1D2C).copy(alpha = .78f),
                         1f to Color(0xFF0C110F).copy(alpha = .97f),
                     )))
+                } else if (!outerIsLandscape) {
+                    // The light home keeps the same prayer identity as a soft
+                    // atmospheric layer; the readable canvas remains white.
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                        0f to Color(0xFFFCFBFF),
+                        .40f to Color(0xFFF8F7FC),
+                        1f to Color.White,
+                    )))
+                    Image(
+                        painter = composeArtworkPainter(HomeImageRes.drawable.prayer_now_insight_day),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.11f },
+                    )
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = .42f),
+                        .48f to Color.White.copy(alpha = .87f),
+                        1f to Color.White,
+                    )))
                 }
                 com.starception.submission.ui.AppTopSearchBar(
                     title = stringResource(R.string.prayer_times_title),
                     onSettingsClick = onSettingsClick,
                     modifier = Modifier,
-                    pillContainerColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color(0xFF25362B) else Color.White,
-                    pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF17221B),
+                    pillContainerColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color(0xFF25362B) else Color(0xFFF7F5FB),
+                    pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF191724),
                     topInset = dynamicTopInset,
                     onVerseClick = onSurahClickWithAyah,
                     onSearchSubmit = onSearchSubmit,
@@ -3518,7 +3537,15 @@ fun PrayerTimesScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(if (darkHome) Color.Transparent else Color.White)
+                                            .then(
+                                                if (darkHome) Modifier else Modifier.background(
+                                                    Brush.verticalGradient(
+                                                        0f to Color.White.copy(alpha = .28f),
+                                                        .45f to Color.White.copy(alpha = .91f),
+                                                        1f to Color.White,
+                                                    ),
+                                                )
+                                            )
                                             .padding(horizontal = feedGutter)
                                             .padding(
                                                 top = 8.dp,

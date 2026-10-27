@@ -21,10 +21,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.border
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -37,6 +39,7 @@ import com.starception.submission.core.images.resources.insight_prayer_foregroun
 import com.starception.submission.core.images.resources.insight_qibla_background
 import com.starception.submission.core.images.resources.insight_qibla_foreground_v2
 import com.starception.submission.core.images.resources.insight_suggestion
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -62,6 +65,7 @@ private val homeArtworkCards by lazy {
 
 @Composable
 internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifier, copyAlpha: Float = 1f) {
+    val dark = LocalDarkTheme.current
     Box(modifier) {
         Image(
             painter = painterResource(card.background),
@@ -78,7 +82,11 @@ internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifi
             )
         }
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(
-            listOf(Color.Black.copy(alpha = .12f), Color.Transparent, Color.Black.copy(alpha = .78f)),
+            listOf(
+                if (dark) Color.Black.copy(alpha = .12f) else Color.White.copy(alpha = .16f),
+                Color.Transparent,
+                Color.Black.copy(alpha = if (dark) .78f else .70f),
+            ),
         )))
         if (copyAlpha > 0f) {
             Column(Modifier.align(Alignment.BottomStart).padding(16.dp)
@@ -116,12 +124,16 @@ private fun ArtworkCard(
     onSelect: (HomeArtworkCard, Rect) -> Unit,
 ) {
     val height = if (LocalDensity.current.fontScale > 1.3f) 240.dp else 168.dp
+    val dark = LocalDarkTheme.current
+    val shape = RoundedCornerShape(24.dp)
     var bounds by remember { mutableStateOf(Rect.Zero) }
     HomeArtworkScene(
         card = card,
         modifier = modifier.height(height)
             .onGloballyPositioned { bounds = it.boundsInWindow() }
-            .clip(RoundedCornerShape(24.dp))
+            .then(if (dark) Modifier else Modifier.shadow(8.dp, shape))
+            .clip(shape)
+            .then(if (dark) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = .88f), shape))
             .clickable { if (bounds.width > 0f) onSelect(card, bounds) },
     )
 }

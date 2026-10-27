@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +64,7 @@ internal fun HomeReadingPlayer(
     val mutedInk = ink.copy(alpha = .72f)
     val playSurface = if (dark) Color.White else Color(0xFF17221B)
     val playInk = if (dark) Color(0xFF10283A) else Color.White
+    val accent = if (dark) MaterialTheme.colorScheme.primary else Color(0xFF8B68B4)
     val isCurrent = playback.surahIndex == surah.number - 1
     val duration = if (isCurrent) playback.durationMs.coerceAtLeast(0) else 0
     val position = if (isCurrent) playback.positionMs.coerceIn(0, duration) else 0
@@ -75,7 +77,12 @@ internal fun HomeReadingPlayer(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Box(Modifier.fillMaxSize().background(if (dark) Color(0xFF06121D) else Color.White)) {
+        Box(Modifier.fillMaxSize().then(
+            if (dark) Modifier.background(Color(0xFF06121D))
+            else Modifier.background(Brush.verticalGradient(
+                listOf(Color(0xFFF8F7FC), Color.White, Color(0xFFFAF9FD)),
+            )),
+        )) {
             if (dark) {
                 Image(
                     painter = painterResource(Res.drawable.insight_quran_background),
@@ -88,6 +95,16 @@ internal fun HomeReadingPlayer(
                     .46f to Color(0xFF091724).copy(alpha = .78f),
                     1f to Color(0xFF06121D),
                 )))
+            } else {
+                Box(
+                    Modifier.align(Alignment.Center).size(320.dp).background(
+                        Brush.radialGradient(listOf(
+                            Color(0xFFE8DDF5).copy(alpha = .48f),
+                            Color.Transparent,
+                        )),
+                        CircleShape,
+                    ),
+                )
             }
             Column(
                 Modifier.fillMaxSize().padding(start = 28.dp, end = 28.dp, top = 40.dp, bottom = 40.dp),
@@ -101,7 +118,7 @@ internal fun HomeReadingPlayer(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Text("TODAY'S READING", color = if (dark) Color(0xFFD9B679) else Color(0xFF385E76),
+                Text("TODAY'S READING", color = if (dark) Color(0xFFD9B679) else accent,
                     style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 Text(surah.nameEnglish, color = ink,
                     style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold,
@@ -124,6 +141,11 @@ internal fun HomeReadingPlayer(
                         dragging = false
                     },
                     enabled = duration > 0,
+                    colors = SliderDefaults.colors(
+                        thumbColor = accent,
+                        activeTrackColor = accent,
+                        inactiveTrackColor = if (dark) Color.White.copy(alpha = .25f) else Color(0xFFE4DFEA),
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

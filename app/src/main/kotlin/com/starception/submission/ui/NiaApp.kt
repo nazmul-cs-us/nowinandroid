@@ -461,7 +461,7 @@ private fun NiaFloatingBottomBar(
                 color = if (homeDark) {
                     Color(0xFF1B2B22)
                 } else if (homeLight) {
-                    Color.White
+                    Color(0xFFFDFBFF)
                 } else if (darkTheme) {
                     colorScheme.surfaceContainer
                 } else {
@@ -549,7 +549,7 @@ private fun NiaFloatingBottomBar(
                     val bubbleColor = if (homeDark) {
                         colorScheme.primaryContainer
                     } else if (homeLight) {
-                        colorScheme.primaryContainer
+                        Color(0xFF211C2B)
                     } else if (darkTheme) {
                         colorScheme.surfaceBright
                     } else {
@@ -599,7 +599,9 @@ private fun NiaFloatingBottomBar(
                     ) {
                         val hasUnread = latestUnreadDestinations.value.contains(destination)
                         val interactionSource = remember(destination) { MutableInteractionSource() }
-                        val contentTint = if (homeDark) {
+                        val contentTint = if (homeLight) {
+                            if (selected) Color.White else Color(0xFF211C2B)
+                        } else if (homeDark) {
                             if (selected) Color(0xFF0C110F) else Color.White
                         } else MaterialTheme.colorScheme.onSurface
                         Box(

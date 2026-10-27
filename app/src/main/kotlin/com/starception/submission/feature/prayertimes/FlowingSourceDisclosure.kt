@@ -49,7 +49,7 @@ internal fun FlowingSourceDisclosure(reference: String, selection: String) {
         label = "hadithSourceChevron",
     )
     val dark = LocalDarkTheme.current
-    val surface = if (dark) Color(0xFF152A3B) else Color.White
+    val surface = if (dark) Color(0xFF152A3B) else Color(0xFFF5F1FA)
     val ink = if (dark) Color.White else Color(0xFF17221B)
     Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
         Surface(
