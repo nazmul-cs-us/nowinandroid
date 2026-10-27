@@ -2998,6 +2998,9 @@ fun PrayerTimesScreen(
                     }
                 }
                 val portraitScrollState = rememberScrollState()
+                LaunchedEffect(insightTileImmersive) {
+                    if (insightTileImmersive) portraitScrollState.animateScrollTo(0)
+                }
                 var homeViewport by remember { mutableStateOf(IntSize.Zero) }
                 var insightHeightPx by remember { mutableIntStateOf(0) }
                 var insightHeaderHeight by remember { mutableStateOf(44.dp) }
@@ -3014,6 +3017,9 @@ fun PrayerTimesScreen(
                 com.starception.submission.ui.AppTopSearchBar(
                     title = stringResource(R.string.prayer_times_title),
                     onSettingsClick = onSettingsClick,
+                    modifier = if (outerIsLandscape) Modifier else Modifier.background(androidx.compose.ui.graphics.Color(0xFF0C110F)),
+                    pillContainerColor = if (outerIsLandscape) androidx.compose.ui.graphics.Color.Unspecified else androidx.compose.ui.graphics.Color(0xFF25362B),
+                    pillContentColor = if (outerIsLandscape) androidx.compose.ui.graphics.Color.Unspecified else androidx.compose.ui.graphics.Color.White,
                     topInset = dynamicTopInset,
                     onVerseClick = onSurahClickWithAyah,
                     onSearchSubmit = onSearchSubmit,
@@ -3414,10 +3420,26 @@ fun PrayerTimesScreen(
                                         }
                                     }
                                 } else {
-                                    // PORTRAIT LAYOUT: Original vertical layout
+                                    val feedAccent = MaterialTheme.colorScheme.primaryContainer
+                                    val feedTypography = MaterialTheme.typography
+                                    val feedShapes = MaterialTheme.shapes
+                                    androidx.compose.material3.MaterialTheme(
+                                        colorScheme = androidx.compose.material3.darkColorScheme(
+                                            primary = feedAccent,
+                                            background = androidx.compose.ui.graphics.Color(0xFF0C110F),
+                                            surface = androidx.compose.ui.graphics.Color(0xFF17221B),
+                                        ),
+                                        typography = feedTypography,
+                                        shapes = feedShapes,
+                                    ) {
+                                    var feedPageRequest by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+                                    LaunchedEffect(feedPageRequest) {
+                                        if (feedPageRequest != null) portraitScrollState.animateScrollTo(0)
+                                    }
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.background)
                                             .padding(horizontal = 24.dp)
                                             .padding(
                                                 top = 8.dp,
@@ -3481,6 +3503,8 @@ fun PrayerTimesScreen(
                                                 .onSizeChanged { insightHeightPx = it.height },
                                         ) {
                                             SwipeableBigTiles(
+                                                immersiveHome = true,
+                                                pageRequest = feedPageRequest,
                                                 prayerTimes = prayerTimes,
                                                 currentTime = currentTime,
                                                 locationService = locationService,
@@ -3538,7 +3562,8 @@ fun PrayerTimesScreen(
                                                     showCompassPopup = true
                                                 },
                                                 timeOffsets = storedOffsets,
-                                                portraitStripHeight = portraitInsightHeight.coerceAtMost(portraitImmersiveInsightHeight),
+                                                portraitStripHeight = (configuration.screenHeightDp.dp * 0.48f)
+                                                    .coerceIn(310.dp, 430.dp).coerceAtMost(portraitImmersiveInsightHeight),
                                                 portraitExpandedStripHeight = portraitImmersiveInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
@@ -3575,6 +3600,14 @@ fun PrayerTimesScreen(
                                                 isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
                                                 weatherThresholds = prayerWeatherThresholds,
                                             )
+                                        }
+
+                                        if (!insightTileImmersive) {
+                                            Spacer(Modifier.height(20.dp))
+                                            HomeArtworkRail { page ->
+                                                feedPageRequest = page to ((feedPageRequest?.second ?: 0) + 1)
+                                            }
+                                            Spacer(Modifier.height(28.dp))
                                         }
 
                                         if (!insightTileImmersive) {
@@ -4490,6 +4523,7 @@ fun PrayerTimesScreen(
 
                                         Spacer(Modifier.height(4.dp))
                                         }
+                                    }
                                     }
                                 } // End of portrait layout else block
                             }

@@ -1367,6 +1367,8 @@ internal fun SwipeableBigTiles(
     onImmersiveModeChange: (Boolean) -> Unit = {},
     onHeaderHeightChange: (Dp) -> Unit = {},
     collapseExpandedTileRequest: Int = 0,
+    immersiveHome: Boolean = false,
+    pageRequest: Pair<Int, Int>? = null,
 ) {
     val insightPageCount = INSIGHT_PAGE_COUNT
     val middleLoopStart = insightPageCount
@@ -1376,7 +1378,7 @@ internal fun SwipeableBigTiles(
         context.getSharedPreferences("insight_carousel_preferences", Context.MODE_PRIVATE)
     }
     val persistedExpandedPage = remember {
-        if (carouselPreferences.getInt(INSIGHT_CONTENT_HEIGHT_VERSION_KEY, 0) >= 2) {
+        if (!immersiveHome && carouselPreferences.getInt(INSIGHT_CONTENT_HEIGHT_VERSION_KEY, 0) >= 2) {
             carouselPreferences.getInt(INSIGHT_EXPANDED_PAGE_KEY, -1)
                 .takeIf { it in 0 until insightPageCount }
         } else {
@@ -1388,7 +1390,7 @@ internal fun SwipeableBigTiles(
         }
     }
     val pagerState = rememberPagerState(
-        initialPage = middleLoopStart + (persistedExpandedPage ?: 0),
+        initialPage = middleLoopStart + (persistedExpandedPage ?: if (immersiveHome) 2 else 0),
         pageCount = { insightPageCount * 3 },
     )
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -1478,7 +1480,7 @@ internal fun SwipeableBigTiles(
         ),
         snapPositionalThreshold = 0.24f,
     )
-    var lastSettledPage by remember { mutableIntStateOf(0) }
+    var lastSettledPage by remember { mutableIntStateOf(if (immersiveHome) 2 else 0) }
     LaunchedEffect(pagerState.settledPage) {
         val settledLogicalPage = pagerState.settledPage % insightPageCount
         if (settledLogicalPage != lastSettledPage && !isAutoAdvancing) {
@@ -1642,7 +1644,7 @@ internal fun SwipeableBigTiles(
     val dailySurahIsActive = dailyReadingPlayback.surahIndex == dailySurah.number - 1
     val readingKeepsFocus = focusedLogicalPage == 2 && dailySurahIsActive &&
         (dailyReadingPlayback.isPlaying || dailyReadingPlayback.isDownloading || dailyReadingPlayback.isLoading)
-    val autoAdvanceEnabled = autoSwipeEnabled && isResumed && systemAnimationsEnabled && !touchExplorationEnabled &&
+    val autoAdvanceEnabled = !immersiveHome && autoSwipeEnabled && isResumed && systemAnimationsEnabled && !touchExplorationEnabled &&
         !isUserTouching && (!pagerState.isScrollInProgress || isAutoAdvancing) && !isInteractionBlocked &&
         !showGlobePopup && !showAutoSwipeSettings && pendingPrayerUndo == null && !readingKeepsFocus &&
         expandedLogicalPage == null
@@ -1750,6 +1752,19 @@ internal fun SwipeableBigTiles(
             ),
         )
     }
+    fun openImmersiveCard(logicalPage: Int) {
+        expandInsightToPreferred(logicalPage)
+        isAutomaticallySized = false
+        setExpansionExtent(1f)
+    }
+    LaunchedEffect(pageRequest) {
+        pageRequest?.let { (page, _) ->
+            if (page in 0 until insightPageCount) {
+                pagerState.animateScrollToPage(middleLoopStart + page)
+                if (immersiveHome) openImmersiveCard(page)
+            }
+        }
+    }
     // Expanded mode remains a carousel. Once a swipe settles, transfer the
     // expanded identity to the newly focused logical page so another long press
     // collapses that card and accessibility reports the correct state.
@@ -1822,7 +1837,7 @@ internal fun SwipeableBigTiles(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Insights",
+                text = if (immersiveHome) "For you" else "Insights",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontSize = headerFontSize,
                     lineHeight = headerLineHeight,
@@ -1871,7 +1886,9 @@ internal fun SwipeableBigTiles(
         }
 
         BoxWithConstraints(modifier = stripModifier) {
-            val normalCardWidth = if (isLandscape) {
+            val normalCardWidth = if (immersiveHome) {
+                maxWidth * 0.88f
+            } else if (isLandscape) {
                 // The split-screen home layout is already narrow enough to signal
                 // that this is a carousel through its indicator. A portrait-style
                 // peek here exposed half of the next card and clipped its copy at
@@ -2095,7 +2112,8 @@ internal fun SwipeableBigTiles(
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                onCompassClick()
+                                if (immersiveHome && !isExpandedCard) openImmersiveCard(logicalPage)
+                                else onCompassClick()
                             },
                         )
 
@@ -2129,6 +2147,9 @@ internal fun SwipeableBigTiles(
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[1] = measured
+                            },
+                            onClick = {
+                                if (immersiveHome && !isExpandedCard) openImmersiveCard(logicalPage)
                             },
                             isFocused = isFocused,
                             backgroundPageOffset = {
@@ -2259,7 +2280,9 @@ internal fun SwipeableBigTiles(
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                if (isDrivingMode) {
+                                if (immersiveHome && !isExpandedCard) {
+                                    openImmersiveCard(logicalPage)
+                                } else if (isDrivingMode) {
                                     onDailyReadingPlayPause(dailySurah.number - 1)
                                 } else {
                                     onSurahClick(dailySurah.number)
@@ -2342,7 +2365,8 @@ internal fun SwipeableBigTiles(
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                showGlobePopup = true
+                                if (immersiveHome && !isExpandedCard) openImmersiveCard(logicalPage)
+                                else showGlobePopup = true
                             },
                              expandedLeadingContent = if (renderExpandedPayload) {
                                  {
@@ -2446,7 +2470,9 @@ internal fun SwipeableBigTiles(
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                if (isExpandedCard && modelKnowledgeCandidate != null) {
+                                if (immersiveHome && !isExpandedCard) {
+                                    openImmersiveCard(logicalPage)
+                                } else if (isExpandedCard && modelKnowledgeCandidate != null) {
                                     onModelKnowledgeClick(modelKnowledgeCandidate)
                                 } else when (val target = displayedAiRecommendation.target) {
                                     is ContextualRecommendationTarget.Surah -> {

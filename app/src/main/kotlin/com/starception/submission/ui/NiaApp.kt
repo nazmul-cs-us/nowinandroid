@@ -344,13 +344,14 @@ internal fun NiaAppContent(
     val view = LocalView.current
     val shouldHideStatusBar = appState.shouldHideStatusBar
     val isDarkTheme = LocalDarkTheme.current
-    DisposableEffect(shouldHideStatusBar, isDarkTheme) {
+    val isImmersiveHome = !isLandscape && appState.currentTopLevelDestination == TopLevelDestination.HOME
+    DisposableEffect(shouldHideStatusBar, isDarkTheme, isImmersiveHome) {
         val window = (view.context as? Activity)?.window ?: return@DisposableEffect onDispose {}
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         // The app theme can differ from the device theme, so edge-to-edge cannot
         // rely on enableEdgeToEdge's one-time system setting for icon contrast.
-        insetsController.isAppearanceLightStatusBars = !isDarkTheme
-        insetsController.isAppearanceLightNavigationBars = !isDarkTheme
+        insetsController.isAppearanceLightStatusBars = !isDarkTheme && !isImmersiveHome
+        insetsController.isAppearanceLightNavigationBars = !isDarkTheme && !isImmersiveHome
         if (shouldHideStatusBar) {
             // Detail screens and Settings: hide status bar (immersive)
             insetsController.hide(WindowInsetsCompat.Type.statusBars())
@@ -446,11 +447,14 @@ private fun NiaFloatingBottomBar(
         @Composable { sizeModifier: Modifier ->
             val darkTheme = LocalDarkTheme.current
             val colorScheme = MaterialTheme.colorScheme
+            val homeDark = !vertical && appState.currentTopLevelDestination == TopLevelDestination.HOME
             val navBarHeight = if (vertical) 50.dp else 56.dp
             val capsuleGap = 4.dp
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
-                color = if (darkTheme) {
+                color = if (homeDark) {
+                    Color(0xFF1B2B22)
+                } else if (darkTheme) {
                     colorScheme.surfaceContainer
                 } else {
                     colorScheme.surfaceContainerHighest
@@ -534,7 +538,9 @@ private fun NiaFloatingBottomBar(
                         animationSpec = NiaMotion.effectsDefault(),
                         label = "navBubbleAlpha",
                     )
-                    val bubbleColor = if (darkTheme) {
+                    val bubbleColor = if (homeDark) {
+                        colorScheme.primaryContainer
+                    } else if (darkTheme) {
                         colorScheme.surfaceBright
                     } else {
                         Color.White
@@ -583,7 +589,9 @@ private fun NiaFloatingBottomBar(
                     ) {
                         val hasUnread = latestUnreadDestinations.value.contains(destination)
                         val interactionSource = remember(destination) { MutableInteractionSource() }
-                        val contentTint = MaterialTheme.colorScheme.onSurface
+                        val contentTint = if (homeDark) {
+                            if (selected) Color(0xFF0C110F) else Color.White
+                        } else MaterialTheme.colorScheme.onSurface
                         Box(
                             modifier = weight
                                 .fillMaxSize()
