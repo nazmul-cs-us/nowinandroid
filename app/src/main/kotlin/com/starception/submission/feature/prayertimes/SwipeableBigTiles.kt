@@ -192,6 +192,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
@@ -1372,6 +1373,7 @@ internal fun SwipeableBigTiles(
     collapseExpandedTileRequest: Int = 0,
     immersiveHome: Boolean = false,
     pageRequest: Pair<Int, Int>? = null,
+    onReaderBoundsChange: (Rect) -> Unit = {},
 ) {
     val insightPageCount = INSIGHT_PAGE_COUNT
     val middleLoopStart = insightPageCount
@@ -1904,7 +1906,9 @@ internal fun SwipeableBigTiles(
                 .height(animatedStripHeight)
         }
 
-        BoxWithConstraints(modifier = stripModifier) {
+        BoxWithConstraints(modifier = stripModifier.onGloballyPositioned {
+            onReaderBoundsChange(it.boundsInWindow())
+        }) {
             val normalCardWidth = if (immersiveHome) {
                 maxWidth * 0.88f
             } else if (isLandscape) {

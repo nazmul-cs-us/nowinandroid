@@ -14,13 +14,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.images.resources.Res
@@ -32,21 +39,21 @@ import org.jetbrains.compose.resources.painterResource
 
 /** Secondary artwork cards select the existing insight reader and its real content. */
 @Composable
-internal fun HomeArtworkRail(onSelect: (Int) -> Unit) {
+internal fun HomeArtworkRail(onSelect: (Int, DrawableResource, Rect) -> Unit) {
     Column {
         Text("Explore your day", style = MaterialTheme.typography.titleLarge,
             color = Color.White, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth()) {
             ArtworkCard("Today's salah", "Prayer & hadith", Res.drawable.insight_prayer_background,
-                Modifier.weight(1f), onClick = { onSelect(1) })
+                Modifier.weight(1f), onClick = { bounds -> onSelect(1, Res.drawable.insight_prayer_background, bounds) })
             Spacer(Modifier.weight(.06f))
             ArtworkCard("For this moment", "Suggested for you", Res.drawable.insight_suggestion,
-                Modifier.weight(1f), onClick = { onSelect(4) })
+                Modifier.weight(1f), onClick = { bounds -> onSelect(4, Res.drawable.insight_suggestion, bounds) })
         }
         Spacer(Modifier.height(12.dp))
         ArtworkCard("Direction to Makkah", "Qibla compass", Res.drawable.insight_qibla_background,
-            Modifier.fillMaxWidth(), onClick = { onSelect(3) })
+            Modifier.fillMaxWidth(), onClick = { bounds -> onSelect(3, Res.drawable.insight_qibla_background, bounds) })
     }
 }
 
@@ -56,10 +63,14 @@ private fun ArtworkCard(
     subtitle: String,
     artwork: DrawableResource,
     modifier: Modifier,
-    onClick: () -> Unit,
+    onClick: (Rect) -> Unit,
 ) {
     val height = if (LocalDensity.current.fontScale > 1.3f) 240.dp else 168.dp
-    Box(modifier.height(height).clip(RoundedCornerShape(24.dp)).clickable(onClick = onClick)) {
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    Box(modifier.height(height)
+        .onGloballyPositioned { bounds = it.boundsInWindow() }
+        .clip(RoundedCornerShape(24.dp))
+        .clickable { onClick(bounds) }) {
         Image(painterResource(artwork), contentDescription = null,
             contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(

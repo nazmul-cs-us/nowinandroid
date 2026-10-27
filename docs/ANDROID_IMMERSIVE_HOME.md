@@ -23,7 +23,12 @@ other destinations keep their selected theme.
 
 The [artwork rail preview](../app/src/testDemo/screenshots/home_artwork_rail.png)
 is a component render at phone width. It verifies image treatment and labels,
-not the full app shell. `HomeArtworkRailTest` checks all three destinations.
+not the full app shell. Tapping a smaller card carries its actual artwork from
+the tapped window bounds into the selected reader, then fades the overlay once
+the reader is immersive. [Mid-transition](../app/src/testDemo/screenshots/artwork_morph_mid.png)
+and [handoff](../app/src/testDemo/screenshots/artwork_morph_overlay.png) renders
+verify the moving artwork and its final bounds. `HomeArtworkRailTest` checks all
+three destinations and the overlay presence.
 
 ```sh
 ./gradlew :app:testDemoDebugUnitTest --tests '*HomeArtworkRailTest'

@@ -8,16 +8,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.starception.submission.core.images.resources.Res
+import com.starception.submission.core.images.resources.insight_prayer_background
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,7 +48,10 @@ class HomeArtworkRailTest {
             }
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Column(Modifier.fillMaxSize().background(Color(0xFF0C110F)).padding(24.dp)) {
-                    HomeArtworkRail { selected = it }
+                    HomeArtworkRail { page, _, bounds ->
+                        selected = page
+                        assertTrue(bounds.width > 0f && bounds.height > 0f)
+                    }
                 }
             }
         }
@@ -51,5 +62,30 @@ class HomeArtworkRailTest {
         compose.onNodeWithText("Direction to Makkah").performClick()
         assertEquals(3, selected)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_artwork_rail.png")
+    }
+
+    @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
+    @Test fun tappedArtworkStaysPresentDuringMorphHandoff() {
+        var finishing by mutableStateOf(false)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CompositionLocalProvider(LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
+            ArtworkMorphOverlay(
+                ArtworkMorphRequest(1, Res.drawable.insight_prayer_background,
+                    Rect(24f, 320f, 190f, 488f), Rect(0f, 80f, 393f, 780f), 1),
+                finishing,
+            )
+        }
+        compose.mainClock.advanceTimeBy(260)
+        compose.onNodeWithTag("artworkMorphOverlay").assertExists()
+        compose.onNodeWithTag("artworkMorphOverlay")
+            .captureRoboImage("src/testDemo/screenshots/artwork_morph_mid.png")
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag("artworkMorphOverlay")
+            .captureRoboImage("src/testDemo/screenshots/artwork_morph_overlay.png")
+        compose.runOnIdle { finishing = true }
+        compose.onNodeWithTag("artworkMorphOverlay").assertExists()
     }
 }

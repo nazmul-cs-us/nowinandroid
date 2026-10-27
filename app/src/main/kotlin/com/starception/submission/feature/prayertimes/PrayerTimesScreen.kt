@@ -3437,6 +3437,34 @@ fun PrayerTimesScreen(
                                         shapes = feedShapes,
                                     ) {
                                     var feedPageRequest by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+                                    var readerBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+                                    var morphRequest by remember { mutableStateOf<ArtworkMorphRequest?>(null) }
+                                    var morphFinishing by remember { mutableStateOf(false) }
+                                    var morphOpened by remember { mutableStateOf(false) }
+                                    var morphToken by remember { mutableIntStateOf(0) }
+                                    val morphDensity = LocalDensity.current
+                                    LaunchedEffect(morphRequest?.token, insightTileExpanded, insightTileImmersive) {
+                                        if (morphRequest != null && insightTileExpanded) morphOpened = true
+                                        if (morphRequest != null && morphOpened && !insightTileExpanded) {
+                                            morphRequest = null
+                                            morphOpened = false
+                                        } else if (morphRequest != null && insightTileImmersive) {
+                                            morphFinishing = true
+                                            kotlinx.coroutines.delay(150)
+                                            morphRequest = null
+                                            morphFinishing = false
+                                            morphOpened = false
+                                        }
+                                    }
+                                    LaunchedEffect(morphRequest?.token) {
+                                        if (morphRequest != null) {
+                                            // Also release the overlay if the reader is cancelled.
+                                            kotlinx.coroutines.delay(2400)
+                                            morphRequest = null
+                                            morphFinishing = false
+                                            morphOpened = false
+                                        }
+                                    }
                                     LaunchedEffect(feedPageRequest) {
                                         if (feedPageRequest != null) portraitScrollState.animateScrollTo(0)
                                     }
@@ -3514,6 +3542,9 @@ fun PrayerTimesScreen(
                                             SwipeableBigTiles(
                                                 immersiveHome = true,
                                                 pageRequest = feedPageRequest,
+                                                onReaderBoundsChange = { bounds ->
+                                                    if (morphRequest == null && !insightTileExpanded) readerBounds = bounds
+                                                },
                                                 prayerTimes = prayerTimes,
                                                 currentTime = currentTime,
                                                 locationService = locationService,
@@ -3613,7 +3644,18 @@ fun PrayerTimesScreen(
 
                                         if (!insightTileImmersive) {
                                             Spacer(Modifier.height(20.dp))
-                                            HomeArtworkRail { page ->
+                                            HomeArtworkRail { page, artwork, source ->
+                                                if (source.width > 0f && readerBounds.width > 0f) {
+                                                    val top = (readerBounds.top + portraitScrollState.value -
+                                                        with(morphDensity) { insightHeaderHeight.toPx() }).coerceAtLeast(0f)
+                                                    val width = with(morphDensity) { configuration.screenWidthDp.dp.toPx() }
+                                                    val height = with(morphDensity) { portraitImmersiveInsightHeight.toPx() }
+                                                    morphToken++
+                                                    morphFinishing = false
+                                                    morphOpened = false
+                                                    morphRequest = ArtworkMorphRequest(page, artwork, source,
+                                                        androidx.compose.ui.geometry.Rect(0f, top, width, top + height), morphToken)
+                                                }
                                                 feedPageRequest = page to ((feedPageRequest?.second ?: 0) + 1)
                                             }
                                             Spacer(Modifier.height(28.dp))
@@ -4532,6 +4574,9 @@ fun PrayerTimesScreen(
 
                                         Spacer(Modifier.height(4.dp))
                                         }
+                                    }
+                                    morphRequest?.let { request ->
+                                        ArtworkMorphOverlay(request, morphFinishing)
                                     }
                                     }
                                 } // End of portrait layout else block
