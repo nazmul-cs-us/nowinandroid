@@ -3065,6 +3065,7 @@ fun PrayerTimesScreen(
                     modifier = Modifier,
                     pillContainerColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color(0xFF25362B) else Color(0xFFF7F5FB),
                     pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF191724),
+                    homeCornerAction = !outerIsLandscape,
                     topInset = dynamicTopInset,
                     onVerseClick = onSurahClickWithAyah,
                     onSearchSubmit = onSearchSubmit,

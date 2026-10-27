@@ -30,6 +30,7 @@ import android.util.TypedValue
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -111,6 +112,7 @@ import com.starception.submission.R
 import com.starception.submission.core.data.model.RecentSearchQuery
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.download.MissingContentCard
 import com.starception.submission.feature.search.SuggestedVerse
 import com.starception.submission.feature.search.SuggestedVerses
@@ -136,6 +138,7 @@ fun AppTopSearchBar(
     topInset: Dp = 0.dp,
     pillContainerColor: ComposeColor = ComposeColor.Unspecified,
     pillContentColor: ComposeColor = ComposeColor.Unspecified,
+    homeCornerAction: Boolean = false,
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
     content: @Composable () -> Unit,
@@ -145,6 +148,7 @@ fun AppTopSearchBar(
     // direct callers like PrayerTimesScreen also get them without per-screen
     // boilerplate.
     val searchNav = LocalSearchNavCallbacks.current
+    val isDarkTheme = LocalDarkTheme.current
     val onProfileClick = LocalProfileClick.current
     val profileAvatarUrl = LocalProfileAvatarUrl.current
     val onTopicClick = searchNav.onTopicClick
@@ -588,7 +592,40 @@ fun AppTopSearchBar(
                     leading.iconSize = (34f * density).toInt()
                     leading.iconTint = ColorStateList.valueOf(titleColor)
                 }
-                settings.iconTint = ColorStateList.valueOf(titleColor)
+                if (homeCornerAction) {
+                    // An inset dark control keeps the Settings action distinct
+                    // from the pearl/light or artwork/dark home canvas.
+                    settings.backgroundTintList = ColorStateList.valueOf(
+                        if (isDarkTheme) Color.rgb(17, 29, 44) else Color.rgb(30, 25, 42),
+                    )
+                    settings.strokeColor = ColorStateList.valueOf(
+                        if (isDarkTheme) Color.argb(105, 255, 255, 255)
+                        else Color.rgb(234, 224, 246),
+                    )
+                    settings.strokeWidth = (2f * density).toInt()
+                    settings.cornerRadius = (24f * density).toInt()
+                    settings.iconSize = (22f * density).toInt()
+                    settings.elevation = 5f * density
+                    settings.iconTint = ColorStateList.valueOf(Color.WHITE)
+                    settings.setOnTouchListener { button, event ->
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_DOWN -> button.animate()
+                                .scaleX(.91f).scaleY(.91f).setDuration(130).start()
+                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> button.animate()
+                                .scaleX(1f).scaleY(1f).setDuration(180).start()
+                        }
+                        false
+                    }
+                } else {
+                    settings.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+                    settings.strokeWidth = 0
+                    settings.iconSize = (26f * density).toInt()
+                    settings.elevation = 0f
+                    settings.iconTint = ColorStateList.valueOf(titleColor)
+                    settings.setOnTouchListener(null)
+                    settings.scaleX = 1f
+                    settings.scaleY = 1f
+                }
                 searchBar.navigationIcon?.mutate()?.setTint(pillTextColor)
                 for (i in 0 until searchBar.menu.size()) {
                     searchBar.menu.getItem(i).icon?.mutate()?.setTint(pillTextColor)
