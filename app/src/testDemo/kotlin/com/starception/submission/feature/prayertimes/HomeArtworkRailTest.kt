@@ -48,8 +48,8 @@ class HomeArtworkRailTest {
             }
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Column(Modifier.fillMaxSize().background(Color(0xFF0C110F)).padding(24.dp)) {
-                    HomeArtworkRail { page, _, bounds ->
-                        selected = page
+                    HomeArtworkRail { card, bounds ->
+                        selected = card.page
                         assertTrue(bounds.width > 0f && bounds.height > 0f)
                     }
                 }
@@ -73,9 +73,12 @@ class HomeArtworkRailTest {
                 org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
             }
             ArtworkMorphOverlay(
-                ArtworkMorphRequest(1, Res.drawable.insight_prayer_background,
-                    Rect(24f, 320f, 190f, 488f), Rect(0f, 80f, 393f, 780f), 1),
-                finishing,
+                ArtworkMorphRequest(
+                    HomeArtworkCard(1, "Today's salah", "Prayer & hadith",
+                        Res.drawable.insight_prayer_background),
+                    Rect(24f, 320f, 190f, 488f), Rect(0f, 80f, 393f, 780f), 1, 0),
+                reversing = false,
+                onFinished = { finishing = true },
             )
         }
         compose.mainClock.advanceTimeBy(260)
@@ -83,9 +86,7 @@ class HomeArtworkRailTest {
         compose.onNodeWithTag("artworkMorphOverlay")
             .captureRoboImage("src/testDemo/screenshots/artwork_morph_mid.png")
         compose.mainClock.advanceTimeBy(300)
-        compose.onNodeWithTag("artworkMorphOverlay")
-            .captureRoboImage("src/testDemo/screenshots/artwork_morph_overlay.png")
-        compose.runOnIdle { finishing = true }
+        compose.runOnIdle { assertTrue(finishing) }
         compose.onNodeWithTag("artworkMorphOverlay").assertExists()
     }
 }

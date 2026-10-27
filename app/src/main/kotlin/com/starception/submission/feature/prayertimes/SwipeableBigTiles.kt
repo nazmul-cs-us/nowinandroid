@@ -1454,11 +1454,17 @@ internal fun SwipeableBigTiles(
     var isSalahHadithLoading by remember { mutableStateOf(true) }
     var interactionEpoch by remember { mutableIntStateOf(0) }
     var isAutoAdvancing by remember { mutableStateOf(false) }
-    // Home intentionally reopens on the last expanded insight. The expansion
-    // target is now resolved once, so restoring this state is stable.
-    var expandedLogicalPage by rememberSaveable { mutableStateOf(persistedExpandedPage) }
-    var expansionExtent by rememberSaveable {
-        mutableFloatStateOf(if (persistedExpandedPage != null) 0.35f else 0f)
+    // The immersive home must always land on its artwork cover. Restoring an
+    // old expanded page hides that cover and reopens the legacy reader at launch.
+    var expandedLogicalPage by if (immersiveHome) {
+        remember { mutableStateOf<Int?>(null) }
+    } else {
+        rememberSaveable { mutableStateOf(persistedExpandedPage) }
+    }
+    var expansionExtent by if (immersiveHome) {
+        remember { mutableFloatStateOf(0f) }
+    } else {
+        rememberSaveable { mutableFloatStateOf(if (persistedExpandedPage != null) 0.35f else 0f) }
     }
     LaunchedEffect(collapseExpandedTileRequest) {
         // The host hands the enlarged tile's space to another section (for
@@ -1472,12 +1478,11 @@ internal fun SwipeableBigTiles(
     }
     LaunchedEffect(expandedLogicalPage) {
         onExpandedPageChange?.invoke(expandedLogicalPage)
-        carouselPreferences.edit()
-            .apply {
-                expandedLogicalPage?.let { putInt(INSIGHT_EXPANDED_PAGE_KEY, it) }
-                    ?: remove(INSIGHT_EXPANDED_PAGE_KEY)
-            }
-            .apply()
+        carouselPreferences.edit().apply {
+            if (immersiveHome) remove(INSIGHT_EXPANDED_PAGE_KEY)
+            else expandedLogicalPage?.let { putInt(INSIGHT_EXPANDED_PAGE_KEY, it) }
+                ?: remove(INSIGHT_EXPANDED_PAGE_KEY)
+        }.apply()
     }
     var pendingPrayerUndo by remember { mutableStateOf<PrayerUndoState?>(null) }
     val autoAdvanceProgress = remember { Animatable(0f) }

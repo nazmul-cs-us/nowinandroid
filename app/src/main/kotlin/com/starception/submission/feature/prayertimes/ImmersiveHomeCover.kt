@@ -5,10 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -22,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -31,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_prayer_background
@@ -43,8 +48,8 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.launch
 
-internal fun homeCoverArtwork(page: Int, isNight: Boolean): DrawableResource = when (page) {
-    0 -> if (isNight) Res.drawable.prayer_now_insight_night else Res.drawable.prayer_now_insight_day
+internal fun homeCoverArtwork(page: Int, isDarkTheme: Boolean): DrawableResource = when (page) {
+    0 -> if (isDarkTheme) Res.drawable.prayer_now_insight_night else Res.drawable.prayer_now_insight_day
     1 -> Res.drawable.insight_prayer_background
     2 -> Res.drawable.insight_quran_background
     3 -> Res.drawable.insight_qibla_background
@@ -55,8 +60,9 @@ internal fun homeCoverArtwork(page: Int, isNight: Boolean): DrawableResource = w
 @Composable
 internal fun ImmersiveHomeCover(
     selectedPage: Int,
-    isNight: Boolean,
     isDarkTheme: Boolean,
+    sceneHeight: Dp,
+    sceneTopInset: Dp,
     nextPrayerName: String,
     nextPrayerCountdown: String,
     onSelectionChanged: (Int) -> Unit,
@@ -70,7 +76,11 @@ internal fun ImmersiveHomeCover(
     LaunchedEffect(pagerState.settledPage) { onSelectionChanged(pagerState.settledPage) }
     val ink = if (isDarkTheme) Color.White else Color(0xFF211C2B)
     val secondaryInk = ink.copy(alpha = if (isDarkTheme) .80f else .72f)
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // The reference leaves breathing room between the recommendation and
+        // the lower feed; anchoring both to the tile bottom puts them too low.
+        val copyBottom = maxHeight * .245f
+        val indicatorBottom = maxHeight * .20f
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             val (eyebrow, title, detail) = when (page) {
                 0 -> Triple("YOUR DAY", "A moment to pause",
@@ -81,12 +91,15 @@ internal fun ImmersiveHomeCover(
                 3 -> Triple("QIBLA", "Turn toward Makkah", "Find your direction")
                 else -> Triple("FOR THIS MOMENT", "A thought for today", "Explore a grounded suggestion")
             }
-            Box(Modifier.fillMaxSize().clickable { onOpen(page) }) {
+            Box(Modifier.fillMaxSize().clipToBounds().clickable { onOpen(page) }) {
                 Image(
-                    painter = painterResource(homeCoverArtwork(page, isNight)),
+                    painter = painterResource(homeCoverArtwork(page, isDarkTheme)),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    // Match the image's crop above the reader, behind the toolbar.
+                    // Cropping each strip independently creates a visible seam.
+                    modifier = Modifier.fillMaxWidth().requiredHeight(sceneHeight)
+                        .offset(y = -sceneTopInset),
                 )
                 Box(Modifier.fillMaxSize().background(
                     if (isDarkTheme) Brush.verticalGradient(
@@ -101,7 +114,7 @@ internal fun ImmersiveHomeCover(
                 ))
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .padding(start = 24.dp, end = 24.dp, bottom = 73.dp),
+                        .padding(start = 24.dp, end = 24.dp, bottom = copyBottom),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
@@ -134,7 +147,7 @@ internal fun ImmersiveHomeCover(
             }
         }
         Row(
-            Modifier.align(Alignment.BottomCenter).padding(bottom = 38.dp),
+            Modifier.align(Alignment.BottomCenter).padding(bottom = indicatorBottom),
             horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -3018,39 +3018,36 @@ fun PrayerTimesScreen(
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
                 val darkHome = LocalDarkTheme.current
                 var coverPage by rememberSaveable { mutableIntStateOf(0) }
-                val nightArtwork = prayerTimes?.let {
-                    currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
-                } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
                 Box(Modifier.fillMaxSize().background(if (darkHome) Color(0xFF0C110F) else Color.White)) {
                 if (!outerIsLandscape && darkHome) {
                     Image(
-                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, nightArtwork)),
+                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, darkHome)),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-                        0f to Color(0xFF071C30).copy(alpha = .48f),
-                        .50f to Color(0xFF0B1D2C).copy(alpha = .78f),
+                        0f to Color(0xFF071C30).copy(alpha = .20f),
+                        .50f to Color(0xFF0B1D2C).copy(alpha = .42f),
                         1f to Color(0xFF0C110F).copy(alpha = .97f),
                     )))
                 } else if (!outerIsLandscape) {
-                    // The light home keeps the same prayer identity as a soft
-                    // atmospheric layer; the readable canvas remains white.
+                    // Let the scene reach behind the system status bar and
+                    // toolbar, then dissolve it into the white lower feed.
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
                         0f to Color(0xFFFCFBFF),
                         .40f to Color(0xFFF8F7FC),
                         1f to Color.White,
                     )))
                     Image(
-                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, nightArtwork)),
+                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, darkHome)),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.11f },
+                        modifier = Modifier.fillMaxSize(),
                     )
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = .42f),
-                        .48f to Color.White.copy(alpha = .87f),
+                        0f to Color.White.copy(alpha = .45f),
+                        .48f to Color.White.copy(alpha = .45f),
                         1f to Color.White,
                     )))
                 }
@@ -3672,7 +3669,7 @@ fun PrayerTimesScreen(
                                                     showCompassPopup = true
                                                 },
                                                 timeOffsets = storedOffsets,
-                                                portraitStripHeight = (configuration.screenHeightDp.dp * 0.72f)
+                                                portraitStripHeight = (configuration.screenHeightDp.dp * 0.69f)
                                                     .coerceIn(450.dp, 640.dp)
                                                     // Leave a real travel distance for the
                                                     // card-to-reader expansion on short phones.
@@ -3724,8 +3721,9 @@ fun PrayerTimesScreen(
                                             ) {
                                                 ImmersiveHomeCover(
                                                     selectedPage = coverPage,
-                                                    isNight = nightArtwork,
                                                     isDarkTheme = darkHome,
+                                                    sceneHeight = configuration.screenHeightDp.dp,
+                                                    sceneTopInset = dynamicTopInset + 56.dp,
                                                     nextPrayerName = PrayerTimeHelpers
                                                         .getNextPrayer(currentTime, prayerTimes)?.first.orEmpty(),
                                                     nextPrayerCountdown = PrayerTimeHelpers
@@ -3740,6 +3738,31 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileImmersive) {
+                                            Column(
+                                                modifier = Modifier.fillMaxWidth()
+                                                    .clickable {
+                                                        coverPage = 2
+                                                        feedPageRequest = 2 to ((feedPageRequest?.second ?: 0) + 1)
+                                                    }
+                                                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                            ) {
+                                                Box(
+                                                    Modifier.fillMaxWidth().height(1.dp).background(
+                                                        MaterialTheme.colorScheme.onBackground.copy(alpha = .22f),
+                                                    ),
+                                                )
+                                                Text(
+                                                    "TODAY'S READING",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = .72f),
+                                                )
+                                                Text(
+                                                    "Spend a moment with the Quran",
+                                                    style = MaterialTheme.typography.titleLarge,
+                                                    color = MaterialTheme.colorScheme.onBackground,
+                                                )
+                                            }
                                             Spacer(Modifier.height(20.dp))
                                             HomeArtworkRail { card, source ->
                                                 if (morphRequest != null || insightTileExpanded) return@HomeArtworkRail
