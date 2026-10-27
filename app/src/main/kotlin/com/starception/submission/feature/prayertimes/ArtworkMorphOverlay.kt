@@ -2,47 +2,39 @@ package com.starception.submission.feature.prayertimes
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
 
 internal data class ArtworkMorphRequest(
-    val page: Int,
-    val artwork: DrawableResource,
+    val card: HomeArtworkCard,
     val from: Rect,
     val to: Rect,
     val token: Int,
+    val sourceScroll: Int,
 )
 
 private object WindowOrigin : PopupPositionProvider {
@@ -54,44 +46,44 @@ private object WindowOrigin : PopupPositionProvider {
     ): IntOffset = IntOffset.Zero
 }
 
-/** Keeps the tapped artwork visible while the existing reader opens underneath. */
+/** Carries the same artwork, foreground and label between the feed and the real reader. */
 @Composable
-internal fun ArtworkMorphOverlay(request: ArtworkMorphRequest, finishing: Boolean) {
+internal fun ArtworkMorphOverlay(
+    request: ArtworkMorphRequest,
+    reversing: Boolean,
+    onFinished: () -> Unit,
+) {
     val density = LocalDensity.current
-    val left = remember(request.token) { Animatable(request.from.left) }
-    val top = remember(request.token) { Animatable(request.from.top) }
-    val width = remember(request.token) { Animatable(request.from.width) }
-    val height = remember(request.token) { Animatable(request.from.height) }
-    val corner = remember(request.token) { Animatable(with(density) { 24.dp.toPx() }) }
-    val opacity by animateFloatAsState(
-        targetValue = if (finishing) 0f else 1f,
-        animationSpec = tween(150),
-        label = "artworkHandoffOpacity",
-    )
-    LaunchedEffect(request.token) {
-        coroutineScope {
-            launch { left.animateTo(request.to.left, tween(520, easing = FastOutSlowInEasing)) }
-            launch { top.animateTo(request.to.top, tween(520, easing = FastOutSlowInEasing)) }
-            launch { width.animateTo(request.to.width, tween(520, easing = FastOutSlowInEasing)) }
-            launch { height.animateTo(request.to.height, tween(520, easing = FastOutSlowInEasing)) }
-            launch { corner.animateTo(0f, tween(520, easing = FastOutSlowInEasing)) }
-        }
+    val progress = remember(request.token, reversing) { Animatable(if (reversing) 1f else 0f) }
+    LaunchedEffect(request.token, reversing) {
+        progress.animateTo(
+            targetValue = if (reversing) 0f else 1f,
+            animationSpec = tween(520, easing = FastOutSlowInEasing),
+        )
+        onFinished()
     }
-    val travel = ((width.value - request.from.width) /
-        (request.to.width - request.from.width).coerceAtLeast(1f)).coerceIn(0f, 1f)
-    Popup(popupPositionProvider = WindowOrigin,
-        properties = PopupProperties(focusable = false, clippingEnabled = false)) {
+    val p = progress.value
+    val left = request.from.left + (request.to.left - request.from.left) * p
+    val top = request.from.top + (request.to.top - request.from.top) * p
+    val width = request.from.width + (request.to.width - request.from.width) * p
+    val height = request.from.height + (request.to.height - request.from.height) * p
+    val corner = with(density) { (24f * (1f - p)).dp }
+    // Fade the travelling scene only once the real destination is ready to take over.
+    val sceneAlpha = ((1f - p) / .26f).coerceIn(0f, 1f)
+    Popup(
+        popupPositionProvider = WindowOrigin,
+        properties = PopupProperties(focusable = false, clippingEnabled = false),
+    ) {
         Box(Modifier.fillMaxSize().testTag("artworkMorphOverlay")
-            .background(Color.Black.copy(alpha = travel * .28f * opacity))) {
-            Image(
-                painter = painterResource(request.artwork),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+            .background(Color.Black.copy(alpha = p * .24f * sceneAlpha))) {
+            HomeArtworkScene(
+                card = request.card,
                 modifier = Modifier
-                    .offset { IntOffset(left.value.roundToInt(), top.value.roundToInt()) }
-                    .size(with(density) { width.value.toDp() }, with(density) { height.value.toDp() })
-                    .clip(RoundedCornerShape(with(density) { corner.value.toDp() }))
-                    .graphicsLayer { alpha = opacity },
+                    .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
+                    .size(with(density) { width.toDp() }, with(density) { height.toDp() })
+                    .clip(RoundedCornerShape(corner))
+                    .graphicsLayer { alpha = sceneAlpha },
+                copyAlpha = ((.64f - p) / .24f).coerceIn(0f, 1f),
             )
         }
     }

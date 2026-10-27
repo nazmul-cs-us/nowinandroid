@@ -323,6 +323,8 @@ data class DailyReadingPlaybackState(
     val isDownloading: Boolean = false,
     val downloadProgress: Float = 0f,
     val error: String? = null,
+    val positionMs: Int = 0,
+    val durationMs: Int = 0,
 )
 
 private data class PrayerUndoState(
@@ -1342,6 +1344,7 @@ internal fun SwipeableBigTiles(
     dailyReadingPlayback: DailyReadingPlaybackState = DailyReadingPlaybackState(),
     onDailyReadingPlayPause: (surahIndex: Int) -> Unit = {},
     onDailyReadingRetry: () -> Unit = {},
+    onDailyReadingSeek: (positionMs: Int) -> Unit = {},
     getCurrentActivity: () -> String,
     onCompassClick: () -> Unit,
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
@@ -1395,7 +1398,7 @@ internal fun SwipeableBigTiles(
         }
     }
     val pagerState = rememberPagerState(
-        initialPage = middleLoopStart + (persistedExpandedPage ?: if (immersiveHome) 2 else 0),
+        initialPage = middleLoopStart + (persistedExpandedPage ?: 0),
         pageCount = { insightPageCount * 3 },
     )
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -1404,6 +1407,7 @@ internal fun SwipeableBigTiles(
     val isDrivingMode = detectedActivity.equals("Driving", ignoreCase = true)
     val carouselScope = rememberCoroutineScope()
     var showGlobePopup by rememberSaveable { mutableStateOf(false) }
+    var showDailyReadingPlayer by rememberSaveable { mutableStateOf(false) }
     var showAutoSwipeSettings by remember { mutableStateOf(false) }
     var autoSwipeEnabled by remember {
         mutableStateOf(carouselPreferences.getBoolean("auto_swipe_enabled", true))
@@ -1485,7 +1489,7 @@ internal fun SwipeableBigTiles(
         ),
         snapPositionalThreshold = 0.24f,
     )
-    var lastSettledPage by remember { mutableIntStateOf(if (immersiveHome) 2 else 0) }
+    var lastSettledPage by remember { mutableIntStateOf(0) }
     LaunchedEffect(pagerState.settledPage) {
         val settledLogicalPage = pagerState.settledPage % insightPageCount
         if (settledLogicalPage != lastSettledPage && !isAutoAdvancing) {
@@ -1765,7 +1769,11 @@ internal fun SwipeableBigTiles(
     LaunchedEffect(pageRequest) {
         pageRequest?.let { (page, _) ->
             if (page in 0 until insightPageCount) {
-                pagerState.animateScrollToPage(middleLoopStart + page)
+                // The tapped feed card supplies the travel animation. Select its
+                // real reader immediately underneath so a different carousel
+                // page cannot flash between the handoff and expansion.
+                if (immersiveHome) pagerState.scrollToPage(middleLoopStart + page)
+                else pagerState.animateScrollToPage(middleLoopStart + page)
                 if (immersiveHome) openImmersiveCard(page)
             }
         }
@@ -1853,6 +1861,7 @@ internal fun SwipeableBigTiles(
         ) { Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = if (immersiveHome) 24.dp else 0.dp)
                 .padding(bottom = headerBottomPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
@@ -1910,7 +1919,7 @@ internal fun SwipeableBigTiles(
             onReaderBoundsChange(it.boundsInWindow())
         }) {
             val normalCardWidth = if (immersiveHome) {
-                maxWidth * 0.88f
+                maxWidth
             } else if (isLandscape) {
                 // The split-screen home layout is already narrow enough to signal
                 // that this is a carousel through its indicator. A portrait-style
@@ -1953,6 +1962,8 @@ internal fun SwipeableBigTiles(
             val restingPageSpacing = if (isLandscape) 10.dp else (14f - (4f * compactProgress)).dp
             val pageSpacing = (restingPageSpacing.value * (1f - synchronizedWidthExpansion)).dp
             val endContentPadding = if (isLandscape) {
+                0.dp
+            } else if (immersiveHome) {
                 0.dp
             } else {
                 (18f * (1f - synchronizedWidthExpansion)).dp
@@ -2293,7 +2304,19 @@ internal fun SwipeableBigTiles(
                             onReadingPlayPause = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                onDailyReadingPlayPause(dailySurah.number - 1)
+                                if (immersiveHome && isExpandedCard) {
+                                    showDailyReadingPlayer = true
+                                    if (!dailySurahIsActive ||
+                                        (!dailyReadingPlayback.isPlaying &&
+                                            dailyReadingPlayback.positionMs == 0 &&
+                                            !dailyReadingPlayback.isLoading &&
+                                            !dailyReadingPlayback.isDownloading)
+                                    ) {
+                                        onDailyReadingPlayPause(dailySurah.number - 1)
+                                    }
+                                } else {
+                                    onDailyReadingPlayPause(dailySurah.number - 1)
+                                }
                             },
                             onReadingRetry = {
                                 interactionEpoch++
@@ -2809,6 +2832,16 @@ internal fun SwipeableBigTiles(
             )
         }
     }
+    if (showDailyReadingPlayer) {
+        HomeReadingPlayer(
+            surah = dailySurah,
+            playback = dailyReadingPlayback,
+            onDismiss = { showDailyReadingPlayer = false },
+            onPlayPause = { onDailyReadingPlayPause(dailySurah.number - 1) },
+            onRetry = onDailyReadingRetry,
+            onSeek = onDailyReadingSeek,
+        )
+    }
 }
 
 private data class PrayerRecapIndicator(
@@ -3146,13 +3179,13 @@ private fun InsightPreviewCard(
         !footerText.isNullOrBlank() ||
         prayerRecap.isNotEmpty()
     val cornerExtent = if (fluidFullBleed) {
-        (26f - 26f * expansionProgress).coerceAtLeast(0f).dp
+        0.dp
     } else {
         (26f - (8f * compactProgress) + (6f * expansionProgress)).dp
     }
     val shape = ContinuousCornerShape(cornerExtent)
     val shadowElevation = if (fluidFullBleed) {
-        (6f * (1f - expansionProgress)).coerceAtLeast(0f).dp
+        0.dp
     } else {
         (6f - (2f * compactProgress) + (4f * expansionProgress)).dp
     }
@@ -5377,9 +5410,8 @@ private fun SalahHadithExpandedStage(
         hadithContext.isFriday -> "No matching Friday narration was found in your available collections."
         else -> "No matching narration was found in your available collections."
     })
-    val source = recommendation?.let {
-        "${it.source.reference} · ${if (it.selectedByModel) "Model selected" else "Search match"}"
-    }.orEmpty()
+    val source = recommendation?.source?.reference.orEmpty()
+    val selection = if (recommendation?.selectedByModel == true) "Model selected" else "Search match"
     val compression = compactProgress.coerceIn(0f, 1f)
     // Manual scrolling keeps reading under user control and participates in
     // the resize-to-reader nested-scroll handoff.
@@ -5466,25 +5498,14 @@ private fun SalahHadithExpandedStage(
                         fontWeight = FontWeight.Medium,
                         onTextLayout = { result ->
                             val bodyHeight = with(density) { result.size.height.toDp() }
-                            onPreferredHeightChange(bodyHeight + 80.dp)
+                            onPreferredHeightChange(
+                                bodyHeight + 80.dp + (if (source.isNotBlank()) 64.dp else 0.dp),
+                            )
                         },
                     )
-                }
-            }
-            if (compression < 0.50f && source.isNotBlank()) {
-                Box(Modifier.fillMaxWidth().insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
-                    Text(
-                        text = source,
-                        modifier = Modifier.fillMaxWidth(),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp,
-                            letterSpacing = 0.sp,
-                        ),
-                        color = Color.White.copy(alpha = 0.56f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (compression < 0.50f && source.isNotBlank()) {
+                        FlowingSourceDisclosure(source, selection)
+                    }
                 }
             }
         }

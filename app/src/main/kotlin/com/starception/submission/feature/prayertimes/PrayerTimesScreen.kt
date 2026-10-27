@@ -106,6 +106,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -144,6 +145,9 @@ import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
+import com.starception.submission.core.images.resources.Res as HomeImageRes
+import com.starception.submission.core.images.resources.prayer_now_insight_day
+import com.starception.submission.core.images.resources.prayer_now_insight_night
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.feature.prayertimes.components.CompassPopupScreen
@@ -187,6 +191,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.painterResource as composeArtworkPainter
 
 private val PrayerReferenceInk = Color(0xFF0A0808)
 private val PrayerReferenceCard = Color(0xFFFFFDF7)
@@ -3014,10 +3019,30 @@ fun PrayerTimesScreen(
                 val navigationBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
                     .asPaddingValues().calculateBottomPadding()
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
+                Box(Modifier.fillMaxSize()) {
+                if (!outerIsLandscape) {
+                    val nightArtwork = prayerTimes?.let {
+                        currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
+                    } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
+                    Image(
+                        painter = composeArtworkPainter(
+                            if (nightArtwork) HomeImageRes.drawable.prayer_now_insight_night
+                            else HomeImageRes.drawable.prayer_now_insight_day,
+                        ),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                        0f to Color(0xFF071C30).copy(alpha = .48f),
+                        .50f to Color(0xFF0B1D2C).copy(alpha = .78f),
+                        1f to Color(0xFF0C110F).copy(alpha = .97f),
+                    )))
+                }
                 com.starception.submission.ui.AppTopSearchBar(
                     title = stringResource(R.string.prayer_times_title),
                     onSettingsClick = onSettingsClick,
-                    modifier = if (outerIsLandscape) Modifier else Modifier.background(androidx.compose.ui.graphics.Color(0xFF0C110F)),
+                    modifier = Modifier,
                     pillContainerColor = if (outerIsLandscape) androidx.compose.ui.graphics.Color.Unspecified else androidx.compose.ui.graphics.Color(0xFF25362B),
                     pillContentColor = if (outerIsLandscape) androidx.compose.ui.graphics.Color.Unspecified else androidx.compose.ui.graphics.Color.White,
                     topInset = dynamicTopInset,
@@ -3152,11 +3177,10 @@ fun PrayerTimesScreen(
                                     )
                                 val portraitImmersiveInsightHeight =
                                     com.starception.submission.core.designsystem.component.insightMaximumTileHeight(
-                                        // Reserve the final full-screen bounds from the first
-                                        // animation frame. The visible navigation contributes 64dp
-                                        // before it leaves; the measured viewport gains that 64dp
-                                        // afterwards, so this target stays stable across the handoff.
-                                        viewport = insightViewport + if (insightTileImmersive) 0.dp else 64.dp,
+                                        // The measured viewport excludes visible bottom navigation.
+                                        // Stay above it while opening, then claim its space after
+                                        // immersive mode actually hides the navigation overlay.
+                                        viewport = insightViewport,
                                         header = 0.dp,
                                     )
 
@@ -3218,6 +3242,8 @@ fun PrayerTimesScreen(
                                                         isDownloading = dailyReadingPlayer.isDownloading,
                                                         downloadProgress = dailyReadingPlayer.downloadProgress,
                                                         error = dailyReadingPlayer.downloadError,
+                                                        positionMs = dailyReadingPlayer.currentPosition,
+                                                        durationMs = dailyReadingPlayer.duration,
                                                     ),
                                                     onDailyReadingPlayPause = { surahIndex ->
                                                         if (dailyReadingPlayer.currentSurahIndex == surahIndex &&
@@ -3229,6 +3255,7 @@ fun PrayerTimesScreen(
                                                         }
                                                     },
                                                     onDailyReadingRetry = dailyReadingPlayer::retryDownload,
+                                                    onDailyReadingSeek = dailyReadingPlayer::seekTo,
                                                     getCurrentActivity = {
                                                         try {
                                                             com.starception.submission.util.ActivityTracker.getCurrentActivity()
@@ -3439,30 +3466,29 @@ fun PrayerTimesScreen(
                                     var feedPageRequest by remember { mutableStateOf<Pair<Int, Int>?>(null) }
                                     var readerBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
                                     var morphRequest by remember { mutableStateOf<ArtworkMorphRequest?>(null) }
-                                    var morphFinishing by remember { mutableStateOf(false) }
+                                    var morphVisible by remember { mutableStateOf(false) }
+                                    var morphReversing by remember { mutableStateOf(false) }
                                     var morphOpened by remember { mutableStateOf(false) }
                                     var morphToken by remember { mutableIntStateOf(0) }
                                     val morphDensity = LocalDensity.current
-                                    LaunchedEffect(morphRequest?.token, insightTileExpanded, insightTileImmersive) {
+                                    LaunchedEffect(morphRequest?.token, insightTileExpanded) {
                                         if (morphRequest != null && insightTileExpanded) morphOpened = true
                                         if (morphRequest != null && morphOpened && !insightTileExpanded) {
-                                            morphRequest = null
-                                            morphOpened = false
-                                        } else if (morphRequest != null && insightTileImmersive) {
-                                            morphFinishing = true
-                                            kotlinx.coroutines.delay(150)
-                                            morphRequest = null
-                                            morphFinishing = false
-                                            morphOpened = false
+                                            // Return to the precise feed position before the
+                                            // travelling scene lands on its original card.
+                                            morphRequest?.let { portraitScrollState.scrollTo(it.sourceScroll) }
+                                            morphReversing = true
+                                            morphVisible = true
                                         }
                                     }
-                                    LaunchedEffect(morphRequest?.token) {
-                                        if (morphRequest != null) {
-                                            // Also release the overlay if the reader is cancelled.
+                                    LaunchedEffect(morphRequest?.token, morphOpened) {
+                                        if (morphRequest != null && !morphOpened) {
                                             kotlinx.coroutines.delay(2400)
-                                            morphRequest = null
-                                            morphFinishing = false
-                                            morphOpened = false
+                                            // A cancelled reader must not leave the rail locked.
+                                            if (!morphOpened) {
+                                                morphRequest = null
+                                                morphVisible = false
+                                            }
                                         }
                                     }
                                     LaunchedEffect(feedPageRequest) {
@@ -3476,7 +3502,7 @@ fun PrayerTimesScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.background)
+                                            .background(Color.Transparent)
                                             .padding(horizontal = feedGutter)
                                             .padding(
                                                 top = 8.dp,
@@ -3536,7 +3562,8 @@ fun PrayerTimesScreen(
                                         // Swipeable Big Tiles
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxWidth()
+                                                .offset(x = -feedGutter)
+                                                .width(configuration.screenWidthDp.dp)
                                                 .onSizeChanged { insightHeightPx = it.height },
                                         ) {
                                             SwipeableBigTiles(
@@ -3577,6 +3604,8 @@ fun PrayerTimesScreen(
                                                     isDownloading = dailyReadingPlayer.isDownloading,
                                                     downloadProgress = dailyReadingPlayer.downloadProgress,
                                                     error = dailyReadingPlayer.downloadError,
+                                                    positionMs = dailyReadingPlayer.currentPosition,
+                                                    durationMs = dailyReadingPlayer.duration,
                                                 ),
                                                 onDailyReadingPlayPause = { surahIndex ->
                                                     if (dailyReadingPlayer.currentSurahIndex == surahIndex &&
@@ -3588,6 +3617,7 @@ fun PrayerTimesScreen(
                                                     }
                                                 },
                                                 onDailyReadingRetry = dailyReadingPlayer::retryDownload,
+                                                onDailyReadingSeek = dailyReadingPlayer::seekTo,
                                                 getCurrentActivity = {
                                                     // Get current activity from ActivityTracker
                                                     try {
@@ -3602,8 +3632,8 @@ fun PrayerTimesScreen(
                                                     showCompassPopup = true
                                                 },
                                                 timeOffsets = storedOffsets,
-                                                portraitStripHeight = (configuration.screenHeightDp.dp * 0.48f)
-                                                    .coerceIn(310.dp, 430.dp).coerceAtMost(portraitImmersiveInsightHeight),
+                                                portraitStripHeight = (configuration.screenHeightDp.dp * 0.68f)
+                                                    .coerceIn(440.dp, 650.dp).coerceAtMost(portraitImmersiveInsightHeight),
                                                 portraitExpandedStripHeight = portraitImmersiveInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
@@ -3644,19 +3674,26 @@ fun PrayerTimesScreen(
 
                                         if (!insightTileImmersive) {
                                             Spacer(Modifier.height(20.dp))
-                                            HomeArtworkRail { page, artwork, source ->
+                                            HomeArtworkRail { card, source ->
+                                                if (morphRequest != null || insightTileExpanded) return@HomeArtworkRail
                                                 if (source.width > 0f && readerBounds.width > 0f) {
                                                     val top = (readerBounds.top + portraitScrollState.value -
                                                         with(morphDensity) { insightHeaderHeight.toPx() }).coerceAtLeast(0f)
                                                     val width = with(morphDensity) { configuration.screenWidthDp.dp.toPx() }
                                                     val height = with(morphDensity) { portraitImmersiveInsightHeight.toPx() }
                                                     morphToken++
-                                                    morphFinishing = false
+                                                    morphReversing = false
+                                                    morphVisible = true
                                                     morphOpened = false
-                                                    morphRequest = ArtworkMorphRequest(page, artwork, source,
-                                                        androidx.compose.ui.geometry.Rect(0f, top, width, top + height), morphToken)
+                                                    morphRequest = ArtworkMorphRequest(
+                                                        card = card,
+                                                        from = source,
+                                                        to = androidx.compose.ui.geometry.Rect(0f, top, width, top + height),
+                                                        token = morphToken,
+                                                        sourceScroll = portraitScrollState.value,
+                                                    )
                                                 }
-                                                feedPageRequest = page to ((feedPageRequest?.second ?: 0) + 1)
+                                                feedPageRequest = card.page to ((feedPageRequest?.second ?: 0) + 1)
                                             }
                                             Spacer(Modifier.height(28.dp))
                                         }
@@ -4575,8 +4612,17 @@ fun PrayerTimesScreen(
                                         Spacer(Modifier.height(4.dp))
                                         }
                                     }
-                                    morphRequest?.let { request ->
-                                        ArtworkMorphOverlay(request, morphFinishing)
+                                    morphRequest?.takeIf { morphVisible }?.let { request ->
+                                        ArtworkMorphOverlay(request, morphReversing) {
+                                            if (morphRequest?.token == request.token) {
+                                                morphVisible = false
+                                                if (morphReversing) {
+                                                    morphRequest = null
+                                                    morphReversing = false
+                                                    morphOpened = false
+                                                }
+                                            }
+                                        }
                                     }
                                     }
                                 } // End of portrait layout else block
@@ -4764,6 +4810,7 @@ fun PrayerTimesScreen(
                         }
                     } // Close Column inside AppTopSearchBar content lambda
                 } // Close AppTopSearchBar scaffold (content lambda)
+                } // Full-viewport artwork behind the portrait home and search chrome
             } // Close PullToSyncContainer lambda
         } // Close Box with layerBackdrop
 

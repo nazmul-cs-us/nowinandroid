@@ -17,10 +17,13 @@ and recommendation content. Keep the existing tile artwork and product actions.
 
 ## Target Android home
 
-The first viewport should read as one dark, immersive feed. A compact live
-prayer cue (current/next prayer and countdown) stays easy to reach without
-competing with the featured artwork. The featured card uses the most relevant
-real insight. Smaller image cards below show distinct available content with
+The first viewport should read as one immersive, edge-to-edge artwork scene.
+The later blue-toned phone reference clarifies its treatment: preserve Deenly's
+own prayer artwork, give day and night a calm blue cast, float legible chrome
+over the image, and let a dark gradient take over as the feed continues. A
+compact live prayer cue (current/next prayer and countdown) stays easy to reach
+without competing with the featured artwork. The featured card uses the most
+relevant real insight. Smaller image cards below show distinct available content with
 clear titles and source/status labels. The editable prayer schedule remains a
 secondary section further down. Existing Home, For You, Saved, Courses, and
 Interests navigation keeps its real destinations.
