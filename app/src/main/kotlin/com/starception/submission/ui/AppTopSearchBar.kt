@@ -520,6 +520,7 @@ fun AppTopSearchBar(
                 val suggestionContainer = root.findViewById<LinearLayout>(R.id.search_suggestion_container)
                 val leading = root.findViewById<MaterialButton>(R.id.leading_button)
                 val settings = root.findViewById<MaterialButton>(R.id.settings_button)
+                val settingsHalo = root.findViewById<View>(R.id.home_settings_halo)
 
                 val searchView = root.findViewById<SearchView>(R.id.app_search_view)
                 // Drive the SearchBar's hint from the typewriter state; the
@@ -595,6 +596,8 @@ fun AppTopSearchBar(
                 if (homeCornerAction) {
                     // An inset dark control keeps the Settings action distinct
                     // from the pearl/light or artwork/dark home canvas.
+                    settingsHalo.visibility = View.VISIBLE
+                    settingsHalo.alpha = if (isDarkTheme) .62f else 1f
                     settings.backgroundTintList = ColorStateList.valueOf(
                         if (isDarkTheme) Color.rgb(17, 29, 44) else Color.rgb(30, 25, 42),
                     )
@@ -609,14 +612,21 @@ fun AppTopSearchBar(
                     settings.iconTint = ColorStateList.valueOf(Color.WHITE)
                     settings.setOnTouchListener { button, event ->
                         when (event.actionMasked) {
-                            MotionEvent.ACTION_DOWN -> button.animate()
-                                .scaleX(.91f).scaleY(.91f).setDuration(130).start()
-                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> button.animate()
-                                .scaleX(1f).scaleY(1f).setDuration(180).start()
+                            MotionEvent.ACTION_DOWN -> {
+                                button.animate().scaleX(.91f).scaleY(.91f).setDuration(130).start()
+                                settingsHalo.animate().scaleX(.95f).scaleY(.95f)
+                                    .alpha(if (isDarkTheme) .48f else .75f).setDuration(130).start()
+                            }
+                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                                button.animate().scaleX(1f).scaleY(1f).setDuration(180).start()
+                                settingsHalo.animate().scaleX(1f).scaleY(1f)
+                                    .alpha(if (isDarkTheme) .62f else 1f).setDuration(180).start()
+                            }
                         }
                         false
                     }
                 } else {
+                    settingsHalo.visibility = View.GONE
                     settings.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
                     settings.strokeWidth = 0
                     settings.iconSize = (26f * density).toInt()

@@ -76,6 +76,18 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintWidth_max="312dp" />
 
+            <View
+                android:id="@+id/home_settings_halo"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:background="@drawable/home_settings_halo"
+                android:clickable="false"
+                android:importantForAccessibility="no"
+                android:visibility="gone"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/settings_button"
                 android:layout_width="48dp"
