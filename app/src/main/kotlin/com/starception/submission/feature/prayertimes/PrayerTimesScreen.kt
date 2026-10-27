@@ -145,9 +145,6 @@ import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
-import com.starception.submission.core.images.resources.Res as HomeImageRes
-import com.starception.submission.core.images.resources.prayer_now_insight_day
-import com.starception.submission.core.images.resources.prayer_now_insight_night
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.feature.prayertimes.components.CompassPopupScreen
@@ -3020,16 +3017,14 @@ fun PrayerTimesScreen(
                     .asPaddingValues().calculateBottomPadding()
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
                 val darkHome = LocalDarkTheme.current
+                var coverPage by rememberSaveable { mutableIntStateOf(0) }
+                val nightArtwork = prayerTimes?.let {
+                    currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
+                } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
                 Box(Modifier.fillMaxSize().background(if (darkHome) Color(0xFF0C110F) else Color.White)) {
                 if (!outerIsLandscape && darkHome) {
-                    val nightArtwork = prayerTimes?.let {
-                        currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
-                    } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
                     Image(
-                        painter = composeArtworkPainter(
-                            if (nightArtwork) HomeImageRes.drawable.prayer_now_insight_night
-                            else HomeImageRes.drawable.prayer_now_insight_day,
-                        ),
+                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, nightArtwork)),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
@@ -3048,7 +3043,7 @@ fun PrayerTimesScreen(
                         1f to Color.White,
                     )))
                     Image(
-                        painter = composeArtworkPainter(HomeImageRes.drawable.prayer_now_insight_day),
+                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, nightArtwork)),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.11f },
@@ -3721,6 +3716,27 @@ fun PrayerTimesScreen(
                                                 isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
                                                 weatherThresholds = prayerWeatherThresholds,
                                             )
+                                            androidx.compose.animation.AnimatedVisibility(
+                                                visible = !insightTileExpanded,
+                                                enter = fadeIn(tween(360)),
+                                                exit = fadeOut(tween(260)),
+                                                modifier = Modifier.matchParentSize(),
+                                            ) {
+                                                ImmersiveHomeCover(
+                                                    selectedPage = coverPage,
+                                                    isNight = nightArtwork,
+                                                    isDarkTheme = darkHome,
+                                                    nextPrayerName = PrayerTimeHelpers
+                                                        .getNextPrayer(currentTime, prayerTimes)?.first.orEmpty(),
+                                                    nextPrayerCountdown = PrayerTimeHelpers
+                                                        .getTimeUntilNextPrayer(currentTime, prayerTimes),
+                                                    onSelectionChanged = { coverPage = it },
+                                                    onOpen = { page ->
+                                                        coverPage = page
+                                                        feedPageRequest = page to ((feedPageRequest?.second ?: 0) + 1)
+                                                    },
+                                                )
+                                            }
                                         }
 
                                         if (!insightTileImmersive) {
@@ -3730,12 +3746,8 @@ fun PrayerTimesScreen(
                                                 if (source.width > 0f && readerBounds.width > 0f) {
                                                     val top = (readerBounds.top + portraitScrollState.value -
                                                         with(morphDensity) { insightHeaderHeight.toPx() }).coerceAtLeast(0f)
-                                                    val left = if (darkHome) 0f else readerBounds.left
-                                                    val width = if (darkHome) {
-                                                        with(morphDensity) { configuration.screenWidthDp.dp.toPx() }
-                                                    } else {
-                                                        readerBounds.width * 0.88f
-                                                    }
+                                                    val left = 0f
+                                                    val width = with(morphDensity) { configuration.screenWidthDp.dp.toPx() }
                                                     val height = with(morphDensity) { portraitImmersiveInsightHeight.toPx() }
                                                     morphToken++
                                                     morphReversing = false
@@ -3749,6 +3761,7 @@ fun PrayerTimesScreen(
                                                         sourceScroll = portraitScrollState.value,
                                                     )
                                                 }
+                                                coverPage = card.page
                                                 feedPageRequest = card.page to ((feedPageRequest?.second ?: 0) + 1)
                                             }
                                             Spacer(Modifier.height(28.dp))
