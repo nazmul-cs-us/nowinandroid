@@ -21,17 +21,23 @@ The first viewport should read as one immersive, edge-to-edge artwork scene.
 The later blue-toned phone reference clarifies its treatment: preserve Deenly's
 own prayer artwork, give day and night a calm blue cast, float legible chrome
 over the image, and let a dark gradient take over as the feed continues. A
-light-theme home uses a white canvas and chrome, with artwork contained inside
-its content cards; the edge-to-edge blue scene belongs to dark mode. The later
-white phone reference sets the light treatment: pearl gradients, quiet violet
-accents, soft depth on floating controls, and artwork fading into the white
-canvas without copying the reference's portrait or task content. A
+light-theme home uses a white canvas and chrome over an edge-to-edge featured
+scene, while the blue/dark scene belongs to dark mode. The later white phone
+reference sets the light treatment: pearl gradients, quiet violet accents,
+soft depth on floating controls, and artwork fading into the white canvas
+without copying the reference's portrait or task content. A
 compact live prayer cue (current/next prayer and countdown) stays easy to reach
 without competing with the featured artwork. The featured card uses the most
 relevant real insight. Smaller image cards below show distinct available content with
 clear titles and source/status labels. The editable prayer schedule remains a
 secondary section further down. Existing Home, For You, Saved, Courses, and
 Interests navigation keeps its real destinations.
+
+The full-screen reference clarifies the hierarchy: the portrait header floats
+over the scene with a greeting and compact Search/Settings actions; the featured
+insight reaches both horizontal edges and carries the page indicators on the
+artwork. The next content section follows beneath that scene rather than making
+the first viewport read as a row of separate dashboard cards.
 
 Card order must come from one home-card model keyed by stable content ID. The
 featured card, small cards, reader, and player must all refer to that model.

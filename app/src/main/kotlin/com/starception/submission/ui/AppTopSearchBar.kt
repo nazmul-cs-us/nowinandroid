@@ -56,18 +56,24 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -93,8 +99,12 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
@@ -139,6 +149,7 @@ fun AppTopSearchBar(
     pillContainerColor: ComposeColor = ComposeColor.Unspecified,
     pillContentColor: ComposeColor = ComposeColor.Unspecified,
     homeCornerAction: Boolean = false,
+    homeImmersiveHeader: Boolean = false,
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
     content: @Composable () -> Unit,
@@ -523,6 +534,17 @@ fun AppTopSearchBar(
                 val settingsHalo = root.findViewById<View>(R.id.home_settings_halo)
 
                 val searchView = root.findViewById<SearchView>(R.id.app_search_view)
+                leading.alpha = if (homeImmersiveHeader) 0f else 1f
+                leading.isClickable = !homeImmersiveHeader
+                searchBar.alpha = if (homeImmersiveHeader) 0f else 1f
+                searchBar.isClickable = !homeImmersiveHeader
+                val homeAccessibility = if (homeImmersiveHeader) {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                } else {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+                }
+                leading.importantForAccessibility = homeAccessibility
+                searchBar.importantForAccessibility = homeAccessibility
                 // Drive the SearchBar's hint from the typewriter state; the
                 // SearchView shows its own static placeholder when expanded.
                 // While voice capture is live the hints are cleared so the centered
@@ -800,6 +822,43 @@ fun AppTopSearchBar(
                 }
             },
         )
+        if (homeImmersiveHeader && !isSearchViewOpen) {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(start = 22.dp, end = 64.dp, top = topInset + 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Assalamu alaikum",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = if (isDarkTheme) ComposeColor.White else ComposeColor(0xFF1F1A2A),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                        .clickable { currentOnProfileClick() }
+                        .semantics { contentDescription = "Open profile" },
+                )
+                Surface(
+                    onClick = { searchViewHolder.value?.show() },
+                    shape = CircleShape,
+                    color = if (isDarkTheme) ComposeColor(0xFF152438).copy(alpha = .84f)
+                    else ComposeColor(0xFFF7F4FB),
+                    shadowElevation = if (isDarkTheme) 0.dp else 3.dp,
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = if (isDarkTheme) ComposeColor.White else ComposeColor(0xFF1F1A2A),
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+            }
+        }
         // Voice wave overlay: the animated visualization that fills the SearchBar
         // pill while the mic is capturing. It sits above the AndroidView so the
         // SearchBar stays interactive when not listening. On the search page it

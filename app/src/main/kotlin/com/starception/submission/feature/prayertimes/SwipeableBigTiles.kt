@@ -1848,12 +1848,15 @@ internal fun SwipeableBigTiles(
     val headerFontSize = (20f - (4f * compactProgress)).sp
     val headerLineHeight = (24f - (4f * compactProgress)).sp
     val headerBottomPadding = (10f - (4f * compactProgress)).dp
+    LaunchedEffect(immersiveHome) {
+        if (immersiveHome) onHeaderHeightChange(0.dp)
+    }
 
     Column(
         modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
     ) {
         AnimatedVisibility(
-            visible = !isImmersive,
+            visible = !isImmersive && !immersiveHome,
             enter = fadeIn(tween(180)) + expandVertically(tween(220)),
             exit = fadeOut(tween(120)) + shrinkVertically(tween(220)),
             modifier = Modifier.onSizeChanged {
@@ -2125,7 +2128,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
-                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
                             onLongPress = onCardLongPress,
                             longPressLabel = if (isExpandedCard) {
                                 "Collapse Prayer Now"
@@ -2186,7 +2189,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
-                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[1] = measured
@@ -2294,7 +2297,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
-                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[2] = measured
@@ -2406,7 +2409,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
-                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[3] = measured
@@ -2483,7 +2486,7 @@ internal fun SwipeableBigTiles(
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
-                            lightHomeArtwork = immersiveHome && !edgeToEdgeArtwork,
+                            lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[4] = measured
@@ -2618,6 +2621,41 @@ internal fun SwipeableBigTiles(
                                      y = 0.dp,
                                  ),
                         )
+                    }
+                }
+            }
+
+            if (immersiveHome && !isImmersive) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
+                        .zIndex(4f)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = .28f))
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(1.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    repeat(insightPageCount) { index ->
+                        val selected = pagerState.currentPage % insightPageCount == index
+                        Box(
+                            Modifier
+                                .size(width = 28.dp, height = 24.dp)
+                                .clickable {
+                                    interactionEpoch++
+                                    carouselScope.launch {
+                                        pagerState.animateScrollToPage(middleLoopStart + index)
+                                    }
+                                }
+                                .semantics { contentDescription = "Show insight ${index + 1}" },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(Modifier
+                                .size(width = if (selected) 16.dp else 5.dp, height = 5.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = if (selected) 1f else .55f)))
+                        }
                     }
                 }
             }

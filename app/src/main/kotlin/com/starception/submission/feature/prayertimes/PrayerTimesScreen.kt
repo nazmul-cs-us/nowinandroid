@@ -3066,6 +3066,7 @@ fun PrayerTimesScreen(
                     pillContainerColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color(0xFF25362B) else Color(0xFFF7F5FB),
                     pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF191724),
                     homeCornerAction = !outerIsLandscape,
+                    homeImmersiveHeader = !outerIsLandscape,
                     topInset = dynamicTopInset,
                     onVerseClick = onSurahClickWithAyah,
                     onSearchSubmit = onSearchSubmit,
@@ -3605,17 +3606,13 @@ fun PrayerTimesScreen(
                                         }
                                         // Swipeable Big Tiles
                                         Box(
-                                            modifier = (if (darkHome) {
-                                                Modifier.offset(x = -feedGutter)
-                                                    .width(configuration.screenWidthDp.dp)
-                                            } else {
-                                                Modifier.fillMaxWidth()
-                                            })
+                                            modifier = Modifier.offset(x = -feedGutter)
+                                                .width(configuration.screenWidthDp.dp)
                                                 .onSizeChanged { insightHeightPx = it.height },
                                         ) {
                                             SwipeableBigTiles(
                                                 immersiveHome = true,
-                                                edgeToEdgeArtwork = darkHome,
+                                                edgeToEdgeArtwork = true,
                                                 pageRequest = feedPageRequest,
                                                 onReaderBoundsChange = { bounds ->
                                                     if (morphRequest == null && !insightTileExpanded) readerBounds = bounds
@@ -3680,12 +3677,14 @@ fun PrayerTimesScreen(
                                                     showCompassPopup = true
                                                 },
                                                 timeOffsets = storedOffsets,
-                                                portraitStripHeight = (configuration.screenHeightDp.dp *
-                                                    (if (darkHome) 0.68f else 0.48f))
-                                                    .coerceIn(
-                                                        if (darkHome) 440.dp else 310.dp,
-                                                        if (darkHome) 650.dp else 430.dp,
-                                                    ).coerceAtMost(portraitImmersiveInsightHeight),
+                                                portraitStripHeight = (configuration.screenHeightDp.dp * 0.72f)
+                                                    .coerceIn(450.dp, 640.dp)
+                                                    // Leave a real travel distance for the
+                                                    // card-to-reader expansion on short phones.
+                                                    .coerceAtMost(
+                                                        (portraitImmersiveInsightHeight - 104.dp)
+                                                            .coerceAtLeast(320.dp),
+                                                    ),
                                                 portraitExpandedStripHeight = portraitImmersiveInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
