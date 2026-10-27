@@ -41,8 +41,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -3000,21 +2998,6 @@ fun PrayerTimesScreen(
                     }
                 }
                 val portraitScrollState = rememberScrollState()
-                val scheduleBringIntoView = remember { BringIntoViewRequester() }
-                LaunchedEffect(showAllPrayers) {
-                    if (!showAllPrayers && !outerIsLandscape) prayerTimeEditMode = false
-                    if (showAllPrayers && !outerIsLandscape) {
-                        kotlinx.coroutines.delay(400)
-                        scheduleBringIntoView.bringIntoView()
-                    }
-                }
-                LaunchedEffect(insightTileExpanded) {
-                    if (insightTileExpanded) {
-                        // The prayer anchor folds away so the enlarged reader owns the viewport.
-                        kotlinx.coroutines.delay(330)
-                        portraitScrollState.animateScrollTo(0)
-                    }
-                }
                 var homeViewport by remember { mutableStateOf(IntSize.Zero) }
                 var insightHeightPx by remember { mutableIntStateOf(0) }
                 var insightHeaderHeight by remember { mutableStateOf(44.dp) }
@@ -3431,24 +3414,10 @@ fun PrayerTimesScreen(
                                         }
                                     }
                                 } else {
-                                    // The portrait feed uses a single dark canvas so the imagery,
-                                    // recommendation cards, and schedule read as one surface.
-                                    val homeAccent = MaterialTheme.colorScheme.primaryContainer
-                                    val homeTypography = MaterialTheme.typography
-                                    val homeShapes = MaterialTheme.shapes
-                                    androidx.compose.material3.MaterialTheme(
-                                        colorScheme = androidx.compose.material3.darkColorScheme(
-                                            primary = homeAccent,
-                                            background = androidx.compose.ui.graphics.Color(0xFF101713),
-                                            surface = androidx.compose.ui.graphics.Color(0xFF17221B),
-                                        ),
-                                        typography = homeTypography,
-                                        shapes = homeShapes,
-                                    ) {
+                                    // PORTRAIT LAYOUT: Original vertical layout
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
                                             .padding(horizontal = 24.dp)
                                             .padding(
                                                 top = 8.dp,
@@ -3505,40 +3474,6 @@ fun PrayerTimesScreen(
                                         ) { expanded ->
                                             if (expanded) 180f else 0f
                                         }
-                                        androidx.compose.animation.AnimatedVisibility(
-                                            visible = !insightTileExpanded,
-                                            enter = fadeIn(tween(200)) + expandVertically(tween(320)),
-                                            exit = fadeOut(tween(120)) + shrinkVertically(tween(320)),
-                                        ) {
-                                            Column {
-                                                val homeDate = java.time.LocalDate.now()
-                                                val homeReading = remember(homeDate) {
-                                                    com.starception.submission.feature.quran.dailyReading(
-                                                        kotlinx.datetime.LocalDate(homeDate.year, homeDate.monthValue, homeDate.dayOfMonth),
-                                                    )
-                                                }
-                                                LivingDayHeader(
-                                                    day = prayerTimes,
-                                                    now = currentTime,
-                                                    completed = prayedPrayersToday,
-                                                    onTogglePrayer = com.starception.submission.util.PrayerTracker::togglePrayerStatus,
-                                                    onQibla = { showCompassPopup = true },
-                                                    onListen = {
-                                                        if (dailyReadingPlayer.currentSurahIndex == homeReading.number - 1 &&
-                                                            (dailyReadingPlayer.isPlaying || dailyReadingPlayer.currentPosition > 0)) {
-                                                            dailyReadingPlayer.togglePlayPause()
-                                                        } else dailyReadingPlayer.playSurah(homeReading.number - 1)
-                                                    },
-                                                    onSchedule = {
-                                                        showAllPrayers = !showAllPrayers
-                                                        if (!showAllPrayers) prayerTimeEditMode = false
-                                                    },
-                                                    scheduleExpanded = showAllPrayers,
-                                                    isListening = dailyReadingPlayer.isPlaying && dailyReadingPlayer.currentSurahIndex == homeReading.number - 1,
-                                                )
-                                                Spacer(Modifier.height(24.dp))
-                                            }
-                                        }
                                         // Swipeable Big Tiles
                                         Box(
                                             modifier = Modifier
@@ -3546,7 +3481,6 @@ fun PrayerTimesScreen(
                                                 .onSizeChanged { insightHeightPx = it.height },
                                         ) {
                                             SwipeableBigTiles(
-                                                livingDayLayout = true,
                                                 prayerTimes = prayerTimes,
                                                 currentTime = currentTime,
                                                 locationService = locationService,
@@ -3604,7 +3538,7 @@ fun PrayerTimesScreen(
                                                     showCompassPopup = true
                                                 },
                                                 timeOffsets = storedOffsets,
-                                                portraitStripHeight = (300f * fontScale.coerceAtLeast(1f)).dp.coerceAtMost(portraitImmersiveInsightHeight),
+                                                portraitStripHeight = portraitInsightHeight.coerceAtMost(portraitImmersiveInsightHeight),
                                                 portraitExpandedStripHeight = portraitImmersiveInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
@@ -3644,11 +3578,6 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileImmersive) {
-                                        androidx.compose.animation.AnimatedVisibility(
-                                            visible = showAllPrayers || prayerTimeEditMode,
-                                            enter = fadeIn(tween(180)) + expandVertically(tween(360)),
-                                            exit = fadeOut(tween(100)) + shrinkVertically(tween(300)),
-                                        ) { Column(Modifier.bringIntoViewRequester(scheduleBringIntoView)) {
                                             // Treat adjustment guidance as part of the prayer section
                                             // header instead of a separate dashboard banner.
                                             Row(
@@ -4015,7 +3944,6 @@ fun PrayerTimesScreen(
                                         // Keep the toggle and location in one layout so the card can travel,
                                         // resize and round into the floating pin instead of cross-fading
                                         // between two unrelated components.
-                                        } } // Expanded schedule
                                         BoxWithConstraints(
                                             modifier = Modifier.fillMaxWidth().onSizeChanged { homeFooterHeightPx = it.height },
                                         ) {
@@ -4027,7 +3955,7 @@ fun PrayerTimesScreen(
                                             )
                                             val locationControlHeight by locationTransition.animateDp(
                                                 transitionSpec = {
-                                                    tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
                                                 label = "locationControlHeight",
                                             ) { expanded ->
@@ -4035,7 +3963,7 @@ fun PrayerTimesScreen(
                                             }
                                             val locationCardWidth by locationTransition.animateDp(
                                                 transitionSpec = {
-                                                    tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
                                                 label = "locationCardWidth",
                                             ) { expanded ->
@@ -4043,7 +3971,7 @@ fun PrayerTimesScreen(
                                             }
                                             val locationCardHeight by locationTransition.animateDp(
                                                 transitionSpec = {
-                                                    tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
                                                 label = "locationCardHeight",
                                             ) { expanded ->
@@ -4051,7 +3979,7 @@ fun PrayerTimesScreen(
                                             }
                                             val locationCardOffsetY by locationTransition.animateDp(
                                                 transitionSpec = {
-                                                    tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
                                                 label = "locationCardOffsetY",
                                             ) { expanded ->
@@ -4063,7 +3991,7 @@ fun PrayerTimesScreen(
                                             }
                                             val locationCardEndInset by locationTransition.animateDp(
                                                 transitionSpec = {
-                                                    tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
                                                 label = "locationCardEndInset",
                                             ) { expanded ->
@@ -4071,7 +3999,7 @@ fun PrayerTimesScreen(
                                             }
                                             val locationCardCornerRadius by locationTransition.animateDp(
                                                 transitionSpec = {
-                                                    tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
                                                 label = "locationCardCornerRadius",
                                             ) { expanded ->
@@ -4079,7 +4007,7 @@ fun PrayerTimesScreen(
                                             }
                                             val locationMarkerInset by locationTransition.animateDp(
                                                 transitionSpec = {
-                                                    tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
                                                 },
                                                 label = "locationMarkerInset",
                                             ) { expanded ->
@@ -4562,7 +4490,6 @@ fun PrayerTimesScreen(
 
                                         Spacer(Modifier.height(4.dp))
                                         }
-                                    }
                                     }
                                 } // End of portrait layout else block
                             }
