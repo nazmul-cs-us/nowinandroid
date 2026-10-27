@@ -67,6 +67,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
@@ -1813,7 +1816,17 @@ internal fun SwipeableBigTiles(
     LaunchedEffect(expansionProgress) {
         onExpansionProgressChange(expansionProgress)
     }
-    val isImmersive = !isLandscape && expansionExtent >= 0.995f
+    // Keep the surrounding chrome in place while the card travels to its final
+    // bounds. Hide it only after the expansion has visually completed; on close,
+    // bring it back as the card reaches its resting size.
+    var isImmersive by remember { mutableStateOf(false) }
+    LaunchedEffect(isLandscape, expansionExtent, expansionProgress) {
+        when {
+            isLandscape -> isImmersive = false
+            expansionExtent >= 0.995f && expansionProgress >= 0.98f -> isImmersive = true
+            expansionExtent < 0.995f && expansionProgress <= 0.12f -> isImmersive = false
+        }
+    }
     LaunchedEffect(isImmersive) {
         onImmersiveModeChange(isImmersive)
     }
@@ -1828,11 +1841,17 @@ internal fun SwipeableBigTiles(
     Column(
         modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
     ) {
-        if (!isImmersive) Row(
+        AnimatedVisibility(
+            visible = !isImmersive,
+            enter = fadeIn(tween(180)) + expandVertically(tween(220)),
+            exit = fadeOut(tween(120)) + shrinkVertically(tween(220)),
+            modifier = Modifier.onSizeChanged {
+                onHeaderHeightChange(with(density) { it.height.toDp() })
+            },
+        ) { Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = headerBottomPadding)
-                .onSizeChanged { onHeaderHeightChange(with(density) { it.height.toDp() } + headerBottomPadding) },
+                .padding(bottom = headerBottomPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1873,7 +1892,7 @@ internal fun SwipeableBigTiles(
                     },
                 )
             }
-        }
+        } }
 
         val stripModifier = if (isLandscape) {
             Modifier
@@ -1922,16 +1941,17 @@ internal fun SwipeableBigTiles(
                 animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
                 label = "insightReadingWidth",
             )
+            val synchronizedWidthExpansion = if (immersiveHome) expansionProgress else widthExpansion
             val cardWidth = (
                 restingCardWidth.value +
-                    ((maxWidth.value - restingCardWidth.value) * widthExpansion)
+                    ((maxWidth.value - restingCardWidth.value) * synchronizedWidthExpansion)
                 ).dp
             val restingPageSpacing = if (isLandscape) 10.dp else (14f - (4f * compactProgress)).dp
-            val pageSpacing = (restingPageSpacing.value * (1f - widthExpansion)).dp
+            val pageSpacing = (restingPageSpacing.value * (1f - synchronizedWidthExpansion)).dp
             val endContentPadding = if (isLandscape) {
                 0.dp
             } else {
-                (18f * (1f - widthExpansion)).dp
+                (18f * (1f - synchronizedWidthExpansion)).dp
             }
 
             HorizontalPager(
@@ -2026,7 +2046,8 @@ internal fun SwipeableBigTiles(
                     // settled page. Keeping incoming pages expanded prevents their
                     // compact artwork flashing while a swipe is still settling.
                     val isExpandedCard = expandedLogicalPage != null
-                    val renderExpandedPayload = isExpandedCard &&
+                    val presentationExpanded = if (immersiveHome) expansionProgress >= 0.55f else isExpandedCard
+                    val renderExpandedPayload = presentationExpanded &&
                         (page == pagerState.settledPage || page == pagerState.currentPage)
                     val onCardLongPress: (() -> Unit)? = when {
                         !isFocused -> null
@@ -2083,8 +2104,9 @@ internal fun SwipeableBigTiles(
                             statusMetaText = prayerWeatherInsight?.summary,
                             weatherThresholds = weatherThresholds,
                             compactProgress = compactProgress,
-                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
-                            isExpanded = isExpandedCard,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = presentationExpanded,
+                            fluidFullBleed = immersiveHome,
                             onLongPress = onCardLongPress,
                             longPressLabel = if (isExpandedCard) {
                                 "Collapse Prayer Now"
@@ -2142,8 +2164,9 @@ internal fun SwipeableBigTiles(
                             skyTintStrength = livePrayerSkyPalette.strength * 0.58f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.72f,
                             compactProgress = compactProgress,
-                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
-                            isExpanded = isExpandedCard,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = presentationExpanded,
+                            fluidFullBleed = immersiveHome,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[1] = measured
@@ -2217,21 +2240,21 @@ internal fun SwipeableBigTiles(
                             },
                             useEditorialExpandedLayout = true,
                             label = if (isDrivingMode) "Driving · Listen" else "Today's reading",
-                            title = if (isExpandedCard) {
+                            title = if (presentationExpanded) {
                                 ""
                             } else if (isDrivingMode) {
                                 "Listen to ${dailySurah.nameEnglish}"
                             } else {
                                 dailySurah.nameEnglish
                             },
-                            supportingText = if (isExpandedCard) {
+                            supportingText = if (presentationExpanded) {
                                 null
                             } else if (isDrivingMode) {
                                 "Hands-free Quran playback"
                             } else {
                                 dailySurah.nameArabic
                             },
-                            footerText = if (isExpandedCard) {
+                            footerText = if (presentationExpanded) {
                                 dailySurah.nameArabic
                             } else if (isDrivingMode) {
                                 "Surah ${dailySurah.number} · Keep your eyes on the road"
@@ -2248,8 +2271,9 @@ internal fun SwipeableBigTiles(
                             skyTintStrength = livePrayerSkyPalette.strength * 0.46f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.64f,
                             compactProgress = compactProgress,
-                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
-                            isExpanded = isExpandedCard,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = presentationExpanded,
+                            fluidFullBleed = immersiveHome,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[2] = measured
@@ -2309,18 +2333,18 @@ internal fun SwipeableBigTiles(
                             // Expanded mode carries its full hierarchy inside the
                             // live instrument. Repeating the bearing and action
                             // below it made the card look like two stacked widgets.
-                            title = if (isExpandedCard) {
+                            title = if (presentationExpanded) {
                                 ""
                             } else {
                                 qiblaBearing?.let { "$it° toward Makkah" }
                                     ?: "Direction to Makkah"
                             },
-                            supportingText = if (isExpandedCard) {
+                            supportingText = if (presentationExpanded) {
                                 null
                             } else {
                                 qiblaBearing?.let(::qiblaCardinalDirection)
                             },
-                            footerText = if (isExpandedCard) {
+                            footerText = if (presentationExpanded) {
                                 null
                             } else {
                                 "Open the live compass and 3D globe"
@@ -2330,11 +2354,12 @@ internal fun SwipeableBigTiles(
                             // subject. Expanded mode supplies a live direction
                             // instrument, so retaining both creates two competing
                             // compasses in the same focal area.
-                            foregroundPainterRes = if (isExpandedCard) {
+                            foregroundPainterRes = if (isExpandedCard && !immersiveHome) {
                                 null
                             } else {
                                 ImageRes.drawable.insight_qibla_foreground_v2
                             },
+                            foregroundFadeOnExpand = immersiveHome,
                             // Keep the compass present without dominating the Qibla scene.
                             foregroundBaseScale = 0.75f,
                             foregroundOffsetFraction = Offset(0.025f, 0.11f),
@@ -2345,8 +2370,9 @@ internal fun SwipeableBigTiles(
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness *
                                 if (isExpandedCard) 0.24f else 0.68f,
                             compactProgress = compactProgress,
-                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
-                            isExpanded = isExpandedCard,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = presentationExpanded,
+                            fluidFullBleed = immersiveHome,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[3] = measured
@@ -2359,8 +2385,8 @@ internal fun SwipeableBigTiles(
                             // The enlarged state already carries its own large
                             // compass icon inside QiblaBearingExpandedStage;
                             // the small header arrow is redundant up there.
-                            directionalHintBearing = if (isExpandedCard) null else qiblaBearing,
-                            deviceHeadingDegrees = if (isExpandedCard) null else liveQiblaHeading,
+                            directionalHintBearing = if (presentationExpanded) null else qiblaBearing,
+                            deviceHeadingDegrees = if (presentationExpanded) null else liveQiblaHeading,
                             actionDescription = "Open Qibla compass",
                             onClick = {
                                 interactionEpoch++
@@ -2388,24 +2414,24 @@ internal fun SwipeableBigTiles(
 
                         else -> {
                             val groundedNudge = modelKnowledgeCandidate?.nudge
-                                ?.takeIf { isExpandedCard }
+                                ?.takeIf { presentationExpanded }
                             InsightPreviewCard(
                             useEditorialExpandedLayout = true,
                             label = if (isDrivingMode) "Driving · Listen" else "AI suggested",
                             // The expanded source panel replaces the compact
                             // recommendation summary. Rendering both caused the
                             // "Feeling blessed" summary to collide with the panel.
-                            title = if (isExpandedCard) {
+                            title = if (presentationExpanded) {
                                 ""
                             } else {
                                 displayedAiRecommendation.title
                             },
-                            supportingText = if (!isExpandedCard && groundedNudge == null) {
+                            supportingText = if (!presentationExpanded && groundedNudge == null) {
                                 displayedAiRecommendation.supportingText
                             } else {
                                 null
                             },
-                            footerText = if (isExpandedCard) {
+                            footerText = if (presentationExpanded) {
                                 null
                             } else if (groundedNudge == null) {
                                 displayedAiRecommendation.footerText
@@ -2420,8 +2446,9 @@ internal fun SwipeableBigTiles(
                             skyTintStrength = livePrayerSkyPalette.strength * 0.50f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.70f,
                             compactProgress = compactProgress,
-                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
-                            isExpanded = isExpandedCard,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = presentationExpanded,
+                            fluidFullBleed = immersiveHome,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[4] = measured
@@ -2949,6 +2976,7 @@ private fun PrayerPosterInsightCard(
     compactProgress: Float,
     expansionProgress: Float,
     isExpanded: Boolean,
+    fluidFullBleed: Boolean = false,
     onLongPress: (() -> Unit)?,
     longPressLabel: String,
     isFocused: Boolean,
@@ -3010,6 +3038,7 @@ private fun PrayerPosterInsightCard(
                              compactProgress = compactProgress,
             expansionProgress = expansionProgress,
             isExpanded = isExpanded,
+            fluidFullBleed = fluidFullBleed,
             onLongPress = onLongPress,
             longPressLabel = longPressLabel,
             isFocused = isFocused,
@@ -3043,6 +3072,7 @@ private fun InsightPreviewCard(
     groundPainterRes: DrawableResource? = null,
     groundFadeStartFraction: Float = 0.68f,
     foregroundPainterRes: DrawableResource? = null,
+    foregroundFadeOnExpand: Boolean = false,
     foregroundOverlayPainterRes: DrawableResource? = null,
     foregroundBaseScale: Float = 1f,
     foregroundOffsetFraction: Offset = Offset.Zero,
@@ -3059,6 +3089,7 @@ private fun InsightPreviewCard(
     compactProgress: Float,
     expansionProgress: Float = 0f,
     isExpanded: Boolean = false,
+    fluidFullBleed: Boolean = false,
     useEditorialExpandedLayout: Boolean = false,
     onLongPress: (() -> Unit)? = null,
     longPressLabel: String? = null,
@@ -3110,9 +3141,17 @@ private fun InsightPreviewCard(
         !statusMetaText.isNullOrBlank() ||
         !footerText.isNullOrBlank() ||
         prayerRecap.isNotEmpty()
-    val cornerExtent = (26f - (8f * compactProgress) + (6f * expansionProgress)).dp
+    val cornerExtent = if (fluidFullBleed) {
+        (26f - 26f * expansionProgress).coerceAtLeast(0f).dp
+    } else {
+        (26f - (8f * compactProgress) + (6f * expansionProgress)).dp
+    }
     val shape = ContinuousCornerShape(cornerExtent)
-    val shadowElevation = (6f - (2f * compactProgress) + (4f * expansionProgress)).dp
+    val shadowElevation = if (fluidFullBleed) {
+        (6f * (1f - expansionProgress)).coerceAtLeast(0f).dp
+    } else {
+        (6f - (2f * compactProgress) + (4f * expansionProgress)).dp
+    }
     val rawDirectionalRotation = directionalHintBearing?.let { bearing ->
         deviceHeadingDegrees?.let { normalizeDegrees(bearing - it) }
     }
@@ -3682,6 +3721,7 @@ private fun InsightPreviewCard(
                             .fillMaxSize()
                             .blur(expandedArtworkBlur)
                             .graphicsLayer {
+                                if (foregroundFadeOnExpand) alpha = 1f - expansionProgress
                                 // The subject remains materially stable while the
                                 // independently controlled environment breathes.
                                 // A smaller movement preserves depth without making

@@ -3152,8 +3152,12 @@ fun PrayerTimesScreen(
                                     )
                                 val portraitImmersiveInsightHeight =
                                     com.starception.submission.core.designsystem.component.insightMaximumTileHeight(
-                                        viewport = insightViewport,
-                                        header = if (insightTileImmersive) 0.dp else insightHeaderHeight,
+                                        // Reserve the final full-screen bounds from the first
+                                        // animation frame. The visible navigation contributes 64dp
+                                        // before it leaves; the measured viewport gains that 64dp
+                                        // afterwards, so this target stays stable across the handoff.
+                                        viewport = insightViewport + if (insightTileImmersive) 0.dp else 64.dp,
+                                        header = 0.dp,
                                     )
 
 
@@ -3436,11 +3440,16 @@ fun PrayerTimesScreen(
                                     LaunchedEffect(feedPageRequest) {
                                         if (feedPageRequest != null) portraitScrollState.animateScrollTo(0)
                                     }
+                                    val feedGutter by animateDpAsState(
+                                        targetValue = if (insightTileExpanded) 0.dp else 24.dp,
+                                        animationSpec = tween(420, easing = FastOutSlowInEasing),
+                                        label = "immersiveFeedGutter",
+                                    )
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .background(MaterialTheme.colorScheme.background)
-                                            .padding(horizontal = 24.dp)
+                                            .padding(horizontal = feedGutter)
                                             .padding(
                                                 top = 8.dp,
                                                 bottom = 0.dp,

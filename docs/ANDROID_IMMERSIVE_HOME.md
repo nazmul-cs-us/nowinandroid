@@ -13,6 +13,11 @@ Tapping a featured card or an artwork card opens the selected insight to the
 immersive height. The current Quran, Salah, recommendation, and Qibla content
 and actions are reused; Back returns to the feed. Auto paging is disabled in
 this layout so the featured card does not change while someone is reading.
+The featured card's gutter, width, height, corner radius, shadow, and artwork move with
+one expansion progress. Reader content appears after the card has grown, while
+the navigation and heading leave near the end of the transition; collapse
+reverses that sequence. The full-screen height is held constant across the
+navigation handoff so the card does not jump at the last frame.
 The home navigation capsule and system bar icons use the dark feed contrast;
 other destinations keep their selected theme.
 
