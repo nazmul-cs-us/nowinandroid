@@ -1,5 +1,9 @@
 # Home R&D: Living Day
 
+> Historical concept study. For the current Android home direction, follow
+> [Android home reference plan](ANDROID_HOME_REFERENCE_PLAN.md). The artwork-led
+> immersive feed replaces this hero-first recommendation.
+
 ![Living Day home concept](images/home-living-day-concept.png)
 
 ## Premium control variant
