@@ -3019,8 +3019,9 @@ fun PrayerTimesScreen(
                 val navigationBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
                     .asPaddingValues().calculateBottomPadding()
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
-                Box(Modifier.fillMaxSize()) {
-                if (!outerIsLandscape) {
+                val darkHome = LocalDarkTheme.current
+                Box(Modifier.fillMaxSize().background(if (darkHome) Color(0xFF0C110F) else Color.White)) {
+                if (!outerIsLandscape && darkHome) {
                     val nightArtwork = prayerTimes?.let {
                         currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
                     } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
@@ -3043,8 +3044,8 @@ fun PrayerTimesScreen(
                     title = stringResource(R.string.prayer_times_title),
                     onSettingsClick = onSettingsClick,
                     modifier = Modifier,
-                    pillContainerColor = if (outerIsLandscape) androidx.compose.ui.graphics.Color.Unspecified else androidx.compose.ui.graphics.Color(0xFF25362B),
-                    pillContentColor = if (outerIsLandscape) androidx.compose.ui.graphics.Color.Unspecified else androidx.compose.ui.graphics.Color.White,
+                    pillContainerColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color(0xFF25362B) else Color.White,
+                    pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF17221B),
                     topInset = dynamicTopInset,
                     onVerseClick = onSurahClickWithAyah,
                     onSearchSubmit = onSearchSubmit,
@@ -3452,14 +3453,29 @@ fun PrayerTimesScreen(
                                     }
                                 } else {
                                     val feedAccent = MaterialTheme.colorScheme.primaryContainer
+                                    val ambientScheme = MaterialTheme.colorScheme
                                     val feedTypography = MaterialTheme.typography
                                     val feedShapes = MaterialTheme.shapes
                                     androidx.compose.material3.MaterialTheme(
-                                        colorScheme = androidx.compose.material3.darkColorScheme(
-                                            primary = feedAccent,
-                                            background = androidx.compose.ui.graphics.Color(0xFF0C110F),
-                                            surface = androidx.compose.ui.graphics.Color(0xFF17221B),
-                                        ),
+                                        colorScheme = if (darkHome) {
+                                            androidx.compose.material3.darkColorScheme(
+                                                primary = feedAccent,
+                                                background = Color(0xFF0C110F),
+                                                surface = Color(0xFF17221B),
+                                            )
+                                        } else {
+                                            ambientScheme.copy(
+                                                background = Color.White,
+                                                surface = Color.White,
+                                                surfaceContainerLowest = Color.White,
+                                                surfaceContainerLow = Color.White,
+                                                surfaceContainer = Color.White,
+                                                surfaceContainerHigh = Color.White,
+                                                surfaceContainerHighest = Color.White,
+                                                onBackground = Color(0xFF17221B),
+                                                onSurface = Color(0xFF17221B),
+                                            )
+                                        },
                                         typography = feedTypography,
                                         shapes = feedShapes,
                                     ) {
@@ -3502,7 +3518,7 @@ fun PrayerTimesScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(Color.Transparent)
+                                            .background(if (darkHome) Color.Transparent else Color.White)
                                             .padding(horizontal = feedGutter)
                                             .padding(
                                                 top = 8.dp,
@@ -3561,13 +3577,17 @@ fun PrayerTimesScreen(
                                         }
                                         // Swipeable Big Tiles
                                         Box(
-                                            modifier = Modifier
-                                                .offset(x = -feedGutter)
-                                                .width(configuration.screenWidthDp.dp)
+                                            modifier = (if (darkHome) {
+                                                Modifier.offset(x = -feedGutter)
+                                                    .width(configuration.screenWidthDp.dp)
+                                            } else {
+                                                Modifier.fillMaxWidth()
+                                            })
                                                 .onSizeChanged { insightHeightPx = it.height },
                                         ) {
                                             SwipeableBigTiles(
                                                 immersiveHome = true,
+                                                edgeToEdgeArtwork = darkHome,
                                                 pageRequest = feedPageRequest,
                                                 onReaderBoundsChange = { bounds ->
                                                     if (morphRequest == null && !insightTileExpanded) readerBounds = bounds
@@ -3632,8 +3652,12 @@ fun PrayerTimesScreen(
                                                     showCompassPopup = true
                                                 },
                                                 timeOffsets = storedOffsets,
-                                                portraitStripHeight = (configuration.screenHeightDp.dp * 0.68f)
-                                                    .coerceIn(440.dp, 650.dp).coerceAtMost(portraitImmersiveInsightHeight),
+                                                portraitStripHeight = (configuration.screenHeightDp.dp *
+                                                    (if (darkHome) 0.68f else 0.48f))
+                                                    .coerceIn(
+                                                        if (darkHome) 440.dp else 310.dp,
+                                                        if (darkHome) 650.dp else 430.dp,
+                                                    ).coerceAtMost(portraitImmersiveInsightHeight),
                                                 portraitExpandedStripHeight = portraitImmersiveInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
@@ -3679,7 +3703,12 @@ fun PrayerTimesScreen(
                                                 if (source.width > 0f && readerBounds.width > 0f) {
                                                     val top = (readerBounds.top + portraitScrollState.value -
                                                         with(morphDensity) { insightHeaderHeight.toPx() }).coerceAtLeast(0f)
-                                                    val width = with(morphDensity) { configuration.screenWidthDp.dp.toPx() }
+                                                    val left = if (darkHome) 0f else readerBounds.left
+                                                    val width = if (darkHome) {
+                                                        with(morphDensity) { configuration.screenWidthDp.dp.toPx() }
+                                                    } else {
+                                                        readerBounds.width * 0.88f
+                                                    }
                                                     val height = with(morphDensity) { portraitImmersiveInsightHeight.toPx() }
                                                     morphToken++
                                                     morphReversing = false
@@ -3688,7 +3717,7 @@ fun PrayerTimesScreen(
                                                     morphRequest = ArtworkMorphRequest(
                                                         card = card,
                                                         from = source,
-                                                        to = androidx.compose.ui.geometry.Rect(0f, top, width, top + height),
+                                                        to = androidx.compose.ui.geometry.Rect(left, top, left + width, top + height),
                                                         token = morphToken,
                                                         sourceScroll = portraitScrollState.value,
                                                     )

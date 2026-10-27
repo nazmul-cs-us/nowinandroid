@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.Alignment
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 
 /** A source detail stays attached to the passage through a curved intermediate silhouette. */
 @Composable
@@ -47,7 +48,9 @@ internal fun FlowingSourceDisclosure(reference: String, selection: String) {
         animationSpec = tween(320, easing = FastOutSlowInEasing),
         label = "hadithSourceChevron",
     )
-    val surface = Color(0xFF152A3B)
+    val dark = LocalDarkTheme.current
+    val surface = if (dark) Color(0xFF152A3B) else Color.White
+    val ink = if (dark) Color.White else Color(0xFF17221B)
     Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
         Surface(
             onClick = { expanded = !expanded },
@@ -62,10 +65,10 @@ internal fun FlowingSourceDisclosure(reference: String, selection: String) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Hadith source", color = Color.White,
+                Text("Hadith source", color = ink,
                     style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 Icon(Icons.Default.ExpandMore, contentDescription = null,
-                    tint = Color.White.copy(alpha = .82f),
+                    tint = ink.copy(alpha = .82f),
                     modifier = Modifier.graphicsLayer { rotationZ = chevronRotation })
             }
         }
@@ -94,9 +97,9 @@ internal fun FlowingSourceDisclosure(reference: String, selection: String) {
                     Modifier.fillMaxWidth().background(surface, RoundedCornerShape(20.dp))
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                 ) {
-                    Text(reference, color = Color.White,
+                    Text(reference, color = ink,
                         style = MaterialTheme.typography.bodyMedium)
-                    Text(selection, color = Color.White.copy(alpha = .70f),
+                    Text(selection, color = ink.copy(alpha = .70f),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(top = 4.dp))
                 }

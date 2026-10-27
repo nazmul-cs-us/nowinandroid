@@ -43,6 +43,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_quran_background
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.feature.quran.Surah
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
@@ -57,6 +58,11 @@ internal fun HomeReadingPlayer(
     onRetry: () -> Unit,
     onSeek: (Int) -> Unit,
 ) {
+    val dark = LocalDarkTheme.current
+    val ink = if (dark) Color.White else Color(0xFF17221B)
+    val mutedInk = ink.copy(alpha = .72f)
+    val playSurface = if (dark) Color.White else Color(0xFF17221B)
+    val playInk = if (dark) Color(0xFF10283A) else Color.White
     val isCurrent = playback.surahIndex == surah.number - 1
     val duration = if (isCurrent) playback.durationMs.coerceAtLeast(0) else 0
     val position = if (isCurrent) playback.positionMs.coerceIn(0, duration) else 0
@@ -69,44 +75,46 @@ internal fun HomeReadingPlayer(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Box(Modifier.fillMaxSize().background(Color(0xFF06121D))) {
-            Image(
-                painter = painterResource(Res.drawable.insight_quran_background),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-                0f to Color(0xFF081725).copy(alpha = .72f),
-                .46f to Color(0xFF091724).copy(alpha = .78f),
-                1f to Color(0xFF06121D),
-            )))
+        Box(Modifier.fillMaxSize().background(if (dark) Color(0xFF06121D) else Color.White)) {
+            if (dark) {
+                Image(
+                    painter = painterResource(Res.drawable.insight_quran_background),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                    0f to Color(0xFF081725).copy(alpha = .72f),
+                    .46f to Color(0xFF091724).copy(alpha = .78f),
+                    1f to Color(0xFF06121D),
+                )))
+            }
             Column(
                 Modifier.fillMaxSize().padding(start = 28.dp, end = 28.dp, top = 40.dp, bottom = 40.dp),
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically) {
-                    Text("NOW PLAYING", color = Color.White.copy(alpha = .76f),
+                    Text("NOW PLAYING", color = mutedInk,
                         style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Clear, contentDescription = "Return to reading", tint = Color.White)
+                        Icon(Icons.Default.Clear, contentDescription = "Return to reading", tint = ink)
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Text("TODAY'S READING", color = Color(0xFFD9B679),
+                Text("TODAY'S READING", color = if (dark) Color(0xFFD9B679) else Color(0xFF385E76),
                     style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                Text(surah.nameEnglish, color = Color.White,
+                Text(surah.nameEnglish, color = ink,
                     style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold,
                     maxLines = 2, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 8.dp))
                 Text("Surah ${surah.number} · ${surah.nameArabic}",
-                    color = Color.White.copy(alpha = .75f), style = MaterialTheme.typography.bodyMedium,
+                    color = mutedInk, style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 4.dp, bottom = 28.dp))
                 if (playback.error != null && isCurrent) {
-                    Text(playback.error, color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    Text(playback.error, color = ink, style = MaterialTheme.typography.bodySmall)
                 } else if ((playback.isLoading || playback.isDownloading) && isCurrent) {
                     Text(if (playback.isDownloading) "Preparing audio…" else "Starting playback…",
-                        color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.bodySmall)
+                        color = mutedInk, style = MaterialTheme.typography.bodySmall)
                 }
                 Slider(
                     value = seekFraction.coerceIn(0f, 1f),
@@ -119,21 +127,21 @@ internal fun HomeReadingPlayer(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(formatPlaybackTime(position), color = Color.White.copy(alpha = .7f),
+                    Text(formatPlaybackTime(position), color = mutedInk,
                         style = MaterialTheme.typography.labelSmall)
-                    Text(formatPlaybackTime(duration), color = Color.White.copy(alpha = .7f),
+                    Text(formatPlaybackTime(duration), color = mutedInk,
                         style = MaterialTheme.typography.labelSmall)
                 }
                 Box(Modifier.fillMaxWidth().padding(top = 22.dp), contentAlignment = Alignment.Center) {
                     Surface(
                         onClick = if (playback.error != null && isCurrent) onRetry else onPlayPause,
                         shape = CircleShape,
-                        color = Color.White,
+                        color = playSurface,
                         modifier = Modifier.size(72.dp),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             if ((playback.isLoading || playback.isDownloading) && isCurrent) {
-                                CircularProgressIndicator(color = Color(0xFF10283A),
+                                CircularProgressIndicator(color = playInk,
                                     modifier = Modifier.size(28.dp))
                             } else {
                                 Icon(
@@ -147,7 +155,7 @@ internal fun HomeReadingPlayer(
                                         playback.isPlaying && isCurrent -> "Pause"
                                         else -> "Play"
                                     },
-                                    tint = Color(0xFF10283A),
+                                    tint = playInk,
                                     modifier = Modifier.size(32.dp),
                                 )
                             }

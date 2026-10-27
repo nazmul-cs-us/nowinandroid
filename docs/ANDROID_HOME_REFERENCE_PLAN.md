@@ -21,6 +21,8 @@ The first viewport should read as one immersive, edge-to-edge artwork scene.
 The later blue-toned phone reference clarifies its treatment: preserve Deenly's
 own prayer artwork, give day and night a calm blue cast, float legible chrome
 over the image, and let a dark gradient take over as the feed continues. A
+light-theme home uses a white canvas and chrome, with artwork contained inside
+its content cards; the edge-to-edge blue scene belongs to dark mode. A
 compact live prayer cue (current/next prayer and countdown) stays easy to reach
 without competing with the featured artwork. The featured card uses the most
 relevant real insight. Smaller image cards below show distinct available content with

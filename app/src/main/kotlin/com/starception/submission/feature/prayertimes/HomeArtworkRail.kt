@@ -97,7 +97,7 @@ internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifi
 internal fun HomeArtworkRail(onSelect: (HomeArtworkCard, Rect) -> Unit) {
     Column {
         Text("Explore your day", style = MaterialTheme.typography.titleLarge,
-            color = Color.White, fontWeight = FontWeight.SemiBold)
+            color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth()) {
             ArtworkCard(homeArtworkCards[0], Modifier.weight(1f), onSelect)

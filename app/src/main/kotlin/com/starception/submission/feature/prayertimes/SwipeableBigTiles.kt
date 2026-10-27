@@ -1375,6 +1375,7 @@ internal fun SwipeableBigTiles(
     onHeaderHeightChange: (Dp) -> Unit = {},
     collapseExpandedTileRequest: Int = 0,
     immersiveHome: Boolean = false,
+    edgeToEdgeArtwork: Boolean = false,
     pageRequest: Pair<Int, Int>? = null,
     onReaderBoundsChange: (Rect) -> Unit = {},
 ) {
@@ -1918,8 +1919,10 @@ internal fun SwipeableBigTiles(
         BoxWithConstraints(modifier = stripModifier.onGloballyPositioned {
             onReaderBoundsChange(it.boundsInWindow())
         }) {
-            val normalCardWidth = if (immersiveHome) {
+            val normalCardWidth = if (immersiveHome && edgeToEdgeArtwork) {
                 maxWidth
+            } else if (immersiveHome) {
+                maxWidth * 0.88f
             } else if (isLandscape) {
                 // The split-screen home layout is already narrow enough to signal
                 // that this is a carousel through its indicator. A portrait-style
@@ -1963,7 +1966,7 @@ internal fun SwipeableBigTiles(
             val pageSpacing = (restingPageSpacing.value * (1f - synchronizedWidthExpansion)).dp
             val endContentPadding = if (isLandscape) {
                 0.dp
-            } else if (immersiveHome) {
+            } else if (immersiveHome && edgeToEdgeArtwork) {
                 0.dp
             } else {
                 (18f * (1f - synchronizedWidthExpansion)).dp
@@ -2121,7 +2124,7 @@ internal fun SwipeableBigTiles(
                             compactProgress = compactProgress,
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
-                            fluidFullBleed = immersiveHome,
+                            fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             longPressLabel = if (isExpandedCard) {
                                 "Collapse Prayer Now"
@@ -2181,7 +2184,7 @@ internal fun SwipeableBigTiles(
                             compactProgress = compactProgress,
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
-                            fluidFullBleed = immersiveHome,
+                            fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[1] = measured
@@ -2288,7 +2291,7 @@ internal fun SwipeableBigTiles(
                             compactProgress = compactProgress,
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
-                            fluidFullBleed = immersiveHome,
+                            fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[2] = measured
@@ -2399,7 +2402,7 @@ internal fun SwipeableBigTiles(
                             compactProgress = compactProgress,
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
-                            fluidFullBleed = immersiveHome,
+                            fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[3] = measured
@@ -2475,7 +2478,7 @@ internal fun SwipeableBigTiles(
                             compactProgress = compactProgress,
                             expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = presentationExpanded,
-                            fluidFullBleed = immersiveHome,
+                            fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             onLongPress = onCardLongPress,
                             onCompactContentHeightChange = { measured ->
                                 compactHeightHints[4] = measured
