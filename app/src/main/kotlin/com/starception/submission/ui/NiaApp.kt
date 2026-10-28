@@ -50,6 +50,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -459,15 +460,19 @@ private fun NiaFloatingBottomBar(
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
                 color = if (homeDark) {
-                    Color(0xFF122033).copy(alpha = .62f)
+                    Color(0xFF122033).copy(alpha = .56f)
                 } else if (homeLight) {
-                    Color.White.copy(alpha = .72f)
+                    Color.White.copy(alpha = .68f)
                 } else if (darkTheme) {
                     colorScheme.surfaceContainer
                 } else {
                     colorScheme.surfaceContainerHighest
                 },
-                shadowElevation = 4.dp,
+                border = if (homeDark || homeLight) BorderStroke(
+                    1.dp,
+                    Color.White.copy(alpha = if (homeDark) .27f else .76f),
+                ) else null,
+                shadowElevation = if (homeDark || homeLight) 8.dp else 4.dp,
                 modifier = sizeModifier,
             ) {
                 val destinations = appState.topLevelDestinations

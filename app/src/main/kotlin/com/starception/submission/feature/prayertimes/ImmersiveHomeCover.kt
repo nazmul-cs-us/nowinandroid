@@ -1,6 +1,7 @@
 package com.starception.submission.feature.prayertimes
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,8 +24,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +47,7 @@ import com.starception.submission.core.images.resources.insight_suggestion
 import com.starception.submission.core.images.resources.prayer_now_insight_day
 import com.starception.submission.core.images.resources.prayer_now_insight_night
 import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.launch
 
 internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableResource = when (page) {
@@ -56,8 +64,8 @@ internal fun homeCoverScrim(isDarkTheme: Boolean): Brush = if (isDarkTheme) {
         0f to Color(0xFF071C30).copy(alpha = .12f),
         .48f to Color(0xFF0B1D2C).copy(alpha = .22f),
         .72f to Color(0xFF071725).copy(alpha = .55f),
-        .91f to Color(0xFF0C110F).copy(alpha = .98f),
-        1f to Color(0xFF0C110F),
+        .91f to Color(0xFF080B14).copy(alpha = .98f),
+        1f to Color(0xFF080B14),
     )
 } else {
     Brush.verticalGradient(
@@ -68,6 +76,43 @@ internal fun homeCoverScrim(isDarkTheme: Boolean): Brush = if (isDarkTheme) {
         .90f to Color.White.copy(alpha = .92f),
         1f to Color.White,
     )
+}
+
+/** A blurred copy of the same scene gives the cover copy a soft, readable backdrop. */
+@Composable
+internal fun HomeCoverArtworkBlur(page: Int, useNightArtwork: Boolean) {
+    Box(
+        Modifier.fillMaxSize()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        .48f to Color.Transparent,
+                        .55f to Color.White.copy(alpha = .88f),
+                        .67f to Color.White.copy(alpha = .88f),
+                        .76f to Color.Transparent,
+                        1f to Color.Transparent,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
+    ) {
+        Image(
+            painter = painterResource(homeCoverArtwork(page, useNightArtwork)),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = if (page == 0) Alignment.BottomEnd else Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+                .then(if (page == 0) Modifier.graphicsLayer {
+                    scaleX = 1.25f
+                    scaleY = 1.25f
+                    translationY = -size.height * .20f
+                } else Modifier)
+                .blur(20.dp),
+        )
+    }
 }
 
 /** A quiet first-screen composition; tapping continues into the corresponding real reader. */

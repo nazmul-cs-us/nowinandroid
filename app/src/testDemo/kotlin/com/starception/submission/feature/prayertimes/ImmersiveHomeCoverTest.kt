@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
@@ -25,6 +26,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -54,6 +56,20 @@ class ImmersiveHomeCoverTest {
         compose.setContent { CoverTestScene(dark = false, onOpen = {}) }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_cover_light.png")
     }
+
+    @Test fun scrolledHomeFeedUsesCompactArtworkSections() {
+        compose.setContent {
+            CompositionLocalProvider(LocalDarkTheme provides true) {
+                MaterialTheme(colorScheme = darkColorScheme()) {
+                    Column(Modifier.fillMaxWidth().height(950.dp)
+                        .background(Color(0xFF080B14)).padding(24.dp)) {
+                        HomeArtworkRail(onSelect = { _, _ -> })
+                    }
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_feed.png")
+    }
 }
 
 @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
@@ -75,6 +91,7 @@ private fun CoverTestScene(dark: Boolean, onOpen: (Int) -> Unit) {
                     translationY = -size.height * .20f
                 },
             )
+            HomeCoverArtworkBlur(page = 0, useNightArtwork = dark)
             Box(Modifier.fillMaxSize().background(homeCoverScrim(dark)))
             Column(Modifier.fillMaxSize().padding(top = 80.dp, start = 24.dp, end = 24.dp)) {
                 Box(Modifier.requiredWidth(393.dp).height(588.dp)) {

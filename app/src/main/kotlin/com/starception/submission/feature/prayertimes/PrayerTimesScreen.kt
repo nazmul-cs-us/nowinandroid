@@ -3021,7 +3021,7 @@ fun PrayerTimesScreen(
                 val prayerArtworkNight = prayerTimes?.let {
                     currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
                 } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
-                Box(Modifier.fillMaxSize().background(if (darkHome) Color(0xFF0C110F) else Color.White)) {
+                Box(Modifier.fillMaxSize().background(if (darkHome) Color(0xFF080B14) else Color.White)) {
                 if (!outerIsLandscape && darkHome) {
                     Image(
                         painter = composeArtworkPainter(homeCoverArtwork(coverPage, prayerArtworkNight)),
@@ -3036,6 +3036,7 @@ fun PrayerTimesScreen(
                             } else Modifier,
                         ),
                     )
+                    if (!insightTileExpanded) HomeCoverArtworkBlur(coverPage, prayerArtworkNight)
                     Box(Modifier.fillMaxSize().background(homeCoverScrim(true)))
                 } else if (!outerIsLandscape) {
                     // Let the scene reach behind the system status bar and
@@ -3058,6 +3059,7 @@ fun PrayerTimesScreen(
                             } else Modifier,
                         ),
                     )
+                    if (!insightTileExpanded) HomeCoverArtworkBlur(coverPage, prayerArtworkNight)
                     Box(Modifier.fillMaxSize().background(homeCoverScrim(false)))
                 }
                 com.starception.submission.ui.AppTopSearchBar(
@@ -3482,8 +3484,8 @@ fun PrayerTimesScreen(
                                         colorScheme = if (darkHome) {
                                             androidx.compose.material3.darkColorScheme(
                                                 primary = feedAccent,
-                                                background = Color(0xFF0C110F),
-                                                surface = Color(0xFF17221B),
+                                                background = Color(0xFF080B14),
+                                                surface = Color(0xFF131B27),
                                             )
                                         } else {
                                             ambientScheme.copy(
@@ -3540,6 +3542,24 @@ fun PrayerTimesScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
+                                            .drawBehind {
+                                                if (!insightTileExpanded && insightHeightPx > 0) {
+                                                    val start = insightHeightPx.toFloat() + 8.dp.toPx()
+                                                    val lowerHeight = (size.height - start).coerceAtLeast(0f)
+                                                    if (lowerHeight > 0f) {
+                                                        val feedColor = if (darkHome) Color(0xFF080B14) else Color.White
+                                                        drawRect(
+                                                            brush = Brush.verticalGradient(
+                                                                colors = listOf(Color.Transparent, feedColor),
+                                                                startY = start,
+                                                                endY = start + 116.dp.toPx(),
+                                                            ),
+                                                            topLeft = Offset(0f, start),
+                                                            size = androidx.compose.ui.geometry.Size(size.width, lowerHeight),
+                                                        )
+                                                    }
+                                                }
+                                            }
                                             .then(
                                                 if (darkHome || !insightTileExpanded) Modifier else Modifier.background(
                                                     Brush.verticalGradient(
@@ -3768,12 +3788,12 @@ fun PrayerTimesScreen(
                                                     ),
                                                 )
                                                 Text(
-                                                    "TODAY'S READING",
+                                                    "DAILY REFLECTION",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = .72f),
                                                 )
                                                 Text(
-                                                    "Continue today's reading",
+                                                    "What will you take from today’s reading?",
                                                     style = MaterialTheme.typography.titleLarge,
                                                     color = MaterialTheme.colorScheme.onBackground,
                                                 )

@@ -5,11 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,6 +41,8 @@ import com.starception.submission.core.images.resources.insight_prayer_foregroun
 import com.starception.submission.core.images.resources.insight_qibla_background
 import com.starception.submission.core.images.resources.insight_qibla_foreground_v2
 import com.starception.submission.core.images.resources.insight_suggestion
+import com.starception.submission.core.images.resources.insight_quran_background
+import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -54,12 +58,14 @@ internal data class HomeArtworkCard(
 
 private val homeArtworkCards by lazy {
     listOf(
+        HomeArtworkCard(2, "Today's reading", "Quran for today",
+            Res.drawable.insight_quran_background, Res.drawable.insight_quran_foreground_v2),
         HomeArtworkCard(1, "Today's salah", "Prayer & hadith",
             Res.drawable.insight_prayer_background, Res.drawable.insight_prayer_foreground),
-        HomeArtworkCard(4, "AI suggested", "For this moment",
-            Res.drawable.insight_suggestion),
         HomeArtworkCard(3, "Qibla", "Direction to Makkah",
             Res.drawable.insight_qibla_background, Res.drawable.insight_qibla_foreground_v2),
+        HomeArtworkCard(4, "AI suggested", "For this moment",
+            Res.drawable.insight_suggestion),
     )
 }
 
@@ -103,17 +109,42 @@ internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifi
 /** Secondary artwork cards open the existing insight reader and its real content. */
 @Composable
 internal fun HomeArtworkRail(onSelect: (HomeArtworkCard, Rect) -> Unit) {
+    val ink = MaterialTheme.colorScheme.onBackground
     Column {
-        Text("Explore your day", style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth()) {
-            ArtworkCard(homeArtworkCards[0], Modifier.weight(1f), onSelect)
-            Spacer(Modifier.weight(.06f))
-            ArtworkCard(homeArtworkCards[1], Modifier.weight(1f), onSelect)
+        HomeFeedSectionLabel("EXPLORE YOUR DAY")
+        Spacer(Modifier.height(16.dp))
+        LazyRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+            items(homeArtworkCards.take(3), key = HomeArtworkCard::page) { card ->
+                Column(Modifier.width(142.dp)) {
+                    ArtworkCard(card, Modifier.fillMaxWidth(), 148.dp, onSelect)
+                    Spacer(Modifier.height(10.dp))
+                    Text(card.label, color = ink, style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold, maxLines = 2)
+                    Text(card.subtitle, color = ink.copy(alpha = .62f),
+                        style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                }
+            }
         }
-        Spacer(Modifier.height(12.dp))
-        ArtworkCard(homeArtworkCards[2], Modifier.fillMaxWidth(), onSelect)
+        Spacer(Modifier.height(32.dp))
+        HomeFeedSectionLabel("SUGGESTED FOR YOU")
+        Spacer(Modifier.height(16.dp))
+        ArtworkCard(homeArtworkCards[3], Modifier.fillMaxWidth(), 224.dp, onSelect)
+        Spacer(Modifier.height(10.dp))
+        Text(homeArtworkCards[3].label, color = ink, style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold)
+        Text(homeArtworkCards[3].subtitle, color = ink.copy(alpha = .62f),
+            style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun HomeFeedSectionLabel(text: String) {
+    val ink = MaterialTheme.colorScheme.onBackground
+    Column {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(ink.copy(alpha = .18f)))
+        Spacer(Modifier.height(18.dp))
+        Text(text, color = ink.copy(alpha = .82f), style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium)
     }
 }
 
@@ -121,15 +152,17 @@ internal fun HomeArtworkRail(onSelect: (HomeArtworkCard, Rect) -> Unit) {
 private fun ArtworkCard(
     card: HomeArtworkCard,
     modifier: Modifier,
+    height: androidx.compose.ui.unit.Dp,
     onSelect: (HomeArtworkCard, Rect) -> Unit,
 ) {
-    val height = if (LocalDensity.current.fontScale > 1.3f) 240.dp else 168.dp
+    val measuredHeight = if (LocalDensity.current.fontScale > 1.3f) height + 24.dp else height
     val dark = LocalDarkTheme.current
     val shape = RoundedCornerShape(24.dp)
     var bounds by remember { mutableStateOf(Rect.Zero) }
     HomeArtworkScene(
         card = card,
-        modifier = modifier.height(height)
+        copyAlpha = 0f,
+        modifier = modifier.height(measuredHeight)
             .onGloballyPositioned { bounds = it.boundsInWindow() }
             .then(if (dark) Modifier else Modifier.shadow(8.dp, shape))
             .clip(shape)

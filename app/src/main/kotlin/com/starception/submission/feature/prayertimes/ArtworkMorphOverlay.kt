@@ -83,7 +83,7 @@ internal fun ArtworkMorphOverlay(
                     .size(with(density) { width.toDp() }, with(density) { height.toDp() })
                     .clip(RoundedCornerShape(corner))
                     .graphicsLayer { alpha = sceneAlpha },
-                copyAlpha = ((.64f - p) / .24f).coerceIn(0f, 1f),
+                copyAlpha = 0f,
             )
         }
     }
