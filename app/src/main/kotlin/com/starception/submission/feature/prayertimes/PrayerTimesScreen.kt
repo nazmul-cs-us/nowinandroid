@@ -3056,13 +3056,6 @@ fun PrayerTimesScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(
-                                bottom = if (!outerIsLandscape) {
-                                    navigationBarInset + if (insightTileImmersive) 0.dp else 64.dp
-                                } else {
-                                    0.dp
-                                },
-                            )
                             .clipToBounds()
                             .onSizeChanged { homeViewport = it }
                             .then(syncState.pullModifier)
@@ -3169,18 +3162,22 @@ fun PrayerTimesScreen(
                                     }
                                 val portraitInsightHeight = (portraitInsightRestingHeight - syncContentCompression)
                                     .coerceAtLeast(portraitInsightMinHeight)
-                                // The measured viewport already excludes visible bottom navigation.
-                                // Only an explicit immersive resize releases that reserved space.
-                                val measuredInsightViewport = with(LocalDensity.current) { homeViewport.height.toDp() }
+                                // Draw through the floating bar, but keep its
+                                // clearance in height calculations until the
+                                // immersive reader actually hides it.
+                                val navigationClearance = navigationBarInset +
+                                    if (insightTileImmersive) 0.dp else 64.dp
+                                val measuredInsightViewport = with(LocalDensity.current) {
+                                    homeViewport.height.toDp()
+                                } - navigationClearance
                                 val insightViewport = if (homeViewport.height > 0) measuredInsightViewport else (
                                     configuration.screenHeightDp.dp - dynamicTopInset - navigationBarInset -
                                         (if (insightTileImmersive) 0.dp else 64.dp) - 156.dp
                                     )
                                 val portraitImmersiveInsightHeight =
                                     com.starception.submission.core.designsystem.component.insightMaximumTileHeight(
-                                        // The measured viewport excludes visible bottom navigation.
-                                        // Stay above it while opening, then claim its space after
-                                        // immersive mode actually hides the navigation overlay.
+                                        // Stay above the bar while opening, then
+                                        // claim its space once immersive mode hides it.
                                         viewport = insightViewport,
                                         header = 0.dp,
                                     )
@@ -3563,7 +3560,8 @@ fun PrayerTimesScreen(
                                             header + footer + 12.dp
                                         }
                                         val remainingHeight = with(dashboardDensity) {
-                                            homeViewport.height.toDp() - insightHeightPx.toDp() - chromeHeight
+                                            homeViewport.height.toDp() - navigationClearance -
+                                                insightHeightPx.toDp() - chromeHeight
                                         }
                                         val minimumPrayerHeight = maxOf(
                                             88.dp,
@@ -3574,7 +3572,8 @@ fun PrayerTimesScreen(
                                             insightExpanded = insightTileExpanded,
                                             availableHeight = with(dashboardDensity) {
                                                 val header = if (prayerHeaderHeightPx > 0) prayerHeaderHeightPx.toDp() else 52.dp
-                                                (homeViewport.height.toDp() - insightHeightPx.toDp() - header - 12.dp).value
+                                                (homeViewport.height.toDp() - navigationClearance -
+                                                    insightHeightPx.toDp() - header - 12.dp).value
                                             },
                                             prayerSectionMinimumHeight = minimumPrayerHeight.value * 2,
                                             fullLocationHeight = 92f,
@@ -4890,6 +4889,13 @@ fun PrayerTimesScreen(
                                 userLongitude = prayerTimes?.location?.longitude ?: 0.0,
                                 showGlobe = true,
                             )
+                        }
+                        // Reserve room after the last item, inside the scrollable
+                        // content. The viewport itself continues behind the
+                        // floating navigation instead of ending in a fixed band.
+                        if (!outerIsLandscape) {
+                            Spacer(Modifier.height(navigationBarInset +
+                                if (insightTileImmersive) 0.dp else 64.dp))
                         }
                     } // Close Column inside AppTopSearchBar content lambda
                 } // Close AppTopSearchBar scaffold (content lambda)
