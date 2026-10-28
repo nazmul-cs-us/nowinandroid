@@ -100,6 +100,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -144,6 +145,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color as ComposeColor
 import coil.size.Size as CoilSize
 import com.google.android.material.R as MaterialR
+
+/** Home's scrolling content must start at the window top, beneath its overlay header. */
+internal fun configureHomeContentOverlap(contentContainer: FrameLayout, immersiveHome: Boolean) {
+    val params = contentContainer.layoutParams as? CoordinatorLayout.LayoutParams ?: return
+    if (immersiveHome == (params.behavior == null)) return
+    params.behavior = if (immersiveHome) null else AppBarLayout.ScrollingViewBehavior()
+    contentContainer.layoutParams = params
+}
 
 @Composable
 fun AppTopSearchBar(
@@ -533,6 +542,7 @@ fun AppTopSearchBar(
                 val searchBar = root.findViewById<SearchBar>(R.id.app_search_bar)
                 val appBar = root.findViewById<AppBarLayout>(R.id.app_bar_layout)
                 val contentContainer = root.findViewById<FrameLayout>(R.id.content_container)
+                configureHomeContentOverlap(contentContainer, homeImmersiveHeader)
                 val composeView = contentContainer.findViewWithTag<ComposeView>(COMPOSE_CONTENT_TAG)
                 val suggestionContainer = root.findViewById<LinearLayout>(R.id.search_suggestion_container)
                 val leading = root.findViewById<MaterialButton>(R.id.leading_button)

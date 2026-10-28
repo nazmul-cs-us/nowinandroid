@@ -453,28 +453,26 @@ private fun NiaFloatingBottomBar(
         @Composable { sizeModifier: Modifier ->
             val darkTheme = LocalDarkTheme.current
             val colorScheme = MaterialTheme.colorScheme
-            val homeDark = darkTheme && !vertical &&
-                appState.currentTopLevelDestination == TopLevelDestination.HOME
-            val homeLight = !darkTheme && !vertical &&
-                appState.currentTopLevelDestination == TopLevelDestination.HOME
-            val navBarHeight = if (vertical) 50.dp else if (homeDark || homeLight) 50.dp else 56.dp
+            val portraitDark = darkTheme && !vertical
+            val portraitLight = !darkTheme && !vertical
+            val navBarHeight = 50.dp
             val capsuleGap = 4.dp
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
-                color = if (homeDark) {
-                    Color(0xFF122033).copy(alpha = .56f)
-                } else if (homeLight) {
-                    Color.White.copy(alpha = .68f)
+                color = if (portraitDark) {
+                    Color(0xFF122033).copy(alpha = .86f)
+                } else if (portraitLight) {
+                    Color.White.copy(alpha = .94f)
                 } else if (darkTheme) {
                     colorScheme.surfaceContainer
                 } else {
                     colorScheme.surfaceContainerHighest
                 },
-                border = if (homeDark || homeLight) BorderStroke(
+                border = if (portraitDark || portraitLight) BorderStroke(
                     1.dp,
-                    Color.White.copy(alpha = if (homeDark) .27f else .76f),
+                    Color.White.copy(alpha = if (portraitDark) .27f else .76f),
                 ) else null,
-                shadowElevation = if (homeDark || homeLight) 8.dp else 4.dp,
+                shadowElevation = if (portraitDark || portraitLight) 8.dp else 4.dp,
                 modifier = sizeModifier,
             ) {
                 val destinations = appState.topLevelDestinations
@@ -574,9 +572,9 @@ private fun NiaFloatingBottomBar(
                         animationSpec = NiaMotion.effectsDefault(),
                         label = "navBubbleAlpha",
                     )
-                    val bubbleColor = if (homeDark) {
+                    val bubbleColor = if (portraitDark) {
                         Color.White.copy(alpha = .22f)
-                    } else if (homeLight) {
+                    } else if (portraitLight) {
                         Color(0xFF211C2B)
                     } else if (darkTheme) {
                         colorScheme.surfaceBright
@@ -629,9 +627,9 @@ private fun NiaFloatingBottomBar(
                     ) {
                         val hasUnread = latestUnreadDestinations.value.contains(destination)
                         val interactionSource = remember(destination) { MutableInteractionSource() }
-                        val contentTint = if (homeLight) {
+                        val contentTint = if (portraitLight) {
                             if (selected) Color.White else Color(0xFF211C2B)
-                        } else if (homeDark) {
+                        } else if (portraitDark) {
                             Color.White
                         } else MaterialTheme.colorScheme.onSurface
                         Box(
@@ -675,11 +673,11 @@ private fun NiaFloatingBottomBar(
                                         contentDescription = stringResource(destination.iconTextId),
                                         tint = contentTint,
                                         modifier = Modifier.size(
-                                            if (homeDark || homeLight) 19.dp else if (vertical) 22.dp else 24.dp,
+                                            if (portraitDark || portraitLight) 19.dp else if (vertical) 22.dp else 24.dp,
                                         ),
                                     )
                                 }
-                                if (homeDark || homeLight) {
+                                if (portraitDark || portraitLight) {
                                     Text(
                                         text = stringResource(destination.iconTextId),
                                         color = contentTint,
