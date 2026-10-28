@@ -17,8 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
@@ -77,17 +75,7 @@ private fun CoverTestScene(dark: Boolean, onOpen: (Int) -> Unit) {
                     translationY = -size.height * .20f
                 },
             )
-            Box(Modifier.fillMaxSize().background(if (dark) Brush.verticalGradient(
-                0f to Color(0xFF071C30).copy(alpha = .12f),
-                .50f to Color(0xFF0B1D2C).copy(alpha = .50f),
-                .78f to Color(0xFF0C110F).copy(alpha = .97f),
-                1f to Color(0xFF0C110F).copy(alpha = .97f),
-            ) else Brush.verticalGradient(
-                0f to Color.White.copy(alpha = .14f),
-                .48f to Color.White.copy(alpha = .58f),
-                .78f to Color.White,
-                1f to Color.White,
-            )))
+            Box(Modifier.fillMaxSize().background(homeCoverScrim(dark)))
             Column(Modifier.fillMaxSize().padding(top = 80.dp, start = 24.dp, end = 24.dp)) {
                 Box(Modifier.requiredWidth(393.dp).height(588.dp)) {
                     ImmersiveHomeCover(

@@ -432,7 +432,7 @@ private fun NiaFloatingBottomBar(
     // the same shared-bounds surface returns to the bot.
     var nudgeOccupiesNavigation by remember { mutableStateOf(false) }
     val voiceSlotWidth by animateDpAsState(
-        targetValue = if (nudgeOccupiesNavigation) 0.dp else 62.dp,
+        targetValue = if (nudgeOccupiesNavigation) 0.dp else 54.dp,
         animationSpec = NiaMotion.spatialSlow(),
         label = "bottomNavigationVoiceSlotWidth",
     )
@@ -454,14 +454,14 @@ private fun NiaFloatingBottomBar(
                 appState.currentTopLevelDestination == TopLevelDestination.HOME
             val homeLight = !darkTheme && !vertical &&
                 appState.currentTopLevelDestination == TopLevelDestination.HOME
-            val navBarHeight = if (vertical) 50.dp else 56.dp
+            val navBarHeight = if (vertical) 50.dp else if (homeDark || homeLight) 50.dp else 56.dp
             val capsuleGap = 4.dp
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
                 color = if (homeDark) {
-                    Color(0xFF122033).copy(alpha = .76f)
+                    Color(0xFF122033).copy(alpha = .62f)
                 } else if (homeLight) {
-                    Color.White.copy(alpha = .82f)
+                    Color.White.copy(alpha = .72f)
                 } else if (darkTheme) {
                     colorScheme.surfaceContainer
                 } else {
@@ -547,7 +547,7 @@ private fun NiaFloatingBottomBar(
                         label = "navBubbleAlpha",
                     )
                     val bubbleColor = if (homeDark) {
-                        colorScheme.primaryContainer
+                        Color.White.copy(alpha = .22f)
                     } else if (homeLight) {
                         Color(0xFF211C2B)
                     } else if (darkTheme) {
@@ -602,7 +602,7 @@ private fun NiaFloatingBottomBar(
                         val contentTint = if (homeLight) {
                             if (selected) Color.White else Color(0xFF211C2B)
                         } else if (homeDark) {
-                            if (selected) Color(0xFF0C110F) else Color.White
+                            Color.White
                         } else MaterialTheme.colorScheme.onSurface
                         Box(
                             modifier = weight
@@ -616,35 +616,49 @@ private fun NiaFloatingBottomBar(
                                 .then(if (hasUnread) Modifier.notificationDot() else Modifier),
                             contentAlignment = Alignment.Center,
                         ) {
-                            AnimatedContent(
-                                targetState = selected,
-                                transitionSpec = {
-                                    (
-                                        fadeIn(NiaMotion.effectsFast()) +
-                                            scaleIn(
-                                                initialScale = 0.7f,
-                                                animationSpec = NiaMotion.spatialFast(),
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                AnimatedContent(
+                                    targetState = selected,
+                                    transitionSpec = {
+                                        (
+                                            fadeIn(NiaMotion.effectsFast()) +
+                                                scaleIn(
+                                                    initialScale = 0.7f,
+                                                    animationSpec = NiaMotion.spatialFast(),
+                                                )
+                                            ) togetherWith (
+                                            fadeOut(NiaMotion.effectsFast()) +
+                                                scaleOut(
+                                                    targetScale = 0.82f,
+                                                    animationSpec = NiaMotion.spatialFast(),
+                                                )
                                             )
-                                        ) togetherWith (
-                                        fadeOut(NiaMotion.effectsFast()) +
-                                            scaleOut(
-                                                targetScale = 0.82f,
-                                                animationSpec = NiaMotion.spatialFast(),
-                                            )
-                                        )
-                                },
-                                label = "floatingNavigationIconMorph",
-                            ) { active ->
-                                Icon(
-                                    imageVector = if (active) {
-                                        destination.selectedIcon
-                                    } else {
-                                        destination.unselectedIcon
                                     },
-                                    contentDescription = stringResource(destination.iconTextId),
-                                    tint = contentTint,
-                                    modifier = Modifier.size(if (vertical) 22.dp else 24.dp),
-                                )
+                                    label = "floatingNavigationIconMorph",
+                                ) { active ->
+                                    Icon(
+                                        imageVector = if (active) {
+                                            destination.selectedIcon
+                                        } else {
+                                            destination.unselectedIcon
+                                        },
+                                        contentDescription = stringResource(destination.iconTextId),
+                                        tint = contentTint,
+                                        modifier = Modifier.size(
+                                            if (homeDark || homeLight) 19.dp else if (vertical) 22.dp else 24.dp,
+                                        ),
+                                    )
+                                }
+                                if (homeDark || homeLight) {
+                                    Text(
+                                        text = stringResource(destination.iconTextId),
+                                        color = contentTint,
+                                        fontSize = 9.sp,
+                                        lineHeight = 11.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                             }
                         }
                     }
@@ -696,7 +710,7 @@ private fun NiaFloatingBottomBar(
             generatingSuggestion = generatingSuggestion,
             verticalLayout = vertical,
             // Tracks navBarHeight so the voice button stays proportional to the pill.
-            buttonSize = if (vertical) 44.dp else 52.dp,
+            buttonSize = if (vertical) 44.dp else 48.dp,
             onVoiceClick = {
                 com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch()
             },

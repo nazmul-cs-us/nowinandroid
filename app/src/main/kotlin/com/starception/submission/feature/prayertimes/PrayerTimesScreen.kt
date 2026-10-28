@@ -3036,12 +3036,7 @@ fun PrayerTimesScreen(
                             } else Modifier,
                         ),
                     )
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-                        0f to Color(0xFF071C30).copy(alpha = .12f),
-                        .50f to Color(0xFF0B1D2C).copy(alpha = .50f),
-                        .78f to Color(0xFF0C110F).copy(alpha = .97f),
-                        1f to Color(0xFF0C110F).copy(alpha = .97f),
-                    )))
+                    Box(Modifier.fillMaxSize().background(homeCoverScrim(true)))
                 } else if (!outerIsLandscape) {
                     // Let the scene reach behind the system status bar and
                     // toolbar, then dissolve it into the white lower feed.
@@ -3063,12 +3058,7 @@ fun PrayerTimesScreen(
                             } else Modifier,
                         ),
                     )
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = if (coverPage == 0) .14f else .50f),
-                        .48f to Color.White.copy(alpha = if (coverPage == 0) .58f else .50f),
-                        .78f to Color.White,
-                        1f to Color.White,
-                    )))
+                    Box(Modifier.fillMaxSize().background(homeCoverScrim(false)))
                 }
                 com.starception.submission.ui.AppTopSearchBar(
                     title = stringResource(R.string.prayer_times_title),

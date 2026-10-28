@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +48,26 @@ internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableReso
     2 -> Res.drawable.insight_quran_background
     3 -> Res.drawable.insight_qibla_background
     else -> Res.drawable.insight_suggestion
+}
+
+/** Keep the poster legible through the recommendation, then hand it into the feed. */
+internal fun homeCoverScrim(isDarkTheme: Boolean): Brush = if (isDarkTheme) {
+    Brush.verticalGradient(
+        0f to Color(0xFF071C30).copy(alpha = .12f),
+        .48f to Color(0xFF0B1D2C).copy(alpha = .22f),
+        .72f to Color(0xFF071725).copy(alpha = .55f),
+        .91f to Color(0xFF0C110F).copy(alpha = .98f),
+        1f to Color(0xFF0C110F),
+    )
+} else {
+    Brush.verticalGradient(
+        0f to Color.White.copy(alpha = .08f),
+        .48f to Color.White.copy(alpha = .10f),
+        .60f to Color.White.copy(alpha = .48f),
+        .73f to Color.White.copy(alpha = .62f),
+        .90f to Color.White.copy(alpha = .92f),
+        1f to Color.White,
+    )
 }
 
 /** A quiet first-screen composition; tapping continues into the corresponding real reader. */
