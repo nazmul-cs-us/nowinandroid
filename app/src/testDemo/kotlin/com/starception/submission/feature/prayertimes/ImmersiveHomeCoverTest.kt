@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -61,6 +62,28 @@ class ImmersiveHomeCoverTest {
     @Test fun lightCoverFillsThePaddedHomeWidth() {
         compose.setContent { CoverTestScene(dark = false, onOpen = {}) }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_cover_light.png")
+    }
+
+    @Test fun nightArtworkKeepsReadableCopyInLightMode() {
+        compose.setContent { CoverTestScene(dark = false, useNightArtwork = true, onOpen = {}) }
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_cover_night_light_mode.png")
+        assertTrue(homeCoverHeaderUsesLightText(page = 0, useNightArtwork = true))
+        assertTrue(homeCoverCopyUsesLightText(page = 0, useNightArtwork = true, isDarkTheme = false))
+        assertFalse(homeCoverHeaderUsesLightText(page = 0, useNightArtwork = false))
+    }
+
+    @Test fun daytimePrayerCoverShowsSunAboveMountains() {
+        compose.setContent {
+            CoverTestScene(dark = false, epochSeconds = 1_793_174_400.0, onOpen = {})
+        }
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_prayer_sun.png")
+    }
+
+    @Test fun nighttimePrayerCoverShowsMoonAboveMountains() {
+        compose.setContent {
+            CoverTestScene(dark = true, epochSeconds = 1_793_214_000.0, onOpen = {})
+        }
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_prayer_moon.png")
     }
 
     @Test fun artworkTracksTheHorizontalSwipe() {
@@ -235,6 +258,8 @@ class ImmersiveHomeCoverTest {
 @Composable
 private fun CoverTestScene(
     dark: Boolean,
+    useNightArtwork: Boolean = dark,
+    epochSeconds: Double? = null,
     onOpen: (Int) -> Unit,
     onScrollPositionChanged: (Float) -> Unit = {},
 ) {
@@ -244,12 +269,21 @@ private fun CoverTestScene(
     MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
         Box(Modifier.fillMaxWidth().height(852.dp)) {
             val position = remember { mutableFloatStateOf(0f) }
-            HomeCoverArtworkBackdrop(position, useNightArtwork = dark, isDarkTheme = dark, isExpanded = false)
+            HomeCoverArtworkBackdrop(
+                position,
+                useNightArtwork = useNightArtwork,
+                isDarkTheme = dark,
+                isExpanded = false,
+                epochSeconds = epochSeconds,
+                latitude = epochSeconds?.let { 25.2048 },
+                longitude = epochSeconds?.let { 55.2708 },
+            )
             Column(Modifier.fillMaxSize().padding(top = 80.dp, start = 24.dp, end = 24.dp)) {
                 Box(Modifier.requiredWidth(393.dp).height(588.dp)) {
                     ImmersiveHomeCover(
                         selectedPage = 0,
                         isDarkTheme = dark,
+                        useNightArtwork = useNightArtwork,
                         nextPrayerName = "Asr",
                         nextPrayerCountdown = "1h 41m",
                         onSelectionChanged = {},

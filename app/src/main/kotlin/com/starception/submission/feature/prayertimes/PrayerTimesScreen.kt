@@ -3022,6 +3022,7 @@ fun PrayerTimesScreen(
                 val prayerArtworkNight = prayerTimes?.let {
                     currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
                 } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
+                val coverEpochSeconds = remember(currentTime) { System.currentTimeMillis() / 1000.0 }
                 Box(Modifier.fillMaxSize().background(if (darkHome) Color(0xFF080B14) else Color.White)) {
                 if (!outerIsLandscape) {
                     HomeCoverArtworkBackdrop(
@@ -3029,6 +3030,9 @@ fun PrayerTimesScreen(
                         useNightArtwork = prayerArtworkNight,
                         isDarkTheme = darkHome,
                         isExpanded = insightTileExpanded,
+                        epochSeconds = coverEpochSeconds,
+                        latitude = prayerTimes?.location?.latitude,
+                        longitude = prayerTimes?.location?.longitude,
                         scrollOffsetPx = portraitScrollState.value,
                         coverHeightPx = insightHeightPx,
                     )
@@ -3042,6 +3046,7 @@ fun PrayerTimesScreen(
                     pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF191724),
                     homeCornerAction = !outerIsLandscape,
                     homeImmersiveHeader = !outerIsLandscape,
+                    homeHeaderLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
                     homeHeaderVisibility = {
                         if (insightTileExpanded) 0f else
                             (1f - portraitScrollState.value / headerFadeDistancePx).coerceIn(0f, 1f)
@@ -3741,6 +3746,7 @@ fun PrayerTimesScreen(
                                                 ImmersiveHomeCover(
                                                     selectedPage = coverPage,
                                                     isDarkTheme = darkHome,
+                                                    useNightArtwork = prayerArtworkNight,
                                                     nextPrayerName = PrayerTimeHelpers
                                                         .getNextPrayer(currentTime, prayerTimes)?.first.orEmpty(),
                                                     nextPrayerCountdown = PrayerTimeHelpers

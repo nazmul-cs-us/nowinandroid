@@ -50,6 +50,7 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -89,10 +90,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -164,6 +167,7 @@ fun AppTopSearchBar(
     pillContentColor: ComposeColor = ComposeColor.Unspecified,
     homeCornerAction: Boolean = false,
     homeImmersiveHeader: Boolean = false,
+    homeHeaderLightText: Boolean = false,
     homeHeaderVisibility: () -> Float = { 1f },
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
@@ -846,6 +850,11 @@ fun AppTopSearchBar(
             derivedStateOf { homeHeaderVisibility() > .001f }
         }
         if (homeImmersiveHeader && !isSearchViewOpen && showHomeHeader) {
+            val greetingColor by animateColorAsState(
+                targetValue = if (homeHeaderLightText) ComposeColor.White else ComposeColor(0xFF1F1A2A),
+                animationSpec = tween(220),
+                label = "homeGreetingArtworkContrast",
+            )
             Row(
                 modifier = Modifier.fillMaxWidth()
                     // The wallpaper reaches into the status area, while the actions
@@ -861,8 +870,15 @@ fun AppTopSearchBar(
             ) {
                 Text(
                     text = "Assalamu alaikum",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = if (isDarkTheme) ComposeColor.White else ComposeColor(0xFF1F1A2A),
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        shadow = Shadow(
+                            color = if (homeHeaderLightText) ComposeColor.Black.copy(alpha = .55f)
+                                else ComposeColor.White.copy(alpha = .55f),
+                            offset = Offset(0f, 1.5f),
+                            blurRadius = 7f,
+                        ),
+                    ),
+                    color = greetingColor,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

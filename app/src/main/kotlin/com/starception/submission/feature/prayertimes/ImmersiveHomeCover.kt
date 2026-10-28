@@ -48,6 +48,7 @@ import com.starception.submission.core.images.resources.home_cover_salah_portrai
 import com.starception.submission.core.images.resources.home_cover_quran_portrait
 import com.starception.submission.core.images.resources.home_cover_qibla_portrait
 import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
+import com.starception.submission.feature.prayertimes.celestial.PrayerHomeCoverCelestialLayer
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.launch
@@ -60,6 +61,19 @@ internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableReso
     3 -> Res.drawable.home_cover_qibla_portrait
     else -> Res.drawable.home_cover_suggestion_portrait
 }
+
+/** Cover ink follows the photograph; the app theme alone cannot describe its contrast. */
+internal fun homeCoverHeaderUsesLightText(page: Int, useNightArtwork: Boolean): Boolean = when (page) {
+    0 -> useNightArtwork
+    2 -> false // The reading scene has a bright window behind the greeting.
+    else -> true
+}
+
+internal fun homeCoverCopyUsesLightText(
+    page: Int,
+    useNightArtwork: Boolean,
+    isDarkTheme: Boolean,
+): Boolean = isDarkTheme || page != 0 || useNightArtwork
 
 /** Keep the poster legible through the recommendation, then hand it into the feed. */
 internal fun homeCoverScrim(isDarkTheme: Boolean): Brush = if (isDarkTheme) {
@@ -134,6 +148,9 @@ internal fun HomeCoverArtworkBackdrop(
     useNightArtwork: Boolean,
     isDarkTheme: Boolean,
     isExpanded: Boolean,
+    epochSeconds: Double? = null,
+    latitude: Double? = null,
+    longitude: Double? = null,
     scrollOffsetPx: Int = 0,
     coverHeightPx: Int = 0,
 ) {
@@ -141,8 +158,24 @@ internal fun HomeCoverArtworkBackdrop(
     val lowerPage = scrollPosition.toInt().coerceIn(0, 4)
     val swipeProgress = (scrollPosition - lowerPage).coerceIn(0f, 1f)
     HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
+    val prayerVisibility = when (lowerPage) {
+        0 -> 1f - swipeProgress
+        4 -> swipeProgress
+        else -> 0f
+    }
+    if (prayerVisibility > 0f && epochSeconds != null && latitude != null && longitude != null) {
+        PrayerHomeCoverCelestialLayer(
+            epochSeconds = epochSeconds,
+            latitude = latitude,
+            longitude = longitude,
+            isNight = useNightArtwork,
+            modifier = Modifier.graphicsLayer { alpha = prayerVisibility },
+        )
+    }
     if (!isExpanded) HomeCoverArtworkBlur(lowerPage, swipeProgress, useNightArtwork)
-    Box(Modifier.fillMaxSize().background(homeCoverScrim(isDarkTheme)))
+    Box(Modifier.fillMaxSize().background(
+        homeCoverScrim(homeCoverCopyUsesLightText(lowerPage, useNightArtwork, isDarkTheme))
+    ))
     // The cover scene is fixed behind the vertically scrolling feed. Once the
     // cover leaves the viewport, fully cover it so no stale artwork shows
     // through the transparent top of the next section.
@@ -165,6 +198,7 @@ internal fun HomeCoverArtworkBackdrop(
 internal fun ImmersiveHomeCover(
     selectedPage: Int,
     isDarkTheme: Boolean,
+    useNightArtwork: Boolean = isDarkTheme,
     nextPrayerName: String,
     nextPrayerCountdown: String,
     onSelectionChanged: (Int) -> Unit,
@@ -187,15 +221,16 @@ internal fun ImmersiveHomeCover(
             (pagerState.currentPage + pagerState.currentPageOffsetFraction) % 5f
         }.collect(onScrollPositionChanged)
     }
-    val ink = if (isDarkTheme) Color.White else Color(0xFF211C2B)
-    val secondaryInk = ink.copy(alpha = if (isDarkTheme) .80f else .72f)
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // The reference leaves breathing room between the recommendation and
-        // the lower feed; anchoring both to the tile bottom puts them too low.
-        val copyBottom = maxHeight * .20f
-        val indicatorBottom = maxHeight * .13f
+        // Keep the copy on the water/floor, below the focal artwork. Move the
+        // page dots with it so they retain a clear gap beneath the detail line.
+        val copyBottom = maxHeight * .10f
+        val indicatorBottom = maxHeight * .03f
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { absolutePage ->
             val page = absolutePage % 5
+            val useLightText = homeCoverCopyUsesLightText(page, useNightArtwork, isDarkTheme)
+            val ink = if (useLightText) Color.White else Color(0xFF211C2B)
+            val secondaryInk = ink.copy(alpha = if (useLightText) .80f else .72f)
             val (eyebrow, title, detail) = when (page) {
                 0 -> Triple("YOUR DAY", "A moment to pause",
                     listOfNotNull(nextPrayerName.takeIf(String::isNotBlank),
@@ -245,6 +280,12 @@ internal fun ImmersiveHomeCover(
             horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val indicatorPage = pagerState.currentPage % 5
+            val indicatorInk = if (homeCoverCopyUsesLightText(indicatorPage, useNightArtwork, isDarkTheme)) {
+                Color.White
+            } else {
+                Color(0xFF211C2B)
+            }
             val indicatorPosition = (pagerState.currentPage + pagerState.currentPageOffsetFraction) % 5f
             repeat(5) { index ->
                 val directDistance = abs(indicatorPosition - index)
@@ -264,7 +305,7 @@ internal fun ImmersiveHomeCover(
                 ) {
                     Box(Modifier.size(width = (5f + 11f * emphasis).dp, height = 4.dp)
                         .clip(CircleShape)
-                        .background(ink.copy(alpha = .48f + .52f * emphasis)))
+                        .background(indicatorInk.copy(alpha = .48f + .52f * emphasis)))
                 }
             }
         }

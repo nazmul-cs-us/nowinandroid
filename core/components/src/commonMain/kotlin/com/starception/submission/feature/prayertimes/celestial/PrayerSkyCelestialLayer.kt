@@ -193,6 +193,76 @@ fun PrayerSkyCelestialLayer(
     }
 }
 
+/** The Home poster uses a different portrait composition from the Prayer Now tile. */
+@Composable
+fun PrayerHomeCoverCelestialLayer(
+    epochSeconds: Double,
+    latitude: Double,
+    longitude: Double,
+    isNight: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val snapshot = remember(epochSeconds, latitude, longitude) {
+        skySnapshotAt(julianDay(epochSeconds), latitude, longitude)
+    }
+    val showMoon = isNight && snapshot.moonAltAz.altitudeDeg > -1.5 &&
+        snapshot.moonPhase.illuminatedFraction > 0.01
+    val showSun = !isNight && snapshot.sunAltAz.altitudeDeg > -1.5
+    if (!showMoon && !showSun) return
+
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val fieldWidth = maxWidth
+        val fieldHeight = maxHeight
+        val diameter = (fieldWidth.value * .12f).coerceIn(35f, 55f).dp
+        // The portrait artwork's mountain line begins around 30% height. Keep
+        // the disc in open sky, away from the greeting and the mosque towers.
+        val altitude = if (showSun) snapshot.sunAltAz.altitudeDeg else snapshot.moonAltAz.altitudeDeg
+        val azimuth = if (showSun) snapshot.sunAltAz.azimuthDeg else snapshot.moonAltAz.azimuthDeg
+        val horizontalDrift = sin((azimuth - 180.0) * PI / 180.0).toFloat()
+        val x = if (showSun) .66f + .04f * horizontalDrift else .23f + .05f * horizontalDrift
+        val y = (.26f - .04f * (altitude / 90.0).coerceIn(0.0, 1.0).toFloat())
+            .coerceIn(.22f, .26f)
+        val position = Offset(x, y)
+        if (showSun) {
+            SunAtmosphericLight(position, diameter, Color(0xFFFFD76A))
+        } else {
+            Canvas(Modifier.fillMaxSize()) {
+                val center = Offset(size.width * x, size.height * y)
+                val radius = diameter.toPx() * 1.9f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFD8EAFF).copy(alpha = .32f),
+                            Color(0xFFD8EAFF).copy(alpha = .10f),
+                            Color.Transparent,
+                        ),
+                        center = center,
+                        radius = radius,
+                    ),
+                    center = center,
+                    radius = radius,
+                )
+            }
+        }
+        Box(Modifier.fillMaxSize(), contentAlignment = AbsoluteAlignment.TopLeft) {
+            val bodyModifier = Modifier
+                .absoluteOffset(fieldWidth * x - diameter / 2, fieldHeight * y - diameter / 2)
+                .size(diameter)
+            if (showSun) {
+                SunBody(bodyDiameter = diameter, modifier = bodyModifier)
+            } else {
+                MoonBody(
+                    illuminatedFraction = snapshot.moonPhase.illuminatedFraction.toFloat(),
+                    waxing = snapshot.moonPhase.waxing,
+                    brightLimbRotation = snapshot.moonBrightLimbScreenDeg.toFloat(),
+                    modifier = bodyModifier,
+                    bodyDiameter = diameter,
+                )
+            }
+        }
+    }
+}
+
 private data class MosqueWindowLight(
     val x: Float,
     val y: Float,
