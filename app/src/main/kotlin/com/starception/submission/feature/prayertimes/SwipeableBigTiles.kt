@@ -1519,7 +1519,7 @@ internal fun SwipeableBigTiles(
 
     val currentPrayer = getCurrentPrayer()
     val nextPrayer = getNextPrayer() ?: currentPrayer
-    val nextPrayerName = nextPrayer?.first?.let(::getPrayerDisplayName) ?: "Prayer time"
+    val nextPrayerName = nextPrayer?.first?.let(::getPrayerDisplayName).orEmpty()
     // Today's Salah follows the obligatory-prayer window, not the helper's
     // narrow 30-minute alert window (and never treats Sunrise as a prayer).
     val currentPrayerLookupName = prayerTimes
@@ -1531,7 +1531,9 @@ internal fun SwipeableBigTiles(
         ?: "Prayer"
     val currentPrayerDisplayName = getPrayerDisplayName(currentPrayerLookupName)
     val nextPrayerTime = nextPrayer?.first?.let(getPrayerTimeDisplay).orEmpty()
-    val prayerTitle = if (nextPrayerTime.isNotBlank()) {
+    val prayerTitle = if (nextPrayer == null) {
+        "Finding your next prayer"
+    } else if (nextPrayerTime.isNotBlank()) {
         "Your next prayer is $nextPrayerName at $nextPrayerTime"
     } else {
         "Your next prayer is $nextPrayerName"
@@ -2357,6 +2359,7 @@ internal fun SwipeableBigTiles(
                                  {
                                  EditorialQuranReadingStage(
                                     surah = dailySurah,
+                                    onOpenSurah = { onSurahClick(dailySurah.number) },
                                     onPreferredHeightChange = { stageHeightHints[2] = it },
                                     playback = dailyReadingPlayback,
                                     compactProgress = compactProgress,
@@ -5141,6 +5144,7 @@ private fun QiblaExpandedStage(
 @Composable
 private fun EditorialQuranReadingStage(
     surah: Surah,
+    onOpenSurah: () -> Unit,
     playback: DailyReadingPlaybackState,
     compactProgress: Float,
     onPreferredHeightChange: (Dp) -> Unit = {},
@@ -5190,6 +5194,7 @@ private fun EditorialQuranReadingStage(
         }
     }
     var ayahs by remember(surah.number) { mutableStateOf<List<Ayah>>(emptyList()) }
+    var isLoadingAyahs by remember(surah.number) { mutableStateOf(true) }
     var translations by remember(surah.number) { mutableStateOf<Map<Int, String>>(emptyMap()) }
     var tajweedAnnotations by remember(surah.number) {
         mutableStateOf<Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>>(emptyMap())
@@ -5203,6 +5208,7 @@ private fun EditorialQuranReadingStage(
         }
     }
     LaunchedEffect(surah.number, translationCode, showTranslation) {
+        isLoadingAyahs = true
         suspend fun openingAyahs(source: QuranRepository): List<Ayah> {
             val resolved = source.getSurahByNumber(surah.number) ?: return emptyList()
             return source.getAyahsBySurahOnce(resolved.id)
@@ -5234,6 +5240,7 @@ private fun EditorialQuranReadingStage(
         } else {
             emptyMap()
         }
+        isLoadingAyahs = false
     }
 
     val isPlaying = playback.isPlaying && playback.surahIndex == surah.number - 1
@@ -5291,7 +5298,12 @@ private fun EditorialQuranReadingStage(
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = if (isPlaying) "PLAYING" else "${ayahs.size} AYAT",
+                        text = when {
+                            isPlaying -> "PLAYING"
+                            isLoadingAyahs -> "LOADING"
+                            ayahs.isEmpty() -> "TEXT UNAVAILABLE"
+                            else -> "${ayahs.size} AYAT"
+                        },
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 11.sp,
                             lineHeight = 16.sp,
@@ -5304,7 +5316,48 @@ private fun EditorialQuranReadingStage(
                     )
                 }
             }
-            LazyColumn(
+            if (ayahs.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f)
+                        .padding(horizontal = 18.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF0B1827).copy(alpha = .82f))
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        if (isLoadingAyahs) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = HomeReferenceGold,
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                        Text(
+                            text = if (isLoadingAyahs) "Preparing today’s passage…" else "Quran text is unavailable",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                        )
+                        if (!isLoadingAyahs) {
+                            Text(
+                                text = "Open the Surah page to get the text.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = .72f),
+                                textAlign = TextAlign.Center,
+                            )
+                            androidx.compose.material3.TextButton(onClick = onOpenSurah) {
+                                Text("Open Surah", color = HomeReferenceGold)
+                            }
+                        }
+                    }
+                }
+            } else LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -5317,17 +5370,6 @@ private fun EditorialQuranReadingStage(
                 contentPadding = PaddingValues(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (ayahs.isEmpty()) {
-                    item {
-                        Text(
-                            text = "Preparing today's passage…",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.58f),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                        )
-                    }
-                }
                 items(
                     items = ayahs,
                     key = { ayah -> ayah.numberInSurah },
@@ -6151,7 +6193,12 @@ private fun RecommendationExpandedStage(
             }
         } else if (candidate == null) {
             Column(
-                modifier = Modifier.fillMaxWidth().verticalScroll(aiScrollState)
+                modifier = Modifier.fillMaxWidth()
+                    .insightReadingEdges(
+                        canScrollBackward = { aiScrollState.canScrollBackward },
+                        canScrollForward = { aiScrollState.canScrollForward },
+                    )
+                    .verticalScroll(aiScrollState)
                     .onSizeChanged { onPreferredHeightChange(with(density) { it.height.toDp() } + 100.dp) },
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {

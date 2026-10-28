@@ -84,6 +84,26 @@ class ImmersiveHomeCoverTest {
         compose.onNodeWithText("A thought for today").fetchSemanticsNode()
     }
 
+    @Test fun eachCoverOpensItsMatchingInsight() {
+        val openedPages = mutableListOf<Int>()
+        compose.setContent { CoverTestScene(dark = true, onOpen = openedPages::add) }
+        val titles = listOf(
+            "A moment to pause",
+            "Make room for reflection",
+            "Return to the Quran",
+            "Turn toward Makkah",
+            "A thought for today",
+        )
+        titles.forEachIndexed { index, title ->
+            if (index > 0) {
+                compose.onNodeWithText(titles[index - 1]).performTouchInput { swipeLeft() }
+                compose.waitForIdle()
+            }
+            compose.onNodeWithText(title).performClick()
+        }
+        assertEquals(listOf(0, 1, 2, 3, 4), openedPages)
+    }
+
     @Test fun scrolledHomeFeedUsesCompactArtworkSections() {
         compose.setContent {
             CompositionLocalProvider(LocalDarkTheme provides true) {
