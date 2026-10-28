@@ -56,6 +56,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -85,6 +86,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -497,10 +499,31 @@ private fun NiaFloatingBottomBar(
                     // Size of a single item cell along the main axis, and the
                     // bubble's target position for the selected tab.
                     val horizontalContentInset = 12.dp
+                    // Match the reference's four roomy icon slots. Keep the
+                    // fifth destination available through a short horizontal swipe.
+                    val navigationScroll = rememberScrollState()
+                    val visibleDestinations = destinations.size.coerceIn(1, 4)
                     val itemExtent = if (vertical) {
                         maxHeight / destinations.size
                     } else {
-                        (maxWidth - horizontalContentInset * 2) / destinations.size
+                        (maxWidth - horizontalContentInset * 2) / visibleDestinations
+                    }
+                    if (!vertical) {
+                        val density = LocalDensity.current
+                        LaunchedEffect(selectedIndex, itemExtent, maxWidth) {
+                            if (selectedIndex < 0) return@LaunchedEffect
+                            val itemPx = with(density) { itemExtent.roundToPx() }
+                            val viewportPx = with(density) {
+                                (maxWidth - horizontalContentInset * 2).roundToPx()
+                            }
+                            val target = floatingNavigationScrollTarget(
+                                selectedIndex = selectedIndex,
+                                itemWidthPx = itemPx,
+                                viewportWidthPx = viewportPx,
+                                currentScrollPx = navigationScroll.value,
+                            )
+                            navigationScroll.animateScrollTo(target)
+                        }
                     }
                     // Extend the active shape beyond its icon cell while keeping
                     // the first and last capsules inset from the bar's outer edge.
@@ -583,8 +606,10 @@ private fun NiaFloatingBottomBar(
                             )
                         } else {
                             val halfCross = crossSize / 2f
-                            val left = minOf(leadingPosition.value, trailingPosition.value)
-                            val right = maxOf(leadingPosition.value, trailingPosition.value) + mainSize
+                            val left = minOf(leadingPosition.value, trailingPosition.value) -
+                                navigationScroll.value
+                            val right = maxOf(leadingPosition.value, trailingPosition.value) +
+                                mainSize - navigationScroll.value
                             drawRoundRect(
                                 color = bubbleColor,
                                 topLeft = Offset(left, size.height / 2f - halfCross),
@@ -594,8 +619,8 @@ private fun NiaFloatingBottomBar(
                         }
                     }
 
-                    // Match the reference's icon-only cells. Destination names remain
-                    // available to accessibility through each icon's description.
+                    // Compact icons retain visible labels on Home and accessibility
+                    // descriptions on every destination.
                     @Composable
                     fun ItemCell(
                         destination: TopLevelDestination,
@@ -681,11 +706,16 @@ private fun NiaFloatingBottomBar(
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = horizontalContentInset),
+                                .padding(horizontal = horizontalContentInset)
+                                .horizontalScroll(navigationScroll),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             destinations.forEachIndexed { index, destination ->
-                                ItemCell(destination, index == selectedIndex, Modifier.weight(1f))
+                                ItemCell(
+                                    destination,
+                                    index == selectedIndex,
+                                    Modifier.width(itemExtent).fillMaxHeight(),
+                                )
                             }
                         }
                     }
@@ -772,6 +802,22 @@ private fun NiaFloatingBottomBar(
             )
         }
     }
+}
+
+/** Reveal a selected destination without moving the strip for already-visible tabs. */
+internal fun floatingNavigationScrollTarget(
+    selectedIndex: Int,
+    itemWidthPx: Int,
+    viewportWidthPx: Int,
+    currentScrollPx: Int,
+): Int {
+    val start = selectedIndex * itemWidthPx
+    return when {
+        start < currentScrollPx -> start
+        start + itemWidthPx > currentScrollPx + viewportWidthPx ->
+            start + itemWidthPx - viewportWidthPx
+        else -> currentScrollPx
+    }.coerceAtLeast(0)
 }
 
 /**
