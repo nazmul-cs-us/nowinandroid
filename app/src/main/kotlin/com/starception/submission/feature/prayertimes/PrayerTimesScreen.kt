@@ -3018,17 +3018,21 @@ fun PrayerTimesScreen(
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
                 val darkHome = LocalDarkTheme.current
                 var coverPage by rememberSaveable { mutableIntStateOf(0) }
+                val prayerArtworkNight = prayerTimes?.let {
+                    currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
+                } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
                 Box(Modifier.fillMaxSize().background(if (darkHome) Color(0xFF0C110F) else Color.White)) {
                 if (!outerIsLandscape && darkHome) {
                     Image(
-                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, darkHome)),
+                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, prayerArtworkNight)),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-                        0f to Color(0xFF071C30).copy(alpha = .20f),
-                        .50f to Color(0xFF0B1D2C).copy(alpha = .42f),
+                        0f to Color(0xFF071C30).copy(alpha = .12f),
+                        .50f to Color(0xFF0B1D2C).copy(alpha = .30f),
+                        .78f to Color(0xFF0C110F).copy(alpha = .97f),
                         1f to Color(0xFF0C110F).copy(alpha = .97f),
                     )))
                 } else if (!outerIsLandscape) {
@@ -3040,14 +3044,15 @@ fun PrayerTimesScreen(
                         1f to Color.White,
                     )))
                     Image(
-                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, darkHome)),
+                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, prayerArtworkNight)),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = .45f),
-                        .48f to Color.White.copy(alpha = .45f),
+                        0f to Color.White.copy(alpha = if (coverPage == 0) .14f else .50f),
+                        .48f to Color.White.copy(alpha = if (coverPage == 0) .28f else .50f),
+                        .78f to Color.White,
                         1f to Color.White,
                     )))
                 }
@@ -3532,7 +3537,7 @@ fun PrayerTimesScreen(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .then(
-                                                if (darkHome) Modifier else Modifier.background(
+                                                if (darkHome || !insightTileExpanded) Modifier else Modifier.background(
                                                     Brush.verticalGradient(
                                                         0f to Color.White.copy(alpha = .28f),
                                                         .45f to Color.White.copy(alpha = .91f),
@@ -3598,10 +3603,17 @@ fun PrayerTimesScreen(
                                         }
                                         // Swipeable Big Tiles
                                         Box(
-                                            modifier = Modifier.offset(x = -feedGutter)
-                                                .width(configuration.screenWidthDp.dp)
+                                            // requiredWidth overflows the padded feed symmetrically,
+                                            // so the resting artwork actually reaches both screen edges.
+                                            modifier = Modifier.requiredWidth(configuration.screenWidthDp.dp)
                                                 .onSizeChanged { insightHeightPx = it.height },
                                         ) {
+                                            val readerReveal by animateFloatAsState(
+                                                targetValue = if (insightTileExpanded) 1f else 0f,
+                                                animationSpec = tween(300),
+                                                label = "homeReaderReveal",
+                                            )
+                                            Box(Modifier.graphicsLayer { alpha = readerReveal }) {
                                             SwipeableBigTiles(
                                                 immersiveHome = true,
                                                 edgeToEdgeArtwork = true,
@@ -3713,6 +3725,7 @@ fun PrayerTimesScreen(
                                                 isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
                                                 weatherThresholds = prayerWeatherThresholds,
                                             )
+                                            }
                                             androidx.compose.animation.AnimatedVisibility(
                                                 visible = !insightTileExpanded,
                                                 enter = fadeIn(tween(360)),
@@ -3722,8 +3735,6 @@ fun PrayerTimesScreen(
                                                 ImmersiveHomeCover(
                                                     selectedPage = coverPage,
                                                     isDarkTheme = darkHome,
-                                                    sceneHeight = configuration.screenHeightDp.dp,
-                                                    sceneTopInset = dynamicTopInset + 56.dp,
                                                     nextPrayerName = PrayerTimeHelpers
                                                         .getNextPrayer(currentTime, prayerTimes)?.first.orEmpty(),
                                                     nextPrayerCountdown = PrayerTimeHelpers
@@ -3758,7 +3769,7 @@ fun PrayerTimesScreen(
                                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = .72f),
                                                 )
                                                 Text(
-                                                    "Spend a moment with the Quran",
+                                                    "Continue today's reading",
                                                     style = MaterialTheme.typography.titleLarge,
                                                     color = MaterialTheme.colorScheme.onBackground,
                                                 )

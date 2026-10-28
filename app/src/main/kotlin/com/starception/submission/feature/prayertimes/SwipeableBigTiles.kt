@@ -243,13 +243,13 @@ import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.duadatabase.Dua
 import com.starception.submission.core.images.resources.insight_prayer_background
 import com.starception.submission.core.images.resources.insight_prayer_foreground
+import com.starception.submission.core.images.resources.insight_prayer_poster_day
+import com.starception.submission.core.images.resources.insight_prayer_poster_night
 import com.starception.submission.core.images.resources.insight_qibla_background
 import com.starception.submission.core.images.resources.insight_qibla_foreground_v2
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.images.resources.insight_suggestion
-import com.starception.submission.core.images.resources.prayer_now_insight_day
-import com.starception.submission.core.images.resources.prayer_now_insight_night
 import com.starception.submission.core.images.resources.prayer_now_mountains_day
 import com.starception.submission.core.images.resources.prayer_now_mountains_night
 import com.starception.submission.core.images.resources.prayer_now_mosque_day
@@ -3101,9 +3101,9 @@ private fun PrayerPosterInsightCard(
             statusMetaText = statusMetaText,
             weatherThresholds = weatherThresholds,
             backgroundPainterRes = if (effectiveIsNight) {
-                ImageRes.drawable.prayer_now_insight_night
+                ImageRes.drawable.insight_prayer_poster_night
             } else {
-                ImageRes.drawable.prayer_now_insight_day
+                ImageRes.drawable.insight_prayer_poster_day
             },
             animateWater = !effectiveIsNight,
             backgroundBaseScale = 1.018f,

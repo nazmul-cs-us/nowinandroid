@@ -1,6 +1,5 @@
 package com.starception.submission.feature.prayertimes
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,8 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -26,30 +23,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_prayer_background
 import com.starception.submission.core.images.resources.insight_qibla_background
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_suggestion
-import com.starception.submission.core.images.resources.prayer_now_insight_day
-import com.starception.submission.core.images.resources.prayer_now_insight_night
+import com.starception.submission.core.images.resources.insight_prayer_poster_day
+import com.starception.submission.core.images.resources.insight_prayer_poster_night
 import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.launch
 
-internal fun homeCoverArtwork(page: Int, isDarkTheme: Boolean): DrawableResource = when (page) {
-    0 -> if (isDarkTheme) Res.drawable.prayer_now_insight_night else Res.drawable.prayer_now_insight_day
+internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableResource = when (page) {
+    0 -> if (useNightArtwork) Res.drawable.insight_prayer_poster_night else Res.drawable.insight_prayer_poster_day
     1 -> Res.drawable.insight_prayer_background
     2 -> Res.drawable.insight_quran_background
     3 -> Res.drawable.insight_qibla_background
@@ -61,8 +54,6 @@ internal fun homeCoverArtwork(page: Int, isDarkTheme: Boolean): DrawableResource
 internal fun ImmersiveHomeCover(
     selectedPage: Int,
     isDarkTheme: Boolean,
-    sceneHeight: Dp,
-    sceneTopInset: Dp,
     nextPrayerName: String,
     nextPrayerCountdown: String,
     onSelectionChanged: (Int) -> Unit,
@@ -92,26 +83,6 @@ internal fun ImmersiveHomeCover(
                 else -> Triple("FOR THIS MOMENT", "A thought for today", "Explore a grounded suggestion")
             }
             Box(Modifier.fillMaxSize().clipToBounds().clickable { onOpen(page) }) {
-                Image(
-                    painter = painterResource(homeCoverArtwork(page, isDarkTheme)),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    // Match the image's crop above the reader, behind the toolbar.
-                    // Cropping each strip independently creates a visible seam.
-                    modifier = Modifier.fillMaxWidth().requiredHeight(sceneHeight)
-                        .offset(y = -sceneTopInset),
-                )
-                Box(Modifier.fillMaxSize().background(
-                    if (isDarkTheme) Brush.verticalGradient(
-                        0f to Color(0xFF07121D).copy(alpha = .18f),
-                        .48f to Color(0xFF081321).copy(alpha = .18f),
-                        1f to Color(0xFF06101B).copy(alpha = .96f),
-                    ) else Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = .38f),
-                        .42f to Color.White.copy(alpha = .36f),
-                        1f to Color.White.copy(alpha = .96f),
-                    ),
-                ))
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                         .padding(start = 24.dp, end = 24.dp, bottom = copyBottom),
