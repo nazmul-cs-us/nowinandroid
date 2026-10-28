@@ -34,7 +34,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_prayer_background
@@ -85,7 +87,7 @@ internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifi
                 painter = painterResource(foreground),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.matchParentSize().padding(8.dp),
+                modifier = Modifier.matchParentSize().padding(6.dp),
             )
         }
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(
@@ -111,18 +113,22 @@ internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifi
 @Composable
 internal fun HomeArtworkRail(onSelect: (HomeArtworkCard, Rect) -> Unit) {
     val ink = MaterialTheme.colorScheme.onBackground
+    val largeText = LocalDensity.current.fontScale > 1.3f
     Column {
         HomeFeedSectionLabel("EXPLORE YOUR DAY")
-        Spacer(Modifier.height(16.dp))
-        LazyRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+        Spacer(Modifier.height(14.dp))
+        LazyRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
             items(homeArtworkCards.take(3), key = HomeArtworkCard::page) { card ->
-                Column(Modifier.width(142.dp)) {
-                    ArtworkCard(card, Modifier.fillMaxWidth(), 148.dp, onSelect)
-                    Spacer(Modifier.height(10.dp))
+                Column(Modifier.width(if (largeText) 142.dp else 124.dp)) {
+                    ArtworkCard(card, Modifier.fillMaxWidth(), 126.dp, onSelect, compact = true)
+                    Spacer(Modifier.height(8.dp))
                     Text(card.label, color = ink, style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold, maxLines = 2)
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = if (largeText) 2 else 1,
+                        overflow = TextOverflow.Ellipsis)
                     Text(card.subtitle, color = ink.copy(alpha = .62f),
-                        style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                        style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -170,15 +176,17 @@ private fun ArtworkCard(
     modifier: Modifier,
     height: androidx.compose.ui.unit.Dp,
     onSelect: (HomeArtworkCard, Rect) -> Unit,
+    compact: Boolean = false,
 ) {
     val measuredHeight = if (LocalDensity.current.fontScale > 1.3f) height + 24.dp else height
     val dark = LocalDarkTheme.current
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(if (compact) 20.dp else 24.dp)
     var bounds by remember { mutableStateOf(Rect.Zero) }
     HomeArtworkScene(
         card = card,
         copyAlpha = 0f,
         modifier = modifier.height(measuredHeight)
+            .testTag("homeArtworkCard-${card.page}")
             .onGloballyPositioned { bounds = it.boundsInWindow() }
             .then(if (dark) Modifier else Modifier.shadow(8.dp, shape))
             .clip(shape)

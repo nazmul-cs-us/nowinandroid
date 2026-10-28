@@ -16,7 +16,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -55,11 +54,11 @@ class HomeArtworkRailTest {
                 }
             }
         }
-        compose.onNodeWithText("Today's salah").performClick()
+        compose.onNodeWithTag("homeArtworkCard-1").performClick()
         assertEquals(1, selected)
-        compose.onNodeWithText("For this moment").performClick()
+        compose.onNodeWithTag("homeArtworkCard-4").performClick()
         assertEquals(4, selected)
-        compose.onNodeWithText("Direction to Makkah").performClick()
+        compose.onNodeWithTag("homeArtworkCard-3").performClick()
         assertEquals(3, selected)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_artwork_rail.png")
     }
