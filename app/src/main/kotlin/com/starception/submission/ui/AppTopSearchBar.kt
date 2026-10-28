@@ -832,7 +832,9 @@ fun AppTopSearchBar(
         if (homeImmersiveHeader && !isSearchViewOpen) {
             Row(
                 modifier = Modifier.fillMaxWidth()
-                    .padding(start = 22.dp, end = 22.dp, top = topInset + 4.dp),
+                    // The wallpaper reaches into the status area, while the actions
+                    // sit below it even when an OEM reports no safe-drawing inset.
+                    .padding(start = 22.dp, end = 22.dp, top = topInset.coerceAtLeast(24.dp) + 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
