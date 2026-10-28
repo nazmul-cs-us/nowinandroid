@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -104,6 +105,39 @@ class ImmersiveHomeCoverTest {
         assertEquals(listOf(0, 1, 2, 3, 4), openedPages)
     }
 
+    @Test fun swipingCoverUpdatesTheFollowupFeed() {
+        val selectedPage = mutableIntStateOf(0)
+        compose.setContent {
+            CompositionLocalProvider(LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
+            CompositionLocalProvider(LocalDarkTheme provides true) {
+                MaterialTheme(colorScheme = darkColorScheme()) {
+                    Column(Modifier.fillMaxWidth().height(852.dp)
+                        .background(Color(0xFF080B14)).verticalScroll(rememberScrollState())) {
+                        Box(Modifier.fillMaxWidth().height(550.dp)) {
+                            ImmersiveHomeCover(
+                                selectedPage = selectedPage.intValue,
+                                isDarkTheme = true,
+                                nextPrayerName = "Asr",
+                                nextPrayerCountdown = "1h 41m",
+                                onSelectionChanged = { selectedPage.intValue = it },
+                                onOpen = {},
+                            )
+                        }
+                        HomeReflectionPrompt(focusedPage = selectedPage.intValue, onClick = {})
+                        HomeArtworkRail(focusedPage = selectedPage.intValue, onSelect = { _, _ -> })
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("A moment to pause").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        assertEquals(1, selectedPage.intValue)
+        compose.onNodeWithText("What will you carry into your next prayer?").fetchSemanticsNode()
+        compose.onNodeWithText("Prayer now").fetchSemanticsNode()
+    }
+
     @Test fun scrolledHomeFeedUsesCompactArtworkSections() {
         compose.setContent {
             CompositionLocalProvider(LocalDarkTheme provides true) {
@@ -138,7 +172,7 @@ class ImmersiveHomeCoverTest {
             }
         }
         compose.waitForIdle()
-        val reflectionLeft = compose.onNodeWithText("DAILY REFLECTION")
+        val reflectionLeft = compose.onNodeWithText("PRAYER REFLECTION")
             .fetchSemanticsNode().boundsInRoot.left
         val cardsLeft = compose.onNodeWithText("EXPLORE YOUR DAY")
             .fetchSemanticsNode().boundsInRoot.left

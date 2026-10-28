@@ -1,5 +1,10 @@
 package com.starception.submission.feature.prayertimes
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -59,6 +64,21 @@ internal data class HomeArtworkCard(
     val foreground: DrawableResource? = null,
 )
 
+internal data class HomeFeedPage(
+    val eyebrow: String,
+    val prompt: String,
+    val railPages: List<Int>,
+    val featuredPage: Int,
+)
+
+internal fun homeFeedPage(page: Int): HomeFeedPage = when (page) {
+    1 -> HomeFeedPage("TODAY'S SALAH", "What will you carry into your next prayer?", listOf(2, 3, 4), 0)
+    2 -> HomeFeedPage("DAILY REFLECTION", "What will you take from today’s reading?", listOf(0, 1, 3), 4)
+    3 -> HomeFeedPage("QIBLA", "Take a moment to turn toward Makkah.", listOf(2, 0, 4), 1)
+    4 -> HomeFeedPage("FOR THIS MOMENT", "What would help you right now?", listOf(0, 1, 3), 2)
+    else -> HomeFeedPage("PRAYER REFLECTION", "What intention will you carry into your next prayer?", listOf(2, 1, 3), 4)
+}
+
 private val homeArtworkCards by lazy {
     listOf(
         HomeArtworkCard(2, "Today's reading", "Quran for today",
@@ -111,51 +131,76 @@ internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifi
 
 /** Secondary artwork cards open the existing insight reader and its real content. */
 @Composable
-internal fun HomeArtworkRail(onSelect: (HomeArtworkCard, Rect) -> Unit) {
+internal fun HomeArtworkRail(
+    focusedPage: Int = 0,
+    useNightArtwork: Boolean = false,
+    onSelect: (HomeArtworkCard, Rect) -> Unit,
+) {
     val ink = MaterialTheme.colorScheme.onBackground
     val largeText = LocalDensity.current.fontScale > 1.3f
-    Column {
-        HomeFeedSectionLabel("EXPLORE YOUR DAY")
-        Spacer(Modifier.height(14.dp))
-        LazyRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
-            items(homeArtworkCards.take(3), key = HomeArtworkCard::page) { card ->
-                Column(Modifier.width(if (largeText) 142.dp else 124.dp)) {
-                    ArtworkCard(card, Modifier.fillMaxWidth(), 126.dp, onSelect, compact = true)
-                    Spacer(Modifier.height(8.dp))
-                    Text(card.label, color = ink, style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = if (largeText) 2 else 1,
-                        overflow = TextOverflow.Ellipsis)
-                    Text(card.subtitle, color = ink.copy(alpha = .62f),
-                        style = MaterialTheme.typography.bodySmall, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis)
+    val prayerNow = HomeArtworkCard(
+        0, "Prayer now", "Your next prayer", homeCoverArtwork(0, useNightArtwork),
+    )
+    val cards = homeArtworkCards + prayerNow
+    AnimatedContent(
+        targetState = focusedPage.coerceIn(0, 4),
+        transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(160)) },
+        label = "homeFeedSelectedInsight",
+    ) { page ->
+        val feed = homeFeedPage(page)
+        val railCards = feed.railPages.mapNotNull { id -> cards.firstOrNull { it.page == id } }
+        val featuredCard = cards.first { it.page == feed.featuredPage }
+        Column {
+            HomeFeedSectionLabel("EXPLORE YOUR DAY")
+            Spacer(Modifier.height(14.dp))
+            LazyRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+                items(railCards, key = HomeArtworkCard::page) { card ->
+                    Column(Modifier.width(if (largeText) 142.dp else 124.dp)) {
+                        ArtworkCard(card, Modifier.fillMaxWidth(), 126.dp, onSelect, compact = true)
+                        Spacer(Modifier.height(8.dp))
+                        Text(card.label, color = ink, style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = if (largeText) 2 else 1,
+                            overflow = TextOverflow.Ellipsis)
+                        Text(card.subtitle, color = ink.copy(alpha = .62f),
+                            style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
+            Spacer(Modifier.height(32.dp))
+            HomeFeedSectionLabel("SUGGESTED FOR YOU")
+            Spacer(Modifier.height(16.dp))
+            ArtworkCard(featuredCard, Modifier.fillMaxWidth(), 224.dp, onSelect)
+            Spacer(Modifier.height(10.dp))
+            Text(featuredCard.label, color = ink, style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold)
+            Text(featuredCard.subtitle, color = ink.copy(alpha = .62f),
+                style = MaterialTheme.typography.bodyMedium)
         }
-        Spacer(Modifier.height(32.dp))
-        HomeFeedSectionLabel("SUGGESTED FOR YOU")
-        Spacer(Modifier.height(16.dp))
-        ArtworkCard(homeArtworkCards[3], Modifier.fillMaxWidth(), 224.dp, onSelect)
-        Spacer(Modifier.height(10.dp))
-        Text(homeArtworkCards[3].label, color = ink, style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold)
-        Text(homeArtworkCards[3].subtitle, color = ink.copy(alpha = .62f),
-            style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
-internal fun HomeReflectionPrompt(onClick: () -> Unit) {
+internal fun HomeReflectionPrompt(focusedPage: Int = 0, onClick: () -> Unit) {
     val ink = MaterialTheme.colorScheme.onBackground
     Column(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(ink.copy(alpha = .22f)))
-        Text("DAILY REFLECTION", style = MaterialTheme.typography.labelSmall,
-            color = ink.copy(alpha = .72f))
-        Text("What will you take from today’s reading?", style = MaterialTheme.typography.titleLarge,
-            color = ink)
+        AnimatedContent(
+            targetState = focusedPage.coerceIn(0, 4),
+            transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(160)) },
+            label = "homeReflectionSelectedInsight",
+        ) { page ->
+            val feed = homeFeedPage(page)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(feed.eyebrow, style = MaterialTheme.typography.labelSmall,
+                    color = ink.copy(alpha = .72f))
+                Text(feed.prompt, style = MaterialTheme.typography.titleLarge, color = ink)
+            }
+        }
     }
 }
 

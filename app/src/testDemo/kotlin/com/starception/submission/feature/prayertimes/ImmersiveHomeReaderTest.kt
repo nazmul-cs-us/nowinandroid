@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
@@ -45,7 +46,7 @@ class ImmersiveHomeReaderTest {
     @Test fun coverRequestsOpenEachExpandedInsight() {
         hilt.inject()
         var expandedPage: Int? = null
-        val requestedPage = mutableStateOf(2 to 1)
+        val requestedPage = mutableStateOf(0 to 1)
         compose.setContent {
             CompositionLocalProvider(LocalInspectionMode provides true) {
                 org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
@@ -75,7 +76,7 @@ class ImmersiveHomeReaderTest {
                             getCurrentActivity = { "UNKNOWN" },
                             onCompassClick = {},
                             portraitStripHeight = 550.dp,
-                            portraitExpandedStripHeight = 760.dp,
+                            portraitExpandedStripHeight = 852.dp,
                             immersiveHome = true,
                             edgeToEdgeArtwork = true,
                             pageRequest = requestedPage.value,
@@ -86,16 +87,22 @@ class ImmersiveHomeReaderTest {
             }
         }
         compose.waitForIdle()
-        assertEquals(2, expandedPage)
-        compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_quran_reader.png")
+        assertEquals(0, expandedPage)
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_prayer_reader.png")
         for ((page, image) in listOf(
+            2 to "immersive_home_quran_reader.png",
             1 to "immersive_home_salah_reader.png",
             3 to "immersive_home_qibla_reader.png",
             4 to "immersive_home_ai_reader.png",
-            0 to "immersive_home_prayer_reader.png",
         )) {
             compose.runOnIdle { requestedPage.value = page to (requestedPage.value.second + 1) }
             compose.waitForIdle()
+            if (page == 2) {
+                compose.waitUntil(15_000) {
+                    compose.onAllNodesWithText("Quran text is unavailable")
+                        .fetchSemanticsNodes().isNotEmpty()
+                }
+            }
             assertEquals(page, expandedPage)
             compose.onRoot().captureRoboImage("src/testDemo/screenshots/$image")
             if (page == 4) {

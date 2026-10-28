@@ -3914,7 +3914,8 @@ private fun InsightPreviewCard(
                     }
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
-                    .padding(tagInset),
+                    .padding(tagInset)
+                    .padding(end = if (editorialExpanded) 52.dp else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // This tag sits in the top strip, above where the scrim gradient

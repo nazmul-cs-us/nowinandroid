@@ -3165,22 +3165,29 @@ fun PrayerTimesScreen(
                                 // Draw through the floating bar, but keep its
                                 // clearance in height calculations until the
                                 // immersive reader actually hides it.
-                                val navigationClearance = navigationBarInset +
-                                    if (insightTileImmersive) 0.dp else 64.dp
+                                val navigationClearance = if (insightTileImmersive) {
+                                    0.dp
+                                } else {
+                                    navigationBarInset + 64.dp
+                                }
                                 val measuredInsightViewport = with(LocalDensity.current) {
                                     homeViewport.height.toDp()
                                 } - navigationClearance
                                 val insightViewport = if (homeViewport.height > 0) measuredInsightViewport else (
-                                    configuration.screenHeightDp.dp - dynamicTopInset - navigationBarInset -
-                                        (if (insightTileImmersive) 0.dp else 64.dp) - 156.dp
+                                    configuration.screenHeightDp.dp - dynamicTopInset -
+                                        navigationClearance - 156.dp
                                     )
-                                val portraitImmersiveInsightHeight =
-                                    com.starception.submission.core.designsystem.component.insightMaximumTileHeight(
+                                val portraitImmersiveInsightHeight by animateDpAsState(
+                                    targetValue = com.starception.submission.core.designsystem.component.insightMaximumTileHeight(
                                         // Stay above the bar while opening, then
                                         // claim its space once immersive mode hides it.
                                         viewport = insightViewport,
                                         header = 0.dp,
-                                    )
+                                        spacing = if (insightTileImmersive) 0.dp else 16.dp,
+                                    ),
+                                    animationSpec = tween(320, easing = FastOutSlowInEasing),
+                                    label = "immersiveInsightViewportHeight",
+                                )
 
 
                                 if (isLandscape) {
@@ -3749,12 +3756,14 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileImmersive) {
-                                            HomeReflectionPrompt {
-                                                coverPage = 2
-                                                feedPageRequest = 2 to ((feedPageRequest?.second ?: 0) + 1)
+                                            HomeReflectionPrompt(focusedPage = coverPage) {
+                                                feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
                                             }
                                             Spacer(Modifier.height(20.dp))
-                                            HomeArtworkRail { card, source ->
+                                            HomeArtworkRail(
+                                                focusedPage = coverPage,
+                                                useNightArtwork = prayerArtworkNight,
+                                            ) { card, source ->
                                                 if (morphRequest != null || insightTileExpanded) return@HomeArtworkRail
                                                 if (source.width > 0f && readerBounds.width > 0f) {
                                                     val top = (readerBounds.top + portraitScrollState.value -
@@ -4894,8 +4903,8 @@ fun PrayerTimesScreen(
                         // content. The viewport itself continues behind the
                         // floating navigation instead of ending in a fixed band.
                         if (!outerIsLandscape) {
-                            Spacer(Modifier.height(navigationBarInset +
-                                if (insightTileImmersive) 0.dp else 64.dp))
+                            Spacer(Modifier.height(if (insightTileImmersive) 0.dp else
+                                navigationBarInset + 64.dp))
                         }
                     } // Close Column inside AppTopSearchBar content lambda
                 } // Close AppTopSearchBar scaffold (content lambda)
