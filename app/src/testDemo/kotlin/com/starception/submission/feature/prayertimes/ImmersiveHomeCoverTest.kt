@@ -1,7 +1,6 @@
 package com.starception.submission.feature.prayertimes
 
 import android.app.Application
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,27 +14,29 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import org.jetbrains.compose.resources.painterResource
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, qualifiers = "w393dp-h852dp", sdk = [35])
@@ -57,6 +58,28 @@ class ImmersiveHomeCoverTest {
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_cover_light.png")
     }
 
+    @Test fun artworkTracksTheHorizontalSwipe() {
+        val positions = mutableListOf<Float>()
+        compose.setContent {
+            CoverTestScene(dark = true, onOpen = {}, onScrollPositionChanged = positions::add)
+        }
+        compose.onNodeWithText("A moment to pause").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        assertTrue("Artwork should move during the drag", positions.any { it > .05f && it < .95f })
+        assertTrue("The next cover should settle", positions.lastOrNull()?.let { it > .95f } == true)
+    }
+
+    @Test fun swipingRightFromFirstCoverWrapsToTheLast() {
+        val positions = mutableListOf<Float>()
+        compose.setContent {
+            CoverTestScene(dark = true, onOpen = {}, onScrollPositionChanged = positions::add)
+        }
+        compose.onNodeWithText("A moment to pause").performTouchInput { swipeRight() }
+        compose.waitForIdle()
+        assertTrue("The previous cover should settle", positions.lastOrNull()?.let { it > 3.95f } == true)
+        compose.onNodeWithText("A thought for today").fetchSemanticsNode()
+    }
+
     @Test fun scrolledHomeFeedUsesCompactArtworkSections() {
         compose.setContent {
             CompositionLocalProvider(LocalDarkTheme provides true) {
@@ -74,25 +97,18 @@ class ImmersiveHomeCoverTest {
 
 @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 @Composable
-private fun CoverTestScene(dark: Boolean, onOpen: (Int) -> Unit) {
+private fun CoverTestScene(
+    dark: Boolean,
+    onOpen: (Int) -> Unit,
+    onScrollPositionChanged: (Float) -> Unit = {},
+) {
     CompositionLocalProvider(LocalInspectionMode provides true) {
         org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
     }
     MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
         Box(Modifier.fillMaxWidth().height(852.dp)) {
-            Image(
-                painter = painterResource(homeCoverArtwork(0, dark)),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                alignment = Alignment.BottomEnd,
-                modifier = Modifier.fillMaxSize().graphicsLayer {
-                    scaleX = 1.25f
-                    scaleY = 1.25f
-                    translationY = -size.height * .20f
-                },
-            )
-            HomeCoverArtworkBlur(page = 0, useNightArtwork = dark)
-            Box(Modifier.fillMaxSize().background(homeCoverScrim(dark)))
+            val position = remember { mutableFloatStateOf(0f) }
+            HomeCoverArtworkBackdrop(position, useNightArtwork = dark, isDarkTheme = dark, isExpanded = false)
             Column(Modifier.fillMaxSize().padding(top = 80.dp, start = 24.dp, end = 24.dp)) {
                 Box(Modifier.requiredWidth(393.dp).height(588.dp)) {
                     ImmersiveHomeCover(
@@ -101,6 +117,10 @@ private fun CoverTestScene(dark: Boolean, onOpen: (Int) -> Unit) {
                         nextPrayerName = "Asr",
                         nextPrayerCountdown = "1h 41m",
                         onSelectionChanged = {},
+                        onScrollPositionChanged = {
+                            position.floatValue = it
+                            onScrollPositionChanged(it)
+                        },
                         onOpen = onOpen,
                     )
                 }

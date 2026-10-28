@@ -3018,50 +3018,20 @@ fun PrayerTimesScreen(
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
                 val darkHome = LocalDarkTheme.current
                 var coverPage by rememberSaveable { mutableIntStateOf(0) }
+                val coverScrollPosition = remember { mutableFloatStateOf(coverPage.toFloat()) }
                 val prayerArtworkNight = prayerTimes?.let {
                     currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
                 } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
                 Box(Modifier.fillMaxSize().background(if (darkHome) Color(0xFF080B14) else Color.White)) {
-                if (!outerIsLandscape && darkHome) {
-                    Image(
-                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, prayerArtworkNight)),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        alignment = if (coverPage == 0) Alignment.BottomEnd else Alignment.Center,
-                        modifier = Modifier.fillMaxSize().then(
-                            if (coverPage == 0) Modifier.graphicsLayer {
-                                scaleX = 1.25f
-                                scaleY = 1.25f
-                                translationY = -size.height * .20f
-                            } else Modifier,
-                        ),
+                if (!outerIsLandscape) {
+                    HomeCoverArtworkBackdrop(
+                        position = coverScrollPosition,
+                        useNightArtwork = prayerArtworkNight,
+                        isDarkTheme = darkHome,
+                        isExpanded = insightTileExpanded,
                     )
-                    if (!insightTileExpanded) HomeCoverArtworkBlur(coverPage, prayerArtworkNight)
-                    Box(Modifier.fillMaxSize().background(homeCoverScrim(true)))
-                } else if (!outerIsLandscape) {
-                    // Let the scene reach behind the system status bar and
-                    // toolbar, then dissolve it into the white lower feed.
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-                        0f to Color(0xFFFCFBFF),
-                        .40f to Color(0xFFF8F7FC),
-                        1f to Color.White,
-                    )))
-                    Image(
-                        painter = composeArtworkPainter(homeCoverArtwork(coverPage, prayerArtworkNight)),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        alignment = if (coverPage == 0) Alignment.BottomEnd else Alignment.Center,
-                        modifier = Modifier.fillMaxSize().then(
-                            if (coverPage == 0) Modifier.graphicsLayer {
-                                scaleX = 1.25f
-                                scaleY = 1.25f
-                                translationY = -size.height * .20f
-                            } else Modifier,
-                        ),
-                    )
-                    if (!insightTileExpanded) HomeCoverArtworkBlur(coverPage, prayerArtworkNight)
-                    Box(Modifier.fillMaxSize().background(homeCoverScrim(false)))
                 }
+                val headerFadeDistancePx = with(LocalDensity.current) { 96.dp.toPx() }
                 com.starception.submission.ui.AppTopSearchBar(
                     title = stringResource(R.string.prayer_times_title),
                     onSettingsClick = onSettingsClick,
@@ -3070,6 +3040,10 @@ fun PrayerTimesScreen(
                     pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF191724),
                     homeCornerAction = !outerIsLandscape,
                     homeImmersiveHeader = !outerIsLandscape,
+                    homeHeaderVisibility = {
+                        if (insightTileExpanded) 0f else
+                            (1f - portraitScrollState.value / headerFadeDistancePx).coerceIn(0f, 1f)
+                    },
                     topInset = dynamicTopInset,
                     onVerseClick = onSurahClickWithAyah,
                     onSearchSubmit = onSearchSubmit,
@@ -3764,6 +3738,7 @@ fun PrayerTimesScreen(
                                                     nextPrayerCountdown = PrayerTimeHelpers
                                                         .getTimeUntilNextPrayer(currentTime, prayerTimes),
                                                     onSelectionChanged = { coverPage = it },
+                                                    onScrollPositionChanged = { coverScrollPosition.floatValue = it },
                                                     onOpen = { page ->
                                                         coverPage = page
                                                         feedPageRequest = page to ((feedPageRequest?.second ?: 0) + 1)

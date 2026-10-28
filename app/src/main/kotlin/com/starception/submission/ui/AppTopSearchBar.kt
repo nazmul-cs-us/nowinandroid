@@ -83,6 +83,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -139,6 +140,7 @@ import com.starception.submission.ui.search.SearchTokenizer
 import com.starception.submission.ui.search.shouldSuppressAmbiguousAllahPrefixVerses
 import kotlinx.coroutines.delay
 import kotlin.math.absoluteValue
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color as ComposeColor
 import coil.size.Size as CoilSize
 import com.google.android.material.R as MaterialR
@@ -153,6 +155,7 @@ fun AppTopSearchBar(
     pillContentColor: ComposeColor = ComposeColor.Unspecified,
     homeCornerAction: Boolean = false,
     homeImmersiveHeader: Boolean = false,
+    homeHeaderVisibility: () -> Float = { 1f },
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
     content: @Composable () -> Unit,
@@ -829,12 +832,20 @@ fun AppTopSearchBar(
                 }
             },
         )
-        if (homeImmersiveHeader && !isSearchViewOpen) {
+        val showHomeHeader by remember(homeHeaderVisibility) {
+            derivedStateOf { homeHeaderVisibility() > .001f }
+        }
+        if (homeImmersiveHeader && !isSearchViewOpen && showHomeHeader) {
             Row(
                 modifier = Modifier.fillMaxWidth()
                     // The wallpaper reaches into the status area, while the actions
                     // sit below it even when an OEM reports no safe-drawing inset.
-                    .padding(start = 22.dp, end = 22.dp, top = topInset.coerceAtLeast(24.dp) + 18.dp),
+                    .padding(start = 22.dp, end = 22.dp, top = topInset.coerceAtLeast(24.dp) + 18.dp)
+                    .graphicsLayer {
+                        val visibility = homeHeaderVisibility()
+                        alpha = visibility
+                        translationY = -(1f - visibility) * 24.dp.toPx()
+                    },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {

@@ -19,6 +19,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.State
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +51,7 @@ import com.starception.submission.core.images.resources.prayer_now_insight_night
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableResource = when (page) {
     0 -> if (useNightArtwork) Res.drawable.prayer_now_insight_night else Res.drawable.prayer_now_insight_day
@@ -80,7 +83,7 @@ internal fun homeCoverScrim(isDarkTheme: Boolean): Brush = if (isDarkTheme) {
 
 /** A blurred copy of the same scene gives the cover copy a soft, readable backdrop. */
 @Composable
-internal fun HomeCoverArtworkBlur(page: Int, useNightArtwork: Boolean) {
+internal fun HomeCoverArtworkBlur(lowerPage: Int, swipeProgress: Float, useNightArtwork: Boolean) {
     Box(
         Modifier.fillMaxSize()
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -99,20 +102,48 @@ internal fun HomeCoverArtworkBlur(page: Int, useNightArtwork: Boolean) {
                 )
             },
     ) {
+        Box(Modifier.fillMaxSize().blur(20.dp)) {
+            HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
+        }
+    }
+}
+
+@Composable
+private fun HomeCoverArtworkImages(lowerPage: Int, swipeProgress: Float, useNightArtwork: Boolean) {
+    val nextPage = (lowerPage + 1) % 5
+    for (layer in 0..1) {
+        if (layer == 1 && swipeProgress <= .001f) continue
+        val page = if (layer == 0) lowerPage else nextPage
         Image(
             painter = painterResource(homeCoverArtwork(page, useNightArtwork)),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             alignment = if (page == 0) Alignment.BottomEnd else Alignment.Center,
-            modifier = Modifier.fillMaxSize()
-                .then(if (page == 0) Modifier.graphicsLayer {
-                    scaleX = 1.25f
-                    scaleY = 1.25f
-                    translationY = -size.height * .20f
-                } else Modifier)
-                .blur(20.dp),
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                scaleX = if (page == 0) 1.25f else 1f
+                scaleY = if (page == 0) 1.25f else 1f
+                translationX = (if (layer == 0) -swipeProgress else 1f - swipeProgress) * size.width * .18f
+                translationY = if (page == 0) -size.height * .20f else 0f
+                alpha = if (layer == 0) 1f else swipeProgress
+            },
         )
     }
+}
+
+/** Recompose only the artwork while dragging, rather than the entire home feed. */
+@Composable
+internal fun HomeCoverArtworkBackdrop(
+    position: State<Float>,
+    useNightArtwork: Boolean,
+    isDarkTheme: Boolean,
+    isExpanded: Boolean,
+) {
+    val scrollPosition = position.value
+    val lowerPage = scrollPosition.toInt().coerceIn(0, 4)
+    val swipeProgress = (scrollPosition - lowerPage).coerceIn(0f, 1f)
+    HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
+    if (!isExpanded) HomeCoverArtworkBlur(lowerPage, swipeProgress, useNightArtwork)
+    Box(Modifier.fillMaxSize().background(homeCoverScrim(isDarkTheme)))
 }
 
 /** A quiet first-screen composition; tapping continues into the corresponding real reader. */
@@ -123,14 +154,25 @@ internal fun ImmersiveHomeCover(
     nextPrayerName: String,
     nextPrayerCountdown: String,
     onSelectionChanged: (Int) -> Unit,
+    onScrollPositionChanged: (Float) -> Unit = {},
     onOpen: (Int) -> Unit,
 ) {
-    val pagerState = rememberPagerState(initialPage = selectedPage.coerceIn(0, 4), pageCount = { 5 })
+    val pagerState = rememberPagerState(initialPage = 5_000 + selectedPage.coerceIn(0, 4), pageCount = { Int.MAX_VALUE })
     val scope = rememberCoroutineScope()
     LaunchedEffect(selectedPage) {
-        if (pagerState.settledPage != selectedPage) pagerState.scrollToPage(selectedPage.coerceIn(0, 4))
+        val current = pagerState.settledPage % 5
+        if (current != selectedPage) {
+            val forward = (selectedPage - current + 5) % 5
+            val delta = if (forward <= 2) forward else forward - 5
+            pagerState.scrollToPage(pagerState.settledPage + delta)
+        }
     }
-    LaunchedEffect(pagerState.settledPage) { onSelectionChanged(pagerState.settledPage) }
+    LaunchedEffect(pagerState.settledPage) { onSelectionChanged(pagerState.settledPage % 5) }
+    LaunchedEffect(pagerState) {
+        snapshotFlow {
+            (pagerState.currentPage + pagerState.currentPageOffsetFraction) % 5f
+        }.collect(onScrollPositionChanged)
+    }
     val ink = if (isDarkTheme) Color.White else Color(0xFF211C2B)
     val secondaryInk = ink.copy(alpha = if (isDarkTheme) .80f else .72f)
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -138,7 +180,8 @@ internal fun ImmersiveHomeCover(
         // the lower feed; anchoring both to the tile bottom puts them too low.
         val copyBottom = maxHeight * .20f
         val indicatorBottom = maxHeight * .13f
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { absolutePage ->
+            val page = absolutePage % 5
             val (eyebrow, title, detail) = when (page) {
                 0 -> Triple("YOUR DAY", "A moment to pause",
                     listOfNotNull(nextPrayerName.takeIf(String::isNotBlank),
@@ -188,17 +231,26 @@ internal fun ImmersiveHomeCover(
             horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val indicatorPosition = (pagerState.currentPage + pagerState.currentPageOffsetFraction) % 5f
             repeat(5) { index ->
-                val active = pagerState.currentPage == index
+                val directDistance = abs(indicatorPosition - index)
+                val emphasis = (1f - minOf(directDistance, 5f - directDistance)).coerceIn(0f, 1f)
                 Box(
                     Modifier.size(width = 23.dp, height = 26.dp)
-                        .clickable { scope.launch { pagerState.animateScrollToPage(index) } }
+                        .clickable {
+                            scope.launch {
+                                val current = pagerState.currentPage % 5
+                                val forward = (index - current + 5) % 5
+                                val delta = if (forward <= 2) forward else forward - 5
+                                pagerState.animateScrollToPage(pagerState.currentPage + delta)
+                            }
+                        }
                         .semantics { contentDescription = "Show insight ${index + 1} of 5" },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Box(Modifier.size(width = if (active) 16.dp else 5.dp, height = 4.dp)
+                    Box(Modifier.size(width = (5f + 11f * emphasis).dp, height = 4.dp)
                         .clip(CircleShape)
-                        .background(ink.copy(alpha = if (active) 1f else .48f)))
+                        .background(ink.copy(alpha = .48f + .52f * emphasis)))
                 }
             }
         }
