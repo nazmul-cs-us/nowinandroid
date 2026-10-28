@@ -201,13 +201,14 @@ fun PrayerHomeCoverCelestialLayer(
     longitude: Double,
     isNight: Boolean,
     modifier: Modifier = Modifier,
+    forceSunForTesting: Boolean = false,
 ) {
     val snapshot = remember(epochSeconds, latitude, longitude) {
         skySnapshotAt(julianDay(epochSeconds), latitude, longitude)
     }
     val showMoon = isNight && snapshot.moonAltAz.altitudeDeg > -1.5 &&
         snapshot.moonPhase.illuminatedFraction > 0.01
-    val showSun = !isNight && snapshot.sunAltAz.altitudeDeg > -1.5
+    val showSun = !isNight && (forceSunForTesting || snapshot.sunAltAz.altitudeDeg > -1.5)
     if (!showMoon && !showSun) return
 
     BoxWithConstraints(modifier.fillMaxSize()) {

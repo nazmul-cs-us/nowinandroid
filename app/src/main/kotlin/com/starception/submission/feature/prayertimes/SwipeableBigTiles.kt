@@ -89,11 +89,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -105,6 +107,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
@@ -255,6 +258,8 @@ import com.starception.submission.core.images.resources.prayer_now_mountains_nig
 import com.starception.submission.core.images.resources.prayer_now_mosque_day
 import com.starception.submission.core.images.resources.prayer_now_mosque_lights
 import com.starception.submission.core.images.resources.prayer_now_mosque_night
+import com.starception.submission.core.images.resources.home_cover_prayer_day_portrait
+import com.starception.submission.core.images.resources.home_cover_prayer_night_portrait
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
 import com.starception.submission.core.qurandatabase.QuranDatabase
@@ -268,6 +273,7 @@ import com.starception.submission.feature.prayertimes.components.CompassProgress
 import com.starception.submission.feature.prayertimes.components.GlobePopupScreen
 import com.starception.submission.feature.prayertimes.components.rememberParallaxTilt
 import com.starception.submission.feature.prayertimes.celestial.PrayerSkyCelestialLayer
+import com.starception.submission.feature.prayertimes.celestial.PrayerHomeCoverCelestialLayer
 import com.starception.submission.feature.prayertimes.utils.calculateQiblaDirection
 import com.starception.submission.feature.prayertimes.weather.AnimatedPrayerWeatherIcon
 import com.starception.submission.feature.prayertimes.weather.CurrentWeather
@@ -2669,6 +2675,7 @@ internal fun SwipeableBigTiles(
             }
 
             if (isImmersive) {
+                val controlTopInset = immersiveInsightControlTopInset()
                 Surface(
                     onClick = {
                         interactionEpoch++
@@ -2678,7 +2685,7 @@ internal fun SwipeableBigTiles(
                     color = Color.Black.copy(alpha = 0.48f),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(12.dp)
+                        .padding(start = 12.dp, end = 12.dp, top = controlTopInset, bottom = 12.dp)
                         .size(44.dp)
                         .zIndex(4f)
                         .semantics { contentDescription = "Collapse insight" },
@@ -3103,23 +3110,37 @@ private fun PrayerPosterInsightCard(
             statusText = statusText,
             statusMetaText = statusMetaText,
             weatherThresholds = weatherThresholds,
-            backgroundPainterRes = if (effectiveIsNight) {
+            backgroundPainterRes = if (fluidFullBleed && effectiveIsNight) {
+                ImageRes.drawable.home_cover_prayer_night_portrait
+            } else if (fluidFullBleed) {
+                ImageRes.drawable.home_cover_prayer_day_portrait
+            } else if (effectiveIsNight) {
                 ImageRes.drawable.prayer_now_insight_night
             } else {
                 ImageRes.drawable.prayer_now_insight_day
             },
             animateWater = !effectiveIsNight,
-            backgroundBaseScale = 1.018f,
+            backgroundBaseScale = if (fluidFullBleed) 1f else 1.018f,
             backgroundLayer = if (latitude != null && longitude != null) {
                 {
-                    PrayerSkyCelestialLayer(
-                        epochSeconds = epochSeconds,
-                        latitude = latitude,
-                        longitude = longitude,
-                        isNight = effectiveIsNight,
-                        replayKey = isFocused,
-                        forceSunForTesting = forceSunForTesting,
-                    )
+                    if (fluidFullBleed) {
+                        PrayerHomeCoverCelestialLayer(
+                            epochSeconds = epochSeconds,
+                            latitude = latitude,
+                            longitude = longitude,
+                            isNight = effectiveIsNight,
+                            forceSunForTesting = forceSunForTesting,
+                        )
+                    } else {
+                        PrayerSkyCelestialLayer(
+                            epochSeconds = epochSeconds,
+                            latitude = latitude,
+                            longitude = longitude,
+                            isNight = effectiveIsNight,
+                            replayKey = isFocused,
+                            forceSunForTesting = forceSunForTesting,
+                        )
+                    }
                 }
             } else {
                 null
@@ -3149,6 +3170,10 @@ private fun PrayerPosterInsightCard(
             disableCardGesturesWhenExpanded = disableCardGesturesWhenExpanded,
         )
 }
+
+@Composable
+private fun immersiveInsightControlTopInset(): Dp =
+    maxOf(32.dp, WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding() + 12.dp)
 
 @Composable
 private fun InsightPreviewCard(
@@ -3363,6 +3388,11 @@ private fun InsightPreviewCard(
             val cardMaxWidth = maxWidth
             val tagInset = if (editorialExpanded) 10.dp else
                 (11f - (5f * compactProgress) + (3f * expansionProgress)).dp
+            val tagTopInset = if (fluidFullBleed && isExpanded) {
+                immersiveInsightControlTopInset()
+            } else {
+                tagInset
+            }
             val labelFontSize = if (editorialExpanded) 12.sp else
                 (11f - (3f * compactProgress) + expansionProgress).sp
             // Enlarged cards prioritize their Surah/Hadith payload over the
@@ -3914,7 +3944,7 @@ private fun InsightPreviewCard(
                     }
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
-                    .padding(tagInset)
+                    .padding(start = tagInset, end = tagInset, top = tagTopInset, bottom = tagInset)
                     .padding(end = if (editorialExpanded) 52.dp else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
