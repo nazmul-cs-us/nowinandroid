@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -134,6 +135,21 @@ internal fun HomeArtworkRail(onSelect: (HomeArtworkCard, Rect) -> Unit) {
             fontWeight = FontWeight.SemiBold)
         Text(homeArtworkCards[3].subtitle, color = ink.copy(alpha = .62f),
             style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+internal fun HomeReflectionPrompt(onClick: () -> Unit) {
+    val ink = MaterialTheme.colorScheme.onBackground
+    Column(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(ink.copy(alpha = .22f)))
+        Text("DAILY REFLECTION", style = MaterialTheme.typography.labelSmall,
+            color = ink.copy(alpha = .72f))
+        Text("What will you take from today’s reading?", style = MaterialTheme.typography.titleLarge,
+            color = ink)
     }
 }
 

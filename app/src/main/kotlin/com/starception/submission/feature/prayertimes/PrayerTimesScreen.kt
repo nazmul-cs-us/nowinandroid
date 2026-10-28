@@ -3748,30 +3748,9 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileImmersive) {
-                                            Column(
-                                                modifier = Modifier.fillMaxWidth()
-                                                    .clickable {
-                                                        coverPage = 2
-                                                        feedPageRequest = 2 to ((feedPageRequest?.second ?: 0) + 1)
-                                                    }
-                                                    .padding(horizontal = 24.dp, vertical = 20.dp),
-                                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                            ) {
-                                                Box(
-                                                    Modifier.fillMaxWidth().height(1.dp).background(
-                                                        MaterialTheme.colorScheme.onBackground.copy(alpha = .22f),
-                                                    ),
-                                                )
-                                                Text(
-                                                    "DAILY REFLECTION",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = .72f),
-                                                )
-                                                Text(
-                                                    "What will you take from today’s reading?",
-                                                    style = MaterialTheme.typography.titleLarge,
-                                                    color = MaterialTheme.colorScheme.onBackground,
-                                                )
+                                            HomeReflectionPrompt {
+                                                coverPage = 2
+                                                feedPageRequest = 2 to ((feedPageRequest?.second ?: 0) + 1)
                                             }
                                             Spacer(Modifier.height(20.dp))
                                             HomeArtworkRail { card, source ->

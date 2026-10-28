@@ -4,16 +4,20 @@ import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -92,6 +96,34 @@ class ImmersiveHomeCoverTest {
             }
         }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_feed.png")
+    }
+
+    @Test fun scrollingKeepsReflectionAndCardSectionsAligned() {
+        compose.setContent {
+            CompositionLocalProvider(LocalDarkTheme provides true) {
+                MaterialTheme(colorScheme = darkColorScheme()) {
+                    val scroll = rememberScrollState()
+                    LaunchedEffect(scroll) { scroll.scrollTo(500) }
+                    Column(Modifier.fillMaxWidth().height(852.dp)
+                        .background(Color(0xFF080B14))
+                        .verticalScroll(scroll)
+                        .padding(horizontal = 24.dp)) {
+                        Spacer(Modifier.height(588.dp))
+                        HomeReflectionPrompt(onClick = {})
+                        Spacer(Modifier.height(20.dp))
+                        HomeArtworkRail(onSelect = { _, _ -> })
+                        Spacer(Modifier.height(200.dp))
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        val reflectionLeft = compose.onNodeWithText("DAILY REFLECTION")
+            .fetchSemanticsNode().boundsInRoot.left
+        val cardsLeft = compose.onNodeWithText("EXPLORE YOUR DAY")
+            .fetchSemanticsNode().boundsInRoot.left
+        assertEquals(reflectionLeft, cardsLeft, .5f)
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_scrolled.png")
     }
 }
 
