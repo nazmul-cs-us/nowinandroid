@@ -3027,11 +3027,18 @@ fun PrayerTimesScreen(
                         painter = composeArtworkPainter(homeCoverArtwork(coverPage, prayerArtworkNight)),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        alignment = if (coverPage == 0) Alignment.BottomEnd else Alignment.Center,
+                        modifier = Modifier.fillMaxSize().then(
+                            if (coverPage == 0) Modifier.graphicsLayer {
+                                scaleX = 1.25f
+                                scaleY = 1.25f
+                                translationY = -size.height * .20f
+                            } else Modifier,
+                        ),
                     )
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
                         0f to Color(0xFF071C30).copy(alpha = .12f),
-                        .50f to Color(0xFF0B1D2C).copy(alpha = .30f),
+                        .50f to Color(0xFF0B1D2C).copy(alpha = .50f),
                         .78f to Color(0xFF0C110F).copy(alpha = .97f),
                         1f to Color(0xFF0C110F).copy(alpha = .97f),
                     )))
@@ -3047,11 +3054,18 @@ fun PrayerTimesScreen(
                         painter = composeArtworkPainter(homeCoverArtwork(coverPage, prayerArtworkNight)),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        alignment = if (coverPage == 0) Alignment.BottomEnd else Alignment.Center,
+                        modifier = Modifier.fillMaxSize().then(
+                            if (coverPage == 0) Modifier.graphicsLayer {
+                                scaleX = 1.25f
+                                scaleY = 1.25f
+                                translationY = -size.height * .20f
+                            } else Modifier,
+                        ),
                     )
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
                         0f to Color.White.copy(alpha = if (coverPage == 0) .14f else .50f),
-                        .48f to Color.White.copy(alpha = if (coverPage == 0) .28f else .50f),
+                        .48f to Color.White.copy(alpha = if (coverPage == 0) .58f else .50f),
                         .78f to Color.White,
                         1f to Color.White,
                     )))

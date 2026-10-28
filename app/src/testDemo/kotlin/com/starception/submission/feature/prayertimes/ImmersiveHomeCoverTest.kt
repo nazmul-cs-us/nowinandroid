@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -68,16 +70,21 @@ private fun CoverTestScene(dark: Boolean, onOpen: (Int) -> Unit) {
                 painter = painterResource(homeCoverArtwork(0, dark)),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                alignment = Alignment.BottomEnd,
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = 1.25f
+                    scaleY = 1.25f
+                    translationY = -size.height * .20f
+                },
             )
             Box(Modifier.fillMaxSize().background(if (dark) Brush.verticalGradient(
                 0f to Color(0xFF071C30).copy(alpha = .12f),
-                .50f to Color(0xFF0B1D2C).copy(alpha = .30f),
+                .50f to Color(0xFF0B1D2C).copy(alpha = .50f),
                 .78f to Color(0xFF0C110F).copy(alpha = .97f),
                 1f to Color(0xFF0C110F).copy(alpha = .97f),
             ) else Brush.verticalGradient(
                 0f to Color.White.copy(alpha = .14f),
-                .48f to Color.White.copy(alpha = .28f),
+                .48f to Color.White.copy(alpha = .58f),
                 .78f to Color.White,
                 1f to Color.White,
             )))

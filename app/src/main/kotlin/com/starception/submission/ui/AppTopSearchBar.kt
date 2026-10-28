@@ -55,6 +55,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -66,9 +67,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -538,6 +541,8 @@ fun AppTopSearchBar(
                 leading.isClickable = !homeImmersiveHeader
                 searchBar.alpha = if (homeImmersiveHeader) 0f else 1f
                 searchBar.isClickable = !homeImmersiveHeader
+                settings.visibility = if (homeImmersiveHeader) View.INVISIBLE else View.VISIBLE
+                settings.isClickable = !homeImmersiveHeader
                 val homeAccessibility = if (homeImmersiveHeader) {
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 } else {
@@ -545,6 +550,7 @@ fun AppTopSearchBar(
                 }
                 leading.importantForAccessibility = homeAccessibility
                 searchBar.importantForAccessibility = homeAccessibility
+                settings.importantForAccessibility = homeAccessibility
                 // Drive the SearchBar's hint from the typewriter state; the
                 // SearchView shows its own static placeholder when expanded.
                 // While voice capture is live the hints are cleared so the centered
@@ -658,6 +664,7 @@ fun AppTopSearchBar(
                     settings.scaleX = 1f
                     settings.scaleY = 1f
                 }
+                if (homeImmersiveHeader) settingsHalo.visibility = View.GONE
                 searchBar.navigationIcon?.mutate()?.setTint(pillTextColor)
                 for (i in 0 until searchBar.menu.size()) {
                     searchBar.menu.getItem(i).icon?.mutate()?.setTint(pillTextColor)
@@ -825,7 +832,7 @@ fun AppTopSearchBar(
         if (homeImmersiveHeader && !isSearchViewOpen) {
             Row(
                 modifier = Modifier.fillMaxWidth()
-                    .padding(start = 22.dp, end = 64.dp, top = topInset + 4.dp),
+                    .padding(start = 22.dp, end = 22.dp, top = topInset + 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -841,20 +848,23 @@ fun AppTopSearchBar(
                         .semantics { contentDescription = "Open profile" },
                 )
                 Surface(
-                    onClick = { searchViewHolder.value?.show() },
-                    shape = CircleShape,
-                    color = if (isDarkTheme) ComposeColor(0xFF152438).copy(alpha = .84f)
-                    else ComposeColor(0xFFF7F4FB),
-                    shadowElevation = if (isDarkTheme) 0.dp else 3.dp,
-                    modifier = Modifier.size(44.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    color = ComposeColor(0xFF233443).copy(alpha = if (isDarkTheme) .68f else .72f),
+                    border = BorderStroke(1.dp, ComposeColor.White.copy(alpha = .30f)),
+                    shadowElevation = if (isDarkTheme) 3.dp else 6.dp,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = if (isDarkTheme) ComposeColor.White else ComposeColor(0xFF1F1A2A),
-                            modifier = Modifier.size(22.dp),
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { searchViewHolder.value?.show() },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = "Search",
+                                tint = ComposeColor.White, modifier = Modifier.size(19.dp))
+                        }
+                        IconButton(onClick = onSettingsClick, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings",
+                                tint = ComposeColor.White, modifier = Modifier.size(19.dp))
+                        }
                     }
                 }
             }

@@ -70,8 +70,8 @@ internal fun ImmersiveHomeCover(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // The reference leaves breathing room between the recommendation and
         // the lower feed; anchoring both to the tile bottom puts them too low.
-        val copyBottom = maxHeight * .245f
-        val indicatorBottom = maxHeight * .20f
+        val copyBottom = maxHeight * .20f
+        val indicatorBottom = maxHeight * .13f
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             val (eyebrow, title, detail) = when (page) {
                 0 -> Triple("YOUR DAY", "A moment to pause",

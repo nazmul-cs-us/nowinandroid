@@ -459,9 +459,9 @@ private fun NiaFloatingBottomBar(
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
                 color = if (homeDark) {
-                    Color(0xFF1B2B22)
+                    Color(0xFF122033).copy(alpha = .76f)
                 } else if (homeLight) {
-                    Color(0xFFFDFBFF)
+                    Color.White.copy(alpha = .82f)
                 } else if (darkTheme) {
                     colorScheme.surfaceContainer
                 } else {
