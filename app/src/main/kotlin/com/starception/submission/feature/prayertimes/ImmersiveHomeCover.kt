@@ -37,13 +37,13 @@ import com.starception.submission.core.images.resources.insight_prayer_backgroun
 import com.starception.submission.core.images.resources.insight_qibla_background
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_suggestion
-import com.starception.submission.core.images.resources.insight_prayer_poster_day
-import com.starception.submission.core.images.resources.insight_prayer_poster_night
+import com.starception.submission.core.images.resources.prayer_now_insight_day
+import com.starception.submission.core.images.resources.prayer_now_insight_night
 import org.jetbrains.compose.resources.DrawableResource
 import kotlinx.coroutines.launch
 
 internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableResource = when (page) {
-    0 -> if (useNightArtwork) Res.drawable.insight_prayer_poster_night else Res.drawable.insight_prayer_poster_day
+    0 -> if (useNightArtwork) Res.drawable.prayer_now_insight_night else Res.drawable.prayer_now_insight_day
     1 -> Res.drawable.insight_prayer_background
     2 -> Res.drawable.insight_quran_background
     3 -> Res.drawable.insight_qibla_background
