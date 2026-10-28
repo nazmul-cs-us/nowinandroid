@@ -3029,6 +3029,8 @@ fun PrayerTimesScreen(
                         useNightArtwork = prayerArtworkNight,
                         isDarkTheme = darkHome,
                         isExpanded = insightTileExpanded,
+                        scrollOffsetPx = portraitScrollState.value,
+                        coverHeightPx = insightHeightPx,
                     )
                 }
                 val headerFadeDistancePx = with(LocalDensity.current) { 96.dp.toPx() }

@@ -137,6 +137,8 @@ internal fun HomeCoverArtworkBackdrop(
     useNightArtwork: Boolean,
     isDarkTheme: Boolean,
     isExpanded: Boolean,
+    scrollOffsetPx: Int = 0,
+    coverHeightPx: Int = 0,
 ) {
     val scrollPosition = position.value
     val lowerPage = scrollPosition.toInt().coerceIn(0, 4)
@@ -144,6 +146,21 @@ internal fun HomeCoverArtworkBackdrop(
     HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
     if (!isExpanded) HomeCoverArtworkBlur(lowerPage, swipeProgress, useNightArtwork)
     Box(Modifier.fillMaxSize().background(homeCoverScrim(isDarkTheme)))
+    // The cover scene is fixed behind the vertically scrolling feed. Once the
+    // cover leaves the viewport, fully cover it so no stale artwork shows
+    // through the transparent top of the next section.
+    if (!isExpanded && coverHeightPx > 0) {
+        val fadeStart = coverHeightPx * .35f
+        val fadeDistance = coverHeightPx * .50f
+        val feedOpacity = ((scrollOffsetPx - fadeStart) / fadeDistance).coerceIn(0f, 1f)
+        if (feedOpacity > 0f) {
+            Box(
+                Modifier.fillMaxSize().background(
+                    (if (isDarkTheme) Color(0xFF080B14) else Color.White).copy(alpha = feedOpacity)
+                ),
+            )
+        }
+    }
 }
 
 /** A quiet first-screen composition; tapping continues into the corresponding real reader. */

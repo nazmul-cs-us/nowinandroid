@@ -145,6 +145,37 @@ class ImmersiveHomeCoverTest {
         assertEquals(reflectionLeft, cardsLeft, .5f)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_scrolled.png")
     }
+
+    @Test fun scrolledLightFeedCoversTheFixedCoverArtwork() {
+        compose.setContent {
+            CompositionLocalProvider(LocalDarkTheme provides false) {
+                MaterialTheme(colorScheme = lightColorScheme()) {
+                    val scroll = rememberScrollState()
+                    val position = remember { mutableFloatStateOf(0f) }
+                    LaunchedEffect(scroll) { scroll.scrollTo(700) }
+                    Box(Modifier.fillMaxWidth().height(852.dp).background(Color.White)) {
+                        HomeCoverArtworkBackdrop(
+                            position = position,
+                            useNightArtwork = false,
+                            isDarkTheme = false,
+                            isExpanded = false,
+                            scrollOffsetPx = scroll.value,
+                            coverHeightPx = 588,
+                        )
+                        Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 24.dp)) {
+                            Spacer(Modifier.height(588.dp))
+                            HomeReflectionPrompt(onClick = {})
+                            Spacer(Modifier.height(20.dp))
+                            HomeArtworkRail(onSelect = { _, _ -> })
+                            Spacer(Modifier.height(300.dp))
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_scrolled_light.png")
+    }
 }
 
 @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
