@@ -105,6 +105,25 @@ class ImmersiveHomeCoverTest {
         assertEquals(listOf(0, 1, 2, 3, 4), openedPages)
     }
 
+    @Test fun everySwipedCoverKeepsItsPortraitSubjectVisible() {
+        compose.setContent { CoverTestScene(dark = true, onOpen = {}) }
+        val pages = listOf(
+            "A moment to pause" to "prayer",
+            "Make room for reflection" to "salah",
+            "Return to the Quran" to "quran",
+            "Turn toward Makkah" to "qibla",
+            "A thought for today" to "suggestion",
+        )
+        pages.forEachIndexed { index, (title, name) ->
+            if (index > 0) {
+                compose.onNodeWithText(pages[index - 1].first).performTouchInput { swipeLeft() }
+                compose.waitForIdle()
+            }
+            compose.onNodeWithText(title).fetchSemanticsNode()
+            compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_portrait_$name.png")
+        }
+    }
+
     @Test fun swipingCoverUpdatesTheFollowupFeed() {
         val selectedPage = mutableIntStateOf(0)
         compose.setContent {

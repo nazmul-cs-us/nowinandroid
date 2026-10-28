@@ -42,23 +42,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.images.resources.Res
-import com.starception.submission.core.images.resources.insight_prayer_background
-import com.starception.submission.core.images.resources.insight_qibla_background
-import com.starception.submission.core.images.resources.insight_quran_background
-import com.starception.submission.core.images.resources.insight_suggestion
-import com.starception.submission.core.images.resources.prayer_now_insight_day
-import com.starception.submission.core.images.resources.prayer_now_insight_night
+import com.starception.submission.core.images.resources.home_cover_prayer_day_portrait
+import com.starception.submission.core.images.resources.home_cover_prayer_night_portrait
+import com.starception.submission.core.images.resources.home_cover_salah_portrait
+import com.starception.submission.core.images.resources.home_cover_quran_portrait
+import com.starception.submission.core.images.resources.home_cover_qibla_portrait
+import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableResource = when (page) {
-    0 -> if (useNightArtwork) Res.drawable.prayer_now_insight_night else Res.drawable.prayer_now_insight_day
-    1 -> Res.drawable.insight_prayer_background
-    2 -> Res.drawable.insight_quran_background
-    3 -> Res.drawable.insight_qibla_background
-    else -> Res.drawable.insight_suggestion
+    0 -> if (useNightArtwork) Res.drawable.home_cover_prayer_night_portrait else Res.drawable.home_cover_prayer_day_portrait
+    1 -> Res.drawable.home_cover_salah_portrait
+    2 -> Res.drawable.home_cover_quran_portrait
+    3 -> Res.drawable.home_cover_qibla_portrait
+    else -> Res.drawable.home_cover_suggestion_portrait
 }
 
 /** Keep the poster legible through the recommendation, then hand it into the feed. */
@@ -118,12 +118,9 @@ private fun HomeCoverArtworkImages(lowerPage: Int, swipeProgress: Float, useNigh
             painter = painterResource(homeCoverArtwork(page, useNightArtwork)),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            alignment = if (page == 0) Alignment.BottomEnd else Alignment.Center,
+            alignment = Alignment.Center,
             modifier = Modifier.fillMaxSize().graphicsLayer {
-                scaleX = if (page == 0) 1.25f else 1f
-                scaleY = if (page == 0) 1.25f else 1f
                 translationX = (if (layer == 0) -swipeProgress else 1f - swipeProgress) * size.width * .18f
-                translationY = if (page == 0) -size.height * .20f else 0f
                 alpha = if (layer == 0) 1f else swipeProgress
             },
         )

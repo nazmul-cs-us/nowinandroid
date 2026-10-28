@@ -51,6 +51,8 @@ import com.starception.submission.core.images.resources.insight_qibla_foreground
 import com.starception.submission.core.images.resources.insight_suggestion
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
+import com.starception.submission.core.images.resources.prayer_now_insight_day
+import com.starception.submission.core.images.resources.prayer_now_insight_night
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -139,7 +141,8 @@ internal fun HomeArtworkRail(
     val ink = MaterialTheme.colorScheme.onBackground
     val largeText = LocalDensity.current.fontScale > 1.3f
     val prayerNow = HomeArtworkCard(
-        0, "Prayer now", "Your next prayer", homeCoverArtwork(0, useNightArtwork),
+        0, "Prayer now", "Your next prayer",
+        if (useNightArtwork) Res.drawable.prayer_now_insight_night else Res.drawable.prayer_now_insight_day,
     )
     val cards = homeArtworkCards + prayerNow
     AnimatedContent(
