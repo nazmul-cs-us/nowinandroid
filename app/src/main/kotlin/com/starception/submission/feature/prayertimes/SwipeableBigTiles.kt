@@ -2453,11 +2453,11 @@ internal fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                             },
-                            // The enlarged state already carries its own large
-                            // compass icon inside QiblaBearingExpandedStage;
-                            // the small header arrow is redundant up there.
+                            // Keep a compact compass action beside the close
+                            // control so the close glyph can emerge from it.
                             directionalHintBearing = if (presentationExpanded) null else qiblaBearing,
                             deviceHeadingDegrees = if (presentationExpanded) null else liveQiblaHeading,
+                            actionIcon = Icons.Default.Navigation,
                             actionDescription = "Open Qibla compass",
                             onClick = {
                                 interactionEpoch++
@@ -2696,8 +2696,14 @@ internal fun SwipeableBigTiles(
                 }
             }
 
-            if (isImmersive) {
+            if (isImmersive || (immersiveHome && expansionProgress > 0.64f)) {
                 val controlTopInset = immersiveInsightControlTopInset(stripTopInWindowPx)
+                val closeMorphProgress = ((expansionProgress - 0.64f) / 0.34f).coerceIn(0f, 1f)
+                val sourceIcon = when (pagerState.currentPage % insightPageCount) {
+                    0, 3 -> Icons.Default.Navigation
+                    2 -> Icons.Default.PlayArrow
+                    else -> Icons.Default.ChevronRight
+                }
                 Surface(
                     onClick = {
                         interactionEpoch++
@@ -2708,16 +2714,38 @@ internal fun SwipeableBigTiles(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(start = 12.dp, end = 12.dp, top = controlTopInset, bottom = 12.dp)
-                        .size(44.dp)
+                        // Start over the action immediately to the left, then
+                        // travel one control slot into the close position.
+                        .size(40.dp)
+                        .graphicsLayer {
+                            translationX = -52.dp.toPx() * (1f - closeMorphProgress)
+                            alpha = (closeMorphProgress * 3f).coerceIn(0f, 1f)
+                        }
                         .zIndex(4f)
                         .semantics { contentDescription = "Collapse insight" },
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
+                            imageVector = sourceIcon,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer {
+                                    alpha = (1f - closeMorphProgress * 2f).coerceIn(0f, 1f)
+                                    rotationZ = -30f * closeMorphProgress
+                                },
+                        )
+                        Icon(
                             imageVector = Icons.Default.Clear,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer {
+                                    alpha = (closeMorphProgress * 2f - 0.3f).coerceIn(0f, 1f)
+                                    rotationZ = 30f * (1f - closeMorphProgress)
+                                },
                         )
                     }
                 }
