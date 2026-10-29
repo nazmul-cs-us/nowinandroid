@@ -45,8 +45,9 @@ fun mainPageBackgroundBrush(): Brush {
         } else {
             listOf(
                 scheme.background,
+                scheme.primaryContainer.copy(alpha = 0.28f).compositeOver(scheme.background),
                 scheme.surfaceContainerLow,
-                scheme.secondary.copy(alpha = 0.14f).compositeOver(scheme.surfaceContainerLow),
+                scheme.secondaryContainer.copy(alpha = 0.25f).compositeOver(scheme.surfaceContainerLow),
             )
         },
     )

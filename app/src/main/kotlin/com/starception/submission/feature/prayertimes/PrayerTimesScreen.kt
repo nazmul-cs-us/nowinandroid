@@ -3062,7 +3062,10 @@ fun PrayerTimesScreen(
                     currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
                 } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
                 val coverEpochSeconds = remember(currentTime) { System.currentTimeMillis() / 1000.0 }
-                Box(Modifier.fillMaxSize().background(if (darkHome) Color(0xFF080B14) else Color.White)) {
+                Box(Modifier.fillMaxSize().then(
+                    if (darkHome) Modifier.background(Color(0xFF080B14))
+                    else Modifier.background(mainPageBackgroundBrush()),
+                )) {
                 if (!outerIsLandscape) {
                     HomeCoverArtworkBackdrop(
                         position = coverScrollPosition,
@@ -3526,13 +3529,6 @@ fun PrayerTimesScreen(
                                             )
                                         } else {
                                             ambientScheme.copy(
-                                                background = Color.White,
-                                                surface = Color.White,
-                                                surfaceContainerLowest = Color.White,
-                                                surfaceContainerLow = Color.White,
-                                                surfaceContainer = Color.White,
-                                                surfaceContainerHigh = Color.White,
-                                                surfaceContainerHighest = Color.White,
                                                 onBackground = Color(0xFF17221B),
                                                 onSurface = Color(0xFF17221B),
                                             )
@@ -3589,7 +3585,7 @@ fun PrayerTimesScreen(
                                                     val start = insightHeightPx.toFloat() + 8.dp.toPx()
                                                     val lowerHeight = (size.height - start).coerceAtLeast(0f)
                                                     if (lowerHeight > 0f) {
-                                                        val feedColor = if (darkHome) Color(0xFF080B14) else Color.White
+                                                        val feedColor = if (darkHome) Color(0xFF080B14) else ambientScheme.background
                                                         drawRect(
                                                             brush = Brush.verticalGradient(
                                                                 colors = listOf(Color.Transparent, feedColor),
@@ -3599,6 +3595,25 @@ fun PrayerTimesScreen(
                                                             topLeft = Offset(0f, start),
                                                             size = androidx.compose.ui.geometry.Size(size.width, lowerHeight),
                                                         )
+                                                        if (!darkHome) {
+                                                            val gradientStart = start + 116.dp.toPx()
+                                                            drawRect(
+                                                                brush = Brush.verticalGradient(
+                                                                    colors = listOf(
+                                                                        Color.Transparent,
+                                                                        ambientScheme.primary.copy(alpha = 0.07f),
+                                                                        ambientScheme.secondary.copy(alpha = 0.09f),
+                                                                    ),
+                                                                    startY = gradientStart,
+                                                                    endY = size.height,
+                                                                ),
+                                                                topLeft = Offset(0f, gradientStart),
+                                                                size = androidx.compose.ui.geometry.Size(
+                                                                    size.width,
+                                                                    (size.height - gradientStart).coerceAtLeast(0f),
+                                                                ),
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }

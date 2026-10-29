@@ -345,8 +345,7 @@ internal fun NiaAppContent(
     val view = LocalView.current
     val shouldHideStatusBar = appState.shouldHideStatusBar
     val isDarkTheme = LocalDarkTheme.current
-    val isImmersiveHome = !isLandscape && appState.currentTopLevelDestination == TopLevelDestination.HOME
-    DisposableEffect(shouldHideStatusBar, isDarkTheme, isImmersiveHome, insightImmersive) {
+    DisposableEffect(shouldHideStatusBar, isDarkTheme, insightImmersive) {
         val window = (view.context as? Activity)?.window ?: return@DisposableEffect onDispose {}
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         // The app theme can differ from the device theme, so edge-to-edge cannot
@@ -379,12 +378,7 @@ internal fun NiaAppContent(
             deepLinkCourseId = deepLinkCourseId,
         )
     } else {
-        Box(
-            modifier = Modifier.fillMaxSize().then(
-                if (isImmersiveHome && !isDarkTheme) Modifier.background(Color.White)
-                else Modifier.background(mainPageBackgroundBrush()),
-            ),
-        ) {
+        Box(modifier = Modifier.fillMaxSize().background(mainPageBackgroundBrush())) {
             NiaMainContent(
                 appState = appState,
                 snackbarHostState = snackbarHostState,
