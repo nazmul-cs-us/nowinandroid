@@ -206,6 +206,7 @@ class ImmersiveHomeCoverTest {
                 }
             }
         }
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_cover_reflection.png")
         compose.onNodeWithText("Make time for Fajr").performTouchInput { swipeLeft() }
         compose.waitForIdle()
         assertEquals(1, selectedPage.intValue)

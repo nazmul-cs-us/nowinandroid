@@ -21,10 +21,6 @@ import android.net.ConnectivityManager
 import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
-import android.net.NetworkRequest.Builder
-import android.os.Build.VERSION
-import android.os.Build.VERSION_CODES
 import android.util.Log
 import androidx.core.content.getSystemService
 import androidx.tracing.trace
@@ -62,31 +58,27 @@ internal class ConnectivityManagerNetworkMonitor @Inject constructor(
             return@callbackFlow
         }
 
-        /**
-         * The callback's methods are invoked on changes to *any* network matching the [NetworkRequest],
-         * not just the active network. So we can simply track the presence (or absence) of such [Network].
-         */
+        // Only the default route can serve app traffic. A mobile link may advertise
+        // INTERNET without working data, so wait for Android's validation result.
         val callback = object : NetworkCallback() {
-
-            private val networks = mutableSetOf<Network>()
-
             override fun onAvailable(network: Network) {
-                networks += network
-                channel.trySend(true)
+                channel.trySend(connectivityManager.isCurrentlyConnected())
+            }
+
+            override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+                channel.trySend(
+                    network == connectivityManager.activeNetwork && capabilities.hasValidatedInternet(),
+                )
             }
 
             override fun onLost(network: Network) {
-                networks -= network
-                channel.trySend(networks.isNotEmpty())
+                channel.trySend(connectivityManager.isCurrentlyConnected())
             }
         }
 
         val callbackRegistered = try {
             trace("NetworkMonitor.registerNetworkCallback") {
-                val request = Builder()
-                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    .build()
-                connectivityManager.registerNetworkCallback(request, callback)
+                connectivityManager.registerDefaultNetworkCallback(callback)
             }
             true
         } catch (exception: RuntimeException) {
@@ -131,15 +123,9 @@ internal class ConnectivityManagerNetworkMonitor @Inject constructor(
             replay = 1,
         )
 
-    @Suppress("DEPRECATION")
-    private fun ConnectivityManager.isCurrentlyConnected() = when {
-        VERSION.SDK_INT >= VERSION_CODES.M ->
-            activeNetwork
-                ?.let(::getNetworkCapabilities)
-                ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-
-        else -> activeNetworkInfo?.isConnected
-    } ?: false
+    private fun ConnectivityManager.isCurrentlyConnected() = activeNetwork
+        ?.let(::getNetworkCapabilities)
+        ?.hasValidatedInternet() ?: false
 
     private companion object {
         const val TAG = "NetworkMonitor"
@@ -147,3 +133,7 @@ internal class ConnectivityManagerNetworkMonitor @Inject constructor(
         const val POLL_INTERVAL_MILLIS = 30_000L
     }
 }
+
+internal fun NetworkCapabilities.hasValidatedInternet(): Boolean =
+    hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+        hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)

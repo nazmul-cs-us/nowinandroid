@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,7 +31,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -151,21 +155,43 @@ internal fun HomeArtworkRail(
         val feed = homeFeedPage(page)
         val railCards = feed.railPages.mapNotNull { id -> cards.firstOrNull { it.page == id } }
         val featuredCard = cards.first { it.page == feed.featuredPage }
+        val railState = rememberLazyListState()
+        val railSurface = if (LocalDarkTheme.current) Color(0xFF080B14)
+            else MaterialTheme.colorScheme.background
         Column {
             HomeFeedSectionLabel("EXPLORE YOUR DAY")
             Spacer(Modifier.height(14.dp))
-            LazyRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
-                items(railCards, key = HomeArtworkCard::page) { card ->
-                    Column(Modifier.width(if (largeText) 142.dp else 124.dp)) {
-                        ArtworkCard(card, Modifier.fillMaxWidth(), 126.dp, onSelect, compact = true)
-                        Spacer(Modifier.height(8.dp))
-                        Text(card.label, color = ink, style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = if (largeText) 2 else 1,
-                            overflow = TextOverflow.Ellipsis)
-                        Text(card.subtitle, color = ink.copy(alpha = .62f),
-                            style = MaterialTheme.typography.bodySmall, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis)
+            Box(Modifier.drawWithContent {
+                drawContent()
+                if (railState.canScrollForward) {
+                    val fadeWidth = 24.dp.toPx()
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            listOf(Color.Transparent, railSurface),
+                            startX = size.width - fadeWidth,
+                            endX = size.width,
+                        ),
+                        topLeft = Offset(size.width - fadeWidth, 0f),
+                        size = Size(fadeWidth, size.height),
+                    )
+                }
+            }) {
+                LazyRow(
+                    state = railState,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+                ) {
+                    items(railCards, key = HomeArtworkCard::page) { card ->
+                        Column(Modifier.width(if (largeText) 142.dp else 124.dp)) {
+                            ArtworkCard(card, Modifier.fillMaxWidth(), 126.dp, onSelect, compact = true)
+                            Spacer(Modifier.height(8.dp))
+                            Text(card.label, color = ink, style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = if (largeText) 2 else 1,
+                                overflow = TextOverflow.Ellipsis)
+                            Text(card.subtitle, color = ink.copy(alpha = .62f),
+                                style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
@@ -190,7 +216,8 @@ internal fun HomeReflectionPrompt(
 ) {
     val ink = if (onDarkCover) Color.White else MaterialTheme.colorScheme.onBackground
     Column(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 20.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .padding(top = 10.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         HomeSectionDivider(ink)
@@ -250,7 +277,12 @@ private fun ArtworkCard(
 ) {
     val measuredHeight = if (LocalDensity.current.fontScale > 1.3f) height + 24.dp else height
     val dark = LocalDarkTheme.current
-    val shape = RoundedCornerShape(if (compact) 20.dp else 24.dp)
+    val shape = RoundedCornerShape(if (compact) 22.dp else 28.dp)
+    val edge = Brush.verticalGradient(
+        0f to Color.White.copy(alpha = if (dark) .28f else .52f),
+        .45f to Color.White.copy(alpha = if (dark) .10f else .20f),
+        1f to Color.Black.copy(alpha = if (dark) .26f else .14f),
+    )
     var bounds by remember { mutableStateOf(Rect.Zero) }
     HomeArtworkScene(
         card = card,
@@ -258,9 +290,14 @@ private fun ArtworkCard(
         modifier = modifier.height(measuredHeight)
             .testTag("homeArtworkCard-${card.page}")
             .onGloballyPositioned { bounds = it.boundsInWindow() }
-            .then(if (dark) Modifier else Modifier.shadow(8.dp, shape))
+            .then(if (dark) Modifier else Modifier.shadow(
+                elevation = if (compact) 4.dp else 6.dp,
+                shape = shape,
+                ambientColor = Color.Black.copy(alpha = .08f),
+                spotColor = Color.Black.copy(alpha = .12f),
+            ))
             .clip(shape)
-            .then(if (dark) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = .88f), shape))
+            .border(1.dp, edge, shape)
             .clickable { if (bounds.width > 0f) onSelect(card, bounds) },
     )
 }

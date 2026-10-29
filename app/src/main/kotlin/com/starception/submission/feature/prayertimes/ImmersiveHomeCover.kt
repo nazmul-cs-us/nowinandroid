@@ -266,8 +266,8 @@ internal fun ImmersiveHomeCover(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Keep the copy on the water/floor, below the focal artwork. Move the
         // page dots with it so they retain a clear gap beneath the detail line.
-        val copyBottom = maxHeight * .17f
-        val indicatorBottom = maxHeight * .10f
+        val copyBottom = maxHeight * .12f
+        val indicatorBottom = maxHeight * .05f
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { absolutePage ->
             val page = absolutePage % 5
             val useLightText = homeCoverCopyUsesLightText(page, useNightArtwork, isDarkTheme)

@@ -2244,15 +2244,10 @@ private fun NiaMainContent(
             )
         },
     ) { padding ->
-        // Download progress from AssetDownloadManager via MainActivityViewModel
-        // Suppress the app-level banner on HOME — the inner PullToSyncContainer
-        // inside PrayerTimesScreen already shows it there. All other pages show it here.
-        // Home has its own PullToSyncContainer — suppress app-level banner and
-        // pull-to-sync there to avoid doubles. All other pages get both.
+        // Home has its own PullToSyncContainer. Avoid duplicate status lines there.
         val isOnHome = appState.currentTopLevelDestination == TopLevelDestination.HOME
-        // Connectivity banner: shown in the pull-to-sync strip on every page,
-        // including Home (the always-present app-level container carries it, so
-        // Home's own inner container does not need to know about it).
+        // The same network state feeds Home's inner strip and the app-level
+        // strip used by other pages.
         val isOffline by appState.isOffline.collectAsStateWithLifecycle()
         val notConnectedMessage = stringResource(R.string.not_connected)
         val isDownloadingRaw = if (mainViewModel != null) {

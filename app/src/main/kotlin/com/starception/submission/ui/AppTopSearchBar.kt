@@ -58,6 +58,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -93,6 +94,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
@@ -888,24 +891,17 @@ fun AppTopSearchBar(
                         .clickable { currentOnProfileClick() }
                         .semantics { contentDescription = "Open profile" },
                 )
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = ComposeColor(0xFF233443).copy(alpha = if (isDarkTheme) .68f else .72f),
-                    border = BorderStroke(1.dp, ComposeColor.White.copy(alpha = .30f)),
-                    shadowElevation = if (isDarkTheme) 3.dp else 6.dp,
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { searchViewHolder.value?.show() },
-                            modifier = Modifier.size(40.dp),
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = "Search",
-                                tint = ComposeColor.White, modifier = Modifier.size(19.dp))
-                        }
-                        IconButton(onClick = onSettingsClick, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings",
-                                tint = ComposeColor.White, modifier = Modifier.size(19.dp))
-                        }
+                    HomeHeaderDepthAction("Search", isDarkTheme, { searchViewHolder.value?.show() }) {
+                        Icon(Icons.Default.Search, contentDescription = null,
+                            tint = ComposeColor.White, modifier = Modifier.size(19.dp))
+                    }
+                    HomeHeaderDepthAction("Settings", isDarkTheme, onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = null,
+                            tint = ComposeColor.White, modifier = Modifier.size(19.dp))
                     }
                 }
             }
@@ -992,6 +988,44 @@ fun AppTopSearchBar(
                     }
                 }
             }
+        }
+    }
+}
+
+/** A raised dark action set into a soft circular recess, with a full-size touch target. */
+@Composable
+internal fun HomeHeaderDepthAction(
+    label: String,
+    isDarkTheme: Boolean,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier.size(50.dp)
+            .shadow(3.dp, CircleShape, ambientColor = ComposeColor.Black.copy(alpha = .08f),
+                spotColor = ComposeColor.Black.copy(alpha = .14f))
+            .clip(CircleShape)
+            .background(Brush.linearGradient(
+                0f to ComposeColor.White.copy(alpha = if (isDarkTheme) .18f else .42f),
+                .55f to ComposeColor(0xFF526176).copy(alpha = .22f),
+                1f to ComposeColor.White.copy(alpha = if (isDarkTheme) .10f else .24f),
+            ))
+            .semantics { contentDescription = label }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp)
+                .shadow(5.dp, CircleShape, ambientColor = ComposeColor.Black.copy(alpha = .18f),
+                    spotColor = ComposeColor.Black.copy(alpha = .26f))
+                .clip(CircleShape)
+                .background(Brush.verticalGradient(listOf(
+                    ComposeColor(0xFF273445), ComposeColor(0xFF0E1522),
+                )))
+                .border(1.dp, ComposeColor.White.copy(alpha = .24f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            content()
         }
     }
 }

@@ -67,7 +67,8 @@ internal fun ArtworkMorphOverlay(
     val top = request.from.top + (request.to.top - request.from.top) * p
     val width = request.from.width + (request.to.width - request.from.width) * p
     val height = request.from.height + (request.to.height - request.from.height) * p
-    val corner = with(density) { (24f * (1f - p)).dp }
+    val initialCorner = if (with(density) { request.from.width.toDp() } < 180.dp) 22f else 28f
+    val corner = (initialCorner * (1f - p)).dp
     // Fade the travelling scene only once the real destination is ready to take over.
     val sceneAlpha = ((1f - p) / .26f).coerceIn(0f, 1f)
     Popup(
