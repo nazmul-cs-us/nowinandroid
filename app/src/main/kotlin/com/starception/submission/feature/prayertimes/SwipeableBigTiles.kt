@@ -198,6 +198,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -1932,7 +1933,9 @@ internal fun SwipeableBigTiles(
                 .height(animatedStripHeight)
         }
 
+        var stripTopInWindowPx by remember { mutableFloatStateOf(0f) }
         BoxWithConstraints(modifier = stripModifier.onGloballyPositioned {
+            stripTopInWindowPx = it.positionInWindow().y
             onReaderBoundsChange(it.boundsInWindow())
         }) {
             val normalCardWidth = if (immersiveHome && edgeToEdgeArtwork) {
@@ -2675,7 +2678,7 @@ internal fun SwipeableBigTiles(
             }
 
             if (isImmersive) {
-                val controlTopInset = immersiveInsightControlTopInset()
+                val controlTopInset = immersiveInsightControlTopInset(stripTopInWindowPx)
                 Surface(
                     onClick = {
                         interactionEpoch++
@@ -3172,8 +3175,14 @@ private fun PrayerPosterInsightCard(
 }
 
 @Composable
-private fun immersiveInsightControlTopInset(): Dp =
-    maxOf(32.dp, WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding() + 12.dp)
+private fun immersiveInsightControlTopInset(topInWindowPx: Float): Dp {
+    val safeTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
+    val occupiedTop = with(LocalDensity.current) { topInWindowPx.coerceAtLeast(0f).toDp() }
+    return calculateImmersiveInsightControlInset(safeTop, occupiedTop)
+}
+
+internal fun calculateImmersiveInsightControlInset(safeTop: Dp, occupiedTop: Dp): Dp =
+    (maxOf(24.dp, safeTop) - occupiedTop + 12.dp).coerceAtLeast(12.dp)
 
 @Composable
 private fun InsightPreviewCard(
@@ -3252,6 +3261,7 @@ private fun InsightPreviewCard(
     val readerChrome = rememberInsightReaderChrome(editorialExpanded)
     val chromeProgress = insightReaderChromeProgress(readerChrome, editorialExpanded)
     val density = LocalDensity.current
+    var cardTopInWindowPx by remember { mutableFloatStateOf(0f) }
     var suppressClickUntilMs by remember { mutableLongStateOf(0L) }
     val cardInteractionSource = remember { MutableInteractionSource() }
     val cardIndication = LocalIndication.current
@@ -3339,6 +3349,7 @@ private fun InsightPreviewCard(
     Surface(
         modifier = Modifier
             .fillMaxSize()
+            .onGloballyPositioned { cardTopInWindowPx = it.positionInWindow().y }
             .shadow(
                 elevation = shadowElevation,
                 shape = shape,
@@ -3389,7 +3400,7 @@ private fun InsightPreviewCard(
             val tagInset = if (editorialExpanded) 10.dp else
                 (11f - (5f * compactProgress) + (3f * expansionProgress)).dp
             val tagTopInset = if (fluidFullBleed && isExpanded) {
-                immersiveInsightControlTopInset()
+                immersiveInsightControlTopInset(cardTopInWindowPx)
             } else {
                 tagInset
             }
