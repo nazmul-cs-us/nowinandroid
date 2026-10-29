@@ -62,6 +62,44 @@ internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableReso
     else -> Res.drawable.home_cover_suggestion_portrait
 }
 
+internal data class HomeCoverCopy(val eyebrow: String, val title: String, val detail: String)
+
+internal fun homeGreetingForHour(hour: Int): String = when (hour) {
+    in 5..11 -> "Salam, good morning"
+    in 12..17 -> "Salam, good afternoon"
+    else -> "Salam, good evening"
+}
+
+/** The poster previews the destination opened by its tap, not a generic mood. */
+internal fun homeCoverCopy(
+    page: Int,
+    currentPrayerName: String,
+    nextPrayerName: String,
+    nextPrayerCountdown: String,
+    readingSurahName: String,
+    readingSurahNumber: Int,
+): HomeCoverCopy = when (page) {
+    0 -> HomeCoverCopy(
+        "PRAYER NOW",
+        currentPrayerName.takeIf(String::isNotBlank)?.let { "Make time for $it" } ?: "Your prayer moment",
+        if (nextPrayerName.isNotBlank()) {
+            "Next · $nextPrayerName" + nextPrayerCountdown.takeIf(String::isNotBlank)?.let { " in $it" }.orEmpty()
+        } else "Today's prayer times",
+    )
+    1 -> HomeCoverCopy(
+        "TODAY'S SALAH",
+        currentPrayerName.takeIf(String::isNotBlank)?.let { "Hadith for $it" } ?: "Hadith for this prayer",
+        "Read a narration for this prayer",
+    )
+    2 -> HomeCoverCopy(
+        "TODAY'S READING",
+        readingSurahName.takeIf(String::isNotBlank)?.let { "Read $it" } ?: "Read today's Surah",
+        if (readingSurahNumber > 0) "Surah $readingSurahNumber · today's ayahs" else "Today's Quran passage",
+    )
+    3 -> HomeCoverCopy("QIBLA DIRECTION", "Find the Qibla", "Live compass toward Makkah")
+    else -> HomeCoverCopy("AI SUGGESTED", "A verified reading", "Quran, Hadith or dua for this moment")
+}
+
 /** Cover ink follows the photograph; the app theme alone cannot describe its contrast. */
 internal fun homeCoverHeaderUsesLightText(page: Int, useNightArtwork: Boolean): Boolean = when (page) {
     0 -> true // The prayer poster needs the same white, quiet greeting as the reference.
@@ -212,6 +250,9 @@ internal fun ImmersiveHomeCover(
     useNightArtwork: Boolean = isDarkTheme,
     nextPrayerName: String,
     nextPrayerCountdown: String,
+    currentPrayerName: String = "",
+    readingSurahName: String = "",
+    readingSurahNumber: Int = 0,
     onSelectionChanged: (Int) -> Unit,
     onScrollPositionChanged: (Float) -> Unit = {},
     onOpen: (Int) -> Unit,
@@ -242,15 +283,10 @@ internal fun ImmersiveHomeCover(
             val useLightText = homeCoverCopyUsesLightText(page, useNightArtwork, isDarkTheme)
             val ink = if (useLightText) Color.White else Color(0xFF211C2B)
             val secondaryInk = ink.copy(alpha = if (useLightText) .80f else .72f)
-            val (eyebrow, title, detail) = when (page) {
-                0 -> Triple("YOUR DAY", "A moment to pause",
-                    listOfNotNull(nextPrayerName.takeIf(String::isNotBlank),
-                        nextPrayerCountdown.takeIf(String::isNotBlank)).joinToString(" · "))
-                1 -> Triple("TODAY'S SALAH", "Make room for prayer", "A hadith for this prayer")
-                2 -> Triple("TODAY'S READING", "Return to the Quran", "Your daily passage")
-                3 -> Triple("QIBLA", "Turn toward Makkah", "Find your direction")
-                else -> Triple("FOR THIS MOMENT", "A thought for today", "Explore a grounded suggestion")
-            }
+            val (eyebrow, title, detail) = homeCoverCopy(
+                page, currentPrayerName, nextPrayerName, nextPrayerCountdown,
+                readingSurahName, readingSurahNumber,
+            )
             Box(Modifier.fillMaxSize().clipToBounds().clickable { onOpen(page) }) {
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()

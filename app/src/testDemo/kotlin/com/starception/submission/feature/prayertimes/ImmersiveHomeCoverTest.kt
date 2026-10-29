@@ -51,12 +51,30 @@ import org.robolectric.annotation.GraphicsMode
 class ImmersiveHomeCoverTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun coverCopyNamesTheContentOpenedByEachPage() {
+        fun copy(page: Int) = homeCoverCopy(page, "Fajr", "Dhuhr", "2h 10m", "Al-Kahf", 18)
+        assertEquals("Make time for Fajr", copy(0).title)
+        assertEquals("Next · Dhuhr in 2h 10m", copy(0).detail)
+        assertEquals("Hadith for Fajr", copy(1).title)
+        assertEquals("Read Al-Kahf", copy(2).title)
+        assertEquals("Surah 18 · today's ayahs", copy(2).detail)
+        assertEquals("Live compass toward Makkah", copy(3).detail)
+        assertEquals("AI SUGGESTED", copy(4).eyebrow)
+        assertEquals("Quran, Hadith or dua for this moment", copy(4).detail)
+    }
+
+    @Test fun greetingFollowsTimeOfDay() {
+        assertEquals("Salam, good morning", homeGreetingForHour(5))
+        assertEquals("Salam, good afternoon", homeGreetingForHour(12))
+        assertEquals("Salam, good evening", homeGreetingForHour(18))
+    }
+
     @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
     @Test fun coverOpensTheMatchingReader() {
         var openedPage = -1
         compose.setContent { CoverTestScene(dark = true, onOpen = { openedPage = it }) }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_cover.png")
-        compose.onNodeWithText("A moment to pause").performClick()
+        compose.onNodeWithText("Make time for Fajr").performClick()
         assertEquals(0, openedPage)
     }
 
@@ -93,7 +111,7 @@ class ImmersiveHomeCoverTest {
         compose.setContent {
             CoverTestScene(dark = true, onOpen = {}, onScrollPositionChanged = positions::add)
         }
-        compose.onNodeWithText("A moment to pause").performTouchInput { swipeLeft() }
+        compose.onNodeWithText("Make time for Fajr").performTouchInput { swipeLeft() }
         compose.waitForIdle()
         assertTrue("Artwork should move during the drag", positions.any { it > .05f && it < .95f })
         assertTrue("The next cover should settle", positions.lastOrNull()?.let { it > .95f } == true)
@@ -105,7 +123,7 @@ class ImmersiveHomeCoverTest {
             compose.onNodeWithContentDescription("Show insight $page of 5").assertExists()
         }
         compose.onNodeWithContentDescription("Show insight 5 of 5").performClick()
-        compose.onNodeWithText("A thought for today").assertExists()
+        compose.onNodeWithText("A verified reading").assertExists()
     }
 
     @Test fun swipingRightFromFirstCoverWrapsToTheLast() {
@@ -113,21 +131,21 @@ class ImmersiveHomeCoverTest {
         compose.setContent {
             CoverTestScene(dark = true, onOpen = {}, onScrollPositionChanged = positions::add)
         }
-        compose.onNodeWithText("A moment to pause").performTouchInput { swipeRight() }
+        compose.onNodeWithText("Make time for Fajr").performTouchInput { swipeRight() }
         compose.waitForIdle()
         assertTrue("The previous cover should settle", positions.lastOrNull()?.let { it > 3.95f } == true)
-        compose.onNodeWithText("A thought for today").fetchSemanticsNode()
+        compose.onNodeWithText("A verified reading").fetchSemanticsNode()
     }
 
     @Test fun eachCoverOpensItsMatchingInsight() {
         val openedPages = mutableListOf<Int>()
         compose.setContent { CoverTestScene(dark = true, onOpen = openedPages::add) }
         val titles = listOf(
-            "A moment to pause",
-            "Make room for prayer",
-            "Return to the Quran",
-            "Turn toward Makkah",
-            "A thought for today",
+            "Make time for Fajr",
+            "Hadith for Fajr",
+            "Read Al-Kahf",
+            "Find the Qibla",
+            "A verified reading",
         )
         titles.forEachIndexed { index, title ->
             if (index > 0) {
@@ -142,11 +160,11 @@ class ImmersiveHomeCoverTest {
     @Test fun everySwipedCoverKeepsItsPortraitSubjectVisible() {
         compose.setContent { CoverTestScene(dark = true, onOpen = {}) }
         val pages = listOf(
-            "A moment to pause" to "prayer",
-            "Make room for prayer" to "salah",
-            "Return to the Quran" to "quran",
-            "Turn toward Makkah" to "qibla",
-            "A thought for today" to "suggestion",
+            "Make time for Fajr" to "prayer",
+            "Hadith for Fajr" to "salah",
+            "Read Al-Kahf" to "quran",
+            "Find the Qibla" to "qibla",
+            "A verified reading" to "suggestion",
         )
         pages.forEachIndexed { index, (title, name) ->
             if (index > 0) {
@@ -174,6 +192,9 @@ class ImmersiveHomeCoverTest {
                                 isDarkTheme = true,
                                 nextPrayerName = "Asr",
                                 nextPrayerCountdown = "1h 41m",
+                                currentPrayerName = "Fajr",
+                                readingSurahName = "Al-Kahf",
+                                readingSurahNumber = 18,
                                 onSelectionChanged = { selectedPage.intValue = it },
                                 onOpen = {},
                             )
@@ -184,7 +205,7 @@ class ImmersiveHomeCoverTest {
                 }
             }
         }
-        compose.onNodeWithText("A moment to pause").performTouchInput { swipeLeft() }
+        compose.onNodeWithText("Make time for Fajr").performTouchInput { swipeLeft() }
         compose.waitForIdle()
         assertEquals(1, selectedPage.intValue)
         compose.onNodeWithText("What will you carry into your next prayer?").fetchSemanticsNode()
@@ -297,6 +318,9 @@ private fun CoverTestScene(
                         useNightArtwork = useNightArtwork,
                         nextPrayerName = "Asr",
                         nextPrayerCountdown = "1h 41m",
+                        currentPrayerName = "Fajr",
+                        readingSurahName = "Al-Kahf",
+                        readingSurahNumber = 18,
                         onSelectionChanged = {},
                         onScrollPositionChanged = {
                             position.floatValue = it

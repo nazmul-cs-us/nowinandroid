@@ -3064,6 +3064,27 @@ fun PrayerTimesScreen(
                 val prayerArtworkNight = prayerTimes?.let {
                     currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
                 } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
+                val coverReadingDate = LocalDate.now()
+                val coverReading = remember(coverReadingDate) {
+                    com.starception.submission.feature.quran.dailyReading(
+                        kotlinx.datetime.LocalDate(
+                            coverReadingDate.year,
+                            coverReadingDate.monthValue,
+                            coverReadingDate.dayOfMonth,
+                        ),
+                    )
+                }
+                val coverCurrentPrayerName = prayerTimes
+                    ?.getActualPrayers(currentTime)
+                    ?.firstOrNull { it.isCurrently }
+                    ?.name
+                    ?.let(::getPrayerDisplayName)
+                    .orEmpty()
+                val coverNextPrayerName = PrayerTimeHelpers
+                    .getNextPrayer(currentTime, prayerTimes)
+                    ?.first
+                    ?.let(::getPrayerDisplayName)
+                    .orEmpty()
                 val coverEpochSeconds = remember(currentTime) { System.currentTimeMillis() / 1000.0 }
                 Box(Modifier.fillMaxSize().then(
                     if (darkHome) Modifier.background(Color(0xFF080B14))
@@ -3092,6 +3113,7 @@ fun PrayerTimesScreen(
                     homeCornerAction = !outerIsLandscape,
                     homeImmersiveHeader = !outerIsLandscape,
                     homeHeaderLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
+                    homeGreetingText = homeGreetingForHour(currentTime.hour),
                     homeHeaderVisibility = {
                         if (insightTileExpanded) 0f else
                             (1f - portraitScrollState.value / headerFadeDistancePx).coerceIn(0f, 1f)
@@ -3831,10 +3853,12 @@ fun PrayerTimesScreen(
                                                     selectedPage = coverPage,
                                                     isDarkTheme = darkHome,
                                                     useNightArtwork = prayerArtworkNight,
-                                                    nextPrayerName = PrayerTimeHelpers
-                                                        .getNextPrayer(currentTime, prayerTimes)?.first.orEmpty(),
+                                                    currentPrayerName = coverCurrentPrayerName,
+                                                    nextPrayerName = coverNextPrayerName,
                                                     nextPrayerCountdown = PrayerTimeHelpers
                                                         .getTimeUntilNextPrayer(currentTime, prayerTimes),
+                                                    readingSurahName = coverReading.nameEnglish,
+                                                    readingSurahNumber = coverReading.number,
                                                     onSelectionChanged = { coverPage = it },
                                                     onScrollPositionChanged = { coverScrollPosition.floatValue = it },
                                                     onOpen = { page ->

@@ -168,6 +168,7 @@ fun AppTopSearchBar(
     homeCornerAction: Boolean = false,
     homeImmersiveHeader: Boolean = false,
     homeHeaderLightText: Boolean = false,
+    homeGreetingText: String = "Assalamu alaikum",
     homeHeaderVisibility: () -> Float = { 1f },
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
@@ -869,8 +870,9 @@ fun AppTopSearchBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Assalamu alaikum",
-                    style = MaterialTheme.typography.headlineMedium.copy(
+                    text = homeGreetingText,
+                    style = (if (homeGreetingText.length > 18) MaterialTheme.typography.headlineSmall
+                        else MaterialTheme.typography.headlineMedium).copy(
                         shadow = Shadow(
                             color = if (homeHeaderLightText) ComposeColor.Black.copy(alpha = .55f)
                                 else ComposeColor.White.copy(alpha = .55f),
