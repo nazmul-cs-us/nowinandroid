@@ -1441,16 +1441,20 @@ fun PrayerTimesScreen(
     val latestExpandedKnowledgeContext by rememberUpdatedState(botKnowledgeRankingContext)
     val latestExpandedAppSituation by rememberUpdatedState(botAppSituation)
     val expandedAiScope = rememberCoroutineScope()
-    LaunchedEffect(expandedAiKey, aiModelDownloadTick) {
-        if (expandedAiLoading) return@LaunchedEffect
+    LaunchedEffect(expandedAiKey, aiModelDownloadTick, expandedInsightPage) {
+        // Source search and on-device generation can be expensive. Prepare the
+        // suggestion when its reader is opened, not on every Home visit.
+        if (expandedInsightPage != 4 || expandedAiLoading || expandedAiCandidate != null) {
+            return@LaunchedEffect
+        }
         expandedAiLoading = true
         expandedAiSearchFailed = false
         expandedAiProgress = InsightSearchProgress()
         val requestDay = nudgeDay
         val appSituation = latestExpandedAppSituation
         val rankingContext = latestExpandedKnowledgeContext
-        // Begin on home entry. The application-owned queue survives this screen;
-        // only delivery to the UI uses its composition scope.
+        // The application-owned queue survives this screen; only delivery to
+        // the UI uses its composition scope.
         expandedAiScope.launch {
             try {
                 expandedAiCandidate = preparedAiReadings.get(expandedAiKey) { variation ->
@@ -3044,7 +3048,6 @@ fun PrayerTimesScreen(
                 var homeViewportBottomInWindowPx by remember { mutableFloatStateOf(Float.NaN) }
                 var insightTopInWindowPx by remember { mutableFloatStateOf(Float.NaN) }
                 var insightHeightPx by remember { mutableIntStateOf(0) }
-                var insightHeaderHeight by remember { mutableStateOf(44.dp) }
                 var prayerHeaderHeightPx by remember { mutableIntStateOf(0) }
                 var homeFooterHeightPx by remember { mutableIntStateOf(0) }
                 // Content scrolls naturally after the insight reaches its resize limit.
@@ -3537,7 +3540,7 @@ fun PrayerTimesScreen(
                                         shapes = feedShapes,
                                     ) {
                                     var feedPageRequest by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-                                    var readerBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+                                    var readerHasOpened by remember { mutableStateOf(false) }
                                     var morphRequest by remember { mutableStateOf<ArtworkMorphRequest?>(null) }
                                     var morphVisible by remember { mutableStateOf(false) }
                                     var morphReversing by remember { mutableStateOf(false) }
@@ -3562,6 +3565,17 @@ fun PrayerTimesScreen(
                                                 morphRequest = null
                                                 morphVisible = false
                                             }
+                                        }
+                                    }
+                                    LaunchedEffect(insightTileExpanded) {
+                                        if (insightTileExpanded) {
+                                            readerHasOpened = true
+                                        } else if (readerHasOpened) {
+                                            // Keep the reader through its close animation,
+                                            // then dispose its invisible animations/shaders.
+                                            kotlinx.coroutines.delay(480)
+                                            feedPageRequest = null
+                                            readerHasOpened = false
                                         }
                                     }
                                     LaunchedEffect(feedPageRequest) {
@@ -3690,14 +3704,12 @@ fun PrayerTimesScreen(
                                                 animationSpec = tween(300),
                                                 label = "homeReaderReveal",
                                             )
+                                            if (feedPageRequest != null || insightTileExpanded) {
                                             Box(Modifier.graphicsLayer { alpha = readerReveal }) {
                                             SwipeableBigTiles(
                                                 immersiveHome = true,
                                                 edgeToEdgeArtwork = true,
                                                 pageRequest = feedPageRequest,
-                                                onReaderBoundsChange = { bounds ->
-                                                    if (morphRequest == null && !insightTileExpanded) readerBounds = bounds
-                                                },
                                                 prayerTimes = prayerTimes,
                                                 currentTime = currentTime,
                                                 locationService = locationService,
@@ -3785,7 +3797,6 @@ fun PrayerTimesScreen(
                                                     insightTileExpanded = expandedPage != null
                                                     expandedInsightPage = expandedPage
                                                 },
-                                                onHeaderHeightChange = { insightHeaderHeight = it },
                                                 onImmersiveModeChange = { immersive ->
                                                     insightReaderOpen = immersive
                                                 },
@@ -3802,6 +3813,7 @@ fun PrayerTimesScreen(
                                                 isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
                                                 weatherThresholds = prayerWeatherThresholds,
                                             )
+                                            }
                                             }
                                             androidx.compose.animation.AnimatedVisibility(
                                                 visible = !insightTileExpanded,
@@ -3837,9 +3849,9 @@ fun PrayerTimesScreen(
                                                 useNightArtwork = prayerArtworkNight,
                                             ) { card, source ->
                                                 if (morphRequest != null || insightTileExpanded) return@HomeArtworkRail
-                                                if (source.width > 0f && readerBounds.width > 0f) {
-                                                    val top = (readerBounds.top + portraitScrollState.value -
-                                                        with(morphDensity) { insightHeaderHeight.toPx() }).coerceAtLeast(0f)
+                                                if (source.width > 0f && insightTopInWindowPx.isFinite()) {
+                                                    val top = (insightTopInWindowPx + portraitScrollState.value)
+                                                        .coerceAtLeast(0f)
                                                     val left = 0f
                                                     val width = with(morphDensity) { configuration.screenWidthDp.dp.toPx() }
                                                     val height = with(morphDensity) { portraitImmersiveInsightHeight.toPx() }

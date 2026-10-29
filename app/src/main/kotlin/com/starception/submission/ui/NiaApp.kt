@@ -868,34 +868,43 @@ private fun VoiceAssistantButton(
         label = "assistantAmp",
     )
     val ampActive = amp * listeningBlend
-    val barMotion = rememberInfiniteTransition(label = "assistantBarMotion")
-    val wavePhase by barMotion.animateFloat(
-        initialValue = 0f,
-        targetValue = (Math.PI * 2.0).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 920, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "assistantBarWave",
-    )
-    val swirlPhase by barMotion.animateFloat(
-        initialValue = 0f,
-        targetValue = (Math.PI * 2.0).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1_320, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "assistantProcessingSwirl",
-    )
-    val nudgeGlowPulse by barMotion.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1_700, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "assistantNudgeGlow",
-    )
+    // The floating button exists on every destination. Do not keep three
+    // frame clocks alive while it is idle.
+    val wavePhase = if (listening) {
+        val phase by rememberInfiniteTransition(label = "assistantBarMotion").animateFloat(
+            initialValue = 0f,
+            targetValue = (Math.PI * 2.0).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 920, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "assistantBarWave",
+        )
+        phase
+    } else 0f
+    val swirlPhase = if (processing) {
+        val phase by rememberInfiniteTransition(label = "assistantProcessingMotion").animateFloat(
+            initialValue = 0f,
+            targetValue = (Math.PI * 2.0).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1_320, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "assistantProcessingSwirl",
+        )
+        phase
+    } else 0f
+    val nudgeGlow = remember { Animatable(0f) }
+    LaunchedEffect(nudge?.id, generatingSuggestion) {
+        nudgeGlow.snapTo(0f)
+        if (nudge != null || generatingSuggestion) {
+            repeat(3) {
+                nudgeGlow.animateTo(1f, tween(850, easing = FastOutSlowInEasing))
+                nudgeGlow.animateTo(0f, tween(850, easing = FastOutSlowInEasing))
+            }
+        }
+    }
+    val nudgeGlowPulse = nudgeGlow.value
     val container = MaterialTheme.colorScheme.onSurface
     val barColor = MaterialTheme.colorScheme.surface
     val quizOpen by VoiceAssistantNudgeBus.quizOpen.collectAsStateWithLifecycle()
@@ -2097,16 +2106,15 @@ internal fun VoiceNudgeSparkles(
     morph: Float,
     modifier: Modifier = Modifier,
 ) {
-    val transition = rememberInfiniteTransition(label = "voiceNudgeSparkles")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = (Math.PI * 2.0).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2_600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "voiceNudgeSparkleOrbit",
-    )
+    if (morph <= 0f) return
+    val orbit = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        orbit.animateTo(
+            (Math.PI * 4.0).toFloat(),
+            animationSpec = tween(durationMillis = 5_200, easing = LinearEasing),
+        )
+    }
+    val phase = orbit.value
     val sizes = floatArrayOf(0.27f, 0.19f, 0.15f)
 
     Canvas(modifier) {

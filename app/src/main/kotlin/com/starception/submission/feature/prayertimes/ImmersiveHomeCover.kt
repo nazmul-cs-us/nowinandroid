@@ -163,12 +163,13 @@ internal fun HomeCoverArtworkBackdrop(
         4 -> swipeProgress
         else -> 0f
     }
-    if (prayerVisibility > 0f && epochSeconds != null && latitude != null && longitude != null) {
+    if (!isExpanded && prayerVisibility > 0f && epochSeconds != null && latitude != null && longitude != null) {
         PrayerHomeCoverCelestialLayer(
             epochSeconds = epochSeconds,
             latitude = latitude,
             longitude = longitude,
             isNight = useNightArtwork,
+            playing = false,
             modifier = Modifier.graphicsLayer { alpha = prayerVisibility },
         )
     }

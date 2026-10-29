@@ -24,8 +24,6 @@ import com.starception.submission.MainActivityUiState.Loading
 import com.starception.submission.MainActivityUiState.Success
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.data.util.SyncManager
-import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
-import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.model.data.UserData
@@ -33,11 +31,9 @@ import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.feature.prayertimes.wobble.ForbiddenPrayerTimeState
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.media.GlobalMediaViewModel
-import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -269,12 +265,6 @@ class MainActivityViewModel @Inject constructor(
 
         refreshMissingBukhariPrompt()
 
-        // Pre-generate TTS for next 3 hadiths if enrolled in daily_bukhari
-        // This ensures cache is ready for driving mode or manual playback
-        viewModelScope.launch(Dispatchers.IO) {
-            preGenerateHadithTtsOnStartup()
-        }
-
         // Forward debug-injected prayer alerts (DebugPrayerAlertReceiver) through
         // the same flow real ones use, so the stacked layout in PullToSyncContainer
         // can be exercised without waiting for an actual prayer window.
@@ -310,83 +300,6 @@ class MainActivityViewModel @Inject constructor(
             .putString(KEY_PENDING_SETTINGS_SECTION, SETTINGS_SECTION_CONTENT)
             .apply()
         _showMissingBukhariPrompt.value = false
-    }
-
-    /**
-     * Pre-generate TTS audio for next 3 hadiths on app startup.
-     * Only runs if user is enrolled in daily_bukhari and has Sherpa-ONNX TTS configured.
-     */
-    private suspend fun preGenerateHadithTtsOnStartup() {
-        try {
-            // Check if enrolled in daily_bukhari
-            val coursePrefs = context.getSharedPreferences("course_progress", Context.MODE_PRIVATE)
-            val enrolledCourses = coursePrefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()
-
-            if ("daily_bukhari" !in enrolledCourses) {
-                Log.d("MainActivityViewModel", "📚 Not enrolled in daily_bukhari, skipping TTS pre-generation")
-                return
-            }
-
-            if (!HadithDatabase.isDatabaseAvailable(context, "sahih_bukhari.db")) {
-                Log.w("MainActivityViewModel", "📚 Bukhari database missing, skipping TTS pre-generation")
-                return
-            }
-
-            // Check TTS settings
-            val ttsPrefs = context.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
-            val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
-            val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
-
-            if (selectedVoiceName == null) {
-                Log.d("MainActivityViewModel", "📚 Using Android TTS, no pre-generation needed")
-                return
-            }
-
-            // Get current progress
-            val currentProgress = coursePrefs.getInt("progress_daily_bukhari", 0)
-            val startHadithNumber = currentProgress + 1
-
-            Log.i("MainActivityViewModel", "📚 Pre-generating TTS for hadith #$startHadithNumber and next 2 on app startup...")
-
-            // Set voice
-            val voice = try {
-                TtsVoice.valueOf(selectedVoiceName)
-            } catch (e: Exception) {
-                TtsVoice.KOKORO_EN
-            }
-            sherpaOnnxTts.setVoice(voice)
-
-            // Load Bukhari translations (same source as DrivingAudioService)
-            val bukhariTranslationRepo = BukhariLocalTranslationRepository.getInstance(context)
-            bukhariTranslationRepo.loadTranslations()
-
-            // Pre-generate next 3 hadiths
-            for (offset in 0 until 3) {
-                val hadithNumber = startHadithNumber + offset
-                if (hadithNumber > 7563) break
-
-                val hadithText = bukhariTranslationRepo.getEnglishText(hadithNumber) ?: continue
-
-                val introText = com.starception.submission.voice.EnglishTtsTextNormalizer
-                    .bukhariIntro(hadithNumber)
-                val fullText = "$introText $hadithText"
-
-                if (!sherpaOnnxTts.isCached(fullText)) {
-                    Log.i("MainActivityViewModel", "🔄 Pre-generating hadith #$hadithNumber (${fullText.length} chars)")
-                    sherpaOnnxTts.preGenerateAsync(
-                        text = fullText,
-                        speakerId = selectedSpeakerId,
-                    )
-                    delay(500) // Small delay between generations
-                } else {
-                    Log.d("MainActivityViewModel", "📦 Hadith #$hadithNumber already cached")
-                }
-            }
-
-            Log.i("MainActivityViewModel", "✅ Startup TTS pre-generation complete")
-        } catch (e: Exception) {
-            Log.e("MainActivityViewModel", "Error pre-generating hadith TTS on startup", e)
-        }
     }
 
     /**

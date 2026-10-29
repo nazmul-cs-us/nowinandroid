@@ -484,17 +484,22 @@ fun PullToSyncContainer(
     // Indicator text color from theme
     val indicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
 
-    // Spinning animation for syncing state
-    val infiniteTransition = rememberInfiniteTransition(label = "sync_spinner")
-    val spinAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "spin_angle",
-    )
+    // This container is mounted on every destination. Only run a frame clock
+    // while a visible status actually needs a spinning indicator.
+    val spinAngle = if (isDownloading || isRefreshing || isTtsPreparing || isPrayerAlert) {
+        val angle by rememberInfiniteTransition(label = "sync_spinner").animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "spin_angle",
+        )
+        angle
+    } else {
+        0f
+    }
 
     // Every status line that is live right now, most urgent first. They all
     // share the single row: when a mini bar owns the row they ride along as its

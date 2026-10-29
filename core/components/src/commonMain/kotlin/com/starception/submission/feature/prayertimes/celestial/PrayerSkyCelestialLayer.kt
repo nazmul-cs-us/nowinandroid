@@ -202,6 +202,7 @@ fun PrayerHomeCoverCelestialLayer(
     isNight: Boolean,
     modifier: Modifier = Modifier,
     forceSunForTesting: Boolean = false,
+    playing: Boolean = true,
 ) {
     val snapshot = remember(epochSeconds, latitude, longitude) {
         skySnapshotAt(julianDay(epochSeconds), latitude, longitude)
@@ -250,7 +251,7 @@ fun PrayerHomeCoverCelestialLayer(
                 .absoluteOffset(fieldWidth * x - diameter / 2, fieldHeight * y - diameter / 2)
                 .size(diameter)
             if (showSun) {
-                SunBody(bodyDiameter = diameter, modifier = bodyModifier)
+                SunBody(bodyDiameter = diameter, modifier = bodyModifier, playing = playing)
             } else {
                 MoonBody(
                     illuminatedFraction = snapshot.moonPhase.illuminatedFraction.toFloat(),
@@ -258,6 +259,7 @@ fun PrayerHomeCoverCelestialLayer(
                     brightLimbRotation = snapshot.moonBrightLimbScreenDeg.toFloat(),
                     modifier = bodyModifier,
                     bodyDiameter = diameter,
+                    playing = playing,
                 )
             }
         }
@@ -346,10 +348,12 @@ private fun MosqueWindowLights(
 private fun SunBody(
     bodyDiameter: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
+    playing: Boolean = true,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         PlatformCelestialBody(
             body = CelestialBody.Sun,
+            playing = playing,
             modifier = Modifier
                 .size(bodyDiameter)
                 .semantics {
@@ -497,6 +501,7 @@ private fun MoonBody(
     brightLimbRotation: Float,
     bodyDiameter: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
+    playing: Boolean = true,
 ) {
     val phaseAngle = acos((1f - 2f * illuminatedFraction).coerceIn(-1f, 1f)) /
         (2f * PI.toFloat())
@@ -505,7 +510,7 @@ private fun MoonBody(
         PlatformCelestialBody(
             body = CelestialBody.Moon,
             lunarCyclePhase = lunarCyclePhase,
-            playing = true,
+            playing = playing,
             modifier = Modifier
                 .size(bodyDiameter)
                 .graphicsLayer {
