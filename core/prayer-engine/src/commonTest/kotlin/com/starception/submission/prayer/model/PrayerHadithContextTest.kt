@@ -63,4 +63,17 @@ class PrayerHadithContextTest {
             assertTrue(prayerHadithContext(name, LocalDate(2026, 10, 23)).isJumuahPrayer)
         }
     }
+
+    @Test
+    fun incidentalFajrMentionDoesNotTurnNightPrayerIntoFajrGuidance() {
+        val fajr = prayerHadithContext("Fajr", LocalDate(2026, 10, 29))
+        val nightPrayer = "Once in the middle of the night Allah's Messenger went out and " +
+            "prayed in the mosque. The people joined him for the night prayer. ".repeat(6) +
+            "He came out only for the Fajr prayer."
+        val fajrPrayer = "The Messenger spoke about the Fajr prayer and its reward. " +
+            "He reminded the people to attend the morning prayer in congregation."
+        assertFalse(fajr.accepts(nightPrayer))
+        assertTrue(fajr.accepts(fajrPrayer))
+        assertTrue(fajr.relevanceScore(fajrPrayer) > fajr.relevanceScore(nightPrayer))
+    }
 }

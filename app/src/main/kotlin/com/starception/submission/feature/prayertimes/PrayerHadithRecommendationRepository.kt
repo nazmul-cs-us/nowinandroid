@@ -86,9 +86,10 @@ internal object PrayerHadithRecommendationRepository {
                     }
                 }
             }
-            val offset = variation % candidates.size.coerceAtLeast(1)
+            val rankedCandidates = candidates.sortedByDescending { prayer.relevanceScore(it.text) }
+            val offset = variation % rankedCandidates.size.coerceAtLeast(1)
             val shortlist = PrayerHadithSelection.shortlist(
-                candidates.drop(offset) + candidates.take(offset),
+                rankedCandidates.drop(offset) + rankedCandidates.take(offset),
                 date.toEpochDay().toInt() + variation,
             )
             if (shortlist.isEmpty()) {

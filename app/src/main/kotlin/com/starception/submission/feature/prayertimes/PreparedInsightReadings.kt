@@ -40,7 +40,7 @@ internal object PreparedInsightReadings {
             { prefs.getString(name, null) }, { prefs.edit().putString(name, it).apply() })
     }
 
-    fun prayer(context: Context): InsightReadAhead<PrayerHadithRecommendation> = prayerCache ?: cache(context, "prayer", { item: PrayerHadithRecommendation ->
+    fun prayer(context: Context): InsightReadAhead<PrayerHadithRecommendation> = prayerCache ?: cache(context, "prayer_v2", { item: PrayerHadithRecommendation ->
         listOf(item.source.databaseFile, item.source.collection, item.source.hadithNumber.toString(), item.source.text, item.selectedByModel.toString())
     }, { fields ->
         PrayerHadithRecommendation(PrayerHadithCandidate(fields[0], fields[1], fields[2].toInt(), fields[3]), fields[4].toBooleanStrict())

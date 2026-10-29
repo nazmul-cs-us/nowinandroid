@@ -24,6 +24,7 @@ data class PrayerHadithContext(
     val queries: List<String>,
     val isFriday: Boolean,
     val isJumuahPrayer: Boolean,
+    val prayerKey: String,
 ) {
     fun heading(displayPrayerName: String): String = when {
         isJumuahPrayer -> "HADITH FOR JUMU'AH · FRIDAY"
@@ -31,10 +32,31 @@ data class PrayerHadithContext(
         else -> "HADITH FOR ${displayPrayerName.uppercase()}"
     }
 
-    // Search may match commentary; require Friday relevance in the displayed narration too.
-    fun accepts(text: String): Boolean = !isFriday || text.lowercase().filterNot { it.code in 0x064B..0x065F || it.code == 0x0670 || it.code == 0x0640 }.let {
-        "friday" in it || "jumu" in it || "jumma" in it || "جمعة" in it
+    /** A passing mention of the next prayer must not make an unrelated narration eligible. */
+    fun relevanceScore(text: String): Int {
+        val normalized = text.lowercase().filterNot {
+            it.code in 0x064B..0x065F || it.code == 0x0670 || it.code == 0x0640
+        }
+        if (isFriday && listOf("friday", "jumu", "jumma", "جمعة").none { it in normalized }) return 0
+        val firstFocus = queries.map { normalized.indexOf(it.lowercase()) }
+            .filter { it >= 0 }.minOrNull() ?: return 0
+        val competingTopics = when (prayerKey) {
+            "fajr" -> listOf("night prayer", "middle of the night", "tahajjud", "taraweeh", "tarawih",
+                "dhuhr prayer", "asr prayer", "maghrib prayer", "isha prayer")
+            "dhuhr" -> listOf("fajr prayer", "asr prayer", "maghrib prayer", "isha prayer")
+            "asr" -> listOf("fajr prayer", "dhuhr prayer", "maghrib prayer", "isha prayer")
+            "maghrib" -> listOf("fajr prayer", "dhuhr prayer", "asr prayer", "isha prayer")
+            "isha" -> listOf("fajr prayer", "dhuhr prayer", "asr prayer", "maghrib prayer")
+            else -> emptyList()
+        }
+        val competingBeforeFocus = competingTopics.any { term ->
+            normalized.indexOf(term).let { it >= 0 && it < firstFocus }
+        }
+        val focusScore = if (firstFocus < 320) 5 else 2
+        return (focusScore - if (competingBeforeFocus) 4 else 0).coerceAtLeast(0)
     }
+
+    fun accepts(text: String): Boolean = relevanceScore(text) > 0
 }
 
 fun prayerHadithContext(prayerName: String?, date: LocalDate): PrayerHadithContext {
@@ -55,5 +77,9 @@ fun prayerHadithContext(prayerName: String?, date: LocalDate): PrayerHadithConte
         "isha" -> listOf("Isha prayer", "night prayer", "صلاة العشاء")
         else -> listOf("prayer", "congregational prayer", "الصلاة")
     }
-    return PrayerHadithContext(queries, friday, friday && midday)
+    val prayerKey = when (prayer) {
+        "zuhr", "zuhur", "jumuah", "jumua", "jumah", "jummah" -> "dhuhr"
+        else -> prayer
+    }
+    return PrayerHadithContext(queries, friday, friday && midday, prayerKey)
 }

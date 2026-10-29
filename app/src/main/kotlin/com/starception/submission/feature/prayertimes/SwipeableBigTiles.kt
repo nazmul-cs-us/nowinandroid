@@ -2713,7 +2713,9 @@ internal fun SwipeableBigTiles(
                     color = Color.Black.copy(alpha = 0.48f),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(start = 12.dp, end = 12.dp, top = controlTopInset, bottom = 12.dp)
+                        // The card's header action sits slightly below the
+                        // strip anchor; keep the travelling close circle level.
+                        .padding(start = 12.dp, end = 12.dp, top = controlTopInset + 2.dp, bottom = 12.dp)
                         // Start over the action immediately to the left, then
                         // travel one control slot into the close position.
                         .size(40.dp)
@@ -5688,15 +5690,11 @@ private fun SalahHadithExpandedStage(
                         .fillMaxSize()
                         // No overscroll/stretch effect: hitting either edge
                         // must not flash or scale the Hadith panel.
-                        .insightReadingEdges(
-                            canScrollBackward = { hadithScrollState.canScrollBackward },
-                            canScrollForward = { hadithScrollState.canScrollForward },
-                        )
                         .verticalScroll(
                             state = hadithScrollState,
                             overscrollEffect = null,
                         )
-                        .padding(vertical = 8.dp),
+                        .padding(top = 8.dp, bottom = 28.dp),
                     verticalArrangement = Arrangement.Top,
                 ) {
                     if (!loading && !searchFailed && recommendation == null) {

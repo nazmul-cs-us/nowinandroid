@@ -67,9 +67,10 @@ internal suspend fun recommendPrayerHadith(
             }
         }
     }
-    val offset = variation % candidates.size.coerceAtLeast(1)
+    val rankedCandidates = candidates.sortedByDescending { context.relevanceScore(it.text) }
+    val offset = variation % rankedCandidates.size.coerceAtLeast(1)
     val shortlist = PrayerHadithSelection.shortlist(
-        candidates.drop(offset) + candidates.take(offset),
+        rankedCandidates.drop(offset) + rankedCandidates.take(offset),
         date.toEpochDays().toInt() + variation,
     )
     if (shortlist.isEmpty()) {
@@ -103,8 +104,8 @@ internal object PreparedPrayerReadings {
                 val fields = com.starception.submission.core.model.deenly.unpackInsightFields(value)
                 PrayerHadithRecommendation(PrayerHadithCandidate(fields[0], fields[1], fields[2].toInt(), fields[3]), fields[4].toBooleanStrict())
             },
-            read = { store.getString("prepared_prayer_readings_v1") },
-            write = { store.putString("prepared_prayer_readings_v1", it) },
+            read = { store.getString("prepared_prayer_readings_v2") },
+            write = { store.putString("prepared_prayer_readings_v2", it) },
         )
     }
 }
