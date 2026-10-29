@@ -95,6 +95,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -3645,6 +3646,32 @@ fun PrayerTimesScreen(
                                                             topLeft = Offset(0f, start),
                                                             size = androidx.compose.ui.geometry.Size(size.width, lowerHeight),
                                                         )
+                                                        // Low, diffused color gives the reflection depth without
+                                                        // turning its text into a card or tinting the white feed.
+                                                        val glowY = coverBottom + 118.dp.toPx()
+                                                        val glowRadius = size.width * 1.08f
+                                                        val glowTop = (coverBottom - 220.dp.toPx()).coerceAtLeast(0f)
+                                                        val glowBottom = (coverBottom + 450.dp.toPx()).coerceAtMost(size.height)
+                                                        clipRect(top = glowTop, bottom = glowBottom) {
+                                                            drawRect(
+                                                                brush = Brush.radialGradient(
+                                                                    0f to Color(0xFF9865A9).copy(alpha = .48f),
+                                                                    .32f to Color(0xFF805599).copy(alpha = .20f),
+                                                                    .74f to Color.Transparent,
+                                                                    center = Offset(size.width * .08f, glowY),
+                                                                    radius = glowRadius,
+                                                                ),
+                                                            )
+                                                            drawRect(
+                                                                brush = Brush.radialGradient(
+                                                                    0f to Color(0xFF285E96).copy(alpha = .34f),
+                                                                    .38f to Color(0xFF214473).copy(alpha = .12f),
+                                                                    .76f to Color.Transparent,
+                                                                    center = Offset(size.width * .82f, glowY + 26.dp.toPx()),
+                                                                    radius = glowRadius,
+                                                                ),
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }

@@ -193,7 +193,7 @@ internal fun HomeReflectionPrompt(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(ink.copy(alpha = .22f)))
+        HomeSectionDivider(ink)
         AnimatedContent(
             targetState = focusedPage.coerceIn(0, 4),
             transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(160)) },
@@ -218,11 +218,26 @@ internal fun HomeReflectionPrompt(
 private fun HomeFeedSectionLabel(text: String) {
     val ink = MaterialTheme.colorScheme.onBackground
     Column {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(ink.copy(alpha = .18f)))
+        HomeSectionDivider(ink)
         Spacer(Modifier.height(18.dp))
         Text(text, color = ink.copy(alpha = .82f), style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium)
     }
+}
+
+@Composable
+private fun HomeSectionDivider(ink: Color) {
+    Box(
+        Modifier.fillMaxWidth().height(1.dp).background(
+            Brush.horizontalGradient(
+                0f to ink.copy(alpha = 0f),
+                .08f to ink.copy(alpha = .12f),
+                .5f to ink.copy(alpha = .28f),
+                .92f to ink.copy(alpha = .12f),
+                1f to ink.copy(alpha = 0f),
+            ),
+        ),
+    )
 }
 
 @Composable
