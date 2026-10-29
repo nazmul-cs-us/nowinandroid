@@ -65,9 +65,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -95,6 +97,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
@@ -891,19 +894,11 @@ fun AppTopSearchBar(
                         .clickable { currentOnProfileClick() }
                         .semantics { contentDescription = "Open profile" },
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    HomeHeaderDepthAction("Search", isDarkTheme, { searchViewHolder.value?.show() }) {
-                        Icon(Icons.Default.Search, contentDescription = null,
-                            tint = ComposeColor.White, modifier = Modifier.size(19.dp))
-                    }
-                    HomeHeaderDepthAction("Settings", isDarkTheme, onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = null,
-                            tint = ComposeColor.White, modifier = Modifier.size(19.dp))
-                    }
-                }
+                HomeHeaderDepthActions(
+                    isDarkTheme = isDarkTheme,
+                    onSearchClick = { searchViewHolder.value?.show() },
+                    onSettingsClick = onSettingsClick,
+                )
             }
         }
         // Voice wave overlay: the animated visualization that fills the SearchBar
@@ -992,37 +987,64 @@ fun AppTopSearchBar(
     }
 }
 
-/** A raised dark action set into a soft circular recess, with a full-size touch target. */
+/** Two compact dark actions share one soft, sculpted recess. */
 @Composable
-internal fun HomeHeaderDepthAction(
-    label: String,
+internal fun HomeHeaderDepthActions(
     isDarkTheme: Boolean,
+    onSearchClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.width(96.dp).height(48.dp).drawBehind {
+            val radius = 24.dp.toPx()
+            val leftCenter = Offset(radius, radius)
+            val rightCenter = Offset(size.width - radius, radius)
+            fun recess(center: Offset) = Brush.radialGradient(
+                0f to ComposeColor(0xFFE4E4EB).copy(alpha = if (isDarkTheme) .26f else .56f),
+                .72f to ComposeColor(0xFFD9DBE5).copy(alpha = if (isDarkTheme) .24f else .48f),
+                1f to ComposeColor.Transparent,
+                center = center,
+                radius = radius,
+            )
+            drawCircle(recess(leftCenter), radius = radius, center = leftCenter)
+            drawCircle(recess(rightCenter), radius = radius, center = rightCenter)
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+            HomeHeaderDepthAction("Search", onSearchClick) {
+                Icon(Icons.Default.Search, contentDescription = null,
+                    tint = ComposeColor.White, modifier = Modifier.size(19.dp))
+            }
+            HomeHeaderDepthAction("Settings", onSettingsClick) {
+                Icon(Icons.Default.Settings, contentDescription = null,
+                    tint = ComposeColor.White, modifier = Modifier.size(19.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeHeaderDepthAction(
+    label: String,
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = Modifier.size(50.dp)
-            .shadow(3.dp, CircleShape, ambientColor = ComposeColor.Black.copy(alpha = .08f),
-                spotColor = ComposeColor.Black.copy(alpha = .14f))
-            .clip(CircleShape)
-            .background(Brush.linearGradient(
-                0f to ComposeColor.White.copy(alpha = if (isDarkTheme) .18f else .42f),
-                .55f to ComposeColor(0xFF526176).copy(alpha = .22f),
-                1f to ComposeColor.White.copy(alpha = if (isDarkTheme) .10f else .24f),
-            ))
+        modifier = Modifier.size(48.dp)
             .semantics { contentDescription = label }
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            modifier = Modifier.size(40.dp)
-                .shadow(5.dp, CircleShape, ambientColor = ComposeColor.Black.copy(alpha = .18f),
-                    spotColor = ComposeColor.Black.copy(alpha = .26f))
+            modifier = Modifier.size(37.dp)
+                .shadow(3.dp, CircleShape, ambientColor = ComposeColor.Black.copy(alpha = .12f),
+                    spotColor = ComposeColor.Black.copy(alpha = .20f))
                 .clip(CircleShape)
                 .background(Brush.verticalGradient(listOf(
-                    ComposeColor(0xFF273445), ComposeColor(0xFF0E1522),
+                    ComposeColor(0xFF242737), ComposeColor(0xFF0E101A),
                 )))
-                .border(1.dp, ComposeColor.White.copy(alpha = .24f), CircleShape),
+                .border(.5.dp, ComposeColor.White.copy(alpha = .10f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             content()
