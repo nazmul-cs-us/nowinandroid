@@ -324,6 +324,13 @@ internal fun availableImmersiveInsightHeightPx(
     return (visibleBottom - tileTopInWindowPx - scrollOffsetPx).coerceAtLeast(0f)
 }
 
+internal fun shouldHideHomeNavigationForInsight(
+    readerOpen: Boolean,
+    scrollArmed: Boolean,
+    scrollOffsetPx: Int,
+    thresholdPx: Float,
+): Boolean = readerOpen && scrollArmed && scrollOffsetPx > thresholdPx
+
 internal fun shouldReplacePrayerBellWithWeather(
     prayerStatus: String,
     prayerTimeEditMode: Boolean,
@@ -2995,7 +3002,16 @@ fun PrayerTimesScreen(
                 // Prayer rows share the measured space left by the insight tile;
                 // resize gestures may reveal one, two, or three readable rows.
                 var insightTileExpanded by remember { mutableStateOf(false) }
-                var insightTileImmersive by remember { mutableStateOf(false) }
+                var insightReaderOpen by remember { mutableStateOf(false) }
+                var immersiveScrollArmed by remember { mutableStateOf(false) }
+                val portraitScrollState = rememberScrollState()
+                val immersiveScrollThresholdPx = with(LocalDensity.current) { 24.dp.toPx() }
+                val insightTileImmersive = shouldHideHomeNavigationForInsight(
+                    readerOpen = insightReaderOpen,
+                    scrollArmed = immersiveScrollArmed,
+                    scrollOffsetPx = portraitScrollState.value,
+                    thresholdPx = immersiveScrollThresholdPx,
+                )
                 LaunchedEffect(insightTileImmersive) {
                     com.starception.submission.ui.InsightImmersiveBus.update(insightTileImmersive)
                 }
@@ -3017,9 +3033,12 @@ fun PrayerTimesScreen(
                         showAllPrayers = false
                     }
                 }
-                val portraitScrollState = rememberScrollState()
-                LaunchedEffect(insightTileImmersive) {
-                    if (insightTileImmersive) portraitScrollState.animateScrollTo(0)
+                LaunchedEffect(insightReaderOpen) {
+                    immersiveScrollArmed = false
+                    if (insightReaderOpen) {
+                        portraitScrollState.animateScrollTo(0)
+                        immersiveScrollArmed = true
+                    }
                 }
                 var homeViewport by remember { mutableStateOf(IntSize.Zero) }
                 var homeViewportBottomInWindowPx by remember { mutableFloatStateOf(Float.NaN) }
@@ -3557,6 +3576,11 @@ fun PrayerTimesScreen(
                                         animationSpec = tween(420, easing = FastOutSlowInEasing),
                                         label = "immersiveFeedGutter",
                                     )
+                                    val feedTopPadding by animateDpAsState(
+                                        targetValue = if (insightTileExpanded) 0.dp else 8.dp,
+                                        animationSpec = tween(320, easing = FastOutSlowInEasing),
+                                        label = "immersiveFeedTopPadding",
+                                    )
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -3589,7 +3613,7 @@ fun PrayerTimesScreen(
                                             )
                                             .padding(horizontal = feedGutter)
                                             .padding(
-                                                top = 8.dp,
+                                                top = feedTopPadding,
                                                 bottom = 0.dp,
                                             ),
                                         verticalArrangement = Arrangement.Top,
@@ -3757,7 +3781,7 @@ fun PrayerTimesScreen(
                                                 },
                                                 onHeaderHeightChange = { insightHeaderHeight = it },
                                                 onImmersiveModeChange = { immersive ->
-                                                    insightTileImmersive = immersive
+                                                    insightReaderOpen = immersive
                                                 },
                                                 collapseExpandedTileRequest = collapseTileRequest,
                                                 onSurahClick = onSurahClick,
