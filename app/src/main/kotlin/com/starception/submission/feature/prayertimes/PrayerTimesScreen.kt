@@ -107,6 +107,9 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -305,6 +308,21 @@ private data class PrayerTileWeatherAlert(
     val visual: PrayerWeatherVisual,
     val level: WeatherThresholdLevel,
 )
+
+/** Available height below the tile's unscrolled top, including any held banner above it. */
+internal fun availableImmersiveInsightHeightPx(
+    viewportBottomInWindowPx: Float,
+    windowBottomInWindowPx: Float,
+    tileTopInWindowPx: Float,
+    scrollOffsetPx: Int,
+): Float {
+    val visibleBottom = if (windowBottomInWindowPx > 0f) {
+        minOf(viewportBottomInWindowPx, windowBottomInWindowPx)
+    } else {
+        viewportBottomInWindowPx
+    }
+    return (visibleBottom - tileTopInWindowPx - scrollOffsetPx).coerceAtLeast(0f)
+}
 
 internal fun shouldReplacePrayerBellWithWeather(
     prayerStatus: String,
@@ -3004,6 +3022,8 @@ fun PrayerTimesScreen(
                     if (insightTileImmersive) portraitScrollState.animateScrollTo(0)
                 }
                 var homeViewport by remember { mutableStateOf(IntSize.Zero) }
+                var homeViewportBottomInWindowPx by remember { mutableFloatStateOf(Float.NaN) }
+                var insightTopInWindowPx by remember { mutableFloatStateOf(Float.NaN) }
                 var insightHeightPx by remember { mutableIntStateOf(0) }
                 var insightHeaderHeight by remember { mutableStateOf(44.dp) }
                 var prayerHeaderHeightPx by remember { mutableIntStateOf(0) }
@@ -3063,6 +3083,9 @@ fun PrayerTimesScreen(
                             .fillMaxSize()
                             .clipToBounds()
                             .onSizeChanged { homeViewport = it }
+                            .onGloballyPositioned {
+                                homeViewportBottomInWindowPx = it.positionInWindow().y + it.size.height
+                            }
                             .then(syncState.pullModifier)
                             .then(
                                 if (!outerIsLandscape) {
@@ -3175,8 +3198,18 @@ fun PrayerTimesScreen(
                                 } else {
                                     navigationBarInset + 64.dp
                                 }
+                                val windowBottomPx = LocalView.current.rootView.height.toFloat()
                                 val measuredInsightViewport = with(LocalDensity.current) {
-                                    homeViewport.height.toDp()
+                                    if (homeViewportBottomInWindowPx.isFinite() && insightTopInWindowPx.isFinite()) {
+                                        availableImmersiveInsightHeightPx(
+                                            viewportBottomInWindowPx = homeViewportBottomInWindowPx,
+                                            windowBottomInWindowPx = windowBottomPx,
+                                            tileTopInWindowPx = insightTopInWindowPx,
+                                            scrollOffsetPx = portraitScrollState.value,
+                                        ).toDp()
+                                    } else {
+                                        homeViewport.height.toDp()
+                                    }
                                 } - navigationClearance
                                 val insightViewport = if (homeViewport.height > 0) measuredInsightViewport else (
                                     configuration.screenHeightDp.dp - dynamicTopInset -
@@ -3617,6 +3650,9 @@ fun PrayerTimesScreen(
                                             // requiredWidth overflows the padded feed symmetrically,
                                             // so the resting artwork actually reaches both screen edges.
                                             modifier = Modifier.requiredWidth(configuration.screenWidthDp.dp)
+                                                .onGloballyPositioned {
+                                                    insightTopInWindowPx = it.positionInWindow().y
+                                                }
                                                 .onSizeChanged { insightHeightPx = it.height },
                                         ) {
                                             val readerReveal by animateFloatAsState(

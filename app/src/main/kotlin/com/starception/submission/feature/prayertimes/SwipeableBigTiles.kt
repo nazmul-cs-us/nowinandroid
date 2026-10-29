@@ -3956,7 +3956,11 @@ private fun InsightPreviewCard(
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
                     .padding(start = tagInset, end = tagInset, top = tagTopInset, bottom = tagInset)
-                    .padding(end = if (editorialExpanded) 52.dp else 0.dp),
+                    .padding(end = when {
+                        editorialExpanded -> 52.dp
+                        fluidFullBleed && isExpanded -> 64.dp // Reserve the close button's corner.
+                        else -> 0.dp
+                    }),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // This tag sits in the top strip, above where the scrim gradient
