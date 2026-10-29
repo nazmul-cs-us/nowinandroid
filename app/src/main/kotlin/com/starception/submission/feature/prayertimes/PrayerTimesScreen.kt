@@ -3689,6 +3689,13 @@ fun PrayerTimesScreen(
                                         ) { expanded ->
                                             if (expanded) 180f else 0f
                                         }
+                                        val homeRestingReaderHeight =
+                                            (configuration.screenHeightDp.dp * 0.69f)
+                                                .coerceIn(450.dp, 640.dp)
+                                                .coerceAtMost(
+                                                    (portraitImmersiveInsightHeight - 104.dp)
+                                                        .coerceAtLeast(320.dp),
+                                                )
                                         // Swipeable Big Tiles
                                         Box(
                                             // requiredWidth overflows the padded feed symmetrically,
@@ -3770,14 +3777,7 @@ fun PrayerTimesScreen(
                                                     showCompassPopup = true
                                                 },
                                                 timeOffsets = storedOffsets,
-                                                portraitStripHeight = (configuration.screenHeightDp.dp * 0.69f)
-                                                    .coerceIn(450.dp, 640.dp)
-                                                    // Leave a real travel distance for the
-                                                    // card-to-reader expansion on short phones.
-                                                    .coerceAtMost(
-                                                        (portraitImmersiveInsightHeight - 104.dp)
-                                                            .coerceAtLeast(320.dp),
-                                                    ),
+                                                portraitStripHeight = homeRestingReaderHeight,
                                                 portraitExpandedStripHeight = portraitImmersiveInsightHeight,
                                                 // Expanded prayer mode scrolls naturally; keep Insights at its
                                                 // normal size instead of squeezing the carousel to fund row 3.
@@ -3814,6 +3814,12 @@ fun PrayerTimesScreen(
                                                 weatherThresholds = prayerWeatherThresholds,
                                             )
                                             }
+                                            } else {
+                                                // The idle cover still needs the reader's height
+                                                // in layout flow. Removing its transparent reader
+                                                // without this spacer moves the reflection and feed
+                                                // over the artwork and disables the scroll fade.
+                                                Spacer(Modifier.height(homeRestingReaderHeight))
                                             }
                                             androidx.compose.animation.AnimatedVisibility(
                                                 visible = !insightTileExpanded,
