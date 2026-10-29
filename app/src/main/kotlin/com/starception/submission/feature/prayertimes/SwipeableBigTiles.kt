@@ -1941,6 +1941,9 @@ internal fun SwipeableBigTiles(
         }
 
         var stripTopInWindowPx by remember { mutableFloatStateOf(0f) }
+        var focusedActionTopInWindowPx by remember(pagerState.settledPage) {
+            mutableFloatStateOf(Float.NaN)
+        }
         BoxWithConstraints(modifier = stripModifier.onGloballyPositioned {
             stripTopInWindowPx = it.positionInWindow().y
             onReaderBoundsChange(it.boundsInWindow())
@@ -2086,6 +2089,9 @@ internal fun SwipeableBigTiles(
                         },
                 ) {
                     val isFocused = page == pagerState.settledPage && !pagerState.isScrollInProgress
+                    val reportActionTop: ((Float) -> Unit)? = if (isFocused) {
+                        { top -> focusedActionTopInWindowPx = top }
+                    } else null
                     // Expanded mode is a carousel mode, not a property of only the
                     // settled page. Keeping incoming pages expanded prevents their
                     // compact artwork flashing while a swipe is still settling.
@@ -2159,6 +2165,7 @@ internal fun SwipeableBigTiles(
                                 "Enlarge Prayer Now"
                             },
                             isFocused = isFocused,
+                            onHeaderActionTopInWindowPx = reportActionTop,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
@@ -2221,6 +2228,7 @@ internal fun SwipeableBigTiles(
                                 if (immersiveHome && !isExpandedCard) openImmersiveCard(logicalPage)
                             },
                             isFocused = isFocused,
+                            onHeaderActionTopInWindowPx = reportActionTop,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
@@ -2336,6 +2344,7 @@ internal fun SwipeableBigTiles(
                                 compactHeightHints[2] = measured
                             },
                             isFocused = isFocused,
+                            onHeaderActionTopInWindowPx = reportActionTop,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
@@ -2449,6 +2458,7 @@ internal fun SwipeableBigTiles(
                                 compactHeightHints[3] = measured
                             },
                             isFocused = isFocused,
+                            onHeaderActionTopInWindowPx = reportActionTop,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
@@ -2526,6 +2536,7 @@ internal fun SwipeableBigTiles(
                                 compactHeightHints[4] = measured
                             },
                             isFocused = isFocused,
+                            onHeaderActionTopInWindowPx = reportActionTop,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
@@ -2697,7 +2708,11 @@ internal fun SwipeableBigTiles(
             }
 
             if (isImmersive || (immersiveHome && expansionProgress > 0.64f)) {
-                val controlTopInset = immersiveInsightControlTopInset(stripTopInWindowPx)
+                val controlTopInset = if (focusedActionTopInWindowPx.isFinite()) {
+                    with(density) { (focusedActionTopInWindowPx - stripTopInWindowPx).toDp() }
+                } else {
+                    immersiveInsightControlTopInset(stripTopInWindowPx)
+                }
                 val closeMorphProgress = ((expansionProgress - 0.64f) / 0.34f).coerceIn(0f, 1f)
                 val sourceIcon = when (pagerState.currentPage % insightPageCount) {
                     0, 3 -> Icons.Default.Navigation
@@ -2713,9 +2728,7 @@ internal fun SwipeableBigTiles(
                     color = Color.Black.copy(alpha = 0.48f),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        // The card's header action sits slightly below the
-                        // strip anchor; keep the travelling close circle level.
-                        .padding(start = 12.dp, end = 12.dp, top = controlTopInset + 2.dp, bottom = 12.dp)
+                        .padding(start = 12.dp, end = 12.dp, top = controlTopInset, bottom = 12.dp)
                         // Start over the action immediately to the left, then
                         // travel one control slot into the close position.
                         .size(40.dp)
@@ -3138,6 +3151,7 @@ private fun PrayerPosterInsightCard(
     onLongPress: (() -> Unit)?,
     longPressLabel: String,
     isFocused: Boolean,
+    onHeaderActionTopInWindowPx: ((Float) -> Unit)? = null,
     backgroundPageOffset: () -> Float,
     timelineProgress: Float?,
     directionalHintBearing: Int?,
@@ -3217,6 +3231,7 @@ private fun PrayerPosterInsightCard(
             onLongPress = onLongPress,
             longPressLabel = longPressLabel,
             isFocused = isFocused,
+            onHeaderActionTopInWindowPx = onHeaderActionTopInWindowPx,
             backgroundPageOffset = backgroundPageOffset,
             timelineProgress = timelineProgress,
             directionalHintBearing = directionalHintBearing,
@@ -3281,6 +3296,7 @@ internal fun InsightPreviewCard(
     longPressLabel: String? = null,
     fullDayEffect: Boolean = false,
     isFocused: Boolean = false,
+    onHeaderActionTopInWindowPx: ((Float) -> Unit)? = null,
     backgroundPageOffset: () -> Float = { 0f },
     supportingText: String? = null,
     statusText: String? = null,
@@ -4061,6 +4077,9 @@ internal fun InsightPreviewCard(
                 if (showHeaderActions) {
                     Spacer(modifier = Modifier.weight(1f))
                     Row(
+                        modifier = Modifier.onGloballyPositioned { coordinates ->
+                            onHeaderActionTopInWindowPx?.invoke(coordinates.positionInWindow().y)
+                        },
                         horizontalArrangement = Arrangement.spacedBy(if (isReadingHeader) 4.dp else 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

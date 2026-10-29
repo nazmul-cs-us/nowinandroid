@@ -38,6 +38,7 @@ class ExpandedReadingLayoutTest {
 
     @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
     @Test fun surahHeadingClearsPlaybackControls() {
+        var measuredActionTop = Float.NaN
         compose.setContent {
             CompositionLocalProvider(LocalInspectionMode provides true) {
                 org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
@@ -57,6 +58,7 @@ class ExpandedReadingLayoutTest {
                             useEditorialExpandedLayout = true,
                             readingSurahIndex = 73,
                             onReadingPlayPause = {},
+                            onHeaderActionTopInWindowPx = { measuredActionTop = it },
                             expandedLeadingContent = {
                                 Column(Modifier.fillMaxSize().padding(top = 8.dp)) {
                                     Text("SURAH 74 · AL-MUDDATHIR", color = Color.White)
@@ -72,6 +74,7 @@ class ExpandedReadingLayoutTest {
         compose.waitForIdle()
         val play = compose.onNodeWithContentDescription("Listen to daily Surah")
             .fetchSemanticsNode().boundsInRoot
+        assertTrue("The close anchor must use the action row's measured top", kotlin.math.abs(measuredActionTop - play.top) < 1f)
         val heading = compose.onNodeWithText("SURAH 74 · AL-MUDDATHIR", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot
         assertTrue("Surah heading $heading must clear playback $play", heading.top > play.bottom)
