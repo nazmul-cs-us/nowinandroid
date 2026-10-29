@@ -22,7 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.starception.submission.core.images.resources.Res
-import com.starception.submission.core.images.resources.insight_prayer_background
+import com.starception.submission.core.images.resources.home_cover_salah_portrait
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -74,7 +74,7 @@ class HomeArtworkRailTest {
             ArtworkMorphOverlay(
                 ArtworkMorphRequest(
                     HomeArtworkCard(1, "Today's salah", "Prayer & hadith",
-                        Res.drawable.insight_prayer_background),
+                        Res.drawable.home_cover_salah_portrait),
                     Rect(24f, 320f, 190f, 488f), Rect(0f, 80f, 393f, 780f), 1, 0),
                 reversing = false,
                 onFinished = { finishing = true },

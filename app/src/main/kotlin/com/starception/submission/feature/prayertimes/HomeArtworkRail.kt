@@ -44,15 +44,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.images.resources.Res
-import com.starception.submission.core.images.resources.insight_prayer_background
-import com.starception.submission.core.images.resources.insight_prayer_foreground
-import com.starception.submission.core.images.resources.insight_qibla_background
-import com.starception.submission.core.images.resources.insight_qibla_foreground_v2
-import com.starception.submission.core.images.resources.insight_suggestion
-import com.starception.submission.core.images.resources.insight_quran_background
-import com.starception.submission.core.images.resources.insight_quran_foreground_v2
-import com.starception.submission.core.images.resources.prayer_now_insight_day
-import com.starception.submission.core.images.resources.prayer_now_insight_night
+import com.starception.submission.core.images.resources.home_cover_prayer_day_portrait
+import com.starception.submission.core.images.resources.home_cover_prayer_night_portrait
+import com.starception.submission.core.images.resources.home_cover_salah_portrait
+import com.starception.submission.core.images.resources.home_cover_quran_portrait
+import com.starception.submission.core.images.resources.home_cover_qibla_portrait
+import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -84,13 +81,13 @@ internal fun homeFeedPage(page: Int): HomeFeedPage = when (page) {
 private val homeArtworkCards by lazy {
     listOf(
         HomeArtworkCard(2, "Today's reading", "Quran for today",
-            Res.drawable.insight_quran_background, Res.drawable.insight_quran_foreground_v2),
+            Res.drawable.home_cover_quran_portrait),
         HomeArtworkCard(1, "Today's salah", "Prayer & hadith",
-            Res.drawable.insight_prayer_background, Res.drawable.insight_prayer_foreground),
+            Res.drawable.home_cover_salah_portrait),
         HomeArtworkCard(3, "Qibla", "Direction to Makkah",
-            Res.drawable.insight_qibla_background, Res.drawable.insight_qibla_foreground_v2),
+            Res.drawable.home_cover_qibla_portrait),
         HomeArtworkCard(4, "AI suggested", "For this moment",
-            Res.drawable.insight_suggestion),
+            Res.drawable.home_cover_suggestion_portrait),
     )
 }
 
@@ -142,7 +139,8 @@ internal fun HomeArtworkRail(
     val largeText = LocalDensity.current.fontScale > 1.3f
     val prayerNow = HomeArtworkCard(
         0, "Prayer now", "Your next prayer",
-        if (useNightArtwork) Res.drawable.prayer_now_insight_night else Res.drawable.prayer_now_insight_day,
+        if (useNightArtwork) Res.drawable.home_cover_prayer_night_portrait
+        else Res.drawable.home_cover_prayer_day_portrait,
     )
     val cards = homeArtworkCards + prayerNow
     AnimatedContent(

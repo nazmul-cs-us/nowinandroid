@@ -65,7 +65,7 @@ internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableReso
 /** Cover ink follows the photograph; the app theme alone cannot describe its contrast. */
 internal fun homeCoverHeaderUsesLightText(page: Int, useNightArtwork: Boolean): Boolean = when (page) {
     0 -> true // The prayer poster needs the same white, quiet greeting as the reference.
-    2 -> false // The reading scene has a bright window behind the greeting.
+    2, 3 -> false // Reading and Qibla have bright windows behind the greeting.
     else -> true
 }
 

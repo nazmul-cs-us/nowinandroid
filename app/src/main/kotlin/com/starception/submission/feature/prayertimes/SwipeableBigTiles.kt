@@ -261,6 +261,10 @@ import com.starception.submission.core.images.resources.prayer_now_mosque_lights
 import com.starception.submission.core.images.resources.prayer_now_mosque_night
 import com.starception.submission.core.images.resources.home_cover_prayer_day_portrait
 import com.starception.submission.core.images.resources.home_cover_prayer_night_portrait
+import com.starception.submission.core.images.resources.home_cover_salah_portrait
+import com.starception.submission.core.images.resources.home_cover_quran_portrait
+import com.starception.submission.core.images.resources.home_cover_qibla_portrait
+import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
 import com.starception.submission.core.qurandatabase.QuranDatabase
@@ -2207,8 +2211,10 @@ internal fun SwipeableBigTiles(
                                     "$prayersRemaining remain · $nextUnmarkedPrayer is next"
                                 else -> "$prayersRemaining prayers remain today"
                             },
-                            backgroundPainterRes = ImageRes.drawable.insight_prayer_background,
-                            foregroundPainterRes = ImageRes.drawable.insight_prayer_foreground,
+                            backgroundPainterRes = if (immersiveHome) ImageRes.drawable.home_cover_salah_portrait
+                                else ImageRes.drawable.insight_prayer_background,
+                            foregroundPainterRes = if (immersiveHome) null
+                                else ImageRes.drawable.insight_prayer_foreground,
                             foregroundBaseScale = 0.84f,
                             foregroundOffsetFraction = Offset(0f, 0.08f),
                             skyTintTop = livePrayerSkyPalette.top,
@@ -2325,8 +2331,10 @@ internal fun SwipeableBigTiles(
                             } else {
                                 "Surah ${dailySurah.number} · ${dailySurah.revelationType}"
                             },
-                            backgroundPainterRes = ImageRes.drawable.insight_quran_background,
-                            foregroundPainterRes = ImageRes.drawable.insight_quran_foreground_v2,
+                            backgroundPainterRes = if (immersiveHome) ImageRes.drawable.home_cover_quran_portrait
+                                else ImageRes.drawable.insight_quran_background,
+                            foregroundPainterRes = if (immersiveHome) null
+                                else ImageRes.drawable.insight_quran_foreground_v2,
                             // Let more of the reading scene breathe around the Quran.
                             foregroundBaseScale = 0.74f,
                             foregroundOffsetFraction = Offset(0f, 0.09f),
@@ -2428,12 +2436,13 @@ internal fun SwipeableBigTiles(
                             } else {
                                 "Open the live compass and 3D globe"
                             },
-                            backgroundPainterRes = ImageRes.drawable.insight_qibla_background,
+                            backgroundPainterRes = if (immersiveHome) ImageRes.drawable.home_cover_qibla_portrait
+                                else ImageRes.drawable.insight_qibla_background,
                             // The compact scene uses the antique compass as its
                             // subject. Expanded mode supplies a live direction
                             // instrument, so retaining both creates two competing
                             // compasses in the same focal area.
-                            foregroundPainterRes = if (isExpandedCard && !immersiveHome) {
+                            foregroundPainterRes = if (immersiveHome || isExpandedCard) {
                                 null
                             } else {
                                 ImageRes.drawable.insight_qibla_foreground_v2
@@ -2519,9 +2528,10 @@ internal fun SwipeableBigTiles(
                             } else {
                                 "Tap to open the verified source"
                             },
-                            backgroundPainterRes = ImageRes.drawable.insight_suggestion,
-                            backgroundBaseScale = 1.28f,
-                            backgroundHorizontalBias = 0.13f,
+                            backgroundPainterRes = if (immersiveHome) ImageRes.drawable.home_cover_suggestion_portrait
+                                else ImageRes.drawable.insight_suggestion,
+                            backgroundBaseScale = if (immersiveHome) 1f else 1.28f,
+                            backgroundHorizontalBias = if (immersiveHome) 0f else 0.13f,
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.50f,
