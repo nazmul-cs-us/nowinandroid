@@ -64,7 +64,7 @@ internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableReso
 
 /** Cover ink follows the photograph; the app theme alone cannot describe its contrast. */
 internal fun homeCoverHeaderUsesLightText(page: Int, useNightArtwork: Boolean): Boolean = when (page) {
-    0 -> useNightArtwork
+    0 -> true // The prayer poster needs the same white, quiet greeting as the reference.
     2 -> false // The reading scene has a bright window behind the greeting.
     else -> true
 }
@@ -158,6 +158,16 @@ internal fun HomeCoverArtworkBackdrop(
     val lowerPage = scrollPosition.toInt().coerceIn(0, 4)
     val swipeProgress = (scrollPosition - lowerPage).coerceIn(0f, 1f)
     HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
+    if (!useNightArtwork && lowerPage == 0) {
+        // The day scene has a bright blue sky behind the greeting. A local
+        // shadow over the upper sky keeps white type legible without darkening
+        // the water and copy below it.
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+            0f to Color(0xFF101C2B).copy(alpha = .36f),
+            .30f to Color(0xFF101C2B).copy(alpha = .12f),
+            .46f to Color.Transparent,
+        )))
+    }
     val prayerVisibility = when (lowerPage) {
         0 -> 1f - swipeProgress
         4 -> swipeProgress
@@ -225,8 +235,8 @@ internal fun ImmersiveHomeCover(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Keep the copy on the water/floor, below the focal artwork. Move the
         // page dots with it so they retain a clear gap beneath the detail line.
-        val copyBottom = maxHeight * .10f
-        val indicatorBottom = maxHeight * .03f
+        val copyBottom = maxHeight * .17f
+        val indicatorBottom = maxHeight * .10f
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { absolutePage ->
             val page = absolutePage % 5
             val useLightText = homeCoverCopyUsesLightText(page, useNightArtwork, isDarkTheme)
@@ -236,7 +246,7 @@ internal fun ImmersiveHomeCover(
                 0 -> Triple("YOUR DAY", "A moment to pause",
                     listOfNotNull(nextPrayerName.takeIf(String::isNotBlank),
                         nextPrayerCountdown.takeIf(String::isNotBlank)).joinToString(" · "))
-                1 -> Triple("TODAY'S SALAH", "Make room for reflection", "A hadith for this prayer")
+                1 -> Triple("TODAY'S SALAH", "Make room for prayer", "A hadith for this prayer")
                 2 -> Triple("TODAY'S READING", "Return to the Quran", "Your daily passage")
                 3 -> Triple("QIBLA", "Turn toward Makkah", "Find your direction")
                 else -> Triple("FOR THIS MOMENT", "A thought for today", "Explore a grounded suggestion")
@@ -246,20 +256,20 @@ internal fun ImmersiveHomeCover(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                         .padding(start = 24.dp, end = 24.dp, bottom = copyBottom),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
                         eyebrow,
                         color = secondaryInk,
-                        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = .7.sp),
+                        fontWeight = FontWeight.Medium,
                     )
                     Text(
                         title,
                         color = ink,
                         style = MaterialTheme.typography.headlineLarge,
                         textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.Normal,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -278,7 +288,7 @@ internal fun ImmersiveHomeCover(
         }
         Row(
             Modifier.align(Alignment.BottomCenter).padding(bottom = indicatorBottom),
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val indicatorPage = pagerState.currentPage % 5
@@ -288,11 +298,15 @@ internal fun ImmersiveHomeCover(
                 Color(0xFF211C2B)
             }
             val indicatorPosition = (pagerState.currentPage + pagerState.currentPageOffsetFraction) % 5f
-            repeat(5) { index ->
+            // Keep the visual footprint as quiet as the three-mark reference.
+            // A sliding window still represents all five swipeable insights.
+            val firstVisiblePage = (indicatorPage - 1).coerceIn(0, 2)
+            repeat(3) { slot ->
+                val index = firstVisiblePage + slot
                 val directDistance = abs(indicatorPosition - index)
                 val emphasis = (1f - minOf(directDistance, 5f - directDistance)).coerceIn(0f, 1f)
                 Box(
-                    Modifier.size(width = 23.dp, height = 26.dp)
+                    Modifier.size(width = 14.dp, height = 26.dp)
                         .clickable {
                             scope.launch {
                                 val current = pagerState.currentPage % 5
@@ -304,7 +318,7 @@ internal fun ImmersiveHomeCover(
                         .semantics { contentDescription = "Show insight ${index + 1} of 5" },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Box(Modifier.size(width = (5f + 11f * emphasis).dp, height = 4.dp)
+                    Box(Modifier.size(width = (3f + 9f * emphasis).dp, height = 4.dp)
                         .clip(CircleShape)
                         .background(indicatorInk.copy(alpha = .48f + .52f * emphasis)))
                 }

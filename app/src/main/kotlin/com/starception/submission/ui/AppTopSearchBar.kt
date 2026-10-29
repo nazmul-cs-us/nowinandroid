@@ -870,7 +870,7 @@ fun AppTopSearchBar(
             ) {
                 Text(
                     text = "Assalamu alaikum",
-                    style = MaterialTheme.typography.headlineSmall.copy(
+                    style = MaterialTheme.typography.headlineMedium.copy(
                         shadow = Shadow(
                             color = if (homeHeaderLightText) ComposeColor.Black.copy(alpha = .55f)
                                 else ComposeColor.White.copy(alpha = .55f),
@@ -879,7 +879,7 @@ fun AppTopSearchBar(
                         ),
                     ),
                     color = greetingColor,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)

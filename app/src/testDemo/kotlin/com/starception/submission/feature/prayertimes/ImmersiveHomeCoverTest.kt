@@ -69,7 +69,8 @@ class ImmersiveHomeCoverTest {
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_cover_night_light_mode.png")
         assertTrue(homeCoverHeaderUsesLightText(page = 0, useNightArtwork = true))
         assertTrue(homeCoverCopyUsesLightText(page = 0, useNightArtwork = true, isDarkTheme = false))
-        assertFalse(homeCoverHeaderUsesLightText(page = 0, useNightArtwork = false))
+        assertTrue(homeCoverHeaderUsesLightText(page = 0, useNightArtwork = false))
+        assertFalse(homeCoverHeaderUsesLightText(page = 2, useNightArtwork = false))
     }
 
     @Test fun daytimePrayerCoverShowsSunAboveMountains() {
@@ -113,7 +114,7 @@ class ImmersiveHomeCoverTest {
         compose.setContent { CoverTestScene(dark = true, onOpen = openedPages::add) }
         val titles = listOf(
             "A moment to pause",
-            "Make room for reflection",
+            "Make room for prayer",
             "Return to the Quran",
             "Turn toward Makkah",
             "A thought for today",
@@ -132,7 +133,7 @@ class ImmersiveHomeCoverTest {
         compose.setContent { CoverTestScene(dark = true, onOpen = {}) }
         val pages = listOf(
             "A moment to pause" to "prayer",
-            "Make room for reflection" to "salah",
+            "Make room for prayer" to "salah",
             "Return to the Quran" to "quran",
             "Turn toward Makkah" to "qibla",
             "A thought for today" to "suggestion",
