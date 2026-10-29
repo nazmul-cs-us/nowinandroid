@@ -2309,7 +2309,9 @@ internal fun SwipeableBigTiles(
                                 dailySurah.nameArabic
                             },
                             footerText = if (presentationExpanded) {
-                                dailySurah.nameArabic
+                                // The expanded reader already identifies the Surah in
+                                // its heading. Give its ayah translations this space.
+                                null
                             } else if (isDrivingMode) {
                                 "Surah ${dailySurah.number} · Keep your eyes on the road"
                             } else {
@@ -4691,8 +4693,10 @@ internal fun InsightPreviewCard(
                         .padding(
                             start = titleHorizontalPadding,
                             end = titleHorizontalPadding,
-                            top = ((if (prayerRecap.isNotEmpty()) 88f else 64f) -
-                                16f * chromeProgress).dp,
+                            top = (
+                                (if (isReadingHeader) 104f else if (prayerRecap.isNotEmpty()) 88f else 64f) -
+                                    16f * chromeProgress
+                                ).dp,
                             bottom = (24f - 16f * chromeProgress).dp,
                         ),
                     spacing = 12.dp,
@@ -5437,16 +5441,15 @@ private fun EditorialQuranReadingStage(
                     }
                 }
             } else LazyColumn(
+                // A mask over the last line made a partially visible
+                // translation look clipped before the user scrolled it in.
+                // The reader viewport clips naturally at its boundary.
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .insightReadingEdges(
-                        canScrollBackward = { readingScrollState.canScrollBackward },
-                        canScrollForward = { readingScrollState.canScrollForward },
-                    ),
+                    .weight(1f),
                 state = readingScrollState,
                 overscrollEffect = null,
-                contentPadding = PaddingValues(vertical = 12.dp),
+                contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(
