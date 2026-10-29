@@ -1214,6 +1214,13 @@ private fun preferredInsightExpansionExtent(
     return contentSizedInsightExtent(logicalPage, restingHeight, maximumHeight, measuredHeight, isLoading)
 }
 
+/** Full-height readers scroll their passages internally; text length cannot set the shell minimum. */
+internal fun expandedReaderMinimumStageHeight(
+    immersiveHome: Boolean,
+    measuredHeight: Dp?,
+    minimumHeight: Dp,
+): Dp = if (immersiveHome) minimumHeight else measuredHeight ?: minimumHeight
+
 private data class PrayerSkyPalette(
     val top: Color,
     val horizon: Color,
@@ -2265,7 +2272,13 @@ internal fun SwipeableBigTiles(
                                  null
                              },
                             expandedContentHorizontalBleed = 10.dp,
-                            minimumExpandedContentHeight = stageHeightHints[1] ?: 180.dp,
+                            // The Hadith body has its own scroll container. Its full
+                            // measured text height must not enlarge the outer stage
+                            // beyond the visible reader and slide its heading under
+                            // the fixed tile controls.
+                            minimumExpandedContentHeight = expandedReaderMinimumStageHeight(
+                                immersiveHome, stageHeightHints[1], 180.dp,
+                            ),
                             onPreferredHeightChange = { measuredHeight: Dp ->
                                 expandedHeightHints[1] = measuredHeight
                             },
@@ -2273,7 +2286,9 @@ internal fun SwipeableBigTiles(
                         )
 
                         2 -> InsightPreviewCard(
-                            minimumExpandedContentHeight = stageHeightHints[2] ?: 240.dp,
+                            minimumExpandedContentHeight = expandedReaderMinimumStageHeight(
+                                immersiveHome, stageHeightHints[2], 240.dp,
+                            ),
                             onPreferredHeightChange = { measuredHeight: Dp ->
                                 expandedHeightHints[2] = measuredHeight
                             },
@@ -2544,7 +2559,9 @@ internal fun SwipeableBigTiles(
                                  null
                              },
                             expandedContentHorizontalBleed = 10.dp,
-                            minimumExpandedContentHeight = stageHeightHints[4] ?: 180.dp,
+                            minimumExpandedContentHeight = expandedReaderMinimumStageHeight(
+                                immersiveHome, stageHeightHints[4], 180.dp,
+                            ),
                             onPreferredHeightChange = { measuredHeight: Dp ->
                                 expandedHeightHints[4] = measuredHeight
                             },
@@ -2908,7 +2925,7 @@ internal fun SwipeableBigTiles(
     }
 }
 
-private data class PrayerRecapIndicator(
+internal data class PrayerRecapIndicator(
     val name: String,
     val initial: String,
     val isPrayed: Boolean,
@@ -3062,6 +3079,13 @@ internal fun formatPrayerForecastMetric(
     }
 }
 
+internal const val PRAYER_POSTER_ARTWORK_SCALE = 1.018f
+
+internal fun boundedArtworkParallax(requestedPx: Float, extentPx: Float, scale: Float, insetPx: Float): Float {
+    val coveredShift = ((extentPx * (scale - 1f) / 2f) - insetPx).coerceAtLeast(0f)
+    return requestedPx.coerceIn(-coveredShift, coveredShift)
+}
+
 @Composable
 private fun PrayerPosterInsightCard(
     isNight: Boolean,
@@ -3123,7 +3147,9 @@ private fun PrayerPosterInsightCard(
                 ImageRes.drawable.prayer_now_insight_day
             },
             animateWater = !effectiveIsNight,
-            backgroundBaseScale = if (fluidFullBleed) 1f else 1.018f,
+            // The artwork drifts up to 4dp vertically. Keep a little overscan
+            // even in portrait so the light Surface cannot peek through at top.
+            backgroundBaseScale = PRAYER_POSTER_ARTWORK_SCALE,
             backgroundLayer = if (latitude != null && longitude != null) {
                 {
                     if (fluidFullBleed) {
@@ -3185,7 +3211,7 @@ internal fun calculateImmersiveInsightControlInset(safeTop: Dp, occupiedTop: Dp)
     (maxOf(24.dp, safeTop) - occupiedTop + 12.dp).coerceAtLeast(12.dp)
 
 @Composable
-private fun InsightPreviewCard(
+internal fun InsightPreviewCard(
     label: String,
     title: String,
     backgroundPainterRes: DrawableResource? = null,
@@ -3567,7 +3593,9 @@ private fun InsightPreviewCard(
                                     -maxCoveredHorizontalShift,
                                     maxCoveredHorizontalShift,
                                 )
-                                translationY = restingMotion * 4.dp.toPx()
+                                translationY = boundedArtworkParallax(
+                                    restingMotion * 4.dp.toPx(), size.height, imageScale, 1.dp.toPx(),
+                                )
                                 alpha = mosqueLightPulse
                             },
                     )
@@ -3601,7 +3629,9 @@ private fun InsightPreviewCard(
                                     -maxCoveredHorizontalShift,
                                     maxCoveredHorizontalShift,
                                 )
-                                translationY = restingMotion * 4.dp.toPx()
+                                translationY = boundedArtworkParallax(
+                                    restingMotion * 4.dp.toPx(), size.height, imageScale, 1.dp.toPx(),
+                                )
                             },
                     ) {
                         Image(
@@ -3727,7 +3757,9 @@ private fun InsightPreviewCard(
                     scaleX = imageScale
                     scaleY = imageScale
                     translationX = requestedTranslationX.coerceIn(-coveredShift, coveredShift)
-                    translationY = restingMotion * 4.dp.toPx()
+                    translationY = boundedArtworkParallax(
+                        restingMotion * 4.dp.toPx(), size.height, imageScale, 1.dp.toPx(),
+                    )
                 }) { celestialLayer() }
             }
 

@@ -1,5 +1,6 @@
 package com.starception.submission.feature.prayertimes
 
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -35,5 +36,15 @@ class ImmersiveInsightHeightTest {
         assertFalse(shouldHideHomeNavigationForInsight(true, true, 0, 24f))
         assertTrue(shouldHideHomeNavigationForInsight(true, true, 25, 24f))
         assertFalse(shouldHideHomeNavigationForInsight(false, true, 100, 24f))
+    }
+
+    @Test fun longPassagesStayInsideTheirReaderViewport() {
+        assertEquals(180.dp, expandedReaderMinimumStageHeight(true, 900.dp, 180.dp))
+        assertEquals(900.dp, expandedReaderMinimumStageHeight(false, 900.dp, 180.dp))
+    }
+
+    @Test fun parallaxCannotExposeTheTileSurface() {
+        assertEquals(5f, boundedArtworkParallax(-8f, 1000f, 1.012f, 1f) * -1f, .01f)
+        assertEquals(0f, boundedArtworkParallax(8f, 1000f, 1f, 1f), .01f)
     }
 }
