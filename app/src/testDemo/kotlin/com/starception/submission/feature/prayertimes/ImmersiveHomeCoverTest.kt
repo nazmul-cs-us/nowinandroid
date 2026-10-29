@@ -64,9 +64,9 @@ class ImmersiveHomeCoverTest {
     }
 
     @Test fun greetingFollowsTimeOfDay() {
-        assertEquals("Salam, good morning", homeGreetingForHour(5))
-        assertEquals("Salam, good afternoon", homeGreetingForHour(12))
-        assertEquals("Salam, good evening", homeGreetingForHour(18))
+        assertEquals("Salam, morning", homeGreetingForHour(5))
+        assertEquals("Salam, afternoon", homeGreetingForHour(12))
+        assertEquals("Salam, evening", homeGreetingForHour(18))
     }
 
     @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
@@ -81,6 +81,7 @@ class ImmersiveHomeCoverTest {
     @Test fun lightCoverFillsThePaddedHomeWidth() {
         compose.setContent { CoverTestScene(dark = false, onOpen = {}) }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_cover_light.png")
+        assertTrue(homeCoverCopyUsesLightText(page = 0, useNightArtwork = false, isDarkTheme = false))
     }
 
     @Test fun nightArtworkKeepsReadableCopyInLightMode() {

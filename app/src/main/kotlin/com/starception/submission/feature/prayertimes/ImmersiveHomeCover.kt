@@ -65,9 +65,9 @@ internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableReso
 internal data class HomeCoverCopy(val eyebrow: String, val title: String, val detail: String)
 
 internal fun homeGreetingForHour(hour: Int): String = when (hour) {
-    in 5..11 -> "Salam, good morning"
-    in 12..17 -> "Salam, good afternoon"
-    else -> "Salam, good evening"
+    in 5..11 -> "Salam, morning"
+    in 12..17 -> "Salam, afternoon"
+    else -> "Salam, evening"
 }
 
 /** The poster previews the destination opened by its tap, not a generic mood. */
@@ -107,31 +107,21 @@ internal fun homeCoverHeaderUsesLightText(page: Int, useNightArtwork: Boolean): 
     else -> true
 }
 
+/** Every portrait cover keeps white copy on the same deep, blurred lower surface. */
 internal fun homeCoverCopyUsesLightText(
     page: Int,
     useNightArtwork: Boolean,
     isDarkTheme: Boolean,
-): Boolean = isDarkTheme || page != 0 || useNightArtwork
+): Boolean = true
 
-/** Keep the poster legible through the recommendation, then hand it into the feed. */
-internal fun homeCoverScrim(isDarkTheme: Boolean): Brush = if (isDarkTheme) {
-    Brush.verticalGradient(
-        0f to Color(0xFF071C30).copy(alpha = .12f),
-        .48f to Color(0xFF0B1D2C).copy(alpha = .22f),
-        .72f to Color(0xFF071725).copy(alpha = .55f),
-        .91f to Color(0xFF080B14).copy(alpha = .98f),
-        1f to Color(0xFF080B14),
-    )
-} else {
-    Brush.verticalGradient(
-        0f to Color.White.copy(alpha = .08f),
-        .48f to Color.White.copy(alpha = .10f),
-        .60f to Color.White.copy(alpha = .48f),
-        .73f to Color.White.copy(alpha = .62f),
-        .90f to Color.White.copy(alpha = .92f),
-        1f to Color.White,
-    )
-}
+/** Keep the cover title readable while the artwork fades into the reflection. */
+internal fun homeCoverScrim(): Brush = Brush.verticalGradient(
+    0f to Color(0xFF071C30).copy(alpha = .12f),
+    .48f to Color(0xFF0B1D2C).copy(alpha = .22f),
+    .72f to Color(0xFF071725).copy(alpha = .55f),
+    .91f to Color(0xFF080B14).copy(alpha = .98f),
+    1f to Color(0xFF080B14),
+)
 
 /** A blurred copy of the same scene gives the cover copy a soft, readable backdrop. */
 @Composable
@@ -223,7 +213,7 @@ internal fun HomeCoverArtworkBackdrop(
     }
     if (!isExpanded) HomeCoverArtworkBlur(lowerPage, swipeProgress, useNightArtwork)
     Box(Modifier.fillMaxSize().background(
-        homeCoverScrim(homeCoverCopyUsesLightText(lowerPage, useNightArtwork, isDarkTheme))
+        homeCoverScrim()
     ))
     // The cover scene is fixed behind the vertically scrolling feed. Once the
     // cover leaves the viewport, fully cover it so no stale artwork shows

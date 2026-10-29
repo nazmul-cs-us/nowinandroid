@@ -183,8 +183,12 @@ internal fun HomeArtworkRail(
 }
 
 @Composable
-internal fun HomeReflectionPrompt(focusedPage: Int = 0, onClick: () -> Unit) {
-    val ink = MaterialTheme.colorScheme.onBackground
+internal fun HomeReflectionPrompt(
+    focusedPage: Int = 0,
+    onDarkCover: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val ink = if (onDarkCover) Color.White else MaterialTheme.colorScheme.onBackground
     Column(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),

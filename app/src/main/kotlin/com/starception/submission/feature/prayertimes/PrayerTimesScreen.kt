@@ -3621,35 +3621,27 @@ fun PrayerTimesScreen(
                                                     val start = insightHeightPx.toFloat() + 8.dp.toPx()
                                                     val lowerHeight = (size.height - start).coerceAtLeast(0f)
                                                     if (lowerHeight > 0f) {
-                                                        val feedColor = if (darkHome) Color(0xFF080B14) else ambientScheme.background
                                                         drawRect(
-                                                            brush = Brush.verticalGradient(
-                                                                colors = listOf(Color.Transparent, feedColor),
-                                                                startY = start,
-                                                                endY = start + 116.dp.toPx(),
-                                                            ),
+                                                            brush = if (darkHome) {
+                                                                Brush.verticalGradient(
+                                                                    colors = listOf(Color.Transparent, Color(0xFF080B14)),
+                                                                    startY = start,
+                                                                    endY = start + 116.dp.toPx(),
+                                                                )
+                                                            } else {
+                                                                // Continue the dark poster through the reflection,
+                                                                // then return to the light surface before the card rail.
+                                                                Brush.verticalGradient(
+                                                                    0f to Color(0xFF080B14),
+                                                                    .58f to Color(0xFF080B14),
+                                                                    1f to ambientScheme.background,
+                                                                    startY = start,
+                                                                    endY = start + 260.dp.toPx(),
+                                                                )
+                                                            },
                                                             topLeft = Offset(0f, start),
                                                             size = androidx.compose.ui.geometry.Size(size.width, lowerHeight),
                                                         )
-                                                        if (!darkHome) {
-                                                            val gradientStart = start + 116.dp.toPx()
-                                                            drawRect(
-                                                                brush = Brush.verticalGradient(
-                                                                    colors = listOf(
-                                                                        Color.Transparent,
-                                                                        ambientScheme.primary.copy(alpha = 0.07f),
-                                                                        ambientScheme.secondary.copy(alpha = 0.09f),
-                                                                    ),
-                                                                    startY = gradientStart,
-                                                                    endY = size.height,
-                                                                ),
-                                                                topLeft = Offset(0f, gradientStart),
-                                                                size = androidx.compose.ui.geometry.Size(
-                                                                    size.width,
-                                                                    (size.height - gradientStart).coerceAtLeast(0f),
-                                                                ),
-                                                            )
-                                                        }
                                                     }
                                                 }
                                             }
@@ -3870,7 +3862,7 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileExpanded) {
-                                            HomeReflectionPrompt(focusedPage = coverPage) {
+                                            HomeReflectionPrompt(focusedPage = coverPage, onDarkCover = !darkHome) {
                                                 feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
                                             }
                                             Spacer(Modifier.height(20.dp))
