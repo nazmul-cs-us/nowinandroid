@@ -203,7 +203,12 @@ internal fun HomeReflectionPrompt(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(feed.eyebrow, style = MaterialTheme.typography.labelSmall,
                     color = ink.copy(alpha = .72f))
-                Text(feed.prompt, style = MaterialTheme.typography.titleLarge, color = ink)
+                Text(
+                    feed.prompt,
+                    style = if (onDarkCover) MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal)
+                        else MaterialTheme.typography.titleLarge,
+                    color = ink,
+                )
             }
         }
     }

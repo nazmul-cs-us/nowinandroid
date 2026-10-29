@@ -3618,25 +3618,28 @@ fun PrayerTimesScreen(
                                             .fillMaxSize()
                                             .drawBehind {
                                                 if (!insightTileExpanded && insightHeightPx > 0) {
-                                                    val start = insightHeightPx.toFloat() + 8.dp.toPx()
+                                                    val coverBottom = insightHeightPx.toFloat() + 8.dp.toPx()
+                                                    val start = if (darkHome) coverBottom
+                                                        else (coverBottom - 150.dp.toPx()).coerceAtLeast(0f)
                                                     val lowerHeight = (size.height - start).coerceAtLeast(0f)
                                                     if (lowerHeight > 0f) {
                                                         drawRect(
                                                             brush = if (darkHome) {
                                                                 Brush.verticalGradient(
                                                                     colors = listOf(Color.Transparent, Color(0xFF080B14)),
-                                                                    startY = start,
+                                                                    startY = coverBottom,
                                                                     endY = start + 116.dp.toPx(),
                                                                 )
                                                             } else {
-                                                                // Continue the dark poster through the reflection,
-                                                                // then return to the light surface before the card rail.
+                                                                // Begin the fade inside the artwork so the reflection
+                                                                // does not start with a hard, opaque horizontal seam.
                                                                 Brush.verticalGradient(
-                                                                    0f to Color(0xFF080B14),
-                                                                    .58f to Color(0xFF080B14),
+                                                                    0f to Color.Transparent,
+                                                                    .35f to Color(0xFF0B1020).copy(alpha = .94f),
+                                                                    .68f to Color(0xFF0B1020),
                                                                     1f to ambientScheme.background,
                                                                     startY = start,
-                                                                    endY = start + 260.dp.toPx(),
+                                                                    endY = start + 450.dp.toPx(),
                                                                 )
                                                             },
                                                             topLeft = Offset(0f, start),
