@@ -4693,10 +4693,13 @@ internal fun InsightPreviewCard(
                         .padding(
                             start = titleHorizontalPadding,
                             end = titleHorizontalPadding,
-                            top = (
-                                (if (isReadingHeader) 104f else if (prayerRecap.isNotEmpty()) 88f else 64f) -
-                                    16f * chromeProgress
-                                ).dp,
+                            // The label/action row follows the status-bar inset.
+                            // Anchor the reader below that actual row as well as
+                            // its normal editorial offset on every screen size.
+                            top = (maxOf(
+                                if (isReadingHeader) 104.dp else if (prayerRecap.isNotEmpty()) 88.dp else 64.dp,
+                                tagTopInset + 56.dp,
+                            ) - 16.dp * chromeProgress),
                             bottom = (24f - 16f * chromeProgress).dp,
                         ),
                     spacing = 12.dp,

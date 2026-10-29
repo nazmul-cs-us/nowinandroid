@@ -27,6 +27,7 @@ import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_prayer_background
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertTrue
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -83,8 +84,11 @@ class ExpandedSalahLayoutTest {
         }
         compose.mainClock.advanceTimeBy(1_200)
         compose.waitForIdle()
-        compose.onNodeWithText("Today's salah").fetchSemanticsNode()
-        compose.onNodeWithText("Hadith for Fajr").fetchSemanticsNode()
+        val tileLabel = compose.onNodeWithText("Today's salah", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val hadithHeading = compose.onNodeWithText("Hadith for Fajr", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("Hadith heading must clear the tile label", hadithHeading.top > tileLabel.bottom)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/expanded_salah_header.png")
     }
 }

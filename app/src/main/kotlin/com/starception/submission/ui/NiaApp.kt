@@ -453,7 +453,9 @@ private fun NiaFloatingBottomBar(
             val colorScheme = MaterialTheme.colorScheme
             val portraitDark = darkTheme && !vertical
             val portraitLight = !darkTheme && !vertical
-            val navBarHeight = 50.dp
+            // Keep the same full-height portrait navigation on Home and the
+            // other destinations; the compact Home variant shortened the pill.
+            val navBarHeight = if (vertical) 50.dp else 56.dp
             val capsuleGap = 4.dp
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
