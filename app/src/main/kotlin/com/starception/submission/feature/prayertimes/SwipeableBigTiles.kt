@@ -4659,7 +4659,8 @@ private fun InsightPreviewCard(
                         .padding(
                             start = titleHorizontalPadding,
                             end = titleHorizontalPadding,
-                            top = (64f - 16f * chromeProgress).dp,
+                            top = ((if (prayerRecap.isNotEmpty()) 88f else 64f) -
+                                16f * chromeProgress).dp,
                             bottom = (24f - 16f * chromeProgress).dp,
                         ),
                     spacing = 12.dp,

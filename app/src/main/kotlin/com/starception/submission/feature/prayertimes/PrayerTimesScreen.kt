@@ -3602,15 +3602,6 @@ fun PrayerTimesScreen(
                                                     }
                                                 }
                                             }
-                                            .then(
-                                                if (darkHome || !insightTileExpanded) Modifier else Modifier.background(
-                                                    Brush.verticalGradient(
-                                                        0f to Color.White.copy(alpha = .28f),
-                                                        .45f to Color.White.copy(alpha = .91f),
-                                                        1f to Color.White,
-                                                    ),
-                                                )
-                                            )
                                             .padding(horizontal = feedGutter)
                                             .padding(
                                                 top = feedTopPadding,
@@ -3821,7 +3812,7 @@ fun PrayerTimesScreen(
                                             }
                                         }
 
-                                        if (!insightTileImmersive) {
+                                        if (!insightTileExpanded) {
                                             HomeReflectionPrompt(focusedPage = coverPage) {
                                                 feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
                                             }
@@ -3855,7 +3846,7 @@ fun PrayerTimesScreen(
                                             Spacer(Modifier.height(28.dp))
                                         }
 
-                                        if (!insightTileImmersive) {
+                                        if (!insightTileExpanded) {
                                             // Treat adjustment guidance as part of the prayer section
                                             // header instead of a separate dashboard banner.
                                             Row(
@@ -4969,8 +4960,12 @@ fun PrayerTimesScreen(
                         // content. The viewport itself continues behind the
                         // floating navigation instead of ending in a fixed band.
                         if (!outerIsLandscape) {
-                            Spacer(Modifier.height(if (insightTileImmersive) 0.dp else
-                                navigationBarInset + 64.dp))
+                            Spacer(
+                                Modifier.height(
+                                    if (insightTileExpanded) navigationBarInset + 128.dp
+                                    else navigationBarInset + 64.dp,
+                                ),
+                            )
                         }
                     } // Close Column inside AppTopSearchBar content lambda
                 } // Close AppTopSearchBar scaffold (content lambda)
