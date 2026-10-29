@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -96,6 +97,15 @@ class ImmersiveHomeCoverTest {
         compose.waitForIdle()
         assertTrue("Artwork should move during the drag", positions.any { it > .05f && it < .95f })
         assertTrue("The next cover should settle", positions.lastOrNull()?.let { it > .95f } == true)
+    }
+
+    @Test fun pageMarksExposeAllFourSwipeDestinations() {
+        compose.setContent { CoverTestScene(dark = true, onOpen = {}) }
+        (1..5).forEach { page ->
+            compose.onNodeWithContentDescription("Show insight $page of 5").assertExists()
+        }
+        compose.onNodeWithContentDescription("Show insight 5 of 5").performClick()
+        compose.onNodeWithText("A thought for today").assertExists()
     }
 
     @Test fun swipingRightFromFirstCoverWrapsToTheLast() {

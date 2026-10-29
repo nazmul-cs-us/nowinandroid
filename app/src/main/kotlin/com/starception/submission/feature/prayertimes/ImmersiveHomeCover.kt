@@ -298,15 +298,13 @@ internal fun ImmersiveHomeCover(
                 Color(0xFF211C2B)
             }
             val indicatorPosition = (pagerState.currentPage + pagerState.currentPageOffsetFraction) % 5f
-            // Keep the visual footprint as quiet as the three-mark reference.
-            // A sliding window still represents all five swipeable insights.
-            val firstVisiblePage = (indicatorPage - 1).coerceIn(0, 2)
-            repeat(3) { slot ->
-                val index = firstVisiblePage + slot
+            // Show the current insight and all four swipe destinations. Narrow
+            // cells keep the full set as quiet as the reference's page marks.
+            repeat(5) { index ->
                 val directDistance = abs(indicatorPosition - index)
                 val emphasis = (1f - minOf(directDistance, 5f - directDistance)).coerceIn(0f, 1f)
                 Box(
-                    Modifier.size(width = 14.dp, height = 26.dp)
+                    Modifier.size(width = 10.dp, height = 26.dp)
                         .clickable {
                             scope.launch {
                                 val current = pagerState.currentPage % 5
