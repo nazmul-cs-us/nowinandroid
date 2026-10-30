@@ -71,6 +71,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -987,7 +988,29 @@ fun AppTopSearchBar(
     }
 }
 
-/** Two compact dark actions share one soft, sculpted recess. */
+private val HomeActionRecessShape = GenericShape { size, _ ->
+    val radius = size.height / 2f
+    val middle = size.width / 2f
+    val bend = radius * .375f
+    val shoulder = radius * .5f
+    val waist = radius * .375f
+    val notch = radius / 6f
+    moveTo(radius, 0f)
+    cubicTo(bend, 0f, 0f, bend, 0f, radius)
+    cubicTo(0f, size.height - bend, bend, size.height, radius, size.height)
+    cubicTo(middle - shoulder, size.height, middle - waist, size.height - notch,
+        middle, size.height - notch)
+    cubicTo(middle + waist, size.height - notch, middle + shoulder, size.height,
+        size.width - radius, size.height)
+    cubicTo(size.width - bend, size.height, size.width, size.height - bend,
+        size.width, radius)
+    cubicTo(size.width, bend, size.width - bend, 0f, size.width - radius, 0f)
+    cubicTo(middle + shoulder, 0f, middle + waist, notch, middle, notch)
+    cubicTo(middle - waist, notch, middle - shoulder, 0f, radius, 0f)
+    close()
+}
+
+/** Two compact dark actions share one softly inset, curved backing. */
 @Composable
 internal fun HomeHeaderDepthActions(
     isDarkTheme: Boolean,
@@ -995,20 +1018,15 @@ internal fun HomeHeaderDepthActions(
     onSettingsClick: () -> Unit,
 ) {
     Box(
-        modifier = Modifier.width(96.dp).height(48.dp).drawBehind {
-            val radius = 24.dp.toPx()
-            val leftCenter = Offset(radius, radius)
-            val rightCenter = Offset(size.width - radius, radius)
-            fun recess(center: Offset) = Brush.radialGradient(
-                0f to ComposeColor(0xFFE4E4EB).copy(alpha = if (isDarkTheme) .26f else .56f),
-                .72f to ComposeColor(0xFFD9DBE5).copy(alpha = if (isDarkTheme) .24f else .48f),
-                1f to ComposeColor.Transparent,
-                center = center,
-                radius = radius,
-            )
-            drawCircle(recess(leftCenter), radius = radius, center = leftCenter)
-            drawCircle(recess(rightCenter), radius = radius, center = rightCenter)
-        },
+        modifier = Modifier.width(100.dp).height(52.dp)
+            .background(
+                Brush.verticalGradient(
+                    0f to ComposeColor(0xFF777D89).copy(alpha = if (isDarkTheme) .15f else .23f),
+                    .25f to ComposeColor(0xFFD5D8E1).copy(alpha = if (isDarkTheme) .20f else .36f),
+                    1f to ComposeColor(0xFFF2F0F6).copy(alpha = if (isDarkTheme) .20f else .43f),
+                ),
+                HomeActionRecessShape,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
