@@ -235,6 +235,10 @@ fun InsightPager(
     forceSunForTesting: Boolean = false,
     collapseExpanded: Boolean = false,
     onExpandedPageChange: (Int?) -> Unit = {},
+    // A (page, counter) pair: the home cover asks the pager to reveal a tile
+    // the way a long-press does. The counter makes repeated requests for the
+    // same page observable to LaunchedEffect.
+    expandRequest: Pair<Int, Int>? = null,
     modifier: Modifier = Modifier,
 ) {
     val primaryPageCount = 5
@@ -281,6 +285,23 @@ fun InsightPager(
         if (collapseExpanded) {
             isAutomaticallySized = true
             onExpansionExtentChange(0f)
+        }
+    }
+    LaunchedEffect(expandRequest) {
+        expandRequest?.let { (requestedPage, _) ->
+            val target = requestedPage.coerceIn(0, primaryPageCount - 1)
+            pagerScope.launch {
+                pagerState.animateScrollToPage(middleLoopStart + target)
+            }
+            isAutomaticallySized = true
+            onExpansionExtentChange(
+                preferredInsightExpansionExtent(
+                    target,
+                    contentAwareRestingHeight,
+                    boundedMaxTileHeight,
+                    expandedHeightHints[target],
+                ),
+            )
         }
     }
     // Re-evaluate after content measurement and viewport changes, not just

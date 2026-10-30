@@ -51,12 +51,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -84,6 +91,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -255,6 +263,15 @@ fun PrayerTimesScreen(
     // The floating iOS volume HUD: active prayer + its adhan percent while
     // the user adjusts; null hides the capsule.
     var activeAdhanVolume by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    // The immersive home cover, ported from the Android home page. Tapping a
+    // cover page reveals the matching insight tile in the pager below it.
+    var coverPage by remember { mutableStateOf(0) }
+    var coverExpandRequest by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val coverReadingSurah = remember(today) {
+        com.starception.submission.feature.quran.dailyReading(today)
+    }
+    val coverNightArtwork = day.skyPhase == com.starception.submission.core.images.PrayerSkyPhase.Fajr ||
+        day.skyPhase == com.starception.submission.core.images.PrayerSkyPhase.Isha
     val contentStore = remember { SharedContentStore() }
     val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
     val playback by com.starception.submission.shared.media.QuranPlaybackBus.state.collectAsState()
@@ -510,18 +527,66 @@ fun PrayerTimesScreen(
                 // Tablets use their pane's viewport. Portrait phones supply a
                 // separate maximum after measuring their header and navigation.
                 val insightViewportHeight = (maxHeight - 96.dp).coerceAtLeast(220.dp)
-                @Composable
-                fun renderInsightPager(
-                    restingHeight: Dp,
-                    fullWidth: Boolean,
-                    pageMaxWidth: Dp?,
-                    maximumHeight: Dp = insightViewportHeight,
-                ) {
-                    InsightPager(
-                        forceMoonForTesting = forceMoonForTesting,
-                        forceSunForTesting = forceSunForTesting,
-                        initialExpandedPage = initialExpandedInsight,
-                        expansionExtent = insightExpansionExtent,
+                // The Android home for portrait phones: a fixed full-screen
+                // artwork backdrop behind the feed, the swipeable cover copy
+                // as the first feed item, then the reflection prompt, the
+                // explore rail, and the prayer dashboard. The insight reader
+                // takes over the top slot when a cover page opens it.
+                val isPhoneHome = !isTablet && maxWidth < maxHeight
+                val isPagerRevealed = insightExpansionExtent > 0.001f
+                val showPhoneHomeCover = isPhoneHome && !isPagerRevealed && !isInsightImmersive
+                val homeIsDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+                val homeSafeTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
+                val homePortraitScroll = rememberScrollState()
+                val coverScrollPosition = remember { mutableFloatStateOf(coverPage.toFloat()) }
+                val homeCoverHeightPx = remember { mutableIntStateOf(0) }
+                val coverEpochSeconds = remember {
+                    kotlin.time.Clock.System.now().epochSeconds.toDouble()
+                }
+                val phoneCoverSlotHeight = (maxHeight * .55f).coerceIn(450.dp, 620.dp)
+                // The feed starts under the overlay header; the reader slot
+                // opens at the very top of the safe area.
+                val homeTopGap by animateDpAsState(
+                    targetValue = if (showPhoneHomeCover) {
+                        homeSafeTop + 4.dp
+                    } else {
+                        8.dp
+                    },
+                    animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+                    label = "homeCoverTopGap",
+                )
+                // The Android home scrolls the reader fully into view when a
+                // cover page opens it.
+                LaunchedEffect(isPagerRevealed) {
+                    if (isPagerRevealed) homePortraitScroll.animateScrollTo(0)
+                }
+                fun openHomeInsight(page: Int) {
+                    coverPage = page
+                    // Reveal the insight reader for this page; the pager
+                    // refines its own extent after measuring.
+                    insightExpansionExtent = preferredInsightExpansionExtent(
+                        page,
+                        portraitInsightHeight,
+                        insightViewportHeight,
+                        null,
+                    ).coerceIn(0.02f, 0.98f)
+                    coverExpandRequest = page to ((coverExpandRequest?.second ?: 0) + 1)
+                }
+                 @Composable
+                 fun renderInsightPager(
+                     restingHeight: Dp,
+                     fullWidth: Boolean,
+                     pageMaxWidth: Dp?,
+                     maximumHeight: Dp = insightViewportHeight,
+                     expandRequest: Pair<Int, Int>? = null,
+                     initialPage: Int? = initialExpandedInsight,
+                 ) {
+                     InsightPager(
+                         expandRequest = expandRequest,
+                         initialExpandedPage = initialPage,
+                         forceMoonForTesting = forceMoonForTesting,
+                         forceSunForTesting = forceSunForTesting,
+                         expansionExtent = insightExpansionExtent,
                         onExpansionExtentChange = { insightExpansionExtent = it.coerceIn(0f, 1f) },
                         collapseExpanded = showAllPrayers,
                         onExpandedPageChange = { expandedInsightPage = it },
@@ -554,6 +619,24 @@ fun PrayerTimesScreen(
                         .fillMaxSize()
                         .align(Alignment.TopCenter),
                 ) {
+                    // The fixed full-screen artwork backdrop of the Android
+                    // home: edge-to-edge under the status bar, fixed behind
+                    // the scrolling feed, fading to the app surface once the
+                    // cover scrolls out of view.
+                    if (isPhoneHome) {
+                        HomeCoverArtworkBackdrop(
+                            position = coverScrollPosition,
+                            useNightArtwork = coverNightArtwork,
+                            isDarkTheme = homeIsDark,
+                            isExpanded = isPagerRevealed,
+                            epochSeconds = coverEpochSeconds,
+                            latitude = latitude,
+                            longitude = longitude,
+                            scrollOffsetPx = homePortraitScroll.value,
+                            coverHeightPx = homeCoverHeightPx.intValue,
+                            modifier = Modifier.matchParentSize(),
+                        )
+                    }
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -575,18 +658,20 @@ fun PrayerTimesScreen(
                                 start = if (useSideNavigation) 80.dp else 24.dp,
                                 end = 24.dp,
                             )
-                            .padding(top = 8.dp),
+                            .padding(top = if (isPhoneHome) homeTopGap else 8.dp),
                     ) {
                         if (!isInsightImmersive) {
-                            PrayerHomeHeader(
-                                onOpenSettings = onOpenSettings,
-                                onOpenProfile = onOpenProfile,
-                                onOpenSearch = { searchController?.open() ?: onOpenSearch() },
-                                searchTerm = day.nextPrayer ?: day.currentPrayer,
-                                onVoiceTap = { searchController?.openVoice() },
-                                onShowProfile = { showProfileSheet = true },
-                                searchController = searchController,
-                            )
+                            if (!showPhoneHomeCover) {
+                                PrayerHomeHeader(
+                                    onOpenSettings = onOpenSettings,
+                                    onOpenProfile = onOpenProfile,
+                                    onOpenSearch = { searchController?.open() ?: onOpenSearch() },
+                                    searchTerm = day.nextPrayer ?: day.currentPrayer,
+                                    onVoiceTap = { searchController?.openVoice() },
+                                    onShowProfile = { showProfileSheet = true },
+                                    searchController = searchController,
+                                )
+                            }
                             if (showProfileSheet) {
                                 HomeProfileSheet(
                                     onOpenProfile = {
@@ -604,7 +689,9 @@ fun PrayerTimesScreen(
                                     onDismiss = { showProfileSheet = false },
                                 )
                             }
-                            Spacer(Modifier.height(10.dp))
+                            if (!showPhoneHomeCover) {
+                                Spacer(Modifier.height(10.dp))
+                            }
                         }
 
                         if (useTwoPaneLayout) {
@@ -754,18 +841,94 @@ fun PrayerTimesScreen(
                                     prayerSectionMinimumHeight = minimumSchedule.value,
                                     fullLocationHeight = 58f,
                                 )
-                                val scheduleHeight = (maxHeight - phoneInsightHeight -
-                                    (if (showAllPrayers) 0.dp else phoneLocationHeight) -
-                                    sectionGap * 3 - 4.dp).coerceAtLeast(0.dp)
-                                Column(
-                                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                                    verticalArrangement = Arrangement.spacedBy(sectionGap),
-                                ) {
-                                    Box(Modifier.onSizeChanged {
-                                        phoneInsightHeight = with(phoneDensity) { it.height.toDp() }
-                                    }) {
-                                        renderInsightPager(phoneRestingInsight, false, null, phoneMaximumInsight)
-                                    }
+                                  val scheduleHeight = (maxHeight - phoneInsightHeight -
+                                      (if (showAllPrayers) 0.dp else phoneLocationHeight) -
+                                      sectionGap * 3 - 4.dp).coerceAtLeast(0.dp)
+                                  // Captured for the scrolling column below: its content
+                                  // lambda leaves the BoxWithConstraints receiver scope.
+                                  val phoneViewportWidth = maxWidth
+                                  Column(
+                                      modifier = Modifier.fillMaxSize()
+                                          .verticalScroll(homePortraitScroll),
+                                      verticalArrangement = Arrangement.spacedBy(sectionGap),
+                                  ) {
+                                      // The insight reader slot, Android home order: it
+                                      // takes over the top of the feed when a cover page
+                                      // or rail card opens it, and collapses back to zero
+                                      // otherwise. The collapsed container reports zero
+                                      // height, which keeps the schedule budget in sync.
+                                      // Landscape phones keep the carousel in flow — the
+                                      // cover is a portrait composition.
+                                      AnimatedVisibility(
+                                          visible = isPagerRevealed || !isPhoneHome,
+                                          enter = expandVertically(
+                                              animationSpec = tween(
+                                                  durationMillis = 420,
+                                                  easing = FastOutSlowInEasing,
+                                              ),
+                                          ) + fadeIn(animationSpec = tween(durationMillis = 280)),
+                                          exit = shrinkVertically(
+                                              animationSpec = tween(
+                                                  durationMillis = 360,
+                                                  easing = FastOutSlowInEasing,
+                                              ),
+                                          ) + fadeOut(animationSpec = tween(durationMillis = 180)),
+                                          modifier = Modifier.onSizeChanged {
+                                              phoneInsightHeight = with(phoneDensity) { it.height.toDp() }
+                                          },
+                                      ) {
+                                          Box {
+                                              renderInsightPager(
+                                                  phoneRestingInsight,
+                                                  false,
+                                                  null,
+                                                  phoneMaximumInsight,
+                                                  coverExpandRequest,
+                                                  coverPage,
+                                              )
+                                          }
+                                      }
+                                      // The swipeable cover copy, full-bleed over the
+                                      // fixed backdrop: requiredWidth overflows the feed
+                                      // gutters symmetrically and the outer column clips
+                                      // at the screen bounds.
+                                      AnimatedVisibility(
+                                          visible = !isPagerRevealed,
+                                          modifier = Modifier
+                                              .align(Alignment.CenterHorizontally)
+                                              .requiredWidth(phoneViewportWidth + 48.dp)
+                                              .height(phoneCoverSlotHeight)
+                                              .onSizeChanged {
+                                                  homeCoverHeightPx.intValue = it.height
+                                              }
+                                              .clipToBounds(),
+                                      ) {
+                                          ImmersiveHomeCover(
+                                              selectedPage = coverPage,
+                                              useNightArtwork = coverNightArtwork,
+                                              nextPrayerName = day.nextPrayer.orEmpty(),
+                                              nextPrayerCountdown = day.countdown,
+                                              currentPrayerName = day.currentPrayer.orEmpty(),
+                                              readingSurahName = coverReadingSurah.nameEnglish,
+                                              readingSurahNumber = coverReadingSurah.number,
+                                              onSelectionChanged = { coverPage = it },
+                                              onScrollPositionChanged = {
+                                                  coverScrollPosition.floatValue = it
+                                              },
+                                              onOpen = ::openHomeInsight,
+                                          )
+                                      }
+                                      if (!isPagerRevealed) {
+                                          HomeReflectionPrompt(
+                                              focusedPage = coverPage,
+                                              onDarkCover = !homeIsDark,
+                                              onClick = { openHomeInsight(coverPage) },
+                                          )
+                                          HomeArtworkRail(
+                                              focusedPage = coverPage,
+                                              useNightArtwork = coverNightArtwork,
+                                          ) { card, _ -> openHomeInsight(card.page) }
+                                      }
                                     if (!isInsightImmersive) {
                                         val scheduleLayout = homePrayerScheduleLayout(
                                             scheduleHeight.value,
@@ -837,6 +1000,39 @@ fun PrayerTimesScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    // The header overlays the cover artwork, Android-home
+                    // style: status-bar padded, fixed above the backdrop, and
+                    // it fades away as the feed scrolls or a reader opens.
+                    if (isPhoneHome) {
+                        val headerFadeDistancePx = with(LocalDensity.current) { 96.dp.toPx() }
+                        val headerVisibility = if (isPagerRevealed) 0f else
+                            (1f - homePortraitScroll.value / headerFadeDistancePx)
+                                .coerceIn(0f, 1f)
+                        AnimatedVisibility(
+                            visible = showPhoneHomeCover,
+                            enter = fadeIn(tween(durationMillis = 320, easing = FastOutSlowInEasing)),
+                            exit = fadeOut(tween(durationMillis = 220, easing = FastOutSlowInEasing)),
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .graphicsLayer { alpha = headerVisibility }
+                                .windowInsetsPadding(
+                                    WindowInsets.safeDrawing.only(WindowInsetsSides.Top),
+                                )
+                                .padding(horizontal = 24.dp),
+                        ) {
+                            PrayerHomeHeader(
+                                onOpenSettings = onOpenSettings,
+                                onOpenProfile = onOpenProfile,
+                                onOpenSearch = { searchController?.open() ?: onOpenSearch() },
+                                searchTerm = day.nextPrayer ?: day.currentPrayer,
+                                onVoiceTap = { searchController?.openVoice() },
+                                onShowProfile = { showProfileSheet = true },
+                                searchController = searchController,
+                            )
                         }
                     }
 

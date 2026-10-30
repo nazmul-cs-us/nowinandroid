@@ -483,8 +483,8 @@ private fun createPrayerTimesViewController(
         val nudgePreview = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--preview-deenly-nudge" }
         }
-        // Open Prayer Now expanded by default. UI tests can still select a
-        // different logical page with --expand-insight=<0..4>.
+        // The home opens on the cover, Android-style. UI tests can still open
+        // a specific logical page directly with --expand-insight=<0..4>.
         val expandInsight = remember {
             NSProcessInfo.processInfo.arguments
                 .mapNotNull { it as? String }
@@ -492,7 +492,6 @@ private fun createPrayerTimesViewController(
                 ?.substringAfter('=')
                 ?.toIntOrNull()
                 ?.takeIf { it in 0..4 }
-                ?: 0
         }
         val showAllPrayers = remember {
             NSProcessInfo.processInfo.arguments.any { it == "--show-all-prayers" }
