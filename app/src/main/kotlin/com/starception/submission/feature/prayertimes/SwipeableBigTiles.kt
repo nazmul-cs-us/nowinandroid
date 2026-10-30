@@ -2719,7 +2719,11 @@ internal fun SwipeableBigTiles(
 
             if (isImmersive || (immersiveHome && expansionProgress > 0.64f)) {
                 val controlTopInset = if (focusedActionTopInWindowPx.isFinite()) {
-                    with(density) { (focusedActionTopInWindowPx - stripTopInWindowPx).toDp() }
+                    with(density) {
+                        calculateFocusedInsightControlTopInset(
+                            (focusedActionTopInWindowPx - stripTopInWindowPx).toDp(),
+                        )
+                    }
                 } else {
                     immersiveInsightControlTopInset(stripTopInWindowPx)
                 }
@@ -3266,6 +3270,9 @@ private fun immersiveInsightControlTopInset(topInWindowPx: Float): Dp {
 
 internal fun calculateImmersiveInsightControlInset(safeTop: Dp, occupiedTop: Dp): Dp =
     (maxOf(24.dp, safeTop) - occupiedTop + 12.dp).coerceAtLeast(12.dp)
+
+internal fun calculateFocusedInsightControlTopInset(focusedDelta: Dp): Dp =
+    focusedDelta.coerceAtLeast(12.dp)
 
 @Composable
 internal fun InsightPreviewCard(
