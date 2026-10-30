@@ -270,15 +270,15 @@ internal fun ImmersiveHomeCover(
         }.collect(onScrollPositionChanged)
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // Keep the copy on the water/floor, below the focal artwork. Move the
-        // page dots with it so they retain a clear gap beneath the detail line.
-        val pagePosition = (pagerState.currentPage + pagerState.currentPageOffsetFraction) % 5f
-        val prayerDistance = minOf(pagePosition, 5f - pagePosition)
-        val prayerFocus = (1f - prayerDistance).coerceIn(0f, 1f)
-        val indicatorBottom = maxHeight * (.05f - .038f * prayerFocus)
+        // Keep the copy on the water/floor, below the focal artwork. The page
+        // dots share Prayer Now's baseline on every page so neither the copy
+        // nor the dots jump while swiping between cover pages.
+        val indicatorBottom = maxHeight * .012f
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { absolutePage ->
             val page = absolutePage % 5
-            val copyBottom = maxHeight * (if (page == 0) .07f else .12f)
+            // Every cover keeps its copy on the same water/floor baseline as
+            // Prayer Now so the eyebrow does not jump while swiping pages.
+            val copyBottom = maxHeight * .07f
             val useLightText = homeCoverCopyUsesLightText(page, useNightArtwork, isDarkTheme)
             val ink = if (useLightText) Color.White else Color(0xFF211C2B)
             val secondaryInk = ink.copy(alpha = if (useLightText) .80f else .72f)
