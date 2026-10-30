@@ -48,6 +48,7 @@ class ExpandedPrayerNowArtworkTest {
                             supportingText = "1h 15m since Fajr",
                             backgroundPainterRes = Res.drawable.home_cover_prayer_night_portrait,
                             backgroundBaseScale = PRAYER_POSTER_ARTWORK_SCALE,
+                            disableExpandedArtworkBlur = true,
                             compactProgress = 0f,
                             expansionProgress = 1f,
                             isExpanded = true,
