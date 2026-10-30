@@ -216,12 +216,12 @@ fun PrayerHomeCoverCelestialLayer(
         val fieldWidth = maxWidth
         val fieldHeight = maxHeight
         val diameter = (fieldWidth.value * .12f).coerceIn(35f, 55f).dp
-        // The portrait artwork's mountain line begins around 30% height. Keep
-        // the disc in open sky, away from the greeting and the mosque towers.
+        // The desert cover leaves open sky between the date palms. Keep the
+        // disc there, away from fronds and the Home greeting.
         val altitude = if (showSun) snapshot.sunAltAz.altitudeDeg else snapshot.moonAltAz.altitudeDeg
         val azimuth = if (showSun) snapshot.sunAltAz.azimuthDeg else snapshot.moonAltAz.azimuthDeg
         val horizontalDrift = sin((azimuth - 180.0) * PI / 180.0).toFloat()
-        val x = if (showSun) .66f + .04f * horizontalDrift else .23f + .05f * horizontalDrift
+        val x = if (showSun) .49f + .025f * horizontalDrift else .42f + .025f * horizontalDrift
         val y = (.26f - .04f * (altitude / 90.0).coerceIn(0.0, 1.0).toFloat())
             .coerceIn(.22f, .26f)
         val position = Offset(x, y)

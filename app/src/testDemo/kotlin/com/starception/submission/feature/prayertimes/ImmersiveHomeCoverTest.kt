@@ -93,14 +93,14 @@ class ImmersiveHomeCoverTest {
         assertFalse(homeCoverHeaderUsesLightText(page = 2, useNightArtwork = false))
     }
 
-    @Test fun daytimePrayerCoverShowsSunAboveMountains() {
+    @Test fun daytimePrayerCoverShowsSunBetweenDatePalms() {
         compose.setContent {
             CoverTestScene(dark = false, epochSeconds = 1_793_174_400.0, onOpen = {})
         }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_prayer_sun.png")
     }
 
-    @Test fun nighttimePrayerCoverShowsMoonAboveMountains() {
+    @Test fun nighttimePrayerCoverShowsMoonBetweenDatePalms() {
         compose.setContent {
             CoverTestScene(dark = true, epochSeconds = 1_793_214_000.0, onOpen = {})
         }
