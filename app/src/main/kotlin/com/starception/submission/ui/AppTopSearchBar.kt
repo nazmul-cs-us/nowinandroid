@@ -71,12 +71,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -114,6 +112,7 @@ import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -988,56 +987,21 @@ fun AppTopSearchBar(
     }
 }
 
-private val HomeActionRecessShape = GenericShape { size, _ ->
-    val radius = size.height / 2f
-    val middle = size.width / 2f
-    val bend = radius * .375f
-    val shoulder = radius * .5f
-    val waist = radius * .375f
-    val notch = radius / 6f
-    moveTo(radius, 0f)
-    cubicTo(bend, 0f, 0f, bend, 0f, radius)
-    cubicTo(0f, size.height - bend, bend, size.height, radius, size.height)
-    cubicTo(middle - shoulder, size.height, middle - waist, size.height - notch,
-        middle, size.height - notch)
-    cubicTo(middle + waist, size.height - notch, middle + shoulder, size.height,
-        size.width - radius, size.height)
-    cubicTo(size.width - bend, size.height, size.width, size.height - bend,
-        size.width, radius)
-    cubicTo(size.width, bend, size.width - bend, 0f, size.width - radius, 0f)
-    cubicTo(middle + shoulder, 0f, middle + waist, notch, middle, notch)
-    cubicTo(middle - waist, notch, middle - shoulder, 0f, radius, 0f)
-    close()
-}
-
-/** Two compact dark actions share one softly inset, curved backing. */
+/** Two compact dark actions sit in individual soft circular recesses. */
 @Composable
 internal fun HomeHeaderDepthActions(
     isDarkTheme: Boolean,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier.width(100.dp).height(52.dp)
-            .background(
-                Brush.verticalGradient(
-                    0f to ComposeColor(0xFF777D89).copy(alpha = if (isDarkTheme) .15f else .23f),
-                    .25f to ComposeColor(0xFFD5D8E1).copy(alpha = if (isDarkTheme) .20f else .36f),
-                    1f to ComposeColor(0xFFF2F0F6).copy(alpha = if (isDarkTheme) .20f else .43f),
-                ),
-                HomeActionRecessShape,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-            HomeHeaderDepthAction("Search", onSearchClick) {
-                Icon(Icons.Default.Search, contentDescription = null,
-                    tint = ComposeColor.White, modifier = Modifier.size(19.dp))
-            }
-            HomeHeaderDepthAction("Settings", onSettingsClick) {
-                Icon(Icons.Default.Settings, contentDescription = null,
-                    tint = ComposeColor.White, modifier = Modifier.size(19.dp))
-            }
+    Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+        HomeHeaderDepthAction("Search", isDarkTheme, onSearchClick) {
+            Icon(Icons.Default.Search, contentDescription = null,
+                tint = ComposeColor.White, modifier = Modifier.size(19.dp))
+        }
+        HomeHeaderDepthAction("Settings", isDarkTheme, onSettingsClick) {
+            Icon(painterResource(R.drawable.ic_app_top_bar_settings_24), contentDescription = null,
+                tint = ComposeColor.White, modifier = Modifier.size(19.dp))
         }
     }
 }
@@ -1045,11 +1009,22 @@ internal fun HomeHeaderDepthActions(
 @Composable
 private fun HomeHeaderDepthAction(
     label: String,
+    isDarkTheme: Boolean,
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = Modifier.size(48.dp)
+        modifier = Modifier.size(50.dp)
+            .drawBehind {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        0f to ComposeColor(0xFFE4E3EB).copy(alpha = if (isDarkTheme) .32f else .60f),
+                        .72f to ComposeColor(0xFFE4E3EB).copy(alpha = if (isDarkTheme) .32f else .60f),
+                        1f to ComposeColor.Transparent,
+                        radius = size.minDimension / 2f,
+                    ),
+                )
+            }
             .semantics { contentDescription = label }
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
