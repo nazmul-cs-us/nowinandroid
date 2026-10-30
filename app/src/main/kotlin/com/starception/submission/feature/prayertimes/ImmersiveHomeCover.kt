@@ -115,17 +115,23 @@ internal fun homeCoverCopyUsesLightText(
 ): Boolean = true
 
 /** Keep the cover title readable while the artwork fades into the reflection. */
-internal fun homeCoverScrim(): Brush = Brush.verticalGradient(
+internal fun homeCoverScrim(prayerVisibility: Float): Brush = Brush.verticalGradient(
     0f to Color(0xFF071C30).copy(alpha = .12f),
-    .48f to Color(0xFF0B1D2C).copy(alpha = .22f),
-    .72f to Color(0xFF071725).copy(alpha = .55f),
+    (.48f + .03f * prayerVisibility) to Color(0xFF0B1D2C).copy(alpha = .22f),
+    (.72f + .03f * prayerVisibility) to Color(0xFF071725).copy(alpha = .55f),
     .91f to Color(0xFF080B14).copy(alpha = .98f),
     1f to Color(0xFF080B14),
 )
 
 /** A blurred copy of the same scene gives the cover copy a soft, readable backdrop. */
 @Composable
-internal fun HomeCoverArtworkBlur(lowerPage: Int, swipeProgress: Float, useNightArtwork: Boolean) {
+internal fun HomeCoverArtworkBlur(
+    lowerPage: Int,
+    swipeProgress: Float,
+    useNightArtwork: Boolean,
+    prayerVisibility: Float,
+) {
+    val shiftDown = .06f * prayerVisibility
     Box(
         Modifier.fillMaxSize()
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -134,10 +140,10 @@ internal fun HomeCoverArtworkBlur(lowerPage: Int, swipeProgress: Float, useNight
                 drawRect(
                     brush = Brush.verticalGradient(
                         0f to Color.Transparent,
-                        .48f to Color.Transparent,
-                        .55f to Color.White.copy(alpha = .88f),
-                        .67f to Color.White.copy(alpha = .88f),
-                        .76f to Color.Transparent,
+                        (.48f + shiftDown) to Color.Transparent,
+                        (.55f + shiftDown) to Color.White.copy(alpha = .88f),
+                        (.67f + shiftDown) to Color.White.copy(alpha = .88f),
+                        (.76f + shiftDown) to Color.Transparent,
                         1f to Color.Transparent,
                     ),
                     blendMode = BlendMode.DstIn,
@@ -211,9 +217,9 @@ internal fun HomeCoverArtworkBackdrop(
             modifier = Modifier.graphicsLayer { alpha = prayerVisibility },
         )
     }
-    if (!isExpanded) HomeCoverArtworkBlur(lowerPage, swipeProgress, useNightArtwork)
+    if (!isExpanded) HomeCoverArtworkBlur(lowerPage, swipeProgress, useNightArtwork, prayerVisibility)
     Box(Modifier.fillMaxSize().background(
-        homeCoverScrim()
+        homeCoverScrim(prayerVisibility)
     ))
     // The cover scene is fixed behind the vertically scrolling feed. Once the
     // cover leaves the viewport, fully cover it so no stale artwork shows
@@ -266,10 +272,13 @@ internal fun ImmersiveHomeCover(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Keep the copy on the water/floor, below the focal artwork. Move the
         // page dots with it so they retain a clear gap beneath the detail line.
-        val copyBottom = maxHeight * .12f
-        val indicatorBottom = maxHeight * .05f
+        val pagePosition = (pagerState.currentPage + pagerState.currentPageOffsetFraction) % 5f
+        val prayerDistance = minOf(pagePosition, 5f - pagePosition)
+        val prayerFocus = (1f - prayerDistance).coerceIn(0f, 1f)
+        val indicatorBottom = maxHeight * (.05f - .038f * prayerFocus)
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { absolutePage ->
             val page = absolutePage % 5
+            val copyBottom = maxHeight * (if (page == 0) .07f else .12f)
             val useLightText = homeCoverCopyUsesLightText(page, useNightArtwork, isDarkTheme)
             val ink = if (useLightText) Color.White else Color(0xFF211C2B)
             val secondaryInk = ink.copy(alpha = if (useLightText) .80f else .72f)
