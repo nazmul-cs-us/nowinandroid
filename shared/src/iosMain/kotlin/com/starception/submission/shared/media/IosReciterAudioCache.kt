@@ -1,7 +1,6 @@
 package com.starception.submission.shared.audio
 
 import com.starception.submission.core.assets.AssetPlatform
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import platform.Foundation.NSURL
@@ -56,5 +55,5 @@ object IosReciterAudioCache {
 
     fun delete(reciter: QuranReciterSource): Boolean =
         reciter.availableSurahs.filter { it in 1..114 }
-            .all { AssetPlatform.delete(key(reciter.id, it)) }
+            .map { AssetPlatform.delete(key(reciter.id, it)) }.all { it }
 }
