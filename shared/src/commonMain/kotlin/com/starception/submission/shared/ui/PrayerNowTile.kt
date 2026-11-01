@@ -214,7 +214,10 @@ fun PrayerNowTile(
         )
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(11.dp),
+            modifier = Modifier.fillMaxWidth().padding(
+                start = 11.dp, top = 11.dp, bottom = 11.dp,
+                end = if (fluidFullBleed && isExpanded) 64.dp else 11.dp,
+            ),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

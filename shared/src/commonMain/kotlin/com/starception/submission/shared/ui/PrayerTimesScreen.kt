@@ -829,7 +829,7 @@ fun PrayerTimesScreen(
                                 // allowed to fill the viewport, including the pager's
                                 // 34dp heading and 8dp gap. Keep the compact budget
                                 // separate so normal Home still fits its prayer rows.
-                                val phoneMaximumInsight = (maxHeight - 42.dp).coerceAtLeast(140.dp)
+                                val phoneMaximumInsight = (maxHeight - if (isPhoneHome) 0.dp else 42.dp).coerceAtLeast(140.dp)
                                 val phoneRestingInsight = minOf(
                                     portraitInsightHeight,
                                     maxHeight - minimumSchedule - 100.dp,

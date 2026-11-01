@@ -87,6 +87,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -490,6 +491,7 @@ fun InsightPager(
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
+        if (!immersiveHome) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -590,6 +592,8 @@ fun InsightPager(
                     }
                 }
             }
+        }
+
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -1158,6 +1162,24 @@ fun InsightPager(
                     }
                 }
             }
+            // Android's immersive reader keeps its close control on the artwork,
+            // in the top-right control slot, instead of a separate heading row.
+            if (immersiveHome && isExpanded) {
+                CupertinoSurface(
+                    onClick = { onExpansionExtentChange(0f) },
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.48f),
+                    modifier = Modifier.align(Alignment.TopEnd)
+                        .padding(top = 12.dp, end = 12.dp)
+                        .size(40.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.Close, contentDescription = "Collapse insight",
+                            tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+
         }
     }
 }
@@ -2802,7 +2824,7 @@ private fun ArtworkTile(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .graphicsLayer { alpha = 1f - chromeProgress }
-                        .padding(top = 11.dp, end = 11.dp),
+                        .padding(top = 11.dp, end = if (fluidFullBleed && isExpanded) 64.dp else 11.dp),
                 ) {
                     trailing()
                 }
