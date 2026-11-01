@@ -49,6 +49,22 @@ class AssetDownloadManager @Inject constructor(
     private val okHttpClient: OkHttpClient,
 ) {
     private val sharedAssets = CloudAssetRepository(AndroidAssetPlatform(context, okHttpClient))
+    /** External reciter audio is stored separately from CDN-manifest assets. */
+    val reciterDownloads = com.starception.submission.feature.quran.ReciterDownloadManager.get(context)
+
+    suspend fun availableReciters() =
+        com.starception.submission.feature.quran.ReciterCatalog.fetch()
+
+    fun downloadReciter(
+        reciter: com.starception.submission.feature.quran.ReciterCatalog.Reciter,
+        surahs: Set<Int> = reciter.surahs,
+    ) = reciterDownloads.download(reciter, surahs)
+
+    fun cancelReciterDownload(reciterId: String) = reciterDownloads.cancel(reciterId)
+
+    fun deleteReciterDownloads(reciter: com.starception.submission.feature.quran.ReciterCatalog.Reciter) =
+        reciterDownloads.delete(reciter)
+
     sealed class DownloadState {
         data object NotStarted : DownloadState()
         data class Downloading(
