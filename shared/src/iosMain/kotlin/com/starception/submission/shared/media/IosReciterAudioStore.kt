@@ -1,6 +1,8 @@
 package com.starception.submission.shared.audio
 
 import com.starception.submission.core.assets.AssetPlatform
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import platform.Foundation.NSURL
 
 /**
@@ -42,6 +44,7 @@ object IosReciterAudioStore {
         val ordered = source.availableSurahs.filter { it in 1..114 }.sorted()
         var completed = 0
         for (surah in ordered) {
+            currentCoroutineContext().ensureActive()
             if (download(source, surah) != null) completed++
             onCompleted(completed, ordered.size)
         }
