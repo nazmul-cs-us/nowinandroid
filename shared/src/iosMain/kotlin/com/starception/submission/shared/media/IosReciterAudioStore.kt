@@ -27,6 +27,7 @@ object IosReciterAudioStore {
         onProgress: (Long, Long) -> Unit = { _, _ -> },
     ): String? {
         val url = source.urlForSurah(surah) ?: return null
+        require(source.id.matches(Regex("[0-9]+-[0-9]+"))) { "Invalid reciter identifier" }
         val cdnKey = key(source.id, surah)
         cachedUrl(source.id, surah)?.let { return it }
         val path = AssetPlatform.download(
@@ -45,7 +46,8 @@ object IosReciterAudioStore {
         var completed = 0
         for (surah in ordered) {
             currentCoroutineContext().ensureActive()
-            if (download(source, surah) != null) completed++
+            if (download(source, surah) == null) return completed
+            completed++
             onCompleted(completed, ordered.size)
         }
         return completed
