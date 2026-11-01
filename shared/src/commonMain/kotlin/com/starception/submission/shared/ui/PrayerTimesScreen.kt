@@ -265,7 +265,7 @@ fun PrayerTimesScreen(
     var activeAdhanVolume by remember { mutableStateOf<Pair<String, Int>?>(null) }
     // The immersive home cover, ported from the Android home page. Tapping a
     // cover page reveals the matching insight tile in the pager below it.
-    var coverPage by remember { mutableStateOf(0) }
+    var coverPage by remember { mutableStateOf(initialExpandedInsight ?: 0) }
     var coverExpandRequest by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val coverReadingSurah = remember(today) {
         com.starception.submission.feature.quran.dailyReading(today)
@@ -564,7 +564,7 @@ fun PrayerTimesScreen(
                     coverPage = page
                     // Reveal the insight reader for this page; the pager
                     // refines its own extent after measuring.
-                    insightExpansionExtent = preferredInsightExpansionExtent(
+                    insightExpansionExtent = if (isPhoneHome) 1f else preferredInsightExpansionExtent(
                         page,
                         portraitInsightHeight,
                         insightViewportHeight,
@@ -582,6 +582,7 @@ fun PrayerTimesScreen(
                      initialPage: Int? = initialExpandedInsight,
                  ) {
                      InsightPager(
+                         immersiveHome = isPhoneHome,
                          expandRequest = expandRequest,
                          initialExpandedPage = initialPage,
                          forceMoonForTesting = forceMoonForTesting,
@@ -877,10 +878,11 @@ fun PrayerTimesScreen(
                                               phoneInsightHeight = with(phoneDensity) { it.height.toDp() }
                                           },
                                       ) {
-                                          Box {
+                                          Box(Modifier.align(Alignment.CenterHorizontally)
+                                              .requiredWidth(if (isPhoneHome) phoneViewportWidth + 48.dp else phoneViewportWidth)) {
                                               renderInsightPager(
                                                   phoneRestingInsight,
-                                                  false,
+                                                  isPhoneHome,
                                                   null,
                                                   phoneMaximumInsight,
                                                   coverExpandRequest,

@@ -108,3 +108,5 @@ venv/
 iosApp/*.xcodeproj
 iosApp/Sources/Info.plist
 iosApp/build/
+# Local Xcode build caches and indexes
+iosApp/.build/

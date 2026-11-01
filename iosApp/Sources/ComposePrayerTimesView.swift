@@ -29,6 +29,33 @@ struct ComposePrayerTimesView: UIViewControllerRepresentable {
 }
 
 @available(iOS 26.0, *)
+private final class ComposeTabHostController: UIViewController {
+    init(compose: () -> UIViewController) {
+        super.init(nibName: nil, bundle: nil)
+        view.backgroundColor = .clear
+        // The Compose root lives as a child pinned to every edge. Any safe-area
+        // notion SwiftUI has about this tab is carried on this wrapper, and the
+        // child views (rolled bars, etc.) consume it inside Compose itself.
+        let child = compose()
+        addChild(child)
+        view.addSubview(child.view)
+        child.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            child.view.topAnchor.constraint(equalTo: view.topAnchor),
+            child.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            child.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            child.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
+        child.didMove(toParent: self)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+}
+
+@available(iOS 26.0, *)
 struct ComposePrayerTimesTabView: UIViewControllerRepresentable {
     let tabIndex: Int
     let onSelectTab: (Int) -> Void
@@ -36,16 +63,18 @@ struct ComposePrayerTimesTabView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         // The Deenly GGUF inference service the shared suggestion flows call.
         DeenlyKnowledgeRuntime.shared.service = DeenlyKnowledgeServiceImpl.shared
-        return IosComposeRootKt.PrayerTimesTabViewController(
-            sherpaService: SherpaSpeechService.shared,
-            nowPlayingService: NowPlayingService.shared,
-            salahTfliteService: SalahTfliteServiceImpl(),
-            salah3DService: SalahScene3DHost(),
-            startBottomIndex: Int32(tabIndex),
-            onSelectBottom: { index in
-                onSelectTab(Int(index.int32Value))
-            }
-        )
+        return ComposeTabHostController {
+            IosComposeRootKt.PrayerTimesTabViewController(
+                sherpaService: SherpaSpeechService.shared,
+                nowPlayingService: NowPlayingService.shared,
+                salahTfliteService: SalahTfliteServiceImpl(),
+                salah3DService: SalahScene3DHost(),
+                startBottomIndex: Int32(tabIndex),
+                onSelectBottom: { index in
+                    onSelectTab(Int(index.int32Value))
+                }
+            )
+        }
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
@@ -815,7 +844,11 @@ struct NativePrayerTabsView: View {
                 Label("Voice", systemImage: bot.isGeneratingNudge ? "sparkles" : "waveform")
             }
         }
+        // Extend the tab container too: extending only its Compose child leaves
+        // the status-bar and home-indicator regions outside the rendered bounds.
+        .ignoresSafeArea(.container, edges: .all)
         .tabBarMinimizeBehavior(.automatic)
+        .scrollEdgeEffectHidden(true, for: .all)
         .tint(Color.accentColor)
         .overlay(alignment: .bottomTrailing) {
             if !insightImmersive {
@@ -858,12 +891,10 @@ struct NativePrayerTabsView: View {
 
     private func tabContent(_ index: Int) -> some View {
         ComposePrayerTimesTabView(tabIndex: index, onSelectTab: selectContentTab)
-            // Keep the native tab bar's safe area; only the top artwork extends.
-            .ignoresSafeArea(.container, edges: index == 0 ? .top : .all)
-            .clipped()
-            // Extend only the painted backdrop into the native tab safe area.
-            // The interactive Home layout still ends above the floating tabs.
-            .backgroundExtensionEffect()
+            // Paint artwork behind system bars; Compose applies safeDrawing
+            // insets to interactive content inside this full-screen surface.
+            .ignoresSafeArea(.container, edges: .all)
+            .scrollEdgeEffectHidden(true, for: .all)
             .toolbarBackground(.hidden, for: .tabBar)
             .toolbar(insightImmersive ? .hidden : .visible, for: .tabBar)
     }

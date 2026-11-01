@@ -97,6 +97,7 @@ fun PrayerNowTile(
     longitude: Double,
     tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
     isExpanded: Boolean = false,
+    fluidFullBleed: Boolean = false,
     forceMoonForTesting: Boolean = false,
     forceSunForTesting: Boolean = false,
     modifier: Modifier = Modifier,
@@ -119,12 +120,12 @@ fun PrayerNowTile(
     }
     val sceneAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = 0.40f)
     val cornerRadius by animateDpAsState(
-        targetValue = if (isExpanded) 32.dp else 26.dp,
+        targetValue = if (fluidFullBleed) 0.dp else if (isExpanded) 32.dp else 26.dp,
         animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
         label = "prayerNowCornerRadius",
     )
     val shadowElevation by animateDpAsState(
-        targetValue = if (isExpanded) 10.dp else 6.dp,
+        targetValue = if (fluidFullBleed) 0.dp else if (isExpanded) 10.dp else 6.dp,
         animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
         label = "prayerNowShadowElevation",
     )
@@ -173,7 +174,8 @@ fun PrayerNowTile(
         ) {
         Image(
             painter = painterResource(
-                if (isNight) Res.drawable.prayer_now_insight_night
+                if (fluidFullBleed) homeCoverArtwork(0, isNight)
+                else if (isNight) Res.drawable.prayer_now_insight_night
                 else Res.drawable.prayer_now_insight_day,
             ),
             contentDescription = null,

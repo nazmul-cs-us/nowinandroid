@@ -227,6 +227,7 @@ fun InsightPager(
     tileHeight: Dp = 220.dp,
     maxTileHeight: Dp = tileHeight + 104.dp,
     fullWidthPage: Boolean = false,
+    immersiveHome: Boolean = false,
     maxPageWidth: Dp? = null,
     initialExpandedPage: Int? = null,
     expansionExtent: Float = if (initialExpandedPage != null) 1f else 0f,
@@ -295,7 +296,7 @@ fun InsightPager(
             }
             isAutomaticallySized = true
             onExpansionExtentChange(
-                preferredInsightExpansionExtent(
+                if (immersiveHome) 1f else preferredInsightExpansionExtent(
                     target,
                     contentAwareRestingHeight,
                     boundedMaxTileHeight,
@@ -319,7 +320,7 @@ fun InsightPager(
     ) {
         if (isExpanded && isAutomaticallySized && !isResizeDragging && !pagerState.isScrollInProgress) {
             kotlinx.coroutines.delay(120L)
-            val target = preferredInsightExpansionExtent(
+            val target = if (immersiveHome) 1f else preferredInsightExpansionExtent(
                     settledLogicalPage,
                     contentAwareRestingHeight,
                     boundedMaxTileHeight,
@@ -492,12 +493,13 @@ fun InsightPager(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = if (immersiveHome) 24.dp else 0.dp)
                 .padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Insights",
+                text = if (immersiveHome) "For you" else "Insights",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontSize = 20.sp,
                     lineHeight = 24.sp,
@@ -596,7 +598,7 @@ fun InsightPager(
             // The spring may briefly overshoot, but pager spacing and padding
             // must remain non-negative.
             val boundedPageWidth = maxPageWidth?.let { minOf(maxWidth, it) } ?: maxWidth
-            val restingPageWidth = if (fullWidthPage) {
+            val restingPageWidth = if (fullWidthPage || immersiveHome) {
                 boundedPageWidth
             } else {
                 (tileHeight * (250f / 288f))
@@ -616,7 +618,7 @@ fun InsightPager(
                 pageSize = PageSize.Fixed(pageWidth),
                 pageSpacing = 14.dp * (1f - widthExpansion),
                 contentPadding = PaddingValues(
-                    end = if (fullWidthPage) 0.dp else 18.dp * (1f - widthExpansion),
+                    end = if (fullWidthPage || immersiveHome) 0.dp else 18.dp * (1f - widthExpansion),
                 ),
                 beyondViewportPageCount = if (isExpanded) 0 else 1,
                 modifier = Modifier
@@ -730,6 +732,7 @@ fun InsightPager(
                     ) { animatedLogicalPage ->
                     when (animatedLogicalPage) {
                         0 -> PrayerNowTile(
+                            fluidFullBleed = immersiveHome,
                             backgroundPageOffset = { pageOffset },
                             phase = day.skyPhase,
                             weather = day.skyWeather,
@@ -771,9 +774,10 @@ fun InsightPager(
                         )
 
                         1 -> ArtworkTile(
+                            fluidFullBleed = immersiveHome,
                             backgroundPageOffset = { pageOffset },
-                            artwork = Res.drawable.insight_prayer_background,
-                            foreground = Res.drawable.insight_prayer_foreground,
+                            artwork = if (immersiveHome) homeCoverArtwork(1, false) else Res.drawable.insight_prayer_background,
+                            foreground = if (immersiveHome) null else Res.drawable.insight_prayer_foreground,
                             foregroundScale = 0.84f,
                             foregroundOffsetYFraction = 0.08f,
                             isExpanded = isExpanded,
@@ -838,9 +842,10 @@ fun InsightPager(
                                 }
                             }
                             ArtworkTile(
+                                fluidFullBleed = immersiveHome,
                                 backgroundPageOffset = { pageOffset },
-                                artwork = Res.drawable.insight_quran_background,
-                                foreground = Res.drawable.insight_quran_foreground_v2,
+                                artwork = if (immersiveHome) homeCoverArtwork(2, false) else Res.drawable.insight_quran_background,
+                                foreground = if (immersiveHome) null else Res.drawable.insight_quran_foreground_v2,
                                 foregroundScale = 0.74f,
                                 foregroundOffsetYFraction = 0.09f,
                                 isExpanded = isExpanded,
@@ -954,8 +959,9 @@ fun InsightPager(
                             val smoothRotation by rememberSmoothCompassHeading(rawRotation.takeIf { heading.headingDegrees != null })
                             val arrowRotation = smoothRotation ?: rawRotation
                             ArtworkTile(
+                                fluidFullBleed = immersiveHome,
                                 backgroundPageOffset = { pageOffset },
-                                artwork = Res.drawable.insight_qibla_background,
+                                artwork = if (immersiveHome) homeCoverArtwork(3, false) else Res.drawable.insight_qibla_background,
                                 // The compact card already has a live heading
                                 // arrow. Omitting the decorative compass avoids
                                 // a static-compass-to-radar swap on expansion.
@@ -1036,8 +1042,9 @@ fun InsightPager(
                             // The model download is owned by the runtime, so
                             // it survives leaving this tile.
                             ArtworkTile(
+                                fluidFullBleed = immersiveHome,
                                 backgroundPageOffset = { pageOffset },
-                                artwork = Res.drawable.insight_suggestion,
+                                artwork = if (immersiveHome) homeCoverArtwork(4, false) else Res.drawable.insight_suggestion,
                                 isExpanded = isExpanded,
                                 minimumExpandedContentHeight = stageHeightHints[4] ?: 180.dp,
                                 onPreferredHeightChange = { measuredHeight: Dp ->
@@ -1101,7 +1108,7 @@ fun InsightPager(
             }
             if (!pagerState.isScrollInProgress) {
                 val focusedCornerRadius by animateDpAsState(
-                    targetValue = if (isExpanded) 32.dp else 26.dp,
+                    targetValue = if (immersiveHome) 0.dp else if (isExpanded) 32.dp else 26.dp,
                     animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
                     label = "insightGripCornerRadius",
                 )
@@ -2610,6 +2617,7 @@ private fun MissingModelDownloadCard(
 @Composable
 private fun ArtworkTile(
     artwork: DrawableResource,
+    fluidFullBleed: Boolean = false,
     foreground: DrawableResource? = null,
     foregroundScale: Float = 1f,
     foregroundOffsetXFraction: Float = 0f,
@@ -2638,12 +2646,12 @@ private fun ArtworkTile(
     // artwork never reveals the card's edge mid-swipe.
     val backgroundBaseScale = 1.065f
     val cornerRadius by animateDpAsState(
-        targetValue = if (isExpanded) 32.dp else 26.dp,
+        targetValue = if (fluidFullBleed) 0.dp else if (isExpanded) 32.dp else 26.dp,
         animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
         label = "insightCornerRadius",
     )
     val shadowElevation by animateDpAsState(
-        targetValue = if (isExpanded) 10.dp else 6.dp,
+        targetValue = if (fluidFullBleed) 0.dp else if (isExpanded) 10.dp else 6.dp,
         animationSpec = tween(InsightMotion.ExpansionMillis, easing = FastOutSlowInEasing),
         label = "insightShadowElevation",
     )
