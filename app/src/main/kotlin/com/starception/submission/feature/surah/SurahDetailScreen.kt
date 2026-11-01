@@ -1477,6 +1477,7 @@ fun SurahDetailScreen(
                 )
             }
             var reciterDownloading by remember { mutableStateOf<String?>(null) }
+            val reciterDownloadManager = remember(context) { com.starception.submission.feature.quran.ReciterDownloadManager(context.applicationContext) }
             LaunchedEffect(expandedSection) {
                 if (expandedSection == "reciter" && reciters.isEmpty()) {
                     reciterLoading = true
@@ -1802,6 +1803,37 @@ fun SurahDetailScreen(
                             }
                             reciterError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                             reciters.filter { surahNumber in it.surahs }.forEach { reciter ->
+                                val downloadState by reciterDownloadManager.observe(reciter)
+                                    .collectAsState()
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        "${downloadState.downloadedSurahs}/${downloadState.totalSurahs} offline",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        if (downloadState.downloading) "Cancel" else "Download all",
+                                        modifier = Modifier.clickable {
+                                            if (downloadState.downloading) reciterDownloadManager.cancel(reciter.id)
+                                            else reciterDownloadManager.download(reciter)
+                                        }.padding(8.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                    Text(
+                                        "Delete",
+                                        modifier = Modifier.clickable(enabled = !downloadState.downloading) {
+                                            reciterDownloadManager.delete(reciter)
+                                        }.padding(8.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                                downloadState.error?.let { error ->
+                                    Text(error, color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.labelSmall)
+                                }
                                 val label = reciter.name + " · " + reciter.riwaya
                                 Text(
                                     if (reciterDownloading == reciter.id) "Downloading… " + label else label,
