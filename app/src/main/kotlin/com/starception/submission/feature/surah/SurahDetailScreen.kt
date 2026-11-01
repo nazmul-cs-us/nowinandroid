@@ -1792,7 +1792,7 @@ fun SurahDetailScreen(
                                 modifier = Modifier.fillMaxWidth().clickable {
                                     selectedReciter = "Deenly audio"
                                     context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                                        .edit().putString("selected_name", selectedReciter).apply()
+                                        .edit().putString("selected_name", selectedReciter).remove("selected_id").apply()
                                     expandedSection = null
                                     playbackService?.playSurah(surahNumber - 1)
                                 }.padding(vertical = 14.dp),
@@ -1849,7 +1849,7 @@ fun SurahDetailScreen(
                                                     )
                                                     selectedReciter = label
                                                     context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                                                        .edit().putString("selected_name", label).apply()
+                                                        .edit().putString("selected_name", label).putString("selected_id", reciter.id).apply()
                                                     expandedSection = null
                                                 } catch (error: Exception) {
                                                     android.widget.Toast.makeText(
