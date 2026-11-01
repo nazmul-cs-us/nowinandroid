@@ -85,6 +85,7 @@ import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppIconSection
 import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.ContentManagementSection
+import com.starception.submission.settings.components.ReciterStorageSection
 import com.starception.submission.settings.components.DeveloperSettingsSection
 import com.starception.submission.settings.components.HsvColorWheelDialog
 import com.starception.submission.settings.components.NotificationsSection
@@ -510,6 +511,7 @@ fun UnifiedSettingsScreen(
                                     onDownloadCategory = viewModel::downloadContent,
                                     onDeleteCategory = viewModel::deleteContent,
                                 )
+                                ReciterStorageSection()
                             }
                         }
                     }
