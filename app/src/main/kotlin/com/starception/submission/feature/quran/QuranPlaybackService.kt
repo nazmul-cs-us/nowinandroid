@@ -42,10 +42,13 @@ import com.starception.submission.download.AudioDownloadHelper
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 import javax.inject.Inject
+import kotlinx.coroutines.*
 
 @AndroidEntryPoint
 class QuranPlaybackService : Service() {
 
+    private val reciterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var reciterJob: Job? = null
     private val binder = QuranBinder()
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -193,19 +196,52 @@ class QuranPlaybackService : Service() {
     }
 
     fun playSurah(index: Int, shouldAutoPlay: Boolean = true) {
+        reciterJob?.cancel()
+        reciterJob = null
         try {
             Log.d("PlaybackTrace", "🎵 playSurah(index=$index, shouldAutoPlay=$shouldAutoPlay) | mediaPlayer=${mediaPlayer != null} | lang=$audioLanguage")
             // Save the current playing state before changing tracks
             wasPlayingBeforeChange = shouldAutoPlay
 
             currentSurahIndex = index
-            val selectedId = getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                .getString("selected_id", null)
+            val reciterPreferences = getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+            val selectedId = if (audioLanguage == AudioLanguage.ARABIC_ONLY)
+                reciterPreferences.getString("selected_id", null) else null
             val selectedFile = selectedId?.takeIf { it.matches(Regex("[0-9]+-[0-9]+")) }
                 ?.let { id ->
                     File(filesDir, "quran/reciters/$id/%03d.mp3".format(java.util.Locale.US, index + 1))
                         .takeIf { it.isFile && it.length() > 0L }
                 }
+            val selectedServer = reciterPreferences.getString("selected_server", null)
+            val selectedSurahs = reciterPreferences.getString("selected_surahs", "").orEmpty()
+                .split(',').mapNotNull { it.toIntOrNull() }.filter { it in 1..114 }.toSet()
+            if (selectedFile == null && selectedId != null && selectedId.matches(Regex("[0-9]+-[0-9]+"))) {
+                runCatching { mediaPlayer?.pause() }
+                onPlaybackStateChanged?.invoke(false)
+                onGlobalPlaybackStateChanged?.invoke(false)
+                reciterJob = reciterScope.launch {
+                    try {
+                        val source = if (selectedServer != null && selectedSurahs.isNotEmpty()) {
+                            ReciterCatalog.Reciter(selectedId,
+                                reciterPreferences.getString("selected_name", "Reciter").orEmpty(),
+                                selectedServer, selectedSurahs, "")
+                        } else {
+                            ReciterCatalog.fetch(this@QuranPlaybackService).firstOrNull { it.id == selectedId }
+                                ?: error("Selected reciter is no longer available")
+                        }
+                        ReciterDownloadManager.get(this@QuranPlaybackService).downloadSurah(source, index + 1)
+                        ensureActive()
+                        reciterJob = null
+                        playSurah(index, shouldAutoPlay)
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) {
+                        Log.e("QuranService", "Selected reciter download failed", error)
+                        android.widget.Toast.makeText(this@QuranPlaybackService,
+                            "Unable to download reciter audio. Please retry.", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+                return
+            }
             var audioFile = selectedFile ?: resolveAudioFile(index)
             Log.d("PlaybackTrace", "🎵 audioFile=${audioFile?.absolutePath} | exists=${audioFile?.exists()} | size=${audioFile?.length()}")
 
@@ -285,6 +321,9 @@ class QuranPlaybackService : Service() {
     fun playDownloadedReciterSurah(index: Int, file: File, reciterName: String) {
         require(index in 0 until QuranData.surahs.size)
         require(file.isFile && file.length() > 0L)
+        reciterJob?.cancel()
+        reciterJob = null
+        audioLanguage = AudioLanguage.ARABIC_ONLY
         currentSurahIndex = index
         wasPlayingBeforeChange = true
         runCatching {
@@ -302,6 +341,11 @@ class QuranPlaybackService : Service() {
     }
 
     fun togglePlayPause() {
+        if (reciterJob?.isActive == true) {
+            reciterJob?.cancel()
+            reciterJob = null
+            return
+        }
         mediaPlayer?.let { player ->
             if (player.isPlaying) {
                 player.pause()
@@ -685,6 +729,7 @@ class QuranPlaybackService : Service() {
     }
 
     override fun onDestroy() {
+        reciterScope.cancel()
         super.onDestroy()
         Log.d("QuranService", "Service destroyed")
         stopProgressUpdates()

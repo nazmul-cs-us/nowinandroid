@@ -35,6 +35,9 @@ import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -71,9 +74,17 @@ class MainActivityViewModel @Inject constructor(
     val uiState: StateFlow<MainActivityUiState> = _uiState.asStateFlow()
 
     // Global content download progress (from singleton AssetDownloadManager)
-    val isContentDownloading: StateFlow<Boolean> = downloadManager.isGloballyDownloading
-    val contentDownloadProgress: StateFlow<Float> = downloadManager.globalDownloadProgress
-    val contentDownloadLabel: StateFlow<String> = downloadManager.globalDownloadLabel
+    val isContentDownloading: StateFlow<Boolean> = combine(downloadManager.isGloballyDownloading, downloadManager.reciterDownloads.activeTransfer) {
+        cdn, reciter -> cdn || reciter != null
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val contentDownloadProgress: StateFlow<Float> = combine(downloadManager.isGloballyDownloading,
+        downloadManager.globalDownloadProgress, downloadManager.reciterDownloads.activeTransfer) { cdn, progress, reciter ->
+        if (cdn) progress.coerceAtLeast(0.001f) else reciter?.progress ?: 0f
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
+    val contentDownloadLabel: StateFlow<String> = combine(downloadManager.isGloballyDownloading,
+        downloadManager.globalDownloadLabel, downloadManager.reciterDownloads.activeTransfer) { cdn, label, reciter ->
+        if (cdn) label else reciter?.label.orEmpty()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     // TTS is generating audio for playback (hadith reading etc.) — shows a
     // "Preparing audio" banner in the pull-to-sync container.

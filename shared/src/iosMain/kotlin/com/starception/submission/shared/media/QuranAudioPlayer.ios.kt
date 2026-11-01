@@ -35,9 +35,14 @@ actual suspend fun resolveQuranAudioUrl(
 ): String? {
     if (translationCode.equals("ar", ignoreCase = true) ||
         translationCode.equals("arabic", ignoreCase = true)) {
-        val selectedId = QuranReciterPreferences().selectedReciterId()
-        if (selectedId != null && selectedId.matches(Regex("[0-9]+-[0-9]+"))) {
-            IosReciterAudioCache.cachedUrl(selectedId, surahNumber)?.let { return it }
+        val preferences = QuranReciterPreferences()
+        preferences.selectedReciterId()?.takeIf { it.matches(Regex("[0-9]+-[0-9]+")) }?.let { id ->
+            IosReciterAudioStore.cachedUrl(id, surahNumber)?.let { return it }
+        }
+        val selected = preferences.selectedSource()
+        if (selected != null && selected.urlForSurah(surahNumber) != null) {
+            return IosReciterAudioStore.cachedUrl(selected.id, surahNumber)
+                ?: IosReciterAudioStore.download(selected, surahNumber)
         }
     }
     val manifest = iosCloudAssets.loadManifest() ?: return null

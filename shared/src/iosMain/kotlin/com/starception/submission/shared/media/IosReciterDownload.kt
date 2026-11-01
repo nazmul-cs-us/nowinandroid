@@ -13,6 +13,7 @@ import kotlin.coroutines.resume
  * Downloads a reciter's MP3 before handing its local file URL to AVAudioFile.
  * Unlike AVPlayer, the current iOS QuranAudioPlayer requires local audio files.
  */
+@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 suspend fun downloadIosReciterSurah(
     reciter: QuranReciterSource,
     surah: Int,

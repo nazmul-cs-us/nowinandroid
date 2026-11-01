@@ -8,6 +8,7 @@ import com.starception.submission.shared.storage.platformKeyValueStore
  * The built-in CDN remains the default and is resolved by the existing
  * resolveQuranAudioUrl() implementation on each platform.
  */
+@kotlinx.serialization.Serializable
 data class QuranReciterSource(
     val id: String,
     val displayName: String,
@@ -25,10 +26,23 @@ data class QuranReciterSource(
 class QuranReciterPreferences(
     private val store: KeyValueStore = platformKeyValueStore(),
 ) {
+    fun selectedSource(): QuranReciterSource? = runCatching {
+        kotlinx.serialization.json.Json.decodeFromString<QuranReciterSource>(
+            store.getString("quran_reciter_source").orEmpty())
+    }.getOrNull()
+
+    fun selectSource(source: QuranReciterSource?) {
+        store.putString("quran_reciter_source", source?.let {
+            kotlinx.serialization.json.Json.encodeToString(QuranReciterSource.serializer(), it)
+        }.orEmpty())
+        select(source?.id)
+    }
+
     fun selectedReciterId(): String? =
         store.getString("quran_selected_reciter_id")?.takeIf { it.isNotBlank() }
 
     fun select(reciterId: String?) {
+        if (selectedSource()?.id != reciterId) store.putString("quran_reciter_source", "")
         store.putString("quran_selected_reciter_id", reciterId.orEmpty())
     }
 }

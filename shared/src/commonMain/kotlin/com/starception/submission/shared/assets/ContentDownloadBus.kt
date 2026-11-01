@@ -16,6 +16,8 @@
 
 package com.starception.submission.shared.assets
 
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -35,11 +37,22 @@ data class ContentDownloadStatus(
  * the banner on every screen, not just the storage manager.
  */
 object ContentDownloadBus {
-    private val _state = MutableStateFlow<ContentDownloadStatus?>(null)
-    val state: StateFlow<ContentDownloadStatus?> = _state
+    private val content = MutableStateFlow<ContentDownloadStatus?>(null)
+    private val reciters = MutableStateFlow<Map<String, ContentDownloadStatus>>(emptyMap())
+    val state: StateFlow<ContentDownloadStatus?> = combine(content, reciters) { cdn, active ->
+        cdn?.copy(progress = cdn.progress.coerceAtLeast(0.001f)) ?: when (active.size) {
+            0 -> null
+            1 -> active.values.first()
+            else -> ContentDownloadStatus("Downloading recitations (${active.size})",
+                active.values.map { it.progress }.average().toFloat())
+        }
+    }.stateIn(CoroutineScope(SupervisorJob() + Dispatchers.Default), SharingStarted.Eagerly, null)
 
-    fun publish(status: ContentDownloadStatus?) {
-        _state.value = status
+    fun publish(status: ContentDownloadStatus?) { content.value = status }
+
+    /** Independent keys keep finishing/cancelling one transfer from hiding another. */
+    fun publishReciter(key: String, status: ContentDownloadStatus?) {
+        reciters.update { if (status == null) it - key else it + (key to status.copy(progress = status.progress.coerceIn(0.001f, 1f))) }
     }
 }
 

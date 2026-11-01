@@ -1883,6 +1883,7 @@ private fun SurahReadingSettingsSheet(
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     var expandedSection by remember { mutableStateOf<String?>(null) }
     ReadingSettingsModal(onDismiss = onDismiss) {
+        ReciterSettingsSection()
         // Food Truck's grouped-form layout: titled sections on cards.
         SettingsSection(title = "Preview") {
             Text(

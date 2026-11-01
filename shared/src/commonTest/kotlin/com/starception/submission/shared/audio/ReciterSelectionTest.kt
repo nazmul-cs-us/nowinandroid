@@ -27,4 +27,24 @@ class ReciterSelectionTest {
             selectableQuranReciters(2, listOf(unavailable, available, available)),
         )
     }
+
+    @Test
+    fun selectedSourceSurvivesRecreationAndDefaultClearsMetadata() {
+        val store = com.starception.submission.shared.storage.InMemoryKeyValueStore()
+        val source = QuranReciterSource("1-2", "Example", "https://example.org/", setOf(1, 114), "Hafs")
+        QuranReciterPreferences(store).selectSource(source)
+        val recreated = QuranReciterPreferences(store)
+        assertEquals(source, recreated.selectedSource())
+        assertEquals("1-2", recreated.selectedReciterId())
+        recreated.select(null)
+        assertNull(recreated.selectedSource())
+        assertNull(recreated.selectedReciterId())
+    }
+
+    @Test
+    fun damagedPreferenceDoesNotBreakPlayback() {
+        val store = com.starception.submission.shared.storage.InMemoryKeyValueStore()
+        store.putString("quran_reciter_source", "invalid json")
+        assertNull(QuranReciterPreferences(store).selectedSource())
+    }
 }

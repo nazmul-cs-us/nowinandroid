@@ -101,10 +101,11 @@ fun PrayerSettingsScreen(
     audioActions: AudioSettingsActions = AudioSettingsActions(),
     contentStorageState: ContentStorageState = ContentStorageState(),
     contentStorageActions: ContentStorageActions = ContentStorageActions(),
+    initialReciterStorageExpanded: Boolean = false,
 ) {
     // One section open at a time, as on Android: the sections are long enough
     // that several open at once buries the one being read.
-    var expanded by remember { mutableStateOf<String?>(SECTION_APPEARANCE) }
+    var expanded by remember { mutableStateOf<String?>(if (initialReciterStorageExpanded) SECTION_CONTENT else SECTION_APPEARANCE) }
     AdaptiveSurface(
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -345,6 +346,7 @@ fun PrayerSettingsScreen(
                             expanded = if (expanded == SECTION_CONTENT) null else SECTION_CONTENT
                         },
                     ) {
+                        ReciterSettingsSection(manageDownloads = true, initiallyExpanded = initialReciterStorageExpanded)
                         ContentStorageSettingsSection(
                             state = contentStorageState,
                             actions = contentStorageActions,

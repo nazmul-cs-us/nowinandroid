@@ -1,5 +1,29 @@
 package com.starception.submission.settings.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.OutlinedTextField
+import kotlinx.coroutines.CancellationException
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,9 +59,17 @@ fun ReciterStorageSection() {
     var error by remember { mutableStateOf<String?>(null) }
     var selectedId by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
+    var query by remember { mutableStateOf("") }
+    var refresh by remember { mutableStateOf(0) }
+    var expanded by remember { mutableStateOf(false) }
+    LaunchedEffect(refresh, expanded) {
+        if (!expanded) return@LaunchedEffect
+        loading = true
+        error = null
         try {
-            reciters = ReciterCatalog.fetch()
+            reciters = ReciterCatalog.fetch(context)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
             error = failure.message ?: "Unable to load reciters"
         } finally {
@@ -45,35 +77,71 @@ fun ReciterStorageSection() {
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Quran reciter downloads", style = MaterialTheme.typography.titleMedium)
-        if (loading) Text("Loading reciter catalog…")
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        if (!loading && reciters.isEmpty() && error == null) Text("No reciters available")
-        reciters.forEach { reciter ->
-            val status by manager.observe(reciter).collectAsState()
-            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                OutlinedButton(
-                    onClick = { selectedId = if (selectedId == reciter.id) null else reciter.id },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("${reciter.name} · ${reciter.riwaya} — ${status.downloadedSurahs}/${status.totalSurahs} offline")
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { expanded = !expanded }.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Filled.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("Quran recitations", style = MaterialTheme.typography.titleSmall)
+                    Text("Reciters & offline audio", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (selectedId == reciter.id) {
-                    Text(
-                        "${status.downloadedBytes / (1024 * 1024)} MB stored",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    status.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = {
-                            if (status.downloading) manager.cancel(reciter.id) else manager.download(reciter)
-                        }) { Text(if (status.downloading) "Cancel" else "Download all") }
-                        if (status.downloadedSurahs > 0) {
-                            OutlinedButton(onClick = { manager.delete(reciter) }) { Text("Delete") }
+                Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Hide reciters" else "Show reciters")
+            }
+            if (expanded) Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(value = query, onValueChange = { query = it },
+                    placeholder = { Text("Search reciters") }, leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), singleLine = true)
+                if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                error?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { refresh++ }) { Text("Try again") }
+                }
+                val filtered = reciters.filter { (it.name + " " + it.riwaya).contains(query, true) }
+                if (!loading && filtered.isEmpty()) Text("No reciters found", style = MaterialTheme.typography.bodyMedium)
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                    items(filtered, key = { it.id }) { reciter ->
+                        val status by manager.observe(reciter).collectAsState()
+                        val open = selectedId == reciter.id || status.downloading
+                        Column {
+                            Row(Modifier.fillMaxWidth().clickable(role = Role.Button) {
+                                selectedId = if (selectedId == reciter.id) null else reciter.id
+                            }.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(reciter.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(reciter.riwaya, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    if (status.downloadedSurahs > 0) Text("${status.downloadedSurahs} surahs · ${status.downloadedBytes / (1024 * 1024)} MB offline",
+                                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                }
+                                Icon(if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                            }
+                            if (open) {
+                                if (status.downloading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                Text("${status.downloadedSurahs} of ${status.totalSurahs} surahs saved", style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                status.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                                Row(Modifier.padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilledTonalButton(onClick = {
+                                        if (status.downloading) manager.cancel(reciter.id) else manager.download(reciter)
+                                    }, enabled = status.downloading || status.downloadedSurahs < status.totalSurahs) {
+                                        Text(if (status.downloading) "Cancel" else "Download all")
+                                    }
+                                    if (status.downloadedSurahs > 0) TextButton(onClick = { manager.delete(reciter) }, enabled = !status.downloading) {
+                                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         }
                     }
                 }
+                Spacer(Modifier.height(4.dp))
             }
         }
     }

@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +41,32 @@ class ReciterDownloadManager private constructor(private val context: Context) {
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    data class TransferProgress(val label: String, val progress: Float)
+    private val transfers = MutableStateFlow<Map<String, TransferProgress>>(emptyMap())
+    val activeTransfer: StateFlow<TransferProgress?> = transfers.map { active ->
+        when (active.size) {
+            0 -> null
+            1 -> active.values.first()
+            else -> TransferProgress("Downloading recitations (${active.size})", active.values.map { it.progress }.average().toFloat())
+        }
+    }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    private fun publish(key: String, label: String, progress: Float) {
+        transfers.update { it + (key to TransferProgress(label, progress.coerceIn(0.001f, 1f))) }
+    }
+    private fun clear(key: String) { transfers.update { it - key } }
+
+    suspend fun downloadSurah(reciter: ReciterCatalog.Reciter, surah: Int): File {
+        cachedFile(reciter, surah)?.let { return it }
+        val key = "playback:${reciter.id}:$surah:${java.util.UUID.randomUUID()}"
+        publish(key, "Downloading ${reciter.name}", 0f)
+        return try {
+            ReciterCatalog.download(context, reciter, surah) { progress ->
+                publish(key, "Downloading ${reciter.name}", progress)
+            }
+        } finally { clear(key) }
+    }
+
     private val jobs = mutableMapOf<String, Job>()
     private val generation = mutableMapOf<String, Int>()
     private val cancelled = mutableSetOf<String>()
@@ -73,13 +100,18 @@ class ReciterDownloadManager private constructor(private val context: Context) {
         cancelled.remove(reciter.id)
         val token = (generation[reciter.id] ?: 0) + 1
         generation[reciter.id] = token
+        publish(reciter.id, "Downloading ${reciter.name}", 0f)
         val job = scope.launch {
             if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(downloading = true)
             try {
-                for (surah in surahs.sorted()) {
+                for ((index, surah) in surahs.sorted().withIndex()) {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     if (reciter.id in cancelled) throw CancellationException("Cancelled")
-                    ReciterCatalog.download(context, reciter, surah)
+                    ReciterCatalog.download(context, reciter, surah) { fraction ->
+                        if (generation[reciter.id] == token) publish(reciter.id,
+                            "Downloading ${reciter.name} · ${index + 1}/${surahs.size}",
+                            (index + fraction) / surahs.size)
+                    }
                     if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(downloading = true)
                 }
                 if (generation[reciter.id] == token) state.value = snapshot(reciter)
@@ -88,6 +120,8 @@ class ReciterDownloadManager private constructor(private val context: Context) {
                 throw cancelled
             } catch (error: Exception) {
                 if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(error = error.message ?: "Download failed")
+            } finally {
+                if (generation[reciter.id] == token) clear(reciter.id)
             }
         }
         jobs[reciter.id] = job
@@ -95,9 +129,11 @@ class ReciterDownloadManager private constructor(private val context: Context) {
 
     @Synchronized
     fun cancel(reciterId: String) {
+        clear(reciterId)
         cancelled.add(reciterId)
         generation[reciterId] = (generation[reciterId] ?: 0) + 1
         jobs.remove(reciterId)?.cancel()
+        states[reciterId]?.let { it.value = it.value.copy(downloading = false) }
     }
 
     @Synchronized

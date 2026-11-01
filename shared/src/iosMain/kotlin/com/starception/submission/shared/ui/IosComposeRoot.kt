@@ -415,6 +415,8 @@ private fun createPrayerTimesViewController(
     startBottomIndex: Int,
     onSelectBottom: ((Int) -> Unit)?,
 ): UIViewController = ComposeUIViewController {
+    com.starception.submission.shared.audio.QuranReciterLibrary.platform =
+        com.starception.submission.shared.audio.IosReciterLibrary
     // Register system media before the content-setup gate. Playback state can
     // outlive an individual tab or reader composition.
     remember(nowPlayingService) {
@@ -1097,6 +1099,7 @@ private fun createPrayerTimesViewController(
                 salah3DService = salah3DService,
                 settings = { onBack, onOpenSalahTraining ->
                     PrayerSettingsScreen(
+                        initialReciterStorageExpanded = NSProcessInfo.processInfo.arguments.any { it == "--start-reciter-storage" },
                         settings = prayerSettings,
                         countryName = country?.countryName,
                         showRestoreOption = settingsStore.isChanged(place.countryCode, country),

@@ -1468,6 +1468,7 @@ fun SurahDetailScreen(
             // Which inline picker is expanded: "font", "language", or null.
             var expandedSection by remember { mutableStateOf<String?>(null) }
             var reciters by remember { mutableStateOf<List<com.starception.submission.feature.quran.ReciterCatalog.Reciter>>(emptyList()) }
+            var reciterQuery by remember { mutableStateOf("") }
             var reciterLoading by remember { mutableStateOf(false) }
             var reciterError by remember { mutableStateOf<String?>(null) }
             var selectedReciter by remember {
@@ -1482,7 +1483,7 @@ fun SurahDetailScreen(
                 if (expandedSection == "reciter" && reciters.isEmpty()) {
                     reciterLoading = true
                     try {
-                        reciters = com.starception.submission.feature.quran.ReciterCatalog.fetch()
+                        reciters = com.starception.submission.feature.quran.ReciterCatalog.fetch(context)
                         reciterError = null
                     } catch (error: Exception) {
                         reciterError = "Unable to load reciters. Check your connection."
@@ -1802,7 +1803,14 @@ fun SurahDetailScreen(
                                 androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                             }
                             reciterError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                            reciters.filter { surahNumber in it.surahs }.forEach { reciter ->
+                            androidx.compose.material3.OutlinedTextField(
+                                value = reciterQuery, onValueChange = { reciterQuery = it },
+                                label = { Text("Search reciters") }, singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            reciters.filter { surahNumber in it.surahs &&
+                                (it.name + " " + it.riwaya).contains(reciterQuery, ignoreCase = true)
+                            }.forEach { reciter ->
                                 val downloadState by reciterDownloadManager.observe(reciter)
                                     .collectAsState()
                                 Row(
@@ -1842,14 +1850,16 @@ fun SurahDetailScreen(
                                             coroutineScope.launch {
                                                 reciterDownloading = reciter.id
                                                 try {
-                                                    val file = com.starception.submission.feature.quran.ReciterCatalog
-                                                        .download(context, reciter, surahNumber)
+                                                    val file = reciterDownloadManager.downloadSurah(reciter, surahNumber)
                                                     playbackService?.playDownloadedReciterSurah(
                                                         surahNumber - 1, file, reciter.name
                                                     )
                                                     selectedReciter = label
                                                     context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                                                        .edit().putString("selected_name", label).putString("selected_id", reciter.id).apply()
+                                                        .edit().putString("selected_name", label).putString("selected_id", reciter.id)
+                                                        .putString("selected_server", reciter.server)
+                                                        .putString("selected_surahs", reciter.surahs.joinToString(","))
+                                                        .apply()
                                                     expandedSection = null
                                                 } catch (error: Exception) {
                                                     android.widget.Toast.makeText(
