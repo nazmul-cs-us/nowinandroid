@@ -274,6 +274,26 @@ class QuranPlaybackService : Service() {
         playSurah(index, shouldAutoPlay = true)
     }
 
+    /** Play a downloaded alternate reciter track using the existing media session. */
+    fun playDownloadedReciterSurah(index: Int, file: File, reciterName: String) {
+        require(index in 0 until QuranData.surahs.size)
+        require(file.isFile && file.length() > 0L)
+        currentSurahIndex = index
+        wasPlayingBeforeChange = true
+        runCatching {
+            mediaPlayer?.release()
+            initializePlayer()
+            mediaPlayer?.apply {
+                setDataSource(file.absolutePath)
+                prepareAsync()
+            }
+            onSurahChanged?.invoke(index)
+            onGlobalSurahChanged?.invoke(index)
+            updateMediaSessionMetadata()
+            startForeground(NOTIFICATION_ID, createNotification())
+        }.onFailure { Log.e("QuranService", "Alternate reciter playback failed: $reciterName", it) }
+    }
+
     fun togglePlayPause() {
         mediaPlayer?.let { player ->
             if (player.isPlaying) {
