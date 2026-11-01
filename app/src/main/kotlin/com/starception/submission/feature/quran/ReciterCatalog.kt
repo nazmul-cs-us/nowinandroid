@@ -7,6 +7,8 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 
 /** MP3Quran catalog; keeps the bundled/CDN recitation as a separate default option. */
 object ReciterCatalog {
@@ -68,7 +70,19 @@ object ReciterCatalog {
                 try {
                     connection.connectTimeout = 15000
                     connection.readTimeout = 30000
-                    connection.inputStream.use { input -> temp.outputStream().use { input.copyTo(it) } }
+                    connection.instanceFollowRedirects = true
+                    require(connection.responseCode in 200..299) { "Audio server returned HTTP ${connection.responseCode}" }
+                    connection.inputStream.use { input ->
+                        temp.outputStream().use { output ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                coroutineContext.ensureActive()
+                                val read = input.read(buffer)
+                                if (read < 0) break
+                                output.write(buffer, 0, read)
+                            }
+                        }
+                    }
                     require(temp.length() > 0L) { "Empty audio response" }
                     check(temp.renameTo(destination)) { "Could not save downloaded audio" }
                 } finally {
