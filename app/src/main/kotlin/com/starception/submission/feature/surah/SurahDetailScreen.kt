@@ -1467,6 +1467,30 @@ fun SurahDetailScreen(
             androidx.activity.compose.BackHandler { showFloatingToolbar = false }
             // Which inline picker is expanded: "font", "language", or null.
             var expandedSection by remember { mutableStateOf<String?>(null) }
+            var reciters by remember { mutableStateOf<List<com.starception.submission.feature.quran.ReciterCatalog.Reciter>>(emptyList()) }
+            var reciterLoading by remember { mutableStateOf(false) }
+            var reciterError by remember { mutableStateOf<String?>(null) }
+            var selectedReciter by remember {
+                mutableStateOf(
+                    context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+                        .getString("selected_name", "Deenly audio") ?: "Deenly audio"
+                )
+            }
+            var reciterDownloading by remember { mutableStateOf<String?>(null) }
+            LaunchedEffect(expandedSection) {
+                if (expandedSection == "reciter" && reciters.isEmpty()) {
+                    reciterLoading = true
+                    try {
+                        reciters = com.starception.submission.feature.quran.ReciterCatalog.fetch()
+                        reciterError = null
+                    } catch (error: Exception) {
+                        reciterError = "Unable to load reciters. Check your connection."
+                    } finally {
+                        reciterLoading = false
+                    }
+                }
+            }
+
             // Sheet follows the finger while dragging the handle down; past a
             // threshold the drag dismisses the sheet.
             var sheetDragOffset by remember { mutableStateOf(0f) }
@@ -1740,6 +1764,75 @@ fun SurahDetailScreen(
                                 }
                             },
                         )
+                    }
+
+                    // Quran reciter — existing Deenly CDN audio remains the default.
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clickable { expandedSection = if (expandedSection == "reciter") null else "reciter" }
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Reciter", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(selectedReciter, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null,
+                            modifier = Modifier.padding(start = 8.dp).size(12.dp))
+                    }
+                    androidx.compose.animation.AnimatedVisibility(visible = expandedSection == "reciter") {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                            Text(
+                                "Audio is downloaded only when you select a reciter and play this surah.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                "Deenly audio (CDN)",
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    selectedReciter = "Deenly audio"
+                                    context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+                                        .edit().putString("selected_name", selectedReciter).apply()
+                                    expandedSection = null
+                                    playbackService?.playSurah(surahNumber - 1)
+                                }.padding(vertical = 14.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            if (reciterLoading) {
+                                androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
+                            reciterError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                            reciters.filter { surahNumber in it.surahs }.forEach { reciter ->
+                                val label = reciter.name + " · " + reciter.riwaya
+                                Text(
+                                    if (reciterDownloading == reciter.id) "Downloading… " + label else label,
+                                    modifier = Modifier.fillMaxWidth()
+                                        .clickable(enabled = reciterDownloading == null) {
+                                            coroutineScope.launch {
+                                                reciterDownloading = reciter.id
+                                                try {
+                                                    val file = com.starception.submission.feature.quran.ReciterCatalog
+                                                        .download(context, reciter, surahNumber)
+                                                    playbackService?.playDownloadedReciterSurah(
+                                                        surahNumber - 1, file, reciter.name
+                                                    )
+                                                    selectedReciter = label
+                                                    context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+                                                        .edit().putString("selected_name", label).apply()
+                                                    expandedSection = null
+                                                } catch (error: Exception) {
+                                                    android.widget.Toast.makeText(
+                                                        context, "Reciter audio unavailable: " + (error.message ?: ""),
+                                                        android.widget.Toast.LENGTH_LONG
+                                                    ).show()
+                                                } finally {
+                                                    reciterDownloading = null
+                                                }
+                                            }
+                                        }.padding(vertical = 12.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        }
                     }
 
                     // Arabic font — value + chevron row.
