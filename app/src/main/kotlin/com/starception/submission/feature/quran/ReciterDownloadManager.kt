@@ -18,7 +18,16 @@ import java.io.File
  * MP3Quran recordings are not CDN-manifest assets: keep them in a separate namespace
  * while exposing the same progress/cancel/delete lifecycle as content downloads.
  */
-class ReciterDownloadManager(private val context: Context) {
+class ReciterDownloadManager private constructor(private val context: Context) {
+    companion object {
+        @Volatile private var instance: ReciterDownloadManager? = null
+
+        fun get(context: Context): ReciterDownloadManager =
+            instance ?: synchronized(this) {
+                instance ?: ReciterDownloadManager(context.applicationContext).also { instance = it }
+            }
+    }
+
     data class DownloadStatus(
         val downloadedSurahs: Int = 0,
         val totalSurahs: Int = 0,
@@ -65,7 +74,7 @@ class ReciterDownloadManager(private val context: Context) {
         val token = (generation[reciter.id] ?: 0) + 1
         generation[reciter.id] = token
         val job = scope.launch {
-            state.value = snapshot(reciter).copy(downloading = true)
+            if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(downloading = true)
             try {
                 for (surah in surahs.sorted()) {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
