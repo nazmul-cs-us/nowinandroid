@@ -51,6 +51,17 @@ object IosReciterAudioStore {
         return completed
     }
 
+    fun downloadedCount(source: QuranReciterSource): Int =
+        source.availableSurahs.count { it in 1..114 && cachedUrl(source.id, it) != null }
+
+    fun downloadedBytes(source: QuranReciterSource): Long =
+        source.availableSurahs.filter { it in 1..114 }
+            .sumOf { surah ->
+                val url = cachedUrl(source.id, surah) ?: return@sumOf 0L
+                val path = NSURL.URLWithString(url)?.path ?: return@sumOf 0L
+                AssetPlatform.fileSize(path)
+            }
+
     fun delete(source: QuranReciterSource, surah: Int): Boolean =
         AssetPlatform.delete(key(source.id, surah))
 
