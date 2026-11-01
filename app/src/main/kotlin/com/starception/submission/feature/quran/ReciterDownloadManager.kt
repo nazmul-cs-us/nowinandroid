@@ -32,6 +32,7 @@ class ReciterDownloadManager(private val context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = mutableMapOf<String, Job>()
+    private val cancelled = mutableSetOf<String>()
     private val states = mutableMapOf<String, MutableStateFlow<DownloadStatus>>()
 
     @Synchronized
@@ -59,11 +60,13 @@ class ReciterDownloadManager(private val context: Context) {
         if (jobs[reciter.id]?.isActive == true) return
         require(surahs.all { it in reciter.surahs })
         val state = states.getOrPut(reciter.id) { MutableStateFlow(snapshot(reciter)) }
+        cancelled.remove(reciter.id)
         val job = scope.launch {
             state.value = snapshot(reciter).copy(downloading = true)
             try {
                 for (surah in surahs.sorted()) {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    if (reciter.id in cancelled) throw CancellationException("Cancelled")
                     ReciterCatalog.download(context, reciter, surah)
                     state.value = snapshot(reciter).copy(downloading = true)
                 }
@@ -80,6 +83,7 @@ class ReciterDownloadManager(private val context: Context) {
 
     @Synchronized
     fun cancel(reciterId: String) {
+        cancelled.add(reciterId)
         jobs.remove(reciterId)?.cancel()
     }
 
