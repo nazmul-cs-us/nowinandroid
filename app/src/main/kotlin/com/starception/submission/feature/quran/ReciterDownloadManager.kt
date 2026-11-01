@@ -32,6 +32,7 @@ class ReciterDownloadManager(private val context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = mutableMapOf<String, Job>()
+    private val generation = mutableMapOf<String, Int>()
     private val cancelled = mutableSetOf<String>()
     private val states = mutableMapOf<String, MutableStateFlow<DownloadStatus>>()
 
@@ -61,6 +62,8 @@ class ReciterDownloadManager(private val context: Context) {
         require(surahs.all { it in reciter.surahs })
         val state = states.getOrPut(reciter.id) { MutableStateFlow(snapshot(reciter)) }
         cancelled.remove(reciter.id)
+        val token = (generation[reciter.id] ?: 0) + 1
+        generation[reciter.id] = token
         val job = scope.launch {
             state.value = snapshot(reciter).copy(downloading = true)
             try {
@@ -68,14 +71,14 @@ class ReciterDownloadManager(private val context: Context) {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     if (reciter.id in cancelled) throw CancellationException("Cancelled")
                     ReciterCatalog.download(context, reciter, surah)
-                    state.value = snapshot(reciter).copy(downloading = true)
+                    if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(downloading = true)
                 }
-                state.value = snapshot(reciter)
+                if (generation[reciter.id] == token) state.value = snapshot(reciter)
             } catch (cancelled: CancellationException) {
-                state.value = snapshot(reciter)
+                if (generation[reciter.id] == token) state.value = snapshot(reciter)
                 throw cancelled
             } catch (error: Exception) {
-                state.value = snapshot(reciter).copy(error = error.message ?: "Download failed")
+                if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(error = error.message ?: "Download failed")
             }
         }
         jobs[reciter.id] = job
@@ -84,6 +87,7 @@ class ReciterDownloadManager(private val context: Context) {
     @Synchronized
     fun cancel(reciterId: String) {
         cancelled.add(reciterId)
+        generation[reciterId] = (generation[reciterId] ?: 0) + 1
         jobs.remove(reciterId)?.cancel()
     }
 
