@@ -1,6 +1,8 @@
 package com.starception.submission.shared.audio
 
 import com.starception.submission.core.assets.AssetPlatform
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import platform.Foundation.NSURL
 
 /**
@@ -25,6 +27,7 @@ object IosReciterAudioStore {
         onProgress: (Long, Long) -> Unit = { _, _ -> },
     ): String? {
         val url = source.urlForSurah(surah) ?: return null
+        require(source.id.matches(Regex("[0-9]+-[0-9]+"))) { "Invalid reciter identifier" }
         val cdnKey = key(source.id, surah)
         cachedUrl(source.id, surah)?.let { return it }
         val path = AssetPlatform.download(
@@ -42,11 +45,24 @@ object IosReciterAudioStore {
         val ordered = source.availableSurahs.filter { it in 1..114 }.sorted()
         var completed = 0
         for (surah in ordered) {
-            if (download(source, surah) != null) completed++
+            currentCoroutineContext().ensureActive()
+            if (download(source, surah) == null) return completed
+            completed++
             onCompleted(completed, ordered.size)
         }
         return completed
     }
+
+    fun downloadedCount(source: QuranReciterSource): Int =
+        source.availableSurahs.count { it in 1..114 && cachedUrl(source.id, it) != null }
+
+    fun downloadedBytes(source: QuranReciterSource): Long =
+        source.availableSurahs.filter { it in 1..114 }
+            .sumOf { surah ->
+                val url = cachedUrl(source.id, surah) ?: return@sumOf 0L
+                val path = NSURL.URLWithString(url)?.path ?: return@sumOf 0L
+                AssetPlatform.fileSize(path)
+            }
 
     fun delete(source: QuranReciterSource, surah: Int): Boolean =
         AssetPlatform.delete(key(source.id, surah))

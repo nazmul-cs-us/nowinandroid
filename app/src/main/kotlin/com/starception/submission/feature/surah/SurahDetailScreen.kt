@@ -1477,7 +1477,7 @@ fun SurahDetailScreen(
                 )
             }
             var reciterDownloading by remember { mutableStateOf<String?>(null) }
-            val reciterDownloadManager = remember(context) { com.starception.submission.feature.quran.ReciterDownloadManager(context.applicationContext) }
+            val reciterDownloadManager = remember(context) { com.starception.submission.feature.quran.ReciterDownloadManager.get(context.applicationContext) }
             LaunchedEffect(expandedSection) {
                 if (expandedSection == "reciter" && reciters.isEmpty()) {
                     reciterLoading = true
