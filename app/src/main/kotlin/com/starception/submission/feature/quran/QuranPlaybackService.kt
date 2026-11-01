@@ -199,7 +199,14 @@ class QuranPlaybackService : Service() {
             wasPlayingBeforeChange = shouldAutoPlay
 
             currentSurahIndex = index
-            var audioFile = resolveAudioFile(index)
+            val selectedId = getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+                .getString("selected_id", null)
+            val selectedFile = selectedId?.takeIf { it.matches(Regex("[0-9]+-[0-9]+")) }
+                ?.let { id ->
+                    File(filesDir, "quran/reciters/$id/%03d.mp3".format(java.util.Locale.US, index + 1))
+                        .takeIf { it.isFile && it.length() > 0L }
+                }
+            var audioFile = selectedFile ?: resolveAudioFile(index)
             Log.d("PlaybackTrace", "🎵 audioFile=${audioFile?.absolutePath} | exists=${audioFile?.exists()} | size=${audioFile?.length()}")
 
             if (audioFile == null || !audioFile.exists()) {
