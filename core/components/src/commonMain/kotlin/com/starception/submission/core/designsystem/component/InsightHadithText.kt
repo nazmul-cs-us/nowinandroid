@@ -25,3 +25,11 @@ fun formatInsightHadithText(raw: String): String {
     val narrated = hadithAttribution.matchEntire(normalized) ?: return normalized
     return narrated.groupValues[1] + "\n\n" + narrated.groupValues[2]
 }
+
+/** Presentation-only title guard; never rewrites the verified passage. */
+fun formatGroundedSuggestionTitle(raw: String, fallback: String): String {
+    val title = raw.replace(hadithWhitespace, " ").trim().removeSurrounding("**")
+    val hasJoinedWords = title.zipWithNext().any { (a, b) -> a.isLowerCase() && b.isUpperCase() }
+    return title.takeIf { it.isNotBlank() && it.length <= 84 && !hasJoinedWords &&
+        !it.contains("<|") && !it.contains("|>") } ?: fallback
+}

@@ -405,7 +405,7 @@ fun PrayerTimesScreen(
                         },
                 ) {
                     Text(
-                        text = playing.title,
+                        text = playing.bannerTitle,
                         modifier = Modifier.fillMaxWidth().basicMarquee(),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,

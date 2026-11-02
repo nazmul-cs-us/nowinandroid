@@ -58,6 +58,7 @@ data class MediaPlaybackState(
     val currentPosition: Int = 0,
     val duration: Int = 0,
     val source: MediaSource = MediaSource.None,
+    val reciterName: String? = null,
 )
 
 /**

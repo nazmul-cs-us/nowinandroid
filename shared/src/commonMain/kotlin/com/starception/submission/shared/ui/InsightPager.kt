@@ -115,6 +115,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.starception.submission.core.designsystem.component.formatInsightHadithText
+import com.starception.submission.core.designsystem.component.formatGroundedSuggestionTitle
 import com.starception.submission.core.designsystem.component.InsightContentLayout
 import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
 import androidx.compose.ui.draw.blur
@@ -2493,6 +2494,20 @@ private fun ModelSuggestionStage(
 ) {
     val density = LocalDensity.current
     val sourceScrollState = rememberScrollState()
+    val formatted = remember(card?.sourceText) { formatInsightHadithText(card?.sourceText.orEmpty()) }
+    val sections = remember(formatted) { formatted.split("\n\n", limit = 2) }
+    val narrator = sections.firstOrNull()?.takeIf { sections.size == 2 && it.startsWith("Narrated ") }
+    val body = if (narrator != null) sections[1] else formatted
+    val sourceName = when (card?.target) {
+        is DeenlyKnowledgeTarget.Surah -> "the Holy Quran"
+        is DeenlyKnowledgeTarget.FortressDua -> "Fortress of the Muslim"
+        is DeenlyKnowledgeTarget.BukhariHadith -> "Sahih al-Bukhari"
+        is DeenlyKnowledgeTarget.ShamayelBook -> "Shama'il At-Tirmidhi"
+        null -> "the verified source"
+    }
+    val heading = remember(card?.title, sourceName) {
+        formatGroundedSuggestionTitle(card?.title.orEmpty(), "A reflection from $sourceName")
+    }
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
@@ -2525,20 +2540,25 @@ private fun ModelSuggestionStage(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = card?.title.orEmpty(),
+                text = heading,
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 17.sp,
-                    lineHeight = 26.sp,
+                    fontSize = 20.sp,
+                    lineHeight = 28.sp,
                 ),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.fillMaxWidth(),
             )
+            androidx.compose.material3.HorizontalDivider(color = Color.White.copy(alpha = 0.14f))
+            narrator?.let {
+                Text(it, style = MaterialTheme.typography.labelLarge.copy(lineHeight = 21.sp),
+                    color = ReadingPreviewGold.copy(alpha = 0.9f))
+            }
             Text(
-                text = card?.sourceText.orEmpty(),
+                text = body,
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontSize = 16.sp,
-                    lineHeight = 25.sp,
+                    lineHeight = 27.sp,
                 ),
                 color = Color.White.copy(alpha = 0.88f),
                 modifier = Modifier.fillMaxWidth(),

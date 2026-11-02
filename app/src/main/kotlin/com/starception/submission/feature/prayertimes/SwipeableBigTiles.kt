@@ -6419,7 +6419,7 @@ private fun RecommendationExpandedStage(
                             verticalArrangement = Arrangement.Top,
                         ) {
                             Text(
-                                text = nudge.supportingText?.takeIf(String::isNotBlank) ?: nudge.label,
+                                text = formatInsightHadithText(nudge.supportingText?.takeIf(String::isNotBlank) ?: nudge.label),
                                 modifier = Modifier.fillMaxWidth(),
                                 style = insightReaderBodyStyle(compression),
                                 color = Color.White,

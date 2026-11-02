@@ -27,6 +27,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -485,7 +486,9 @@ internal fun QuranDetailScreen(
         return
     }
     var playing by remember(number) { mutableStateOf(false) }
-    var showAudioPlayer by remember(number) { mutableStateOf(false) }
+    var showAudioPlayer by remember(number) {
+        mutableStateOf(com.starception.submission.shared.media.QuranPlaybackBus.state.value?.surahNumber == number)
+    }
     var audioLoading by remember(number) { mutableStateOf(false) }
     val globalPlayback by com.starception.submission.shared.media.QuranPlaybackBus.state.collectAsState()
     var translationLanguage by remember {
@@ -497,7 +500,8 @@ internal fun QuranDetailScreen(
         val playback = globalPlayback
         if (playback?.surahNumber == number) {
             playing = playback.playing
-            showAudioPlayer = true
+        } else {
+            playing = false
         }
     }
 
@@ -522,6 +526,9 @@ internal fun QuranDetailScreen(
                     player = player,
                     surahNumber = number,
                     audioUrl = url,
+                    reciterName = if (requestedLanguage == "ar" || requestedLanguage == "arabic")
+                        com.starception.submission.shared.audio.QuranReciterPreferences().selectedSource()?.displayName
+                            ?: "Mishary Rashid Al-Alafasy" else null,
                 )
                 playing = true
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -889,11 +896,8 @@ internal fun QuranDetailScreen(
                             Icon(Icons.Filled.SkipNext, contentDescription = "Next surah")
                         }
                         Spacer(Modifier.weight(1f))
-                        IconButton(onClick = { isBookmarked = number in store.toggleSurah(number) }) {
-                            Icon(
-                                if (isBookmarked) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
-                                contentDescription = if (isBookmarked) "Remove bookmark" else "Bookmark surah",
-                            )
+                        IconButton(onClick = { showAudioPlayer = false }) {
+                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Minimize player")
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1078,6 +1082,7 @@ internal fun QuranDetailScreen(
                                     surah = surah,
                                     ayahCount = displayVerses.size,
                                     nameTranslation = state.nameTranslation,
+                                    showTitle = showAudioPlayer,
                                 )
                             },
                             requestedPage = requestedMushafPage,
@@ -1103,6 +1108,7 @@ internal fun QuranDetailScreen(
                                     surah = surah,
                                     ayahCount = displayVerses.size,
                                     nameTranslation = state.nameTranslation,
+                                    showTitle = showAudioPlayer,
                                 )
                             }
                             if (showBismillah) {
@@ -1162,22 +1168,30 @@ internal fun QuranDetailScreen(
 
     // Android-parity pinned overlays: the floating surah name and the play FAB
     // track the artwork edge and the reader scroll.
-    var showFabVisible by remember { mutableStateOf(true) }
-    LaunchedEffect(ayahListState) {
-        var previousScroll = 0f
+    var showFabVisible by remember(number) { mutableStateOf(true) }
+    LaunchedEffect(ayahListState, number) {
+        var anchorIndex = ayahListState.firstVisibleItemIndex
+        var anchorOffset = ayahListState.firstVisibleItemScrollOffset
+        var anchorHeader = headerCollapseOffset.floatValue
         snapshotFlow {
-            -headerCollapseOffset.floatValue + ayahListState.firstVisibleItemScrollOffset
-        }.collect { current ->
-            val delta = current - previousScroll
-            if (kotlin.math.abs(delta) > 50f) {
-                // Android's FAB rule: always visible near the top, hidden
-                // while scrolling down into the reader, shown scrolling up.
-                showFabVisible = if (current < 100f) true else delta < 0f
-                previousScroll = current
+            Triple(ayahListState.firstVisibleItemIndex,
+                ayahListState.firstVisibleItemScrollOffset, headerCollapseOffset.floatValue)
+        }.collect { (index, offset, header) ->
+            val delta = when {
+                index > anchorIndex -> 51f
+                index < anchorIndex -> -51f
+                else -> (offset - anchorOffset) + anchorHeader - header
+            }
+            val atTop = index == 0 && offset < 100 && header > -100f
+            if (atTop || kotlin.math.abs(delta) > 50f) {
+                showFabVisible = atTop || delta < 0f
+                anchorIndex = index
+                anchorOffset = offset
+                anchorHeader = header
             }
         }
     }
-    if (!mushafMode) {
+    if (!mushafMode && !showAudioPlayer) {
         val nameStartYPx = artworkBottomPx + with(density) { 12.dp.toPx() }
         // The SwiftUI host renders Compose edge-to-edge (ignoresSafeArea) and
         // WindowInsets reports zero inside it, so the physical status-bar band
@@ -1230,13 +1244,18 @@ internal fun QuranDetailScreen(
         }
     }
     AnimatedVisibility(
-        visible = showFabVisible,
-        enter = scaleIn(tween(300)) + fadeIn(tween(300)),
-        exit = scaleOut(tween(300)) + fadeOut(tween(300)),
+        visible = showFabVisible && !showAudioPlayer,
+        enter = scaleIn(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(300)),
+        exit = scaleOut(tween(300, easing = FastOutSlowInEasing)) + fadeOut(tween(300)),
         modifier = Modifier
             .align(Alignment.TopEnd)
             .padding(end = 12.dp)
-            .offset { IntOffset(x = 0, y = (artworkBottomPx - 28.dp.toPx()).roundToInt()) },
+            .offset {
+                // Match Android's artwork-edge overlap: one quarter above, three quarters below.
+                // Read collapse in placement so scrolling moves the FAB without recomposing the reader.
+                IntOffset(x = 0, y = (artworkBottomPx + headerCollapseOffset.floatValue -
+                    14.dp.toPx()).roundToInt())
+            },
     ) {
         Surface(
             onClick = toggleSurahPlay,
@@ -1331,6 +1350,7 @@ private fun SurahAlbumInfoCard(
     surah: com.starception.submission.feature.quran.Surah,
     ayahCount: Int,
     nameTranslation: String,
+    showTitle: Boolean = false,
 ) {
     // Android's AlbumInfoCard: one continuous surface starting flush under the
     // artwork. The surah name is NOT here — it is the floating overlay that
@@ -1349,7 +1369,13 @@ private fun SurahAlbumInfoCard(
             // Reserve both lines of the floating title (English + Arabic).
             // The old 44dp slot ended underneath the Arabic baseline, causing
             // it to overlap the English meaning on iPhone-sized layouts.
-            Spacer(Modifier.height(80.dp))
+            if (showTitle) {
+                Text(surah.nameEnglish, style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold)
+                Text(surah.nameArabic, style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+            } else Spacer(Modifier.height(80.dp))
             if (nameTranslation.isNotBlank()) {
                 Text(
                     text = "\"$nameTranslation\"",
@@ -6146,7 +6172,7 @@ internal fun QuranPlaybackSyncBar(
                 },
             ) {
                 Text(
-                    text = playing.title,
+                    text = playing.bannerTitle,
                     modifier = Modifier.fillMaxWidth().basicMarquee(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,

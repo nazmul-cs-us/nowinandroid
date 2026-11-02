@@ -47,7 +47,10 @@ object QuranPlaybackBus {
         val positionSeconds: Float,
         val durationSeconds: Float,
         val sourceUrl: String? = null,
-    )
+        val reciterName: String? = null,
+    ) {
+        val bannerTitle: String get() = listOfNotNull(title, reciterName?.takeIf { it.isNotBlank() }).joinToString(" · ")
+    }
 
     private const val POLL_MILLIS = 500L
     private const val END_EPSILON_SECONDS = 1.5f
@@ -66,13 +69,15 @@ object QuranPlaybackBus {
         player: QuranAudioPlayer,
         surahNumber: Int,
         audioUrl: String = quranAudioUrl(surahNumber),
+        reciterName: String? = com.starception.submission.shared.audio.QuranReciterPreferences()
+            .selectedSource()?.displayName ?: "Mishary Rashid Al-Alafasy",
     ) {
         val title = QuranData.surahs
             .firstOrNull { it.number == surahNumber }
             ?.nameEnglish
             ?.takeIf(String::isNotBlank)
             ?: "Surah $surahNumber"
-        begin(player, audioUrl, title, surahNumber)
+        begin(player, audioUrl, title, surahNumber, reciterName = reciterName)
     }
 
     /** Reports a Fortress invocation that just started. */
@@ -125,6 +130,7 @@ object QuranPlaybackBus {
         fallbackTitle: String,
         surahNumber: Int?,
         sourceUrl: String = url,
+        reciterName: String? = null,
     ) {
         activePlayer = player
         activeUrl = url
@@ -132,6 +138,7 @@ object QuranPlaybackBus {
             surahNumber = surahNumber,
             title = fallbackTitle,
             sourceUrl = sourceUrl,
+            reciterName = reciterName,
             playing = true,
             positionSeconds = 0f,
             durationSeconds = player.durationSeconds(),

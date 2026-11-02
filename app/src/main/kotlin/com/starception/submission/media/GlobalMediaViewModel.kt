@@ -640,6 +640,7 @@ class GlobalMediaViewModel(
                     isPlaying = isPlaying,
                     title = surah?.nameArabic ?: "Quran",
                     subtitle = surah?.nameEnglish ?: "",
+                    reciterName = service.currentReciterName,
                     currentPosition = service.getCurrentPosition(),
                     duration = service.getDuration(),
                     source = activeSource,

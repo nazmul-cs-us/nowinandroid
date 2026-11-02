@@ -93,11 +93,9 @@ fun MediaMiniBar(
             preparingAudio -> "Preparing audio…"
             else -> playback.subtitle
         }
-        val displayText = if (subtitleText.isBlank()) {
-            playback.title
-        } else {
-            "${playback.title} · $subtitleText"
-        }
+        val displayText = listOfNotNull(playback.title,
+            playback.reciterName?.takeIf { it.isNotBlank() }, subtitleText.takeIf { it.isNotBlank() })
+            .joinToString(" · ")
         Text(
             text = displayText,
             modifier = Modifier
