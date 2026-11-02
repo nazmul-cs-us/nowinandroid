@@ -70,13 +70,18 @@ object IosReciterAudioStore {
         onCompleted: (Int, Int) -> Unit = { _, _ -> },
     ): Int {
         val ordered = source.availableSurahs.filter { it in 1..114 }.sorted()
-        var completed = 0
+        val pending = ordered.filter { cachedUrl(source.id, it) == null }
+        var completed = ordered.size - pending.size
+        onCompleted(completed, ordered.size)
+        if (pending.isEmpty()) return completed
         val bannerKey = "collection:${source.id}"
-        ContentDownloadBus.publishReciter(bannerKey, ContentDownloadStatus("Downloading ${source.displayName}", 0.001f))
+        ContentDownloadBus.publishReciter(bannerKey, ContentDownloadStatus(
+            "Downloading ${source.displayName} · $completed/${ordered.size}",
+            (completed.toFloat() / ordered.size).coerceAtLeast(0.001f), completed, ordered.size))
+        val throttle = com.starception.submission.shared.assets.ContentDownloadProgressThrottle()
         try {
-            for (surah in ordered) {
+            for (surah in pending) {
                 currentCoroutineContext().ensureActive()
-                val throttle = com.starception.submission.shared.assets.ContentDownloadProgressThrottle()
                 val result = downloadFile(source, surah) { done, total ->
                     val fileFraction = if (total > 0) done.toFloat() / total else 0f
                     val fraction = (completed + fileFraction) / ordered.size.coerceAtLeast(1)

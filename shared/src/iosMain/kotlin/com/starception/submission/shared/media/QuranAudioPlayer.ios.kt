@@ -40,7 +40,10 @@ actual suspend fun resolveQuranAudioUrl(
             IosReciterAudioStore.cachedUrl(id, surahNumber)?.let { return it }
         }
         val selected = preferences.selectedSource()
-        if (selected != null && selected.urlForSurah(surahNumber) != null) {
+        if (selected != null) {
+            check(selected.urlForSurah(surahNumber) != null) {
+                "This surah is not available from ${selected.displayName}. Choose another reciter."
+            }
             return IosReciterAudioStore.cachedUrl(selected.id, surahNumber)
                 ?: IosReciterAudioStore.download(selected, surahNumber)
         }

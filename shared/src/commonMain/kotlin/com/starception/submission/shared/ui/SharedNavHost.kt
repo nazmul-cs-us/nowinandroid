@@ -296,11 +296,14 @@ fun SharedNavHost(
             navController.navigate(QuranDetailRoute(surahNumber)) { launchSingleTop = true }
         }
     }
+    val detailDownload by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
     Box(modifier) {
         com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer(
             isRefreshing = false,
             onRefresh = {},
             mediaBar = detailMediaBar,
+            downloadProgress = if (ownsSyncContainer) 0f else detailDownload?.progress ?: 0f,
+            downloadLabel = if (ownsSyncContainer) "" else detailDownload?.label.orEmpty(),
             enabled = false,
             modifier = Modifier.fillMaxSize(),
         ) { _ ->

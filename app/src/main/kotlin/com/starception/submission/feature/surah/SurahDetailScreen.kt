@@ -57,6 +57,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -1469,6 +1470,7 @@ fun SurahDetailScreen(
             var expandedSection by remember { mutableStateOf<String?>(null) }
             var reciters by remember { mutableStateOf<List<com.starception.submission.feature.quran.ReciterCatalog.Reciter>>(emptyList()) }
             var reciterQuery by remember { mutableStateOf("") }
+            var reciterRefresh by remember { mutableStateOf(0) }
             var reciterLoading by remember { mutableStateOf(false) }
             var reciterError by remember { mutableStateOf<String?>(null) }
             var selectedReciter by remember {
@@ -1477,14 +1479,20 @@ fun SurahDetailScreen(
                         .getString("selected_name", "Deenly audio") ?: "Deenly audio"
                 )
             }
+            var selectedReciterId by remember {
+                mutableStateOf(context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+                    .getString("selected_id", null))
+            }
             var reciterDownloading by remember { mutableStateOf<String?>(null) }
             val reciterDownloadManager = remember(context) { com.starception.submission.feature.quran.ReciterDownloadManager.get(context.applicationContext) }
-            LaunchedEffect(expandedSection) {
+            LaunchedEffect(expandedSection, reciterRefresh) {
                 if (expandedSection == "reciter" && reciters.isEmpty()) {
                     reciterLoading = true
                     try {
                         reciters = com.starception.submission.feature.quran.ReciterCatalog.fetch(context)
                         reciterError = null
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
                     } catch (error: Exception) {
                         reciterError = "Unable to load reciters. Check your connection."
                     } finally {
@@ -1784,96 +1792,97 @@ fun SurahDetailScreen(
                     androidx.compose.animation.AnimatedVisibility(visible = expandedSection == "reciter") {
                         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                             Text(
-                                "Audio is downloaded only when you select a reciter and play this surah.",
+                                "Choose a reciter to play this surah. Offline downloads are managed separately.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Text(
-                                "Deenly audio (CDN)",
-                                modifier = Modifier.fillMaxWidth().clickable {
+                            com.starception.submission.feature.quran.ReciterChoiceRow(
+                                name = "Deenly audio", description = "Default recitation",
+                                selected = selectedReciterId == null,
+                                enabled = reciterDownloading == null,
+                                onSelect = {
                                     selectedReciter = "Deenly audio"
+                                    selectedReciterId = null
                                     context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                                        .edit().putString("selected_name", selectedReciter).remove("selected_id").apply()
+                                        .edit().putString("selected_name", selectedReciter)
+                                        .remove("selected_id").remove("selected_server").remove("selected_surahs").apply()
                                     expandedSection = null
                                     playbackService?.playSurah(surahNumber - 1)
-                                }.padding(vertical = 14.dp),
-                                style = MaterialTheme.typography.bodyMedium,
+                                },
                             )
                             if (reciterLoading) {
                                 androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                             }
-                            reciterError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                            reciterError?.let {
+                                Text(it, color = MaterialTheme.colorScheme.error)
+                                androidx.compose.material3.TextButton(onClick = { reciterRefresh++ }) { Text("Try again") }
+                            }
                             androidx.compose.material3.OutlinedTextField(
                                 value = reciterQuery, onValueChange = { reciterQuery = it },
                                 label = { Text("Search reciters") }, singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            reciters.filter { surahNumber in it.surahs &&
-                                (it.name + " " + it.riwaya).contains(reciterQuery, ignoreCase = true)
-                            }.forEach { reciter ->
-                                val downloadState by reciterDownloadManager.observe(reciter)
-                                    .collectAsState()
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        "${downloadState.downloadedSurahs}/${downloadState.totalSurahs} offline",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Text(
-                                        if (downloadState.downloading) "Cancel" else "Download all",
-                                        modifier = Modifier.clickable {
-                                            if (downloadState.downloading) reciterDownloadManager.cancel(reciter.id)
-                                            else reciterDownloadManager.download(reciter)
-                                        }.padding(8.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                    Text(
-                                        "Delete",
-                                        modifier = Modifier.clickable(enabled = !downloadState.downloading) {
-                                            reciterDownloadManager.delete(reciter)
-                                        }.padding(8.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                }
-                                downloadState.error?.let { error ->
-                                    Text(error, color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.labelSmall)
-                                }
-                                val label = reciter.name + " · " + reciter.riwaya
-                                Text(
-                                    if (reciterDownloading == reciter.id) "Downloading… " + label else label,
-                                    modifier = Modifier.fillMaxWidth()
-                                        .clickable(enabled = reciterDownloading == null) {
-                                            coroutineScope.launch {
-                                                reciterDownloading = reciter.id
-                                                try {
-                                                    val file = reciterDownloadManager.downloadSurah(reciter, surahNumber)
-                                                    playbackService?.playDownloadedReciterSurah(
-                                                        surahNumber - 1, file, reciter.name
-                                                    )
-                                                    selectedReciter = label
-                                                    context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                                                        .edit().putString("selected_name", label).putString("selected_id", reciter.id)
-                                                        .putString("selected_server", reciter.server)
-                                                        .putString("selected_surahs", reciter.surahs.joinToString(","))
-                                                        .apply()
-                                                    expandedSection = null
-                                                } catch (error: Exception) {
-                                                    android.widget.Toast.makeText(
-                                                        context, "Reciter audio unavailable: " + (error.message ?: ""),
-                                                        android.widget.Toast.LENGTH_LONG
-                                                    ).show()
-                                                } finally {
-                                                    reciterDownloading = null
-                                                }
-                                            }
-                                        }.padding(vertical = 12.dp),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
+                            val matchingReciters = reciters.filter { surahNumber in it.surahs &&
+                                (it.name + " " + it.riwaya).contains(reciterQuery.trim(), ignoreCase = true)
                             }
+                            if (!reciterLoading && matchingReciters.isEmpty()) Text(
+                                "No reciters found. Try another name or riwaya.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                items(matchingReciters, key = { it.id }) { reciter ->
+                                    val downloadState by reciterDownloadManager.observe(reciter).collectAsState()
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        com.starception.submission.feature.quran.ReciterChoiceRow(
+                                            name = reciter.name,
+                                            description = reciter.riwaya + " · ${downloadState.downloadedSurahs}/${downloadState.totalSurahs} offline",
+                                            selected = selectedReciterId == reciter.id,
+                                            enabled = reciterDownloading == null,
+                                            onSelect = {
+                                                coroutineScope.launch {
+                                                    reciterDownloading = reciter.id
+                                                    try {
+                                                        val file = reciterDownloadManager.downloadSurah(reciter, surahNumber)
+                                                        playbackService?.playDownloadedReciterSurah(surahNumber - 1, file, reciter.name)
+                                                        val label = reciter.name + " · " + reciter.riwaya
+                                                        selectedReciter = label
+                                                        selectedReciterId = reciter.id
+                                                        context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+                                                            .edit().putString("selected_name", label).putString("selected_id", reciter.id)
+                                                            .putString("selected_server", reciter.server)
+                                                            .putString("selected_surahs", reciter.surahs.joinToString(",")).apply()
+                                                        expandedSection = null
+                                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                                        throw cancelled
+                                                    } catch (error: Exception) {
+                                                        Toast.makeText(context, "Reciter audio unavailable: " + error.message,
+                                                            Toast.LENGTH_LONG).show()
+                                                    } finally { reciterDownloading = null }
+                                                }
+                                            },
+                                        )
+                                        if (reciterDownloading == reciter.id || downloadState.downloading)
+                                            androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            androidx.compose.material3.TextButton(onClick = {
+                                                if (downloadState.downloading) reciterDownloadManager.cancel(reciter.id)
+                                                else reciterDownloadManager.download(reciter)
+                                            }, enabled = downloadState.downloading || downloadState.downloadedSurahs < downloadState.totalSurahs) {
+                                                Text(if (downloadState.downloading) "Cancel download" else "Download all")
+                                            }
+                                            if (downloadState.downloadedSurahs > 0) androidx.compose.material3.TextButton(
+                                                onClick = { reciterDownloadManager.delete(reciter) }, enabled = !downloadState.downloading,
+                                            ) { Text("Remove downloads", color = MaterialTheme.colorScheme.error) }
+                                        }
+                                        downloadState.error?.let { Text(it, color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodySmall) }
+                                    }
+                                }
+                            }
+
                         }
                     }
 

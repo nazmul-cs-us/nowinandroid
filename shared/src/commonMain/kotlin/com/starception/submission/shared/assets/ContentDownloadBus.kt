@@ -40,11 +40,19 @@ object ContentDownloadBus {
     private val content = MutableStateFlow<ContentDownloadStatus?>(null)
     private val reciters = MutableStateFlow<Map<String, ContentDownloadStatus>>(emptyMap())
     val state: StateFlow<ContentDownloadStatus?> = combine(content, reciters) { cdn, active ->
-        cdn?.copy(progress = cdn.progress.coerceAtLeast(0.001f)) ?: when (active.size) {
+        // Keep the explicitly requested reciter visible even during automatic CDN downloads.
+        // Clearing one producer must not clear another producer's active banner.
+        when {
+            cdn != null && active.isNotEmpty() -> active.values.last().let {
+                it.copy(label = "${it.label} · other downloads active")
+            }
+            cdn != null -> cdn.copy(progress = cdn.progress.coerceAtLeast(0.001f))
+            else -> when (active.size) {
             0 -> null
             1 -> active.values.first()
             else -> ContentDownloadStatus("Downloading recitations (${active.size})",
                 active.values.map { it.progress }.average().toFloat())
+            }
         }
     }.stateIn(CoroutineScope(SupervisorJob() + Dispatchers.Default), SharingStarted.Eagerly, null)
 

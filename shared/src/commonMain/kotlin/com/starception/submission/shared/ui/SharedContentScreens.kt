@@ -1248,6 +1248,7 @@ internal fun QuranDetailScreen(
     }
         if (showReadingSettings) {
             SurahReadingSettingsSheet(
+                surahNumber = number,
                 previewText = (ayahState as? QuranAyahState.Loaded)?.verses
                     ?.firstOrNull()?.arabicText
                     ?: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
@@ -1862,6 +1863,7 @@ private fun ReadingSettingsModal(
 @androidx.compose.runtime.Composable
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 private fun SurahReadingSettingsSheet(
+    surahNumber: Int,
     previewText: String,
     selectedFont: String,
     fontSize: Float,
@@ -1883,7 +1885,7 @@ private fun SurahReadingSettingsSheet(
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     var expandedSection by remember { mutableStateOf<String?>(null) }
     ReadingSettingsModal(onDismiss = onDismiss) {
-        ReciterSettingsSection()
+        ReciterSettingsSection(surahNumber = surahNumber)
         // Food Truck's grouped-form layout: titled sections on cards.
         SettingsSection(title = "Preview") {
             Text(
@@ -6062,11 +6064,14 @@ private fun TopLevelScaffold(
         // refresh that completes immediately so the gesture springs back.
         // The shared connectivity feed drives the persistent offline row.
         if (onRefresh != null) {
+            val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
             val isOnline by com.starception.submission.shared.connectivity.appConnectivity.isOnline
                 .collectAsState()
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,
+                downloadProgress = downloadStatus?.progress ?: 0f,
+                downloadLabel = downloadStatus?.label.orEmpty(),
                 syncResultText = syncResultText,
                 isOffline = !isOnline,
                 prayerAlertState = prayerAlert

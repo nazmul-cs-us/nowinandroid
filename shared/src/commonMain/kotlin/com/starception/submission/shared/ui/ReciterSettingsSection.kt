@@ -59,7 +59,7 @@ private object ReciterDownloadState {
 }
 
 @Composable
-internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyExpanded: Boolean = false) {
+internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyExpanded: Boolean = false, surahNumber: Int? = null) {
     val library = QuranReciterLibrary.platform ?: return
     val preferences = remember { QuranReciterPreferences() }
     var selected by remember { mutableStateOf(preferences.selectedReciterId()) }
@@ -128,38 +128,42 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
                         TextButton(onClick = { refresh++ }) { Text("Try again") }
                     }
                     download.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                    if (!manageDownloads) {
-                        TextButton(onClick = {
+                    Text("Choose the voice for Arabic playback. Save audio separately for offline listening.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    com.starception.submission.feature.quran.ReciterChoiceRow(
+                        name = "Deenly audio",
+                        description = "Default recitation",
+                        selected = selected == null,
+                        onSelect = {
                             preferences.selectSource(null); selected = null
                             com.starception.submission.shared.media.QuranPlaybackBus.stop()
-                        }) { Text(if (selected == null) "✓ Deenly audio" else "Deenly audio") }
-                    }
-                    val filtered = catalog.filter { (it.displayName + " " + it.riwaya).contains(query, true) }
-                    if (!loading && filtered.isEmpty()) Text("No reciters found", style = MaterialTheme.typography.bodyMedium)
+                        },
+                    )
+                    val available = surahNumber?.let { selectableQuranReciters(it, catalog) } ?: catalog
+                    val filtered = available.filter { (it.displayName + " " + it.riwaya).contains(query.trim(), true) }
+                    if (!loading && filtered.isEmpty()) Text("No reciters found. Try another name or riwaya.", style = MaterialTheme.typography.bodyMedium)
                     LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
                         items(filtered, key = { it.id }) { source ->
-                            val count = remember(source.id, download.revision, revision) { library.count(source) }
-                            val bytes = remember(source.id, download.revision, revision) { library.bytes(source) }
+                            val count = remember(source.id, download.completed, download.revision, revision) { library.count(source) }
+                            val bytes = remember(source.id, download.completed, download.revision, revision) { library.bytes(source) }
                             val open = openedReciter == source.id || download.active == source.id
                             Column {
-                                Row(Modifier.fillMaxWidth().clickable(role = Role.Button) {
-                                    openedReciter = if (openedReciter == source.id) null else source.id
-                                    if (!manageDownloads) {
+                                com.starception.submission.feature.quran.ReciterChoiceRow(
+                                    name = source.displayName,
+                                    description = listOfNotNull(source.riwaya.takeIf { it.isNotBlank() },
+                                        "$count of ${source.availableSurahs.size} surahs offline").joinToString(" · "),
+                                    selected = selected == source.id,
+                                    onSelect = {
                                         preferences.selectSource(source); selected = source.id
                                         com.starception.submission.shared.media.QuranPlaybackBus.stop()
-                                    }
-                                }.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        Text((if (!manageDownloads && selected == source.id) "✓ " else "") + source.displayName,
-                                            style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(source.riwaya, style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        if (count > 0) Text("$count surahs · ${bytes / (1024 * 1024)} MB offline",
-                                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                                    }
-                                    Icon(if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                    },
+                                )
+                                TextButton(onClick = {
+                                    openedReciter = if (openedReciter == source.id) null else source.id
+                                }) {
+                                    Text(if (open) "Hide downloads" else "Offline audio" +
+                                        (if (bytes > 0) " · ${bytes / (1024 * 1024)} MB" else ""))
                                 }
                                 if (open) {
                                     if (download.active == source.id) {
@@ -180,6 +184,7 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
                                         }
                                     }
                                 }
+                                Spacer(Modifier.height(8.dp))
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                             }
                         }

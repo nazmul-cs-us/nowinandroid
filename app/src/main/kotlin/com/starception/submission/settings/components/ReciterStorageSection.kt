@@ -57,8 +57,10 @@ fun ReciterStorageSection() {
     var reciters by remember { mutableStateOf<List<ReciterCatalog.Reciter>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    var selectedId by remember { mutableStateOf<String?>(null) }
+    var expandedReciterId by remember { mutableStateOf<String?>(null) }
 
+    val preferences = remember(context) { context.getSharedPreferences("quran_reciter", android.content.Context.MODE_PRIVATE) }
+    var preferredReciterId by remember { mutableStateOf(preferences.getString("selected_id", null)) }
     var query by remember { mutableStateOf("") }
     var refresh by remember { mutableStateOf(0) }
     var expanded by remember { mutableStateOf(false) }
@@ -100,26 +102,41 @@ fun ReciterStorageSection() {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { refresh++ }) { Text("Try again") }
                 }
-                val filtered = reciters.filter { (it.name + " " + it.riwaya).contains(query, true) }
+                Text("Choose the voice for Arabic playback. Offline downloads are managed separately.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                com.starception.submission.feature.quran.ReciterChoiceRow(
+                    name = "Deenly audio", description = "Default recitation",
+                    selected = preferredReciterId == null,
+                    onSelect = {
+                        preferences.edit().remove("selected_id").remove("selected_server").remove("selected_surahs")
+                            .putString("selected_name", "Deenly audio").apply()
+                        preferredReciterId = null
+                    },
+                )
+                val filtered = reciters.filter { (it.name + " " + it.riwaya).contains(query.trim(), true) }
                 if (!loading && filtered.isEmpty()) Text("No reciters found", style = MaterialTheme.typography.bodyMedium)
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
                     items(filtered, key = { it.id }) { reciter ->
                         val status by manager.observe(reciter).collectAsState()
-                        val open = selectedId == reciter.id || status.downloading
+                        val open = expandedReciterId == reciter.id || status.downloading
                         Column {
-                            Row(Modifier.fillMaxWidth().clickable(role = Role.Button) {
-                                selectedId = if (selectedId == reciter.id) null else reciter.id
-                            }.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    Text(reciter.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(reciter.riwaya, style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    if (status.downloadedSurahs > 0) Text("${status.downloadedSurahs} surahs · ${status.downloadedBytes / (1024 * 1024)} MB offline",
-                                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                                }
-                                Icon(if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                            com.starception.submission.feature.quran.ReciterChoiceRow(
+                                name = reciter.name,
+                                description = reciter.riwaya + " · ${status.downloadedSurahs}/${status.totalSurahs} offline",
+                                selected = preferredReciterId == reciter.id,
+                                onSelect = {
+                                    preferences.edit().putString("selected_id", reciter.id)
+                                        .putString("selected_name", reciter.name + " · " + reciter.riwaya)
+                                        .putString("selected_server", reciter.server)
+                                        .putString("selected_surahs", reciter.surahs.joinToString(",")).apply()
+                                    preferredReciterId = reciter.id
+                                },
+                            )
+                            TextButton(onClick = {
+                                expandedReciterId = if (expandedReciterId == reciter.id) null else reciter.id
+                            }) {
+                                Text(if (open) "Hide downloads" else "Offline audio" +
+                                    (if (status.downloadedBytes > 0) " · ${status.downloadedBytes / (1024 * 1024)} MB" else ""))
                             }
                             if (open) {
                                 if (status.downloading) LinearProgressIndicator(Modifier.fillMaxWidth())
