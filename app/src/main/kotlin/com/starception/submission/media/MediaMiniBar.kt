@@ -17,6 +17,9 @@
 package com.starception.submission.media
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -32,10 +35,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
 import com.starception.submission.ui.MiniBarShell
+
+@Composable
+fun mediaMiniBarHeight(): Dp = maxOf(44.dp, with(LocalDensity.current) {
+    MaterialTheme.typography.labelLarge.lineHeight.toDp() +
+        MaterialTheme.typography.labelMedium.lineHeight.toDp()
+} + 8.dp)
 
 /**
  * Media mini-bar for the PullToSyncContainer sage area.
@@ -83,33 +95,32 @@ fun MediaMiniBar(
         progress = progress,
         modifier = modifier,
         showProgressLine = showProgressLine,
+        rowHeight = mediaMiniBarHeight(),
     ) {
-        // Title + subtitle share one line so playback and Mushaf navigation use
-        // exactly the same compact geometry.
-        // Tapping the title navigates to the playing surah; drag-to-dismiss is bound
-        // to this area only so taps on the playback buttons are never intercepted.
-        val subtitleText = when {
-            statusText != null -> statusText
-            preparingAudio -> "Preparing audio…"
-            else -> playback.subtitle
-        }
-        val displayText = listOfNotNull(playback.title,
-            playback.reciterName?.takeIf { it.isNotBlank() }, subtitleText.takeIf { it.isNotBlank() })
-            .joinToString(" · ")
-        Text(
-            text = displayText,
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(end = 6.dp)
                 .clickable(onClick = onTitleClick)
                 .then(titleDragModifier),
-            style = MaterialTheme.typography.bodyMedium,
-            fontSize = 17.sp,
-            lineHeight = 19.sp,
-            color = if (preparingAudio) subtitleColor else contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        ) {
+            Text(
+                text = playback.bannerTitle,
+                modifier = Modifier.fillMaxWidth().basicMarquee(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = playback.bannerSubtitle(statusText, preparingAudio),
+                modifier = Modifier.fillMaxWidth().basicMarquee(),
+                style = MaterialTheme.typography.labelMedium,
+                color = subtitleColor,
+                maxLines = 1,
+            )
+        }
 
         // Controls: skip prev, play/pause, skip next
         IconButton(

@@ -28,6 +28,7 @@ import com.starception.submission.feature.surah.MushafMiniBarState
 import com.starception.submission.media.MediaAction
 import com.starception.submission.media.MediaControllerUiState
 import com.starception.submission.media.MediaMiniBar
+import com.starception.submission.media.mediaMiniBarHeight
 
 /**
  * Android's rows for the shared [PullToSyncContainer][com.starception.submission
@@ -48,6 +49,7 @@ fun mediaSyncBarRow(
     val hapticFeedback = LocalHapticFeedback.current
     return SyncBarRow(
         isVisible = state.isVisible,
+        minimumHeight = mediaMiniBarHeight(),
         progress = if (state.playback.duration > 0) {
             (state.playback.currentPosition.toFloat() / state.playback.duration.toFloat())
                 .coerceIn(0f, 1f)

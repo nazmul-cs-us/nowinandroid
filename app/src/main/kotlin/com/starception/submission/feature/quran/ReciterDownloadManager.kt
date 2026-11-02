@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -35,9 +36,10 @@ class ReciterDownloadManager private constructor(private val context: Context) {
         val downloadedBytes: Long = 0,
         val downloading: Boolean = false,
         val error: String? = null,
+        val currentFileProgress: Float = 0f,
     ) {
         val progress: Float get() = if (totalSurahs == 0) 0f else
-            downloadedSurahs.toFloat() / totalSurahs
+            ((downloadedSurahs + currentFileProgress) / totalSurahs).coerceIn(0f, 1f)
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -61,9 +63,20 @@ class ReciterDownloadManager private constructor(private val context: Context) {
         val key = "playback:${reciter.id}:$surah:${java.util.UUID.randomUUID()}"
         publish(key, "Downloading ${reciter.name}", 0f)
         return try {
-            ReciterCatalog.download(context, reciter, surah) { progress ->
+            val file = ReciterCatalog.download(context, reciter, surah) { progress ->
                 publish(key, "Downloading ${reciter.name}", progress)
             }
+            // Single-surah playback downloads must refresh an open Storage
+            // panel just like a bulk download does.
+            withContext(Dispatchers.IO) {
+                val saved = snapshot(reciter)
+                states[reciter.id]?.update { current -> current.copy(
+                    downloadedSurahs = saved.downloadedSurahs,
+                    totalSurahs = saved.totalSurahs,
+                    downloadedBytes = saved.downloadedBytes,
+                ) }
+            }
+            file
         } finally { clear(key) }
     }
 
@@ -108,9 +121,12 @@ class ReciterDownloadManager private constructor(private val context: Context) {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     if (reciter.id in cancelled) throw CancellationException("Cancelled")
                     ReciterCatalog.download(context, reciter, surah) { fraction ->
-                        if (generation[reciter.id] == token) publish(reciter.id,
-                            "Downloading ${reciter.name} · ${index + 1}/${surahs.size}",
-                            (index + fraction) / surahs.size)
+                        if (generation[reciter.id] == token) {
+                            state.update { it.copy(currentFileProgress = fraction) }
+                            publish(reciter.id,
+                                "Downloading ${reciter.name} · ${index + 1}/${surahs.size}",
+                                (index + fraction) / surahs.size)
+                        }
                     }
                     if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(downloading = true)
                 }
@@ -133,7 +149,7 @@ class ReciterDownloadManager private constructor(private val context: Context) {
         cancelled.add(reciterId)
         generation[reciterId] = (generation[reciterId] ?: 0) + 1
         jobs.remove(reciterId)?.cancel()
-        states[reciterId]?.let { it.value = it.value.copy(downloading = false) }
+        states[reciterId]?.let { it.value = it.value.copy(downloading = false, currentFileProgress = 0f) }
     }
 
     @Synchronized

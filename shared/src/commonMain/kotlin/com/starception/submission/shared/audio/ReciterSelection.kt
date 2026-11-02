@@ -2,6 +2,9 @@ package com.starception.submission.shared.audio
 
 import com.starception.submission.shared.storage.KeyValueStore
 import com.starception.submission.shared.storage.platformKeyValueStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * Cross-platform Quran reciter preference and URL resolution.
@@ -26,6 +29,10 @@ data class QuranReciterSource(
 class QuranReciterPreferences(
     private val store: KeyValueStore = platformKeyValueStore(),
 ) {
+    companion object {
+        private val revision = MutableStateFlow(0L)
+        val changes = revision.asStateFlow()
+    }
     fun selectedSource(): QuranReciterSource? = runCatching {
         kotlinx.serialization.json.Json.decodeFromString<QuranReciterSource>(
             store.getString("quran_reciter_source").orEmpty())
@@ -44,6 +51,7 @@ class QuranReciterPreferences(
     fun select(reciterId: String?) {
         if (selectedSource()?.id != reciterId) store.putString("quran_reciter_source", "")
         store.putString("quran_selected_reciter_id", reciterId.orEmpty())
+        revision.update { it + 1 }
     }
 }
 

@@ -59,7 +59,21 @@ data class MediaPlaybackState(
     val duration: Int = 0,
     val source: MediaSource = MediaSource.None,
     val reciterName: String? = null,
-)
+) {
+    val bannerTitle: String get() = if (source is MediaSource.Quran) {
+        listOf(subtitle, title).filter(String::isNotBlank).distinct().joinToString(" · ")
+    } else title
+
+    fun bannerSubtitle(statusText: String?, preparingAudio: Boolean): String = listOfNotNull(
+        reciterName?.takeIf(String::isNotBlank),
+        when {
+            !statusText.isNullOrBlank() -> statusText
+            preparingAudio -> "Preparing audio…"
+            source is MediaSource.Quran -> if (isPlaying) "Playing" else "Paused"
+            else -> subtitle.takeIf(String::isNotBlank)
+        },
+    ).joinToString(" · ")
+}
 
 /**
  * Sealed class for media controller actions dispatched from UI.

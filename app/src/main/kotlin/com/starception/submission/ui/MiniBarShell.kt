@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 
 /**
  * The single row height every top strip row uses — mini bars and plain status
@@ -50,6 +51,7 @@ fun MiniBarShell(
      * isn't sitting under two readings of one number.
      */
     showProgressLine: Boolean = true,
+    rowHeight: Dp = MiniBarRowHeight,
     content: @Composable RowScope.() -> Unit,
 ) {
     val trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.08f)
@@ -58,7 +60,7 @@ fun MiniBarShell(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(MiniBarRowHeight),
+            .height(rowHeight),
     ) {
         Row(
             modifier = Modifier

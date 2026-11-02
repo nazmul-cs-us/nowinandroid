@@ -282,8 +282,7 @@ class QuranPlaybackService : Service() {
             }
 
             currentReciterName = if (selectedFile != null)
-                reciterPreferences.getString("selected_name", null)?.takeUnless { it == "Deenly audio" }
-                    ?: "Mishary Rashid Al-Alafasy"
+                ReciterSelectionStore(this).current().name
             else "Mishary Rashid Al-Alafasy"
 
             // Samsung's MediaPlayer can enter an unrecoverable native error

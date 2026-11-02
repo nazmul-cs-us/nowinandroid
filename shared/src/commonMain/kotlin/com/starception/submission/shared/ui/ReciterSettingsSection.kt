@@ -67,7 +67,8 @@ private object ReciterDownloadState {
 internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyExpanded: Boolean = false, surahNumber: Int? = null, onSelected: () -> Unit = {}) {
     val library = QuranReciterLibrary.platform ?: return
     val preferences = remember { QuranReciterPreferences() }
-    var selected by remember { mutableStateOf(preferences.selectedReciterId()) }
+    val selectionRevision by QuranReciterPreferences.changes.collectAsState()
+    val selected = remember(selectionRevision) { preferences.selectedReciterId() }
     val store = remember { platformKeyValueStore() }
     var catalog by remember { mutableStateOf<List<QuranReciterSource>>(emptyList()) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
@@ -168,7 +169,7 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
                                 description = "Default recitation",
                                 selected = selected == null,
                                 onSelect = {
-                                    preferences.selectSource(null); selected = null
+                                    preferences.selectSource(null)
                                     com.starception.submission.shared.media.QuranPlaybackBus.stop()
                                     onSelected()
                                 },
@@ -190,7 +191,7 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
                                         else source.riwaya.ifBlank { "Arabic recitation" },
                                     selected = selected == source.id,
                                     onSelect = {
-                                        preferences.selectSource(source); selected = source.id
+                                        preferences.selectSource(source)
                                         com.starception.submission.shared.media.QuranPlaybackBus.stop()
                                         onSelected()
                                     },

@@ -53,6 +53,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.starception.submission.feature.quran.ReciterCatalog
 import com.starception.submission.feature.quran.ReciterDownloadManager
+import com.starception.submission.feature.quran.ReciterSelectionStore
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.feature.quran.ReciterGroup
 import com.starception.submission.feature.quran.ReciterGroupFilters
 import com.starception.submission.feature.quran.reciterGroup
@@ -80,8 +82,9 @@ fun ReciterStorageSection(
     var error by remember { mutableStateOf<String?>(null) }
     var expandedReciterId by remember { mutableStateOf<String?>(null) }
 
-    val preferences = remember(context) { context.getSharedPreferences("quran_reciter", android.content.Context.MODE_PRIVATE) }
-    var preferredReciterId by remember { mutableStateOf(preferences.getString("selected_id", null)) }
+    val selectionStore = remember(context) { ReciterSelectionStore(context) }
+    val selection by selectionStore.selections.collectAsStateWithLifecycle(initialValue = selectionStore.current())
+    val preferredReciterId = selection.id
     var query by remember { mutableStateOf("") }
     var group by remember { mutableStateOf<ReciterGroup?>(null) }
     var refresh by remember { mutableStateOf(0) }
@@ -124,7 +127,7 @@ fun ReciterStorageSection(
                 Icon(Icons.Filled.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(sectionTitle, style = MaterialTheme.typography.titleSmall)
-                    Text("Reciters & offline audio", style = MaterialTheme.typography.bodySmall,
+                    Text(selection.name, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
@@ -179,9 +182,7 @@ fun ReciterStorageSection(
                     previewLoading = preview.activeId == "default-cdn" && preview.loading,
                     onSelect = {
                         preview.stop()
-                        preferences.edit().remove("selected_id").remove("selected_server").remove("selected_surahs")
-                            .putString("selected_name", "Mishary Rashid Al-Alafasy").apply()
-                        preferredReciterId = null
+                        selectionStore.select(null)
                         onReciterSelected()
                     },
                 )
@@ -212,11 +213,7 @@ fun ReciterStorageSection(
                                 previewLoading = preview.activeId == reciter.id && preview.loading,
                                 onSelect = {
                                     preview.stop()
-                                    preferences.edit().putString("selected_id", reciter.id)
-                                        .putString("selected_name", reciter.name + " · " + reciter.riwaya)
-                                        .putString("selected_server", reciter.server)
-                                        .putString("selected_surahs", reciter.surahs.joinToString(",")).apply()
-                                    preferredReciterId = reciter.id
+                                    selectionStore.select(reciter)
                                     onReciterSelected()
                                 },
                             )
@@ -227,7 +224,8 @@ fun ReciterStorageSection(
                                     (if (status.downloadedBytes > 0) " · ${status.downloadedBytes / (1024 * 1024)} MB" else ""))
                             }
                             if (manageDownloads && open) {
-                                if (status.downloading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                if (status.downloading) LinearProgressIndicator(
+                                    progress = { status.progress }, modifier = Modifier.fillMaxWidth())
                                 Text("${status.downloadedSurahs} of ${status.totalSurahs} surahs saved", style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 status.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
@@ -238,7 +236,9 @@ fun ReciterStorageSection(
                                         Text(if (status.downloading) "Cancel" else "Download all")
                                     }
                                     if (status.downloadedSurahs > 0) TextButton(onClick = { manager.delete(reciter) }, enabled = !status.downloading) {
-                                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                                        Text("Remove", color = if (status.downloading)
+                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                            else MaterialTheme.colorScheme.error)
                                     }
                                 }
                             }

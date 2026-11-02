@@ -144,6 +144,7 @@ fun UnifiedSettingsScreen(
         }
     }
     var skipInitialExpandScroll by remember { mutableStateOf(true) }
+    val toolbarClearancePx = with(LocalDensity.current) { 72.dp.roundToPx() }
     LaunchedEffect(expandedSections) {
         if (skipInitialExpandScroll) {
             skipInitialExpandScroll = false
@@ -153,7 +154,7 @@ fun UnifiedSettingsScreen(
         val index = sectionItemIndices[id]
         if (index != null) {
             kotlinx.coroutines.delay(120) // let the expand animation begin first
-            listState.animateScrollToItem(index)
+            listState.animateScrollToItem(index, scrollOffset = -toolbarClearancePx)
         }
     }
     val density = LocalDensity.current
@@ -622,6 +623,9 @@ private fun ModernSettingsTopBar(
         tonalElevation = (4 * collapseProgress).dp,
         modifier = modifier
             .fillMaxWidth()
+            // Paint the gap as the toolbar collapses so scrolled rows cannot
+            // peek through between the playback banner and Settings header.
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = collapseProgress))
             .padding(top = 8.dp),
     ) {
         Row(

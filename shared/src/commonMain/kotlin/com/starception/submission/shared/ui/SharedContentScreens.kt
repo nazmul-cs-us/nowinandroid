@@ -619,10 +619,15 @@ internal fun QuranDetailScreen(
     var showReadingSettings by remember { mutableStateOf(false) }
     var showReciterPicker by remember { mutableStateOf(false) }
     var reciterSelectionMade by remember { mutableStateOf(false) }
+    val reciterRevision by com.starception.submission.shared.audio.QuranReciterPreferences.changes.collectAsState()
+    val selectedReciterName = remember(reciterRevision) {
+        com.starception.submission.shared.audio.QuranReciterPreferences().selectedSource()?.displayName
+            ?: "Mishary Rashid Al-Alafasy"
+    }
     val reciterAction = DetailAction(
         id = "reciter",
-        label = "Change reciter",
-        trailingText = "Reciter",
+        label = "Change reciter, selected: $selectedReciterName",
+        trailingText = selectedReciterName,
     ) { showReciterPicker = true }
     // Android's toolbar translation chip — the two-letter code (EN/BN/…) that
     // opens the reading settings' translation picker.

@@ -16,6 +16,10 @@
 
 package com.starception.submission.feature.surah
 
+import androidx.compose.foundation.basicMarquee
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.starception.submission.feature.quran.ReciterSelectionStore
+
 import android.Manifest
 import android.content.ComponentName
 import android.content.Context
@@ -437,6 +441,10 @@ fun SurahDetailScreen(
     val quranRepository: QuranRepository = hiltViewModel<QuranRepositoryHolder>().repository
     val userDataRepository: UserDataRepository = hiltViewModel<UserDataRepositoryHolder>().repository
     val context = LocalContext.current
+    val reciterSelectionStore = remember(context) { ReciterSelectionStore(context) }
+    val reciterSelection by reciterSelectionStore.selections.collectAsStateWithLifecycle(
+        initialValue = reciterSelectionStore.current(),
+    )
 
     // Landscape detection
     val configuration = LocalConfiguration.current
@@ -1324,6 +1332,7 @@ fun SurahDetailScreen(
                 onReciterClick = {
                     showReciterPicker = true
                 },
+                selectedReciterName = reciterSelection.name,
                 onMoreClick = {
                     // Toggle floating toolbar visibility
                     showFloatingToolbar = !showFloatingToolbar
@@ -2302,6 +2311,7 @@ private fun AlbumPlayerTopBar(
     onBookmarkClick: () -> Unit = {},
     onMoreClick: () -> Unit = {},
     onReciterClick: () -> Unit = {},
+    selectedReciterName: String = "Mishary Rashid Al-Alafasy",
     onAllSurahsClick: () -> Unit = onBackClick,
     modifier: Modifier = Modifier,
 ) {
@@ -2368,7 +2378,8 @@ private fun AlbumPlayerTopBar(
     val moreButtonSize = 44.dp
     val backButtonSize = 44.dp
     val bookmarkButtonSize = 44.dp
-    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - bookmarkButtonSize - moreButtonSize - 76.dp)
+    val reciterButtonWidth = if (screenWidthDp < 360.dp) 96.dp else 112.dp
+    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - bookmarkButtonSize - moreButtonSize - reciterButtonWidth)
         .coerceAtLeast(0.dp)
     val maxIconsThatFit = (remainingWidth / iconButtonSize).toInt()
     val showTranslation = true
@@ -2506,14 +2517,16 @@ private fun AlbumPlayerTopBar(
 
                 Surface(
                     onClick = onReciterClick,
-                    modifier = Modifier.width(76.dp).height(44.dp)
-                        .semantics { contentDescription = "Change reciter" },
+                    modifier = Modifier.width(reciterButtonWidth).height(44.dp)
+                        .semantics { contentDescription = "Change reciter, selected: $selectedReciterName" },
                     shape = RoundedCornerShape(12.dp),
                     color = contentColor.copy(alpha = 0.12f),
                     contentColor = contentColor,
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Reciter", style = MaterialTheme.typography.labelMedium)
+                        Text(selectedReciterName, style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 10.dp).basicMarquee(),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 // More options menu - always shown (floating toolbar has all options)

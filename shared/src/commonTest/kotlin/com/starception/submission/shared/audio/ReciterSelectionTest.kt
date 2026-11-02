@@ -3,8 +3,25 @@ package com.starception.submission.shared.audio
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertNotEquals
 
 class ReciterSelectionTest {
+    @Test
+    fun selectionChangesNotifyExistingReadersAfterPreferencesAreSaved() {
+        val store = com.starception.submission.shared.storage.InMemoryKeyValueStore()
+        val reader = QuranReciterPreferences(store)
+        val settings = QuranReciterPreferences(store)
+        val source = QuranReciterSource("1-2", "Yasser Al-Dosari", "https://example.org/", setOf(1))
+        val before = QuranReciterPreferences.changes.value
+        settings.selectSource(source)
+        assertNotEquals(before, QuranReciterPreferences.changes.value)
+        assertEquals(source, reader.selectedSource())
+        val selected = QuranReciterPreferences.changes.value
+        settings.selectSource(null)
+        assertNotEquals(selected, QuranReciterPreferences.changes.value)
+        assertNull(reader.selectedSource())
+    }
+
     @Test
     fun onlyAvailableSurahsResolve() {
         val source = QuranReciterSource(

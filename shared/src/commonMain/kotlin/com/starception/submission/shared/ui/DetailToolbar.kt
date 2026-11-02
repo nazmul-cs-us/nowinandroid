@@ -17,12 +17,14 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,6 +50,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -244,7 +248,8 @@ private fun MaterialDetailToolbar(
                 inlineActions.forEach { action ->
                     IconButton(
                         onClick = action.onClick,
-                        modifier = Modifier.size(44.dp),
+                        modifier = (if (action.id == "reciter") Modifier.width(112.dp).height(44.dp)
+                            else Modifier.size(44.dp)).semantics { contentDescription = action.label },
                         colors = IconButtonDefaults.iconButtonColors(
                             contentColor = contentColor,
                         ),
@@ -264,6 +269,8 @@ private fun MaterialDetailToolbar(
                         } else if (action.trailingText != null) {
                             Text(
                                 text = action.trailingText,
+                                modifier = Modifier.basicMarquee(),
+                                maxLines = 1,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = contentColor,
@@ -369,7 +376,8 @@ private fun CupertinoDetailToolbar(
                         inlineActions.forEach { action ->
                             IconButton(
                                 onClick = action.onClick,
-                                modifier = Modifier.size(52.dp),
+                                modifier = (if (action.id == "reciter") Modifier.width(112.dp).height(52.dp)
+                                    else Modifier.size(52.dp)).semantics { contentDescription = action.label },
                             ) {
                                 action.icon?.let { icon ->
                                     Icon(
@@ -380,6 +388,8 @@ private fun CupertinoDetailToolbar(
                                 } ?: action.trailingText?.let { text ->
                                     Text(
                                         text = text,
+                                        modifier = Modifier.basicMarquee(),
+                                        maxLines = 1,
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
                                     )
