@@ -43,9 +43,17 @@ class QuranAudioSelectionTest {
         }
     }
 
-    @Test fun arabicOnlyUsesSelectedReciterAndTranslationsDoNotMislabelIt() {
+    @Test fun selectedReciterOnlyOverridesArabicRecordings() {
         val source = QuranReciterSource("1-2", "Selected voice", "https://example.org", setOf(1))
         assertEquals("Selected voice", quranPlaybackReciterName("", source))
-        assertNull(quranPlaybackReciterName("en", source))
+        for (code in listOf("en", "bn", "hi", "ur")) {
+            assertEquals("Mishary Rashid Al-Alafasy", quranPlaybackReciterName(code, source))
+        }
+    }
+
+    @Test fun everyCdnLanguageIncludesMisharyAsReciter() {
+        for (code in listOf("", "ar", "en", "bn", "hi", "ur")) {
+            assertEquals("Mishary Rashid Al-Alafasy", quranPlaybackReciterName(code, null))
+        }
     }
 }

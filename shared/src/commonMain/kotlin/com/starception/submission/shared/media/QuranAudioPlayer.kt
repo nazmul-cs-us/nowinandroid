@@ -69,6 +69,7 @@ internal fun quranAudioLanguage(translationCode: String): String = when (transla
     else -> "arabic"
 }
 
-internal fun quranPlaybackReciterName(translationCode: String, selected: QuranReciterSource?): String? =
+/** Every CDN language recording uses Mishary; only a selected Arabic source overrides it. */
+internal fun quranPlaybackReciterName(translationCode: String, selected: QuranReciterSource?): String =
     if (quranAudioLanguage(translationCode) == "arabic") selected?.displayName ?: "Mishary Rashid Al-Alafasy"
-    else null
+    else "Mishary Rashid Al-Alafasy"

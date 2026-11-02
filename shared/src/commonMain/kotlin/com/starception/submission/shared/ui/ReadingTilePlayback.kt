@@ -79,7 +79,15 @@ internal fun rememberReadingTilePlayback(
                                 language = language,
                                 resolve = ::resolveQuranAudioUrl,
                                 play = player::play,
-                                onStarted = { url -> QuranPlaybackBus.startSurah(player, surahNumber, url) },
+                                onStarted = { url ->
+                                    QuranPlaybackBus.startSurah(
+                                        player, surahNumber, url,
+                                        reciterName = com.starception.submission.shared.audio.quranPlaybackReciterName(
+                                            language,
+                                            com.starception.submission.shared.audio.QuranReciterPreferences().selectedSource(),
+                                        ),
+                                    )
+                                },
                             )
                         } catch (cancelled: CancellationException) {
                             throw cancelled

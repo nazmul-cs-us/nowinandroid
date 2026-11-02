@@ -497,8 +497,17 @@ fun PullToSyncContainer(
     val maxRevealDp = maxRevealDpForBanners
     val contentOffsetY = (wobbleIntensity * maxRevealDp).dp
 
-    // Fitbit-style rounded top corners on content card when pushed down
-    val cornerRadius = (wobbleIntensity * 64f).dp.coerceAtMost(48.dp)
+    // A resting banner has the same curve on every device. Deriving it from
+    // wobbleIntensity made smaller Android status/cutout insets produce much
+    // tighter corners than iOS. Follow the animated hold height instead so the
+    // curve still closes continuously when the banner is dismissed.
+    val holdRevealProgress =
+        (refreshingOffset.value * maxRevealDp / standardBarHeightDp.value)
+            .coerceIn(0f, 1f)
+    val cornerRadius = maxOf(
+        holdRevealProgress * 28f,
+        rawWobbleIntensity * 64f,
+    ).dp.coerceAtMost(48.dp)
     // A spring can spend a few frames just above zero while a banner opens or
     // closes. Painting the full accent color during those frames produces a
     // stray colored line at the very top before any banner content is visible.

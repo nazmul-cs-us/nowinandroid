@@ -245,7 +245,6 @@ class QuranPlaybackService : Service() {
                 }
                 return
             }
-            var playingArabic = audioLanguage == AudioLanguage.ARABIC_ONLY
             var audioFile = selectedFile ?: resolveAudioFile(index)
             Log.d("PlaybackTrace", "🎵 audioFile=${audioFile?.absolutePath} | exists=${audioFile?.exists()} | size=${audioFile?.length()}")
 
@@ -262,7 +261,6 @@ class QuranPlaybackService : Service() {
                             "Audio for $audioLanguage not found; falling back to Arabic for surah $index",
                         )
                         audioFile = arabicFile
-                        playingArabic = true
                     }
                 }
             }
@@ -286,7 +284,7 @@ class QuranPlaybackService : Service() {
             currentReciterName = if (selectedFile != null)
                 reciterPreferences.getString("selected_name", null)?.takeUnless { it == "Deenly audio" }
                     ?: "Mishary Rashid Al-Alafasy"
-            else if (playingArabic) "Mishary Rashid Al-Alafasy" else null
+            else "Mishary Rashid Al-Alafasy"
 
             // Samsung's MediaPlayer can enter an unrecoverable native error
             // state after a failed prepare — reset() does not clear it, and

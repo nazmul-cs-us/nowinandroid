@@ -1026,7 +1026,9 @@ fun PrayerTimesScreen(
                                 .windowInsetsPadding(
                                     WindowInsets.safeDrawing.only(WindowInsetsSides.Top),
                                 )
-                                .padding(horizontal = 24.dp),
+                                // The banner consumes the top safe inset. Keep
+                                // a separate gap so the header clears its curve.
+                                .padding(start = 24.dp, end = 24.dp, top = 12.dp),
                         ) {
                             PrayerHomeHeader(
                                 onOpenSettings = onOpenSettings,
