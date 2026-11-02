@@ -2096,6 +2096,7 @@ private fun ReaderReadingSettingsSheet(
     onFontSizeChange: (Float) -> Unit,
     onAlignmentChange: (String) -> Unit,
     onDismiss: () -> Unit,
+    minimumFontSize: Float = 28f,
 ) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     var expandedFontPicker by remember { mutableStateOf(false) }
@@ -2142,9 +2143,9 @@ private fun ReaderReadingSettingsSheet(
                         haptics.performHapticFeedback(
                             androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
                         )
-                        onFontSizeChange((fontSize - 1f).coerceIn(28f, 60f))
+                        onFontSizeChange((fontSize - 1f).coerceIn(minimumFontSize, 60f))
                     },
-                    enabled = fontSize > 28f,
+                    enabled = fontSize > minimumFontSize,
                     shape = androidx.compose.foundation.shape.CircleShape,
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     modifier = Modifier.size(30.dp),
@@ -2160,7 +2161,7 @@ private fun ReaderReadingSettingsSheet(
                         haptics.performHapticFeedback(
                             androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
                         )
-                        onFontSizeChange((fontSize + 1f).coerceIn(28f, 60f))
+                        onFontSizeChange((fontSize + 1f).coerceIn(minimumFontSize, 60f))
                     },
                     enabled = fontSize < 60f,
                     shape = androidx.compose.foundation.shape.CircleShape,
@@ -3034,7 +3035,7 @@ internal fun BukhariHadithDetailScreen(
     }
     var listening by remember { mutableStateOf(false) }
     var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
-    var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
+    var arabicFontSize by remember { mutableStateOf(store.hadithArabicFontSize()) }
     var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
     var showReadingSettings by remember { mutableStateOf(false) }
     var translationLanguage by remember { mutableStateOf(store.hadithTranslationLanguage()) }
@@ -3185,50 +3186,59 @@ internal fun BukhariHadithDetailScreen(
                 }
             }
             Box(Modifier.fillMaxSize()) {
-                ImmersiveDetailScaffold(onBack = onBack, header = {
-                Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
-                    NewsHeaderArtwork(
-                        "masjid_al_nawabi",
-                        Modifier.fillMaxSize().detailAlbumParallax(hadithPageListState),
-                    )
-                    ImmersiveDetailHeaderScrim(
-                        title = "Sahih al-Bukhari",
-                        supportingText = "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
-                        arabicTitle = "صحيح البخاري",
-                    )
-                    Column {
-                        DetailToolbar(
-                            onBack = onBack,
-                            // The surah toolbar's translation chip: the
-                            // two-letter language code opens the reading
-                            // settings' translation picker.
-                            inlineActions = listOf(
-                                DetailAction(
-                                    id = "translation_chip",
-                                    label = "Translation",
-                                    trailingText = translationLanguage.uppercase().take(2),
-                                ) { showReadingSettings = true },
+                val headerOffset = remember { mutableFloatStateOf(0f) }
+                val headerFadePx = with(LocalDensity.current) { 160.dp.toPx() }
+                ImmersiveDetailScaffold(
+                    onBack = onBack,
+                    collapsibleHeader = true,
+                    headerCollapseOffset = headerOffset,
+                    pinnedTopBar = {
+                        Box(Modifier.fillMaxWidth().background(
+                            MaterialTheme.colorScheme.surface.copy(
+                                alpha = (-headerOffset.floatValue / headerFadePx).coerceIn(0f, 1f),
                             ),
-                            sheetActions = listOf(
-                                listenAction,
-                                playAllAction,
-                                translationLanguageAction,
-                                translationProviderAction,
-                                readingSettingsAction,
-                            ),
-                            contentColor = androidx.compose.ui.graphics.Color.White,
-                            toolbarTitle = "Sahih al-Bukhari · Hadith ${currentHadith.id}",
+                        )) {
+                            DetailToolbar(
+                                onBack = onBack,
+                                // The surah toolbar's translation chip: the
+                                // two-letter language code opens the reading
+                                // settings' translation picker.
+                                inlineActions = listOf(
+                                    DetailAction(
+                                        id = "translation_chip",
+                                        label = "Translation",
+                                        trailingText = translationLanguage.uppercase().take(2),
+                                    ) { showReadingSettings = true },
+                                ),
+                                sheetActions = listOf(
+                                    listenAction,
+                                    playAllAction,
+                                    translationLanguageAction,
+                                    translationProviderAction,
+                                    readingSettingsAction,
+                                ),
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                toolbarTitle = "Sahih al-Bukhari · Hadith ${currentHadith.id}",
+                            )
+                        }
+                    },
+                    header = {
+                        NewsHeaderArtwork(
+                            "masjid_al_nawabi",
+                            Modifier.fillMaxWidth().aspectRatio(4f / 3f)
+                                .detailAlbumParallax(hadithPageListState),
                         )
-                    }
-                }
-            }) {
+                    },
+                ) {
                 androidx.compose.foundation.pager.HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.weight(1f),
                 ) { index ->
                     HadithDetailPage(
+                        collectionTitle = "Sahih al-Bukhari",
                         hadith = hadiths[index],
-                        bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },                        arabicFont = selectedArabicFont,
+                        bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },
+                        arabicFont = selectedArabicFont,
                         arabicFontSize = arabicFontSize,
                         textAlignment = textAlignment,
                         listState = hadithPageListState,
@@ -3237,7 +3247,7 @@ internal fun BukhariHadithDetailScreen(
                         onListeningChange = { enabled ->
                             if (enabled) {
                                 com.starception.submission.shared.voice.NarrationQueue.narrateSingle(
-                                    collection = com.starception.submission.shared.voice.NarrationQueue.Collection.SHAMAYEL,
+                                    collection = com.starception.submission.shared.voice.NarrationQueue.Collection.BUKHARI,
                                     bookId = book?.id ?: 0,
                                     hadithId = hadiths[index].id,
                                     language = translationLanguage,
@@ -3267,6 +3277,7 @@ internal fun BukhariHadithDetailScreen(
             }
                 if (showReadingSettings) {
                     ReaderReadingSettingsSheet(
+                        minimumFontSize = 20f,
                         previewText = currentHadith.arabic.ifBlank {
                             "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"
                         },
@@ -3279,7 +3290,7 @@ internal fun BukhariHadithDetailScreen(
                         },
                         onFontSizeChange = { size ->
                             arabicFontSize = size
-                            store.saveQuranArabicFontSize(size)
+                            store.saveHadithArabicFontSize(size)
                         },
                         onAlignmentChange = { alignment ->
                             textAlignment = alignment
@@ -3297,6 +3308,7 @@ internal fun BukhariHadithDetailScreen(
 @Composable
 private fun HadithDetailPage(
     hadith: SharedHadith,
+    collectionTitle: String,
     bookTag: String?,
     arabicFont: String,
     arabicFontSize: Float,
@@ -3316,7 +3328,7 @@ private fun HadithDetailPage(
     ) {
         item {
             Column {
-                Text("Hadith ${hadith.id}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(collectionTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ReaderTag("HADITH ${hadith.id}")
@@ -3333,7 +3345,7 @@ private fun HadithDetailPage(
         }
         if (hadith.arabic.isNotBlank()) {
             item {
-                ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
+                ReaderSection("Arabic (Original)", MaterialTheme.colorScheme.primary, collapsible = true) {
                     Text(
                         hadith.arabic,
                         modifier = Modifier.fillMaxWidth(),
@@ -3342,7 +3354,8 @@ private fun HadithDetailPage(
                         ),
                         fontFamily = QuranArabicFonts.fontFamily(arabicFont),
                         fontSize = arabicFontSize.sp,
-                        lineHeight = (arabicFontSize * 1.65f).sp,
+                        lineHeight = (arabicFontSize * 1.55f).sp,
+                        letterSpacing = 0.sp,
                         textAlign = readerTextAlignment(textAlignment),
                     )
                 }
@@ -3522,7 +3535,7 @@ internal fun ShamayelHadithDetailScreen(
     }
     var listening by remember { mutableStateOf(false) }
     var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
-    var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
+    var arabicFontSize by remember { mutableStateOf(store.hadithArabicFontSize()) }
     var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
     var showReadingSettings by remember { mutableStateOf(false) }
     var translationLanguage by remember { mutableStateOf(store.hadithTranslationLanguage()) }
@@ -3669,48 +3682,56 @@ internal fun ShamayelHadithDetailScreen(
                 }
             }
             Box(Modifier.fillMaxSize()) {
-                ImmersiveDetailScaffold(onBack = onBack, header = {
-                Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
-                    NewsHeaderArtwork(
-                        "masjid_al_nawabi",
-                        Modifier.fillMaxSize().detailAlbumParallax(hadithPageListState),
-                    )
-                    ImmersiveDetailHeaderScrim(
-                        title = "Shama'il At-Tirmidhi",
-                        supportingText = "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
-                        arabicTitle = "شمائل الترمذي",
-                    )
-                     Column {
-                         DetailToolbar(
-                            onBack = onBack,
-                            // The surah toolbar's translation chip: the
-                            // two-letter language code opens the reading
-                            // settings' translation picker.
-                            inlineActions = listOf(
-                                DetailAction(
-                                    id = "translation_chip",
-                                    label = "Translation",
-                                    trailingText = translationLanguage.uppercase().take(2),
-                                ) { showReadingSettings = true },
+                val headerOffset = remember { mutableFloatStateOf(0f) }
+                val headerFadePx = with(LocalDensity.current) { 160.dp.toPx() }
+                ImmersiveDetailScaffold(
+                    onBack = onBack,
+                    collapsibleHeader = true,
+                    headerCollapseOffset = headerOffset,
+                    pinnedTopBar = {
+                        Box(Modifier.fillMaxWidth().background(
+                            MaterialTheme.colorScheme.surface.copy(
+                                alpha = (-headerOffset.floatValue / headerFadePx).coerceIn(0f, 1f),
                             ),
-                            sheetActions = listOf(
-                                listenAction,
-                                playAllAction,
-                                translationLanguageAction,
-                                translationProviderAction,
-                                readingSettingsAction,
-                            ),
-                            contentColor = androidx.compose.ui.graphics.Color.White,
-                            toolbarTitle = "Shama'il At-Tirmidhi · Hadith ${currentHadith.id}",
+                        )) {
+                            DetailToolbar(
+                                onBack = onBack,
+                                // The surah toolbar's translation chip: the
+                                // two-letter language code opens the reading
+                                // settings' translation picker.
+                                inlineActions = listOf(
+                                    DetailAction(
+                                        id = "translation_chip",
+                                        label = "Translation",
+                                        trailingText = translationLanguage.uppercase().take(2),
+                                    ) { showReadingSettings = true },
+                                ),
+                                sheetActions = listOf(
+                                    listenAction,
+                                    playAllAction,
+                                    translationLanguageAction,
+                                    translationProviderAction,
+                                    readingSettingsAction,
+                                ),
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                toolbarTitle = "Shama'il At-Tirmidhi · Hadith ${currentHadith.id}",
+                            )
+                        }
+                    },
+                    header = {
+                        NewsHeaderArtwork(
+                            "masjid_al_nawabi",
+                            Modifier.fillMaxWidth().aspectRatio(4f / 3f)
+                                .detailAlbumParallax(hadithPageListState),
                         )
-                    }
-                }
-            }) {
+                    },
+                ) {
                 androidx.compose.foundation.pager.HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.weight(1f),
                 ) { index ->
                     HadithDetailPage(
+                        collectionTitle = "Shama'il At-Tirmidhi",
                         hadith = hadiths[index],
                         bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },
                         arabicFont = selectedArabicFont,
@@ -3752,6 +3773,7 @@ internal fun ShamayelHadithDetailScreen(
             }
                 if (showReadingSettings) {
                     ReaderReadingSettingsSheet(
+                        minimumFontSize = 20f,
                         previewText = currentHadith.arabic.ifBlank {
                             "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"
                         },
@@ -3764,7 +3786,7 @@ internal fun ShamayelHadithDetailScreen(
                         },
                         onFontSizeChange = { size ->
                             arabicFontSize = size
-                            store.saveQuranArabicFontSize(size)
+                            store.saveHadithArabicFontSize(size)
                         },
                         onAlignmentChange = { alignment ->
                             textAlignment = alignment

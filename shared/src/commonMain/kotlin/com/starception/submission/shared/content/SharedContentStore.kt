@@ -86,6 +86,14 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         store.putString(QURAN_ARABIC_FONT_SIZE, size.coerceIn(28f, 60f).toString())
     }
 
+    fun hadithArabicFontSize(): Float =
+        store.getString("shared_hadith_arabic_font_size")?.toFloatOrNull()
+            ?.coerceIn(20f, 60f) ?: 26f
+
+    fun saveHadithArabicFontSize(size: Float) {
+        store.putString("shared_hadith_arabic_font_size", size.coerceIn(20f, 60f).toString())
+    }
+
     fun quranTextAlignment(): String =
         store.getString(QURAN_TEXT_ALIGNMENT)?.takeUnless(String::isNullOrBlank) ?: "justify"
 

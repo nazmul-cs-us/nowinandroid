@@ -23,7 +23,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,6 +40,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,10 +48,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.starception.submission.feature.quran.ReciterCatalog
 import com.starception.submission.feature.quran.ReciterDownloadManager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
  * External reciter recordings are managed separately from manifest-backed assets.
@@ -62,6 +68,7 @@ fun ReciterStorageSection(
     surahNumber: Int? = null,
     onReciterSelected: () -> Unit = {},
     sectionTitle: String = "Quran recitations",
+    onPreviewStart: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val manager = remember(context) { ReciterDownloadManager.get(context.applicationContext) }
@@ -76,6 +83,18 @@ fun ReciterStorageSection(
     var refresh by remember { mutableStateOf(0) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var fetchedRevision by remember { mutableStateOf(-1) }
+    val preview = remember(context) { ReciterPreviewPlayer(context) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(preview, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) preview.stop()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            preview.stop()
+        }
+    }
     LaunchedEffect(refresh, expanded) {
         if (!expanded || fetchedRevision == refresh) return@LaunchedEffect
         loading = true
@@ -92,7 +111,8 @@ fun ReciterStorageSection(
         }
     }
 
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface,
+    Surface(shape = RoundedCornerShape(16.dp),
+        color = if (manageDownloads) MaterialTheme.colorScheme.surface else Color.Transparent,
         modifier = Modifier.fillMaxWidth()) {
         Column {
             if (!initiallyExpanded || manageDownloads) Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { expanded = !expanded }.padding(16.dp),
@@ -106,13 +126,19 @@ fun ReciterStorageSection(
                 Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                     contentDescription = if (expanded) "Hide reciters" else "Show reciters")
             }
-            if (expanded) Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = query, onValueChange = { query = it },
+            if (expanded) Column(Modifier.padding(horizontal = if (manageDownloads) 16.dp else 0.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextField(value = query, onValueChange = { preview.stop(); query = it },
                     placeholder = { Text("Search reciters") }, leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = { if (query.isNotEmpty()) androidx.compose.material3.IconButton(onClick = { query = "" }) {
+                    trailingIcon = { if (query.isNotEmpty()) androidx.compose.material3.IconButton(onClick = { preview.stop(); query = "" }) {
                         Icon(Icons.Filled.Close, contentDescription = "Clear search")
                     } },
-                    shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ))
                 androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(4.dp)) {
                     if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
@@ -120,21 +146,32 @@ fun ReciterStorageSection(
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { refresh++ }) { Text("Try again") }
                 }
-                Text(if (manageDownloads) "Manage voices and saved audio" else "Choose a voice for Arabic recitation",
+                Text(if (manageDownloads) "Manage voices and saved audio" else "Preview 20 seconds, then tap a name to select",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                preview.error?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
                 val filtered = remember(reciters, surahNumber, query) {
                     reciters.filter { (surahNumber == null || surahNumber in it.surahs) &&
                         (it.name + " " + it.riwaya).contains(query.trim(), true) }
                 }
                 val showDefault = "Mishary Rashid Al-Alafasy default".contains(query.trim(), true)
                 if (!loading && filtered.isEmpty() && !showDefault) Text("No reciters found", style = MaterialTheme.typography.bodyMedium)
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 480.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (showDefault) item(key = "default-cdn") {
                 com.starception.submission.feature.quran.ReciterChoiceRow(
                     name = "Mishary Rashid Al-Alafasy", description = "Default recitation",
                     selected = preferredReciterId == null,
+                    onPreview = if (manageDownloads) null else ({
+                        preview.toggle("default-cdn",
+                            "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/${surahNumber ?: 1}.mp3",
+                            onPreviewStart)
+                    }),
+                    previewing = preview.activeId == "default-cdn",
+                    previewLoading = preview.activeId == "default-cdn" && preview.loading,
                     onSelect = {
+                        preview.stop()
                         preferences.edit().remove("selected_id").remove("selected_server").remove("selected_surahs")
                             .putString("selected_name", "Mishary Rashid Al-Alafasy").apply()
                         preferredReciterId = null
@@ -156,9 +193,18 @@ fun ReciterStorageSection(
                             com.starception.submission.feature.quran.ReciterChoiceRow(
                                 name = reciter.name,
                                 description = if (manageDownloads) "${status.downloadedSurahs}/${status.totalSurahs} surahs offline"
-                                    else reciter.riwaya.ifBlank { "Arabic recitation" },
+                                    else reciter.riwaya.removePrefix("Rewayat ")
+                                        .removeSuffix(" - Murattal").ifBlank { "Arabic recitation" },
                                 selected = preferredReciterId == reciter.id,
+                                onPreview = if (manageDownloads) null else ({
+                                    val sample = surahNumber ?: reciter.surahs.minOrNull() ?: 1
+                                    preview.toggle(reciter.id, reciter.server.trimEnd('/') + "/" +
+                                        "%03d.mp3".format(java.util.Locale.US, sample), onPreviewStart)
+                                }),
+                                previewing = preview.activeId == reciter.id,
+                                previewLoading = preview.activeId == reciter.id && preview.loading,
                                 onSelect = {
+                                    preview.stop()
                                     preferences.edit().putString("selected_id", reciter.id)
                                         .putString("selected_name", reciter.name + " · " + reciter.riwaya)
                                         .putString("selected_server", reciter.server)

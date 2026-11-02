@@ -1233,6 +1233,11 @@ fun SurahDetailScreen(
                         initiallyExpanded = true,
                         manageDownloads = false,
                         surahNumber = surahNumber,
+                        onPreviewStart = {
+                            playbackService?.let { service ->
+                                if (service.isPlaying()) service.togglePlayPause()
+                            }
+                        },
                         onReciterSelected = {
                             reciterSheetScope.launch {
                                 reciterSheetState.hide()

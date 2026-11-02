@@ -24,6 +24,19 @@ import kotlin.test.assertTrue
 
 class SharedContentStoreTest {
     @Test
+    fun hadithSizeDefaultsToAndroidReadingSizeAndStaysSeparateFromQuran() {
+        val keys = InMemoryKeyValueStore()
+        val content = SharedContentStore(keys)
+        assertEquals(26f, content.hadithArabicFontSize())
+        assertEquals(41f, content.quranArabicFontSize())
+        content.saveHadithArabicFontSize(24f)
+        content.saveQuranArabicFontSize(48f)
+        val restored = SharedContentStore(keys)
+        assertEquals(24f, restored.hadithArabicFontSize())
+        assertEquals(48f, restored.quranArabicFontSize())
+    }
+
+    @Test
     fun stateRoundTripsAcrossStoreInstances() {
         val keyValues = InMemoryKeyValueStore()
         val content = SharedContentStore(keyValues)
