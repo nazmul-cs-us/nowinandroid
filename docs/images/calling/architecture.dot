@@ -1,0 +1,32 @@
+digraph Calling {
+ graph [rankdir=LR, bgcolor="#0B1220", pad="0.5", nodesep="0.65", ranksep="1.1", splines=polyline, fontname="DejaVu Sans", fontcolor="#F1F5F9", label="STARCEPTION  /  PRIVATE CALLING\nOne-to-one first · group calling later", labelloc=t, fontsize=28];
+ node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=17, fontcolor="#F1F5F9", color="#475569", fillcolor="#172338", penwidth=1.6, margin="0.25,0.19"];
+ edge [fontname="DejaVu Sans", fontsize=13, fontcolor="#B8C8DC", color="#7890AD", penwidth=1.8, arrowsize=0.8];
+ subgraph cluster_apps {
+  label="ANDROID + iOS"; fontsize=19; color="#40536D"; style=rounded; margin=24;
+  phoneA [label="Phone A\nNative WebRTC + system call UI", fillcolor="#203651"];
+  shared [label="Shared Kotlin Multiplatform logic\nContacts · call state · signalling\nPLANNED", color="#D9AB54", fillcolor="#342C20"];
+  phoneB [label="Phone B\nNative WebRTC + system call UI", fillcolor="#203651"];
+  phoneA -> shared [style=invis]; shared -> phoneB [style=invis];
+  {rank=same;phoneA;shared;phoneB;}
+  phoneA -> phoneB [dir=both, constraint=false, color="#52D9A6", fontcolor="#80E9BE", label="1  PREFERRED PATH\nDirect encrypted WebRTC\naudio / video"];
+ }
+ subgraph cluster_vm {
+  label="YOUR GOOGLE CLOUD VM  /  SINGAPORE\nDebian 13 · e2-medium · 4 GB RAM"; fontsize=20; color="#63748C"; fontcolor="#D9E5F5"; style="rounded,filled"; fillcolor="#111D2E"; margin=28;
+  xmpp [label="MongooseIM + call policy\nContacts · presence · call messages\nPLANNED", color="#D9AB54", fillcolor="#342C20"];
+  bridge [label="Small integration / push bridge\nIdentity · device tokens · TURN credentials\nPLANNED", color="#D9AB54", fillcolor="#342C20"];
+  turn [label="coturn\nAuthenticated media relay\nINSTALLED · TLS delivery check pending", color="#70B9FF", fillcolor="#183450"];
+  cert [label="Certbot + deployment hook\nCertificates for XMPP and TURN\nINSTALLED · renewal test pending", color="#70B9FF", fillcolor="#183450"];
+  {rank=same;xmpp;bridge;turn;cert;}
+  xmpp -> bridge [label="Authorized incoming-call event", constraint=false];
+  bridge -> phoneA [style=dashed, label="HTTPS bootstrap / temporary TURN credentials", constraint=false];
+  cert -> turn [style=dashed, label="Certificate/key copies + restart", constraint=false];
+ }
+ push [label="Google FCM / Apple APNs VoIP\nNotify sleeping phones\nINTEGRATION PLANNED", color="#A99AE6", fillcolor="#29243F"];
+ phoneA -> xmpp [dir=both, color="#D9AB54", fontcolor="#E7C783", label="2  SIGNALLING\nInvite · accept · SDP / ICE\nNo audio / video"];
+ phoneB -> xmpp [dir=both, color="#D9AB54"];
+ phoneA -> turn [dir=both, color="#70B9FF", fontcolor="#A5D1FF", label="3  FALLBACK PATH\nEncrypted media via TURN\nwhen direct connection fails"];
+ phoneB -> turn [dir=both, color="#70B9FF"];
+ bridge -> push [color="#A99AE6", fontcolor="#C4B7EF", label="4  BACKGROUND RINGING\nIncoming-call notification"];
+ push -> phoneB [style=dashed, color="#A99AE6", constraint=false, label="Wake / notify → native call UI"];
+}

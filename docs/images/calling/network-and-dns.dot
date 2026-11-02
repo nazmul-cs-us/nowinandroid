@@ -1,0 +1,32 @@
+digraph Network {
+ graph [rankdir=TB, bgcolor="#0B1220", pad="0.5", nodesep="0.65", ranksep="0.8", splines=polyline, fontname="DejaVu Sans", fontcolor="#F1F5F9", label="STARCEPTION  /  DNS + COTURN NETWORK\nActual hostnames, IP mapping and firewall configuration", labelloc=t, fontsize=26];
+ node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=16, fontcolor="#F1F5F9", color="#607590", fillcolor="#17283E", penwidth=1.6, margin="0.24,0.18"];
+ edge [fontname="DejaVu Sans", fontsize=13, fontcolor="#BED0E5", color="#7BA0C7", penwidth=1.8, arrowsize=0.8];
+ dns [label="1  GODADDY DNS  /  starception.com\nA  xmpp → 34.143.204.245\nA  turn → 34.143.204.245\nTTL:30 minutes · direct DNS", color="#B7A1F5", fillcolor="#2B2542"];
+ client [label="Phone / external test client\nLooks up turn.starception.com\nThen connects to returned IP"];
+ {rank=same;dns;client;}
+ dns -> client [style=dashed,label="DNS answer only\nDNS does not forward media", color="#B7A1F5"];
+ ip [label="2  PUBLIC ENDPOINT\n34.143.204.245\nStatic reservation: still to confirm", color="#6EBBFF", fillcolor="#183852"];
+ client -> ip [dir=both,label="Actual network connection"];
+ fw [label="3  GCP FIREWALL  /  default VPC\nVM target tag: webrtc\nwebrtc-acme-http: TCP80\nwebrtc-turn: UDP3478 · TCP3478/5349\nand UDP49160–49259", fillcolor="#23352C", color="#65CEA2"];
+ ip -> fw [dir=both];
+ nat [label="4  GCP NAT MAPPING\nPublic:34.143.204.245 ↔ private:10.148.0.2\nOS firewall must also permit required traffic"];
+ fw -> nat [dir=both];
+ subgraph cluster_vm {
+ label="5  VM  /  webrtc · asia-southeast1-a · Debian13\ne2-medium ·4GB RAM ·10GB boot disk"; fontsize=19; color="#607590"; style="rounded,filled"; fillcolor="#101D2D"; margin=25;
+ listeners [label="coturn client listeners\nUDP3478: TURN/STUN\nTCP3478: TURN over TCP\nTCP5349: TURN over TLS", color="#70B9FF", fillcolor="#183450"];
+ relay [label="Peer-facing relay sockets\nUDP49160–49259\nAllocated only as needed", color="#70B9FF", fillcolor="#183450"];
+ acme [label="Certbot standalone\nTemporary HTTP80 listener\nOnly during validation", color="#D9AB54", fillcolor="#342C20"];
+ {rank=same;listeners;relay;acme;}
+ listeners -> relay [dir=both,label="Relay packets",constraint=false];
+ config [label="/etc/turnserver.conf\nBind / relay:10.148.0.2\nexternal-ip=34.143.204.245/10.148.0.2\nSecret auth · quotas · peer restrictions\nroot:turnserver ·0640", color="#D9AB54", fillcolor="#342C20"];
+ config -> listeners [style=dashed,label="Read at startup",constraint=false];
+ cert [label="TLS service copies\n/etc/coturn/certs/\nfullchain.pem + privkey.pem\nroot:turnserver ·0640"];
+ cert -> listeners [style=dashed,label="Read at startup",constraint=false];
+ }
+ nat -> listeners [dir=both,label="Client traffic"];
+ nat -> relay [dir=both,label="Peer media"];
+ nat -> acme [label="ACME validation"];
+ note [label="BOUNDARIES\nTURN/TLS5349 is not TURN/TLS443\nFuture XMPP listener/firewall not configured yet\nSSH access is separate from these application rules",shape=note,color="#D9AB54",fillcolor="#342C20"];
+ relay -> note [style=invis];
+}

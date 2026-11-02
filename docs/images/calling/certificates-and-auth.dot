@@ -1,0 +1,28 @@
+digraph Lifecycle {
+ graph [rankdir=TB,bgcolor="#0B1220",pad="0.5",nodesep="0.7",ranksep="0.65",fontname="DejaVu Sans",fontcolor="#F1F5F9",fontsize=26,label="STARCEPTION  /  TRUST + AUTHENTICATION\nCertificates protect the connection; temporary credentials authorize relay use",labelloc=t];
+ node [shape=box,style="rounded,filled",fontname="DejaVu Sans",fontsize=16,fontcolor="#F1F5F9",color="#607590",fillcolor="#17283E",margin="0.25,0.18"];
+ edge [fontname="DejaVu Sans",fontsize=13,fontcolor="#BED0E5",color="#7BA0C7",penwidth=1.8];
+ subgraph cluster_cert {
+ label="A  CERTIFICATE LIFECYCLE  /  installed; renewal test pending";fontcolor="#B9D8F8";fontsize=18;color="#537697";style=rounded;margin=24;
+ timer [label="Certbot scheduled renewal"];
+ validation [label="Let's Encrypt validates both DNS names\nCertbot responds on public HTTP80"];
+ lineage [label="Root-managed certificate lineage\n/etc/letsencrypt/live/webrtc-starception/\nCovers xmpp.starception.com + turn.starception.com"];
+ hook [label="Deploy hook checks certificate lineage\nCopies chain and key with root:turnserver0640\ntry-restart coturn",fillcolor="#342C20",color="#D9AB54"];
+ served [label="coturn serves certificate on TLS5349\nClient checks trusted chain + hostname\nRestart interrupts current relay sessions"];
+ timer -> validation -> lineage -> hook -> served;
+ }
+ subgraph cluster_auth {
+ label="B  TURN AUTHENTICATION  /  manual test now; app issuer planned";fontcolor="#E8D49E";fontsize=18;color="#887245";style=rounded;margin=24;
+ secret [label="Static shared secret\nProtected VM config only\nNever shipped in app",fillcolor="#342C20",color="#D9AB54"];
+ issuer [label="Authorized credential issuer\nNow: local Python diagnostic script\nLater: authenticated app integration"];
+ temp [label="Temporary username: expiry + user suffix\nPassword: Base64 HMAC-SHA1(secret, username)\nDiagnostic lifetime:15 minutes"];
+ allocate [label="Client sends authenticated TURN Allocate\ncoturn checks credentials and allocation limits\nInitial401 nonce challenge is normal"];
+ media [label="Authorized relay allocation\nPermissions / channel bindings establish peer access\nWebRTC media packets can then be relayed"];
+ secret -> issuer -> temp -> allocate -> media;
+ }
+ {rank=same;timer;secret;}
+ {rank=same;validation;issuer;}
+ {rank=same;lineage;temp;}
+ {rank=same;hook;allocate;}
+ {rank=same;served;media;}
+}

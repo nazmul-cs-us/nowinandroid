@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Starception TURN relay check</title>
+<style>
+body{font:16px system-ui;background:#101822;color:#edf3fc;max-width:720px;margin:40px auto;padding:20px}label{display:block;margin:18px 0}input{display:block;box-sizing:border-box;width:100%;padding:12px;margin-top:6px;font:inherit}button{padding:12px 20px;font:inherit;cursor:pointer}pre{white-space:pre-wrap;background:#1d2938;padding:18px;border-radius:12px}small{color:#b9c6da}
+</style>
+<h1>TURN relay check</h1>
+<p>This creates two WebRTC peers in your browser, forces relay-only connections, and exchanges 200 data messages. No camera or microphone access is requested.</p>
+<p><small>Uses a small amount of relay traffic. Credentials stay in this page's memory and are sent to your TURN server for authentication. Nothing is saved or sent to another service. Use temporary credentials only.</small></p>
+<label>TURN URL<input id="url" value="turns:turn.starception.com:5349?transport=tcp"></label>
+<label>Temporary username<input id="username" autocomplete="off"></label>
+<label>Temporary password<input id="password" type="password" autocomplete="off"></label>
+<button id="run">Run test</button> <button id="stop" disabled>Stop</button>
+<pre id="output" aria-live="polite">Ready. Enter fresh temporary credentials.</pre>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let cleanup = null;
+const log = text => { $('output').textContent += text + '\n'; };
+function deadline(promise, ms, label) {
+  let timer;
+  return Promise.race([promise, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label + ' timed out')), ms);
+  })]).finally(() => clearTimeout(timer));
+}
+function gathered(pc) {
+  if (pc.iceGatheringState === 'complete') return Promise.resolve();
+  return new Promise(resolve => {
+    const changed = () => {
+      if (pc.iceGatheringState === 'complete') {
+        pc.removeEventListener('icegatheringstatechange', changed);
+        resolve();
+      }
+    };
+    pc.addEventListener('icegatheringstatechange', changed);
+    changed();
+  });
+}
+async function reportPair(pc, label) {
+  const stats = await pc.getStats();
+  let pair;
+  stats.forEach(s => {
+    if (s.type === 'transport' && s.selectedCandidatePairId) pair = stats.get(s.selectedCandidatePairId);
+  });
+  if (!pair) stats.forEach(s => {
+    if (s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated) pair = s;
+  });
+  if (!pair) { log(label + ': selected candidate stats unavailable'); return; }
+  const candidate = stats.get(pair.localCandidateId);
+  log(label + ': candidate=' + (candidate?.candidateType || 'unknown') +
+    ', relay transport=' + (candidate?.relayProtocol || 'not exposed by browser') +
+    ', address=' + (candidate?.address || candidate?.ip || 'not exposed'));
+  if (candidate && candidate.candidateType !== 'relay') throw new Error('Selected candidate was not a relay');
+}
+$('stop').onclick = () => { if (cleanup) cleanup(); };
+$('run').onclick = async () => {
+  const url = $('url').value.trim();
+  const username = $('username').value.trim();
+  const credential = $('password').value;
+  if (!/^turns?:/.test(url) || !username || !credential) {
+    $('output').textContent = 'Enter a TURN URL and temporary credentials.';
+    return;
+  }
+  $('output').textContent = '';
+  $('run').disabled = true;
+  $('stop').disabled = false;
+  let a, b, interval, closed = false, rejectStopped;
+  const stopped = new Promise((_, reject) => { rejectStopped = reject; });
+  // Suppress an unhandled rejection if Stop is used between awaited operations.
+  stopped.catch(() => {});
+  const wait = (p, ms, label) => deadline(Promise.race([p, stopped]), ms, label);
+  cleanup = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(interval);
+    if (a) a.close();
+    if (b) b.close();
+    rejectStopped(new Error('Test stopped'));
+  };
+  try {
+    if (!window.RTCPeerConnection) throw new Error('WebRTC unavailable; open in a current browser');
+    const config = { iceServers: [{ urls: url, username, credential }], iceTransportPolicy: 'relay' };
+    a = new RTCPeerConnection(config);
+    b = new RTCPeerConnection(config);
+    [a, b].forEach((pc, i) => {
+      pc.onconnectionstatechange = () => log('Peer ' + (i + 1) + ': ' + pc.connectionState);
+      pc.onicecandidateerror = e => log('ICE diagnostic: code ' + e.errorCode);
+    });
+    const sentIds = new Set(), receivedIds = new Set(), echoedIds = new Set();
+    let resolveDone;
+    const delivered = new Promise(resolve => { resolveDone = resolve; });
+    b.ondatachannel = event => {
+      const channel = event.channel;
+      channel.onmessage = message => {
+        const id = Number(message.data);
+        if (!Number.isInteger(id) || id < 0 || id >= 200) return;
+        receivedIds.add(id);
+        channel.send(message.data);
+      };
+    };
+    const channel = a.createDataChannel('relay-check', { ordered: true });
+    const opened = new Promise((resolve, reject) => {
+      channel.onopen = resolve;
+      channel.onerror = () => reject(new Error('Data channel error'));
+    });
+    channel.onmessage = message => {
+      const id = Number(message.data);
+      if (sentIds.has(id)) echoedIds.add(id);
+      if (echoedIds.size === 200) resolveDone();
+    };
+    log('Gathering relay candidates for peer 1...');
+    await a.setLocalDescription(await a.createOffer());
+    await wait(gathered(a), 25000, 'Peer 1 candidate gathering');
+    await b.setRemoteDescription(a.localDescription);
+    log('Gathering relay candidates for peer 2...');
+    await b.setLocalDescription(await b.createAnswer());
+    await wait(gathered(b), 25000, 'Peer 2 candidate gathering');
+    await a.setRemoteDescription(b.localDescription);
+    await wait(opened, 25000, 'Data channel connection');
+    log('Relay connection established. Sending 200 numbered messages...');
+    let next = 0;
+    interval = setInterval(() => {
+      if (channel.readyState !== 'open') return;
+      if (next < 200) { sentIds.add(next); channel.send(String(next++)); }
+      if (next === 200) clearInterval(interval);
+    }, 50);
+    try { await wait(delivered, 30000, 'Message delivery'); }
+    finally {
+      log('Sent=' + sentIds.size + '; received=' + receivedIds.size + '; echoed back=' + echoedIds.size);
+    }
+    await reportPair(a, 'Peer 1');
+    await reportPair(b, 'Peer 2');
+    log('PASS: bidirectional data delivered through relay-only WebRTC.');
+    log('Reliable SCTP can retransmit; this is not a raw packet-loss measurement or a two-device media test.');
+  } catch (error) {
+    log('NOT PASSED: ' + error.message);
+    log('Check credential expiry, ICE connectivity and the server logs.');
+  } finally {
+    cleanup();
+    cleanup = null;
+    $('run').disabled = false;
+    $('stop').disabled = true;
+  }
+};
+window.addEventListener('pagehide', () => { if (cleanup) cleanup(); });
+</script>
+</html>
