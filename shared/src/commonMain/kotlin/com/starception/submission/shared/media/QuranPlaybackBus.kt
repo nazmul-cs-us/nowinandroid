@@ -46,6 +46,7 @@ object QuranPlaybackBus {
         val playing: Boolean,
         val positionSeconds: Float,
         val durationSeconds: Float,
+        val sourceUrl: String? = null,
     )
 
     private const val POLL_MILLIS = 500L
@@ -75,8 +76,8 @@ object QuranPlaybackBus {
     }
 
     /** Reports a Fortress invocation that just started. */
-    fun startFortress(player: QuranAudioPlayer, audioUrl: String, title: String) {
-        begin(player, audioUrl, title.ifBlank { "Fortress of the Muslim" }, surahNumber = null)
+    fun startFortress(player: QuranAudioPlayer, audioUrl: String, title: String, sourceUrl: String = audioUrl) {
+        begin(player, audioUrl, title.ifBlank { "Fortress of the Muslim" }, surahNumber = null, sourceUrl = sourceUrl)
     }
 
     /** Pauses when playing and resumes when paused — the mini-bar's button. */
@@ -123,12 +124,14 @@ object QuranPlaybackBus {
         url: String,
         fallbackTitle: String,
         surahNumber: Int?,
+        sourceUrl: String = url,
     ) {
         activePlayer = player
         activeUrl = url
         _state.value = PlaybackState(
             surahNumber = surahNumber,
             title = fallbackTitle,
+            sourceUrl = sourceUrl,
             playing = true,
             positionSeconds = 0f,
             durationSeconds = player.durationSeconds(),

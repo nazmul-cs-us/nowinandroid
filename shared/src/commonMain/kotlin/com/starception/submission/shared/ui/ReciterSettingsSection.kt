@@ -107,7 +107,7 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(if (manageDownloads) "Quran recitations" else "Reciter", style = MaterialTheme.typography.titleSmall)
                     Text(if (manageDownloads) "Reciters & offline audio" else
-                        (preferences.selectedSource()?.displayName ?: "Deenly audio"),
+                        (preferences.selectedSource()?.displayName ?: "Mishary Rashid Al-Alafasy"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -132,7 +132,7 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     com.starception.submission.feature.quran.ReciterChoiceRow(
-                        name = "Deenly audio",
+                        name = "Mishary Rashid Al-Alafasy",
                         description = "Default recitation",
                         selected = selected == null,
                         onSelect = {

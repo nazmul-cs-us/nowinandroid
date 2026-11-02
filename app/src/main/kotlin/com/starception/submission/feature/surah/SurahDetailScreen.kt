@@ -840,6 +840,7 @@ fun SurahDetailScreen(
     // Track scroll direction for floating toolbar and FAB animation with stable detection
     var previousScrollOffset by remember { mutableStateOf(0) }
     var previousItemIndex by remember { mutableStateOf(0) }
+    var showReciterPicker by remember { mutableStateOf(false) }
     var showFloatingToolbar by remember { mutableStateOf(false) } // Floating toolbar hidden initially, shown via More menu
     var isFloatingToolbarExpanded by remember { mutableStateOf(true) } // When shown, starts expanded
     var showFabVisible by remember { mutableStateOf(true) } // FAB visible by default
@@ -1218,6 +1219,27 @@ fun SurahDetailScreen(
             }
         }
 
+        if (showReciterPicker) {
+            ModalBottomSheet(
+                onDismissRequest = { showReciterPicker = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+                    Text("Choose reciter", style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(bottom = 12.dp))
+                    com.starception.submission.settings.components.ReciterStorageSection(
+                        initiallyExpanded = true,
+                        surahNumber = surahNumber,
+                        onReciterSelected = {
+                            showReciterPicker = false
+                            playbackService?.playSurah(surahNumber - 1)
+                        },
+                    )
+                    Spacer(Modifier.height(24.dp))
+                }
+            }
+        }
+
         // In Mushaf mode the toolbar only shows when the user has scrolled up to the album
         // header (item 0) and at least half of it is in view. Keying off the header's
         // scroll fraction (not firstVisibleItemIndex) is robust to landscape, where the
@@ -1287,6 +1309,9 @@ fun SurahDetailScreen(
                         userDataRepository.setNewsResourceBookmarked(bookmarkId, newState)
                         android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "✅ CLICK_COMPLETE | surah=$surahNumber | bookmarkId=$bookmarkId | state=$newState")
                     }
+                },
+                onReciterClick = {
+                    showReciterPicker = true
                 },
                 onMoreClick = {
                     // Toggle floating toolbar visibility
@@ -1468,39 +1493,6 @@ fun SurahDetailScreen(
             androidx.activity.compose.BackHandler { showFloatingToolbar = false }
             // Which inline picker is expanded: "font", "language", or null.
             var expandedSection by remember { mutableStateOf<String?>(null) }
-            var reciters by remember { mutableStateOf<List<com.starception.submission.feature.quran.ReciterCatalog.Reciter>>(emptyList()) }
-            var reciterQuery by remember { mutableStateOf("") }
-            var reciterRefresh by remember { mutableStateOf(0) }
-            var reciterLoading by remember { mutableStateOf(false) }
-            var reciterError by remember { mutableStateOf<String?>(null) }
-            var selectedReciter by remember {
-                mutableStateOf(
-                    context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                        .getString("selected_name", "Deenly audio") ?: "Deenly audio"
-                )
-            }
-            var selectedReciterId by remember {
-                mutableStateOf(context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                    .getString("selected_id", null))
-            }
-            var reciterDownloading by remember { mutableStateOf<String?>(null) }
-            val reciterDownloadManager = remember(context) { com.starception.submission.feature.quran.ReciterDownloadManager.get(context.applicationContext) }
-            LaunchedEffect(expandedSection, reciterRefresh) {
-                if (expandedSection == "reciter" && reciters.isEmpty()) {
-                    reciterLoading = true
-                    try {
-                        reciters = com.starception.submission.feature.quran.ReciterCatalog.fetch(context)
-                        reciterError = null
-                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        reciterError = "Unable to load reciters. Check your connection."
-                    } finally {
-                        reciterLoading = false
-                    }
-                }
-            }
-
             // Sheet follows the finger while dragging the handle down; past a
             // threshold the drag dismisses the sheet.
             var sheetDragOffset by remember { mutableStateOf(0f) }
@@ -1776,115 +1768,15 @@ fun SurahDetailScreen(
                         )
                     }
 
-                    // Quran reciter — existing Deenly CDN audio remains the default.
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .clickable { expandedSection = if (expandedSection == "reciter") null else "reciter" }
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("Reciter", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Text(selectedReciter, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                        Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null,
-                            modifier = Modifier.padding(start = 8.dp).size(12.dp))
-                    }
-                    androidx.compose.animation.AnimatedVisibility(visible = expandedSection == "reciter") {
-                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                            Text(
-                                "Choose a reciter to play this surah. Offline downloads are managed separately.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            com.starception.submission.feature.quran.ReciterChoiceRow(
-                                name = "Deenly audio", description = "Default recitation",
-                                selected = selectedReciterId == null,
-                                enabled = reciterDownloading == null,
-                                onSelect = {
-                                    selectedReciter = "Deenly audio"
-                                    selectedReciterId = null
-                                    context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                                        .edit().putString("selected_name", selectedReciter)
-                                        .remove("selected_id").remove("selected_server").remove("selected_surahs").apply()
-                                    expandedSection = null
-                                    playbackService?.playSurah(surahNumber - 1)
-                                },
-                            )
-                            if (reciterLoading) {
-                                androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                            }
-                            reciterError?.let {
-                                Text(it, color = MaterialTheme.colorScheme.error)
-                                androidx.compose.material3.TextButton(onClick = { reciterRefresh++ }) { Text("Try again") }
-                            }
-                            androidx.compose.material3.OutlinedTextField(
-                                value = reciterQuery, onValueChange = { reciterQuery = it },
-                                label = { Text("Search reciters") }, singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            val matchingReciters = reciters.filter { surahNumber in it.surahs &&
-                                (it.name + " " + it.riwaya).contains(reciterQuery.trim(), ignoreCase = true)
-                            }
-                            if (!reciterLoading && matchingReciters.isEmpty()) Text(
-                                "No reciters found. Try another name or riwaya.",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                items(matchingReciters, key = { it.id }) { reciter ->
-                                    val downloadState by reciterDownloadManager.observe(reciter).collectAsState()
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        com.starception.submission.feature.quran.ReciterChoiceRow(
-                                            name = reciter.name,
-                                            description = reciter.riwaya + " · ${downloadState.downloadedSurahs}/${downloadState.totalSurahs} offline",
-                                            selected = selectedReciterId == reciter.id,
-                                            enabled = reciterDownloading == null,
-                                            onSelect = {
-                                                coroutineScope.launch {
-                                                    reciterDownloading = reciter.id
-                                                    try {
-                                                        val file = reciterDownloadManager.downloadSurah(reciter, surahNumber)
-                                                        playbackService?.playDownloadedReciterSurah(surahNumber - 1, file, reciter.name)
-                                                        val label = reciter.name + " · " + reciter.riwaya
-                                                        selectedReciter = label
-                                                        selectedReciterId = reciter.id
-                                                        context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
-                                                            .edit().putString("selected_name", label).putString("selected_id", reciter.id)
-                                                            .putString("selected_server", reciter.server)
-                                                            .putString("selected_surahs", reciter.surahs.joinToString(",")).apply()
-                                                        expandedSection = null
-                                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                                        throw cancelled
-                                                    } catch (error: Exception) {
-                                                        Toast.makeText(context, "Reciter audio unavailable: " + error.message,
-                                                            Toast.LENGTH_LONG).show()
-                                                    } finally { reciterDownloading = null }
-                                                }
-                                            },
-                                        )
-                                        if (reciterDownloading == reciter.id || downloadState.downloading)
-                                            androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            androidx.compose.material3.TextButton(onClick = {
-                                                if (downloadState.downloading) reciterDownloadManager.cancel(reciter.id)
-                                                else reciterDownloadManager.download(reciter)
-                                            }, enabled = downloadState.downloading || downloadState.downloadedSurahs < downloadState.totalSurahs) {
-                                                Text(if (downloadState.downloading) "Cancel download" else "Download all")
-                                            }
-                                            if (downloadState.downloadedSurahs > 0) androidx.compose.material3.TextButton(
-                                                onClick = { reciterDownloadManager.delete(reciter) }, enabled = !downloadState.downloading,
-                                            ) { Text("Remove downloads", color = MaterialTheme.colorScheme.error) }
-                                        }
-                                        downloadState.error?.let { Text(it, color = MaterialTheme.colorScheme.error,
-                                            style = MaterialTheme.typography.bodySmall) }
-                                    }
-                                }
-                            }
-
-                        }
-                    }
+                    // Same picker as the direct toolbar action, also available in reading settings.
+                    com.starception.submission.settings.components.ReciterStorageSection(
+                        sectionTitle = "Reciter",
+                        surahNumber = surahNumber,
+                        onReciterSelected = {
+                            showFloatingToolbar = false
+                            playbackService?.playSurah(surahNumber - 1)
+                        },
+                    )
 
                     // Arabic font — value + chevron row.
                     Row(
@@ -2397,6 +2289,7 @@ private fun AlbumPlayerTopBar(
     onTajweedClick: () -> Unit = {},
     onBookmarkClick: () -> Unit = {},
     onMoreClick: () -> Unit = {},
+    onReciterClick: () -> Unit = {},
     onAllSurahsClick: () -> Unit = onBackClick,
     modifier: Modifier = Modifier,
 ) {
@@ -2463,7 +2356,7 @@ private fun AlbumPlayerTopBar(
     val moreButtonSize = 44.dp
     val backButtonSize = 44.dp
     val bookmarkButtonSize = 44.dp
-    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - bookmarkButtonSize - moreButtonSize)
+    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - bookmarkButtonSize - moreButtonSize - 76.dp)
         .coerceAtLeast(0.dp)
     val maxIconsThatFit = (remainingWidth / iconButtonSize).toInt()
     val showTranslation = true
@@ -2599,6 +2492,18 @@ private fun AlbumPlayerTopBar(
                     }
                 } // end hidden actions block
 
+                Surface(
+                    onClick = onReciterClick,
+                    modifier = Modifier.width(76.dp).height(44.dp)
+                        .semantics { contentDescription = "Change reciter" },
+                    shape = RoundedCornerShape(12.dp),
+                    color = contentColor.copy(alpha = 0.12f),
+                    contentColor = contentColor,
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Reciter", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
                 // More options menu - always shown (floating toolbar has all options)
                 IconButton(
                     onClick = onMoreClick,

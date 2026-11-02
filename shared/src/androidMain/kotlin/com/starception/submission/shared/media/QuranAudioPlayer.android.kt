@@ -21,6 +21,8 @@ actual suspend fun resolveQuranAudioUrl(
     translationCode: String,
 ): String? = quranAudioUrl(surahNumber)
 
+actual suspend fun resolveFortressAudioUrl(url: String): String? = url
+
 /** The shared module is not the Android app's media owner. */
 actual class QuranAudioPlayer actual constructor() {
     actual fun play(url: String): Boolean = false

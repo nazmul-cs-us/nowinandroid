@@ -26,6 +26,9 @@ expect suspend fun resolveQuranAudioUrl(
     translationCode: String,
 ): String?
 
+/** Prepares a chapter recording for the platform player (iOS requires a local file). */
+expect suspend fun resolveFortressAudioUrl(url: String): String?
+
 expect class QuranAudioPlayer() {
     fun play(url: String): Boolean
     fun pause()

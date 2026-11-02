@@ -51,7 +51,12 @@ import com.starception.submission.feature.quran.ReciterDownloadManager
  * This panel lives inside the regular Content & Storage settings section.
  */
 @Composable
-fun ReciterStorageSection() {
+fun ReciterStorageSection(
+    initiallyExpanded: Boolean = false,
+    surahNumber: Int? = null,
+    onReciterSelected: () -> Unit = {},
+    sectionTitle: String = "Quran recitations",
+) {
     val context = LocalContext.current
     val manager = remember(context) { ReciterDownloadManager.get(context.applicationContext) }
     var reciters by remember { mutableStateOf<List<ReciterCatalog.Reciter>>(emptyList()) }
@@ -63,7 +68,7 @@ fun ReciterStorageSection() {
     var preferredReciterId by remember { mutableStateOf(preferences.getString("selected_id", null)) }
     var query by remember { mutableStateOf("") }
     var refresh by remember { mutableStateOf(0) }
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(initiallyExpanded) }
     LaunchedEffect(refresh, expanded) {
         if (!expanded) return@LaunchedEffect
         loading = true
@@ -86,7 +91,7 @@ fun ReciterStorageSection() {
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Filled.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Quran recitations", style = MaterialTheme.typography.titleSmall)
+                    Text(sectionTitle, style = MaterialTheme.typography.titleSmall)
                     Text("Reciters & offline audio", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -105,15 +110,16 @@ fun ReciterStorageSection() {
                 Text("Choose the voice for Arabic playback. Offline downloads are managed separately.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 com.starception.submission.feature.quran.ReciterChoiceRow(
-                    name = "Deenly audio", description = "Default recitation",
+                    name = "Mishary Rashid Al-Alafasy", description = "Default recitation",
                     selected = preferredReciterId == null,
                     onSelect = {
                         preferences.edit().remove("selected_id").remove("selected_server").remove("selected_surahs")
-                            .putString("selected_name", "Deenly audio").apply()
+                            .putString("selected_name", "Mishary Rashid Al-Alafasy").apply()
                         preferredReciterId = null
+                        onReciterSelected()
                     },
                 )
-                val filtered = reciters.filter { (it.name + " " + it.riwaya).contains(query.trim(), true) }
+                val filtered = reciters.filter { (surahNumber == null || surahNumber in it.surahs) && (it.name + " " + it.riwaya).contains(query.trim(), true) }
                 if (!loading && filtered.isEmpty()) Text("No reciters found", style = MaterialTheme.typography.bodyMedium)
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
                     items(filtered, key = { it.id }) { reciter ->
@@ -130,6 +136,7 @@ fun ReciterStorageSection() {
                                         .putString("selected_server", reciter.server)
                                         .putString("selected_surahs", reciter.surahs.joinToString(",")).apply()
                                     preferredReciterId = reciter.id
+                                    onReciterSelected()
                                 },
                             )
                             TextButton(onClick = {

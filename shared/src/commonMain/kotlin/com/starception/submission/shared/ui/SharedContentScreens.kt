@@ -611,6 +611,12 @@ internal fun QuranDetailScreen(
         isBookmarked = number in store.toggleSurah(number)
     }
     var showReadingSettings by remember { mutableStateOf(false) }
+    var showReciterPicker by remember { mutableStateOf(false) }
+    val reciterAction = DetailAction(
+        id = "reciter",
+        label = "Change reciter",
+        trailingText = "Reciter",
+    ) { showReciterPicker = true }
     // Android's toolbar translation chip — the two-letter code (EN/BN/…) that
     // opens the reading settings' translation picker.
     val translationChipAction = DetailAction(
@@ -693,6 +699,7 @@ internal fun QuranDetailScreen(
                         onBack = onBack,
                         inlineActions = listOf(
                             translationChipAction,
+                            reciterAction,
                             bookmarkAction,
                         ),
                         sheetActions = listOf(
@@ -764,6 +771,7 @@ internal fun QuranDetailScreen(
                                 onBack = onBack,
                                 inlineActions = listOf(
                                     translationChipAction,
+                                    reciterAction,
                                     bookmarkAction,
                                 ),
                                 sheetActions = listOf(
@@ -1246,6 +1254,11 @@ internal fun QuranDetailScreen(
             }
         }
     }
+        if (showReciterPicker) {
+            ReadingSettingsModal(onDismiss = { showReciterPicker = false }, title = "Choose reciter") {
+                ReciterSettingsSection(initiallyExpanded = true, surahNumber = number)
+            }
+        }
         if (showReadingSettings) {
             SurahReadingSettingsSheet(
                 surahNumber = number,
@@ -1813,6 +1826,7 @@ internal fun FortressChapterScreen(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 private fun ReadingSettingsModal(
     onDismiss: () -> Unit,
+    title: String = "Reading settings",
     content: @androidx.compose.runtime.Composable ColumnScope.() -> Unit,
 ) {
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1835,7 +1849,7 @@ private fun ReadingSettingsModal(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Reading settings",
+                text = title,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )

@@ -41,6 +41,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
+import com.starception.submission.shared.media.FortressCardPlayback
+import com.starception.submission.shared.media.QuranPlaybackBus
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,6 +89,11 @@ internal fun SharedNewsResourceCard(
         com.starception.submission.shared.content.SharedContentStore().quranArabicFont()
     }
     val arabicFontFamily = QuranArabicFonts.fontFamily(arabicFont)
+    val audioUrl = remember(news.content, news.type) { sharedNewsAudioUrl(news.content, news.type) }
+    val playback by QuranPlaybackBus.state.collectAsState()
+    val preparation by FortressCardPlayback.state.collectAsState()
+    val preparing = audioUrl != null && preparation?.url == audioUrl && preparation?.error == null
+    val playing = audioUrl != null && playback?.sourceUrl == audioUrl && playback?.playing == true
     AdaptiveCard(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
@@ -110,6 +125,22 @@ internal fun SharedNewsResourceCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    if (audioUrl != null) IconButton(
+                        onClick = { FortressCardPlayback.toggle(audioUrl, news.title) },
+                        enabled = !preparing,
+                        modifier = Modifier.semantics {
+                            contentDescription = when {
+                                preparing -> "Preparing ${news.title} audio"
+                                playing -> "Pause ${news.title}"
+                                else -> "Play ${news.title}"
+                            }
+                        },
+                    ) {
+                        if (preparing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary)
+                    }
                     IconTapTarget(
                         icon = if (bookmarked) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
                         contentDescription = if (bookmarked) {
@@ -120,6 +151,9 @@ internal fun SharedNewsResourceCard(
                         tint = MaterialTheme.colorScheme.primary,
                         onClick = onToggleBookmark,
                     )
+                }
+                if (audioUrl != null && preparation?.url == audioUrl) preparation?.error?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
                 Spacer(Modifier.height(if (compact) 8.dp else 14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -350,3 +384,11 @@ private fun extractNewsSection(content: String, name: String): String? {
 
 private const val DRAWABLE_PREFIX = "drawable://"
 private const val DEFAULT_NEWS_HEADER = "masjid_al_nawabi"
+
+/** Same structured Audio section used by Android Fortress news cards. */
+internal fun sharedNewsAudioUrl(content: String, type: String): String? {
+    if (!type.contains("dua", ignoreCase = true)) return null
+    return extractNewsSection(content, "Audio")?.takeIf {
+        (it.startsWith("https://") || it.startsWith("http://")) && it.none(Char::isWhitespace)
+    }
+}
