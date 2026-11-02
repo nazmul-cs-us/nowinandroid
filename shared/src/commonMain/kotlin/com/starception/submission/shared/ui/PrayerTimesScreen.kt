@@ -1034,6 +1034,7 @@ fun PrayerTimesScreen(
                                 onVoiceTap = { searchController?.openVoice() },
                                 onShowProfile = { showProfileSheet = true },
                                 searchController = searchController,
+                                onArtwork = true,
                             )
                         }
                     }
@@ -1195,6 +1196,7 @@ private fun PrayerHomeHeader(
     onVoiceTap: (() -> Unit)? = null,
     onShowProfile: () -> Unit = {},
     searchController: SharedSearchController? = null,
+    onArtwork: Boolean = false,
 ) {
     // In-place voice capture: the mic keeps the user on this page — the pill
     // hosts the listening wave, and the search page only opens when a final
@@ -1251,7 +1253,7 @@ private fun PrayerHomeHeader(
             // Android's logged-out state uses its filled circular profile asset.
             icon = Icons.Filled.AccountCircle,
             contentDescription = "Open local profile",
-            tint = MaterialTheme.colorScheme.onBackground,
+            tint = if (onArtwork) Color.White else MaterialTheme.colorScheme.onBackground,
             visualSize = 34.dp,
             iconSize = 34.dp,
             showBackground = false,

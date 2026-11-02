@@ -90,6 +90,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.dismiss
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -245,6 +247,7 @@ fun PullToSyncContainer(
     // NestedScroll connection: properly integrates with scrollable content
     // Only activates pull-to-refresh when content is already scrolled to the top.
     // When enabled=false all gestures pass through untouched (download-only mode).
+    var bannerDismissed by remember { mutableStateOf(false) }
     val nestedScrollConnection = remember(isRefreshing, enabled) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
@@ -267,6 +270,7 @@ fun PullToSyncContainer(
                 if (!enabled) return Offset.Zero
                 // When content can't scroll up anymore (at top) and user pulls DOWN
                 if (available.y > 0f && !isRefreshing && source == NestedScrollSource.UserInput) {
+                    bannerDismissed = false
                     val resistance = 1f - (dragDistance / maxDragDistance * 0.5f).coerceIn(0f, 0.5f)
                     dragDistance += available.y * resistance
                     if (dragDistance >= maxDragDistance) {
@@ -305,6 +309,7 @@ fun PullToSyncContainer(
                 onVerticalDrag = { _, dragAmount ->
                     when {
                         dragAmount > 0f && !isRefreshing -> {
+                            bannerDismissed = false
                             val resistance = 1f -
                                 (dragDistance / maxDragDistance * 0.5f).coerceIn(0f, 0.5f)
                             dragDistance = (dragDistance + dragAmount * resistance)
@@ -395,7 +400,32 @@ fun PullToSyncContainer(
     val hasStatus = isOffline || isPrayerAlert || isForbiddenPrayerTime || isWeatherWarning ||
         isIslamicEvent || isSilentMode || hasSyncResult ||
         isRefreshing || isDownloading || isTtsPreparing
-    val targetHoldHeightDp = if (mediaBar?.isVisible == true || isMushafActive || hasStatus) {
+    // Dismiss the visual strip, not its underlying download, sync or media task.
+    // Keys identify source episodes, never percentage/countdown text: routine updates
+    // must not reopen a strip that the user just hid.
+    val bannerSources = buildSet {
+        if (isOffline) add("offline")
+        if (isRefreshing) add("sync")
+        if (isDownloading) add("download")
+        if (isTtsPreparing) add("tts")
+        if (mediaBar?.isVisible == true) add("media")
+        if (isMushafActive) add("mushaf")
+        if (isPrayerAlert) add("prayer")
+        if (isForbiddenPrayerTime) add("forbidden")
+        if (isWeatherWarning) add("weather:$weatherWarningText")
+        if (isIslamicEvent) add("event:${islamicEventState.eventKey}")
+        if (isSilentMode) add("silent")
+        if (hasSyncResult) add("result:$syncResultText")
+    }
+    LaunchedEffect(bannerSources) { bannerDismissed = false }
+    val dismissBanner: () -> Unit = {
+        bannerDismissed = true
+        dragDistance = 0f
+        lastHapticDistance = 0f
+        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+    val targetHoldHeightDp = if (!bannerDismissed &&
+        (mediaBar?.isVisible == true || isMushafActive || hasStatus)) {
         standardBarHeightDp
     } else {
         0.dp
@@ -727,6 +757,22 @@ fun PullToSyncContainer(
                     .zIndex(1f)
                     .fillMaxWidth()
                     .height(contentOffsetY)
+                    .semantics {
+                        dismiss { dismissBanner(); true }
+                    }
+                    .pointerInput(bannerSources) {
+                        val threshold = 24.dp.toPx()
+                        var totalDrag = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onVerticalDrag = { change, amount ->
+                                totalDrag += amount
+                                change.consume()
+                            },
+                            onDragEnd = { if (totalDrag < -threshold) dismissBanner() },
+                            onDragCancel = { totalDrag = 0f },
+                        )
+                    }
                     .padding(top = barTopInsetPadding, bottom = barBottomPadding),
                 contentAlignment = Alignment.Center,
             ) {
@@ -817,11 +863,6 @@ fun PullToSyncContainer(
                                         spinAngle
                                     },
                                     contentColor = indicatorColor,
-                                    onDismissed = {
-                                        hapticFeedback.performHapticFeedback(
-                                            HapticFeedbackType.LongPress,
-                                        )
-                                    },
                                 )
                             }
                         }
@@ -896,31 +937,11 @@ private fun SyncBarStatusRow(
     status: SyncBarStatus,
     spinAngle: Float,
     contentColor: Color,
-    onDismissed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (status.onDismiss != null) {
-                    Modifier.pointerInput(status.key) {
-                        var totalDrag = 0f
-                        detectVerticalDragGestures(
-                            onDragStart = { totalDrag = 0f },
-                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
-                            onDragEnd = {
-                                if (totalDrag < -80f) {
-                                    onDismissed()
-                                    status.onDismiss.invoke()
-                                }
-                            },
-                        )
-                    }
-                } else {
-                    Modifier
-                },
-            )
             .then(
                 if (status.onClick != null) {
                     Modifier.clickable(onClick = status.onClick)

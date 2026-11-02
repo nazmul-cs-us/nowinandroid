@@ -140,7 +140,8 @@ internal fun HomeArtworkRail(
     useNightArtwork: Boolean = false,
     onSelect: (HomeArtworkCard, Rect) -> Unit,
 ) {
-    val ink = MaterialTheme.colorScheme.onBackground
+    // This feed overlays the dark immersive artwork even in the light app theme.
+    val ink = Color(0xFFF1F4FA)
     val largeText = LocalDensity.current.fontScale > 1.3f
     val prayerNow = HomeArtworkCard(
         0, "Prayer now", "Your next prayer",
@@ -157,13 +158,11 @@ internal fun HomeArtworkRail(
         val railCards = feed.railPages.mapNotNull { id -> cards.firstOrNull { it.page == id } }
         val featuredCard = cards.first { it.page == feed.featuredPage }
         val railState = rememberLazyListState()
-        val railSurface = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) {
-            Color(0xFF080B14)
-        } else {
-            MaterialTheme.colorScheme.background
-        }
-        Column {
-            HomeFeedSectionLabel("EXPLORE YOUR DAY")
+        val railSurface = Color(0xFF080B14)
+        Column(Modifier.background(Brush.verticalGradient(listOf(
+            railSurface.copy(alpha = .82f), railSurface.copy(alpha = .96f),
+        )))) {
+            HomeFeedSectionLabel("EXPLORE YOUR DAY", ink)
             Spacer(Modifier.height(14.dp))
             Box(Modifier.drawWithContent {
                 drawContent()
@@ -200,7 +199,7 @@ internal fun HomeArtworkRail(
                 }
             }
             Spacer(Modifier.height(32.dp))
-            HomeFeedSectionLabel("SUGGESTED FOR YOU")
+            HomeFeedSectionLabel("SUGGESTED FOR YOU", ink)
             Spacer(Modifier.height(16.dp))
             ArtworkCard(featuredCard, Modifier.fillMaxWidth(), 224.dp, onSelect)
             Spacer(Modifier.height(10.dp))
@@ -245,8 +244,7 @@ internal fun HomeReflectionPrompt(
 }
 
 @Composable
-private fun HomeFeedSectionLabel(text: String) {
-    val ink = MaterialTheme.colorScheme.onBackground
+private fun HomeFeedSectionLabel(text: String, ink: Color = MaterialTheme.colorScheme.onBackground) {
     Column {
         HomeSectionDivider(ink)
         Spacer(Modifier.height(18.dp))

@@ -612,6 +612,7 @@ internal fun QuranDetailScreen(
     }
     var showReadingSettings by remember { mutableStateOf(false) }
     var showReciterPicker by remember { mutableStateOf(false) }
+    var reciterSelectionMade by remember { mutableStateOf(false) }
     val reciterAction = DetailAction(
         id = "reciter",
         label = "Change reciter",
@@ -1255,8 +1256,16 @@ internal fun QuranDetailScreen(
         }
     }
         if (showReciterPicker) {
-            ReadingSettingsModal(onDismiss = { showReciterPicker = false }, title = "Choose reciter") {
-                ReciterSettingsSection(initiallyExpanded = true, surahNumber = number)
+            ReadingSettingsModal(onDismiss = {
+                showReciterPicker = false
+                reciterSelectionMade = false
+            }, title = "Choose reciter", dismissRequested = reciterSelectionMade) {
+                ReciterSettingsSection(initiallyExpanded = true, surahNumber = number, onSelected = {
+                    audioJob?.cancel()
+                    audioLoading = false
+                    playing = false
+                    reciterSelectionMade = true
+                })
             }
         }
         if (showReadingSettings) {
@@ -1827,6 +1836,7 @@ internal fun FortressChapterScreen(
 private fun ReadingSettingsModal(
     onDismiss: () -> Unit,
     title: String = "Reading settings",
+    dismissRequested: Boolean = false,
     content: @androidx.compose.runtime.Composable ColumnScope.() -> Unit,
 ) {
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1837,6 +1847,9 @@ private fun ReadingSettingsModal(
             onDismiss()
         }
         Unit
+    }
+    LaunchedEffect(dismissRequested) {
+        if (dismissRequested) dismiss()
     }
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,

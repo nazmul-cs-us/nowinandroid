@@ -1220,18 +1220,24 @@ fun SurahDetailScreen(
         }
 
         if (showReciterPicker) {
+            val reciterSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            val reciterSheetScope = rememberCoroutineScope()
             ModalBottomSheet(
                 onDismissRequest = { showReciterPicker = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                sheetState = reciterSheetState,
             ) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
                     Text("Choose reciter", style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(bottom = 12.dp))
                     com.starception.submission.settings.components.ReciterStorageSection(
                         initiallyExpanded = true,
+                        manageDownloads = false,
                         surahNumber = surahNumber,
                         onReciterSelected = {
-                            showReciterPicker = false
+                            reciterSheetScope.launch {
+                                reciterSheetState.hide()
+                                showReciterPicker = false
+                            }
                             playbackService?.playSurah(surahNumber - 1)
                         },
                     )
@@ -1771,6 +1777,7 @@ fun SurahDetailScreen(
                     // Same picker as the direct toolbar action, also available in reading settings.
                     com.starception.submission.settings.components.ReciterStorageSection(
                         sectionTitle = "Reciter",
+                        manageDownloads = false,
                         surahNumber = surahNumber,
                         onReciterSelected = {
                             showFloatingToolbar = false

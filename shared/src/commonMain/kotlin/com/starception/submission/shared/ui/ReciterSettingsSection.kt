@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.Role
@@ -59,16 +60,12 @@ private object ReciterDownloadState {
 }
 
 @Composable
-internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyExpanded: Boolean = false, surahNumber: Int? = null) {
+internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyExpanded: Boolean = false, surahNumber: Int? = null, onSelected: () -> Unit = {}) {
     val library = QuranReciterLibrary.platform ?: return
     val preferences = remember { QuranReciterPreferences() }
     var selected by remember { mutableStateOf(preferences.selectedReciterId()) }
     val store = remember { platformKeyValueStore() }
-    var catalog by remember {
-        mutableStateOf(runCatching {
-            Json.decodeFromString<List<QuranReciterSource>>(store.getString("quran_reciter_catalog").orEmpty())
-        }.getOrDefault(emptyList()))
-    }
+    var catalog by remember { mutableStateOf<List<QuranReciterSource>>(emptyList()) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var openedReciter by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -77,14 +74,26 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
     var refresh by remember { mutableIntStateOf(0) }
     val download by ReciterDownloadState.state.collectAsState()
     var revision by remember { mutableIntStateOf(0) }
+    val actionScope = rememberCoroutineScope()
+    var deleting by remember { mutableStateOf<String?>(null) }
+    var actionError by remember { mutableStateOf<String?>(null) }
+    var fetchedRevision by remember { mutableIntStateOf(-1) }
     LaunchedEffect(expanded, refresh) {
-        if (!expanded) return@LaunchedEffect
+        if (!expanded || fetchedRevision == refresh) return@LaunchedEffect
         loading = true
         try {
-            val result = library.catalog()
+            if (catalog.isEmpty()) catalog = withContext(Dispatchers.Default) {
+                runCatching {
+                    Json.decodeFromString<List<QuranReciterSource>>(store.getString("quran_reciter_catalog").orEmpty())
+                }.getOrDefault(emptyList())
+            }
+            val result = withContext(Dispatchers.Default) { library.catalog() }
             check(result.isNotEmpty()) { "Unable to load reciters. Check your connection and retry." }
             catalog = result
-            store.putString("quran_reciter_catalog", Json.encodeToString(result))
+            fetchedRevision = refresh
+            withContext(Dispatchers.Default) {
+                store.putString("quran_reciter_catalog", Json.encodeToString(result))
+            }
             error = null
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -98,7 +107,7 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column {
-            Row(
+            if (!initiallyExpanded || manageDownloads) Row(
                 Modifier.fillMaxWidth().clickable(role = Role.Button) { expanded = !expanded }.padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -120,52 +129,71 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
                     OutlinedTextField(value = query, onValueChange = { query = it },
                         placeholder = { Text("Search reciters") },
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear search")
+                        } },
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth().testTag("reciter-search"), singleLine = true)
-                    if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Box(Modifier.fillMaxWidth().height(4.dp)) {
+                        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    }
                     error?.let {
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                         TextButton(onClick = { refresh++ }) { Text("Try again") }
                     }
-                    download.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                    Text("Choose the voice for Arabic playback. Save audio separately for offline listening.",
+                    actionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    if (manageDownloads) download.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                    Text(if (manageDownloads) "Manage voices and saved audio" else "Choose a voice for Arabic recitation",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    com.starception.submission.feature.quran.ReciterChoiceRow(
-                        name = "Mishary Rashid Al-Alafasy",
-                        description = "Default recitation",
-                        selected = selected == null,
-                        onSelect = {
-                            preferences.selectSource(null); selected = null
-                            com.starception.submission.shared.media.QuranPlaybackBus.stop()
-                        },
-                    )
-                    val available = surahNumber?.let { selectableQuranReciters(it, catalog) } ?: catalog
-                    val filtered = available.filter { (it.displayName + " " + it.riwaya).contains(query.trim(), true) }
-                    if (!loading && filtered.isEmpty()) Text("No reciters found. Try another name or riwaya.", style = MaterialTheme.typography.bodyMedium)
-                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                    val filtered = remember(catalog, surahNumber, query) {
+                        val available = surahNumber?.let { selectableQuranReciters(it, catalog) } ?: catalog
+                        available.filter { (it.displayName + " " + it.riwaya).contains(query.trim(), true) }
+                    }
+                    val showDefault = "Mishary Rashid Al-Alafasy default".contains(query.trim(), true)
+                    if (!loading && filtered.isEmpty() && !showDefault) Text("No reciters found. Try another name or riwaya.", style = MaterialTheme.typography.bodyMedium)
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (showDefault) item(key = "default-cdn") {
+                            com.starception.submission.feature.quran.ReciterChoiceRow(
+                                name = "Mishary Rashid Al-Alafasy",
+                                description = "Default recitation",
+                                selected = selected == null,
+                                onSelect = {
+                                    preferences.selectSource(null); selected = null
+                                    com.starception.submission.shared.media.QuranPlaybackBus.stop()
+                                    onSelected()
+                                },
+                            )
+                        }
                         items(filtered, key = { it.id }) { source ->
-                            val count = remember(source.id, download.completed, download.revision, revision) { library.count(source) }
-                            val bytes = remember(source.id, download.completed, download.revision, revision) { library.bytes(source) }
+                            val storage by produceState(0 to 0L, source.id, download.revision, revision, manageDownloads) {
+                                if (manageDownloads) value = withContext(Dispatchers.Default) {
+                                    library.count(source) to library.bytes(source)
+                                }
+                            }
+                            val count = if (download.active == source.id) download.completed else storage.first
+                            val bytes = storage.second
                             val open = openedReciter == source.id || download.active == source.id
                             Column {
                                 com.starception.submission.feature.quran.ReciterChoiceRow(
                                     name = source.displayName,
-                                    description = listOfNotNull(source.riwaya.takeIf { it.isNotBlank() },
-                                        "$count of ${source.availableSurahs.size} surahs offline").joinToString(" · "),
+                                    description = if (manageDownloads) "$count of ${source.availableSurahs.size} surahs offline"
+                                        else source.riwaya.ifBlank { "Arabic recitation" },
                                     selected = selected == source.id,
                                     onSelect = {
                                         preferences.selectSource(source); selected = source.id
                                         com.starception.submission.shared.media.QuranPlaybackBus.stop()
+                                        onSelected()
                                     },
                                 )
-                                TextButton(onClick = {
+                                if (manageDownloads) TextButton(onClick = {
                                     openedReciter = if (openedReciter == source.id) null else source.id
                                 }) {
                                     Text(if (open) "Hide downloads" else "Offline audio" +
                                         (if (bytes > 0) " · ${bytes / (1024 * 1024)} MB" else ""))
                                 }
-                                if (open) {
+                                if (manageDownloads && open) {
                                     if (download.active == source.id) {
                                         LinearProgressIndicator(progress = { if (download.total > 0) download.completed.toFloat() / download.total else 0f },
                                             modifier = Modifier.fillMaxWidth())
@@ -176,16 +204,28 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
                                         FilledTonalButton(onClick = {
                                             if (download.active == source.id) ReciterDownloadState.cancel()
                                             else ReciterDownloadState.start(source, library)
-                                        }, enabled = download.active == source.id || (download.active == null && count < source.availableSurahs.size)) {
+                                        }, enabled = download.active == source.id || (download.active == null && deleting == null && count < source.availableSurahs.size)) {
                                             Text(if (download.active == source.id) "Cancel" else "Download all")
                                         }
-                                        if (count > 0) TextButton(onClick = { library.delete(source); revision++ }, enabled = download.active == null) {
-                                            Text("Remove", color = MaterialTheme.colorScheme.error)
+                                        if (count > 0) TextButton(onClick = {
+                                            actionScope.launch {
+                                                deleting = source.id
+                                                actionError = null
+                                                try {
+                                                    withContext(Dispatchers.Default) { library.delete(source) }
+                                                    revision++
+                                                } catch (cancelled: CancellationException) {
+                                                    throw cancelled
+                                                } catch (failure: Exception) {
+                                                    actionError = failure.message ?: "Unable to remove saved audio."
+                                                } finally { deleting = null }
+                                            }
+                                        }, enabled = download.active == null && deleting == null) {
+                                            Text(if (deleting == source.id) "Removing…" else "Remove", color = MaterialTheme.colorScheme.error)
                                         }
                                     }
                                 }
-                                Spacer(Modifier.height(8.dp))
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                if (manageDownloads) Spacer(Modifier.height(4.dp))
                             }
                         }
                     }

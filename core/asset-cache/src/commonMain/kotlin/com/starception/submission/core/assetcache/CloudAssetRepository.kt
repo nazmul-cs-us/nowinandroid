@@ -101,6 +101,11 @@ class CloudAssetRepository(
     private var cachedManifest: AssetManifest? = null
 
     suspend fun loadManifest(forceRefresh: Boolean = false): AssetManifest? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            loadManifestOnWorker(forceRefresh)
+        }
+
+    private suspend fun loadManifestOnWorker(forceRefresh: Boolean): AssetManifest? =
         manifestMutex.withLock {
             if (!forceRefresh) cachedManifest?.let { return@withLock it }
 

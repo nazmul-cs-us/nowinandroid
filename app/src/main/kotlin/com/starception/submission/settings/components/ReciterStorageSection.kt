@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
@@ -24,6 +25,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.OutlinedTextField
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collect
+import androidx.compose.runtime.produceState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,6 +58,7 @@ import com.starception.submission.feature.quran.ReciterDownloadManager
 @Composable
 fun ReciterStorageSection(
     initiallyExpanded: Boolean = false,
+    manageDownloads: Boolean = true,
     surahNumber: Int? = null,
     onReciterSelected: () -> Unit = {},
     sectionTitle: String = "Quran recitations",
@@ -69,12 +75,14 @@ fun ReciterStorageSection(
     var query by remember { mutableStateOf("") }
     var refresh by remember { mutableStateOf(0) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
+    var fetchedRevision by remember { mutableStateOf(-1) }
     LaunchedEffect(refresh, expanded) {
-        if (!expanded) return@LaunchedEffect
+        if (!expanded || fetchedRevision == refresh) return@LaunchedEffect
         loading = true
         error = null
         try {
             reciters = ReciterCatalog.fetch(context)
+            fetchedRevision = refresh
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
@@ -87,7 +95,7 @@ fun ReciterStorageSection(
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth()) {
         Column {
-            Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { expanded = !expanded }.padding(16.dp),
+            if (!initiallyExpanded || manageDownloads) Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { expanded = !expanded }.padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Filled.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -101,14 +109,28 @@ fun ReciterStorageSection(
             if (expanded) Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(value = query, onValueChange = { query = it },
                     placeholder = { Text("Search reciters") }, leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), singleLine = true)
-                if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    trailingIcon = { if (query.isNotEmpty()) androidx.compose.material3.IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Clear search")
+                    } },
+                    shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(), singleLine = true)
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(4.dp)) {
+                    if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
                 error?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { refresh++ }) { Text("Try again") }
                 }
-                Text("Choose the voice for Arabic playback. Offline downloads are managed separately.",
+                Text(if (manageDownloads) "Manage voices and saved audio" else "Choose a voice for Arabic recitation",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val filtered = remember(reciters, surahNumber, query) {
+                    reciters.filter { (surahNumber == null || surahNumber in it.surahs) &&
+                        (it.name + " " + it.riwaya).contains(query.trim(), true) }
+                }
+                val showDefault = "Mishary Rashid Al-Alafasy default".contains(query.trim(), true)
+                if (!loading && filtered.isEmpty() && !showDefault) Text("No reciters found", style = MaterialTheme.typography.bodyMedium)
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (showDefault) item(key = "default-cdn") {
                 com.starception.submission.feature.quran.ReciterChoiceRow(
                     name = "Mishary Rashid Al-Alafasy", description = "Default recitation",
                     selected = preferredReciterId == null,
@@ -119,16 +141,22 @@ fun ReciterStorageSection(
                         onReciterSelected()
                     },
                 )
-                val filtered = reciters.filter { (surahNumber == null || surahNumber in it.surahs) && (it.name + " " + it.riwaya).contains(query.trim(), true) }
-                if (!loading && filtered.isEmpty()) Text("No reciters found", style = MaterialTheme.typography.bodyMedium)
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                    }
                     items(filtered, key = { it.id }) { reciter ->
-                        val status by manager.observe(reciter).collectAsState()
+                        val status by produceState(
+                            ReciterDownloadManager.DownloadStatus(totalSurahs = reciter.surahs.size),
+                            reciter.id, manageDownloads,
+                        ) {
+                            if (manageDownloads) withContext(Dispatchers.IO) {
+                                manager.observe(reciter).collect { value = it }
+                            }
+                        }
                         val open = expandedReciterId == reciter.id || status.downloading
                         Column {
                             com.starception.submission.feature.quran.ReciterChoiceRow(
                                 name = reciter.name,
-                                description = reciter.riwaya + " · ${status.downloadedSurahs}/${status.totalSurahs} offline",
+                                description = if (manageDownloads) "${status.downloadedSurahs}/${status.totalSurahs} surahs offline"
+                                    else reciter.riwaya.ifBlank { "Arabic recitation" },
                                 selected = preferredReciterId == reciter.id,
                                 onSelect = {
                                     preferences.edit().putString("selected_id", reciter.id)
@@ -139,13 +167,13 @@ fun ReciterStorageSection(
                                     onReciterSelected()
                                 },
                             )
-                            TextButton(onClick = {
+                            if (manageDownloads) TextButton(onClick = {
                                 expandedReciterId = if (expandedReciterId == reciter.id) null else reciter.id
                             }) {
                                 Text(if (open) "Hide downloads" else "Offline audio" +
                                     (if (status.downloadedBytes > 0) " · ${status.downloadedBytes / (1024 * 1024)} MB" else ""))
                             }
-                            if (open) {
+                            if (manageDownloads && open) {
                                 if (status.downloading) LinearProgressIndicator(Modifier.fillMaxWidth())
                                 Text("${status.downloadedSurahs} of ${status.totalSurahs} surahs saved", style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -161,7 +189,7 @@ fun ReciterStorageSection(
                                     }
                                 }
                             }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            if (manageDownloads) Spacer(Modifier.height(4.dp))
                         }
                     }
                 }

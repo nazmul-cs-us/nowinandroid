@@ -19,6 +19,8 @@ package com.starception.submission.shared.assets
 import com.starception.submission.core.assetcache.AssetPlatform
 import com.starception.submission.core.assetcache.CloudAssetRepository
 import platform.Foundation.NSUUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val MANIFEST_URL =
     "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev/manifest.json"
@@ -29,18 +31,18 @@ internal class IosAssetPlatform : AssetPlatform {
     override suspend fun fetchText(url: String): String? = platform.fetchText(url)
 
     override suspend fun readCachedText(relativePath: String): String? =
-        platform.cachedText(relativePath)
+        withContext(Dispatchers.Default) { platform.cachedText(relativePath) }
 
     override suspend fun writeCachedText(relativePath: String, content: String) {
-        check(platform.writeCachedText(relativePath, content))
+        withContext(Dispatchers.Default) { check(platform.writeCachedText(relativePath, content)) }
     }
 
     override suspend fun readBundledText(relativePath: String): String? =
-        platform.bundledText(relativePath)
+        withContext(Dispatchers.Default) { platform.bundledText(relativePath) }
 
-    override suspend fun cachedAssetPath(cdnKey: String): String? = platform.cachedPath(cdnKey)
+    override suspend fun cachedAssetPath(cdnKey: String): String? = withContext(Dispatchers.Default) { platform.cachedPath(cdnKey) }
 
-    override suspend fun bundledAssetPath(cdnKey: String): String? = platform.bundledPath(cdnKey)
+    override suspend fun bundledAssetPath(cdnKey: String): String? = withContext(Dispatchers.Default) { platform.bundledPath(cdnKey) }
 
     override suspend fun downloadToTemporaryFile(
         url: String,
@@ -56,19 +58,19 @@ internal class IosAssetPlatform : AssetPlatform {
         )
     }
 
-    override suspend fun fileSize(absolutePath: String): Long? = platform.fileSize(absolutePath)
+    override suspend fun fileSize(absolutePath: String): Long? = withContext(Dispatchers.Default) { platform.fileSize(absolutePath) }
 
-    override suspend fun sha256(absolutePath: String): String? = platform.fileSha256(absolutePath)
+    override suspend fun sha256(absolutePath: String): String? = withContext(Dispatchers.Default) { platform.fileSha256(absolutePath) }
 
     override suspend fun commitDownloadedAsset(temporaryPath: String, cdnKey: String): String =
-        requireNotNull(platform.commit(temporaryPath, cdnKey))
+        withContext(Dispatchers.Default) { requireNotNull(platform.commit(temporaryPath, cdnKey)) }
 
     override suspend fun deleteFile(absolutePath: String): Boolean {
         val temporaryKey = absolutePath.substringAfter("/StarceptionAssets/")
-        return platform.delete(temporaryKey)
+        return withContext(Dispatchers.Default) { platform.delete(temporaryKey) }
     }
 
-    override suspend fun deleteCachedAsset(cdnKey: String): Boolean = platform.delete(cdnKey)
+    override suspend fun deleteCachedAsset(cdnKey: String): Boolean = withContext(Dispatchers.Default) { platform.delete(cdnKey) }
 }
 
 internal val iosCloudAssets = CloudAssetRepository(

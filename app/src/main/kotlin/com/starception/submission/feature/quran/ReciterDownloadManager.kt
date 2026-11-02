@@ -70,7 +70,7 @@ class ReciterDownloadManager private constructor(private val context: Context) {
     private val jobs = mutableMapOf<String, Job>()
     private val generation = mutableMapOf<String, Int>()
     private val cancelled = mutableSetOf<String>()
-    private val states = mutableMapOf<String, MutableStateFlow<DownloadStatus>>()
+    private val states = java.util.concurrent.ConcurrentHashMap<String, MutableStateFlow<DownloadStatus>>()
 
     @Synchronized
     fun observe(reciter: ReciterCatalog.Reciter): StateFlow<DownloadStatus> =
