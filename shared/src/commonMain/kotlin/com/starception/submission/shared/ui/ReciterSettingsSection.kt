@@ -1,5 +1,9 @@
 package com.starception.submission.shared.ui
 
+import com.starception.submission.feature.quran.ReciterGroup
+import com.starception.submission.feature.quran.ReciterGroupFilters
+import com.starception.submission.feature.quran.reciterGroup
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -71,6 +75,7 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
+    var group by remember { mutableStateOf<ReciterGroup?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
     val download by ReciterDownloadState.state.collectAsState()
     var revision by remember { mutableIntStateOf(0) }
@@ -146,11 +151,14 @@ internal fun ReciterSettingsSection(manageDownloads: Boolean = false, initiallyE
                     Text(if (manageDownloads) "Manage voices and saved audio" else "Choose a voice for Arabic recitation",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    val filtered = remember(catalog, surahNumber, query) {
+                    ReciterGroupFilters(selected = group, onSelect = { group = it })
+                    val filtered = remember(catalog, surahNumber, query, group) {
                         val available = surahNumber?.let { selectableQuranReciters(it, catalog) } ?: catalog
-                        available.filter { (it.displayName + " " + it.riwaya).contains(query.trim(), true) }
+                        available.filter { (group == null || reciterGroup(it.displayName) == group) &&
+                            (it.displayName + " " + it.riwaya).contains(query.trim(), true) }
                     }
-                    val showDefault = "Mishary Rashid Al-Alafasy default".contains(query.trim(), true)
+                    val showDefault = (group == null || group == ReciterGroup.CONTEMPORARY) &&
+                        "Mishary Rashid Al-Alafasy default".contains(query.trim(), true)
                     if (!loading && filtered.isEmpty() && !showDefault) Text("No reciters found. Try another name or riwaya.", style = MaterialTheme.typography.bodyMedium)
                     LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {

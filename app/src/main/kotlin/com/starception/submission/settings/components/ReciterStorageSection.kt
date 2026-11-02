@@ -53,6 +53,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.starception.submission.feature.quran.ReciterCatalog
 import com.starception.submission.feature.quran.ReciterDownloadManager
+import com.starception.submission.feature.quran.ReciterGroup
+import com.starception.submission.feature.quran.ReciterGroupFilters
+import com.starception.submission.feature.quran.reciterGroup
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -80,6 +83,7 @@ fun ReciterStorageSection(
     val preferences = remember(context) { context.getSharedPreferences("quran_reciter", android.content.Context.MODE_PRIVATE) }
     var preferredReciterId by remember { mutableStateOf(preferences.getString("selected_id", null)) }
     var query by remember { mutableStateOf("") }
+    var group by remember { mutableStateOf<ReciterGroup?>(null) }
     var refresh by remember { mutableStateOf(0) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var fetchedRevision by remember { mutableStateOf(-1) }
@@ -151,11 +155,14 @@ fun ReciterStorageSection(
                 preview.error?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
-                val filtered = remember(reciters, surahNumber, query) {
+                ReciterGroupFilters(selected = group, onSelect = { preview.stop(); group = it })
+                val filtered = remember(reciters, surahNumber, query, group) {
                     reciters.filter { (surahNumber == null || surahNumber in it.surahs) &&
+                        (group == null || reciterGroup(it.name) == group) &&
                         (it.name + " " + it.riwaya).contains(query.trim(), true) }
                 }
-                val showDefault = "Mishary Rashid Al-Alafasy default".contains(query.trim(), true)
+                val showDefault = (group == null || group == ReciterGroup.CONTEMPORARY) &&
+                    "Mishary Rashid Al-Alafasy default".contains(query.trim(), true)
                 if (!loading && filtered.isEmpty() && !showDefault) Text("No reciters found", style = MaterialTheme.typography.bodyMedium)
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 480.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)) {
