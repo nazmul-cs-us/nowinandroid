@@ -53,15 +53,22 @@ internal fun selectQuranAudioAsset(
     translationCode: String,
     assets: Collection<com.starception.submission.core.assetcache.AssetEntry>,
 ): com.starception.submission.core.assetcache.AssetEntry? {
-    val language = when (translationCode) {
-        "bn" -> "bengali"
-        "en" -> "english"
-        "hi" -> "hindi"
-        "ur" -> "urdu"
-        else -> "arabic"
-    }
+    val language = quranAudioLanguage(translationCode)
     return assets.firstOrNull { asset ->
         asset.category == "quran_audio_$language" &&
             asset.cdnKey.substringAfterLast('/').takeWhile(Char::isDigit).toIntOrNull() == surahNumber
     }
 }
+
+/** Reading's Arabic-only preference is an empty code, not necessarily "ar". */
+internal fun quranAudioLanguage(translationCode: String): String = when (translationCode.lowercase()) {
+    "bn" -> "bengali"
+    "en" -> "english"
+    "hi" -> "hindi"
+    "ur" -> "urdu"
+    else -> "arabic"
+}
+
+internal fun quranPlaybackReciterName(translationCode: String, selected: QuranReciterSource?): String? =
+    if (quranAudioLanguage(translationCode) == "arabic") selected?.displayName ?: "Mishary Rashid Al-Alafasy"
+    else null

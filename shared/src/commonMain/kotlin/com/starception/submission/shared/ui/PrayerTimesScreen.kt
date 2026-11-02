@@ -405,7 +405,7 @@ fun PrayerTimesScreen(
                         },
                 ) {
                     Text(
-                        text = playing.bannerTitle,
+                        text = if (statusText != null) playing.bannerTitle else playing.title,
                         modifier = Modifier.fillMaxWidth().basicMarquee(),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
@@ -414,7 +414,9 @@ fun PrayerTimesScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = statusText ?: if (playing.playing) "Playing" else "Paused",
+                        text = statusText ?: listOfNotNull(playing.reciterName,
+                            if (playing.playing) "Playing" else "Paused").joinToString(" · "),
+                        modifier = Modifier.fillMaxWidth().basicMarquee(),
                         style = MaterialTheme.typography.labelMedium,
                         color = stripColor.copy(alpha = 0.7f),
                         maxLines = 1,
@@ -1385,15 +1387,19 @@ private fun PrayerHomeHeader(
                 }
             },
         )
-        IconTapTarget(
-            icon = Icons.Outlined.Settings,
-            contentDescription = "Prayer settings",
-            tint = MaterialTheme.colorScheme.onBackground,
-            visualSize = 36.dp,
-            iconSize = 26.dp,
-            showBackground = false,
-            onClick = onOpenSettings,
-        )
+        Box(Modifier.size(48.dp).clip(CircleShape).background(
+            if (onArtwork) Color.Black.copy(alpha = 0.32f) else Color.Transparent,
+        )) {
+            IconTapTarget(
+                icon = Icons.Outlined.Settings,
+                contentDescription = "Prayer settings",
+                tint = if (onArtwork) Color.White else MaterialTheme.colorScheme.onBackground,
+                visualSize = 44.dp,
+                iconSize = 26.dp,
+                showBackground = onArtwork,
+                onClick = onOpenSettings,
+            )
+        }
     }
 }
 

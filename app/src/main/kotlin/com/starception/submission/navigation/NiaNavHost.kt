@@ -301,28 +301,28 @@ fun NiaNavHost(
             modifier = modifier,
             enterTransition = {
                 if (initialState.isTopLevelRoute() && targetState.isTopLevelRoute()) {
-                    NiaTransitions.fadeThroughEnter()
+                    androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180))
                 } else {
                     NiaTransitions.detailEnter()
                 }
             },
             exitTransition = {
                 if (initialState.isTopLevelRoute() && targetState.isTopLevelRoute()) {
-                    NiaTransitions.fadeThroughExit()
+                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120))
                 } else {
                     NiaTransitions.detailExit()
                 }
             },
             popEnterTransition = {
                 if (initialState.isTopLevelRoute() && targetState.isTopLevelRoute()) {
-                    NiaTransitions.fadeThroughEnter()
+                    androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180))
                 } else {
                     NiaTransitions.detailPopEnter()
                 }
             },
             popExitTransition = {
                 if (initialState.isTopLevelRoute() && targetState.isTopLevelRoute()) {
-                    NiaTransitions.fadeThroughExit()
+                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120))
                 } else {
                     NiaTransitions.detailPopExit()
                 }

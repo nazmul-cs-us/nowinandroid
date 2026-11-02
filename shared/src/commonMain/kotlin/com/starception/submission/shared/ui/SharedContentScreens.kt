@@ -526,9 +526,8 @@ internal fun QuranDetailScreen(
                     player = player,
                     surahNumber = number,
                     audioUrl = url,
-                    reciterName = if (requestedLanguage == "ar" || requestedLanguage == "arabic")
-                        com.starception.submission.shared.audio.QuranReciterPreferences().selectedSource()?.displayName
-                            ?: "Mishary Rashid Al-Alafasy" else null,
+                    reciterName = com.starception.submission.shared.audio.quranPlaybackReciterName(
+                        requestedLanguage, com.starception.submission.shared.audio.QuranReciterPreferences().selectedSource()),
                 )
                 playing = true
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -1082,7 +1081,7 @@ internal fun QuranDetailScreen(
                                     surah = surah,
                                     ayahCount = displayVerses.size,
                                     nameTranslation = state.nameTranslation,
-                                    showTitle = showAudioPlayer,
+                                    arabicFont = selectedArabicFont,
                                 )
                             },
                             requestedPage = requestedMushafPage,
@@ -1108,7 +1107,7 @@ internal fun QuranDetailScreen(
                                     surah = surah,
                                     ayahCount = displayVerses.size,
                                     nameTranslation = state.nameTranslation,
-                                    showTitle = showAudioPlayer,
+                                    arabicFont = selectedArabicFont,
                                 )
                             }
                             if (showBismillah) {
@@ -1188,58 +1187,6 @@ internal fun QuranDetailScreen(
                 anchorIndex = index
                 anchorOffset = offset
                 anchorHeader = header
-            }
-        }
-    }
-    if (!mushafMode && !showAudioPlayer) {
-        val nameStartYPx = artworkBottomPx + with(density) { 12.dp.toPx() }
-        // The SwiftUI host renders Compose edge-to-edge (ignoresSafeArea) and
-        // WindowInsets reports zero inside it, so the physical status-bar band
-        // (up to ~59dp on iPhones) must be cleared by hand: the name parks
-        // just under the 64dp pinned toolbar, never at the screen's edge.
-        val nameEndYPx = with(density) { 64.dp.toPx() }
-        val nameStartXPx = with(density) { 24.dp.toPx() }
-        val nameEndXPx = with(density) { 76.dp.toPx() }
-        Box(
-            modifier = Modifier
-                .offset {
-                    val scrolled = -headerCollapseOffset.floatValue +
-                        ayahListState.firstVisibleItemScrollOffset
-                    val y = (nameStartYPx - scrolled).coerceAtLeast(nameEndYPx)
-                    val progress = ((nameStartYPx - y) / (nameStartYPx - nameEndYPx))
-                        .coerceIn(0f, 1f)
-                    IntOffset(
-                        x = (nameStartXPx + progress * (nameEndXPx - nameStartXPx)).roundToInt(),
-                        y = y.roundToInt(),
-                    )
-                }
-                .graphicsLayer {
-                    val scrolled = -headerCollapseOffset.floatValue +
-                        ayahListState.firstVisibleItemScrollOffset
-                    val y = (nameStartYPx - scrolled).coerceAtLeast(nameEndYPx)
-                    val progress = ((nameStartYPx - y) / (nameStartYPx - nameEndYPx))
-                        .coerceIn(0f, 1f)
-                    val scale = 1f - progress * 0.4f
-                    scaleX = scale
-                    scaleY = scale
-                    transformOrigin = TransformOrigin(0f, 0f)
-                },
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = surah.nameEnglish,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = surah.nameArabic,
-                    fontFamily = QuranArabicFonts.fontFamily(selectedArabicFont),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
@@ -1350,12 +1297,10 @@ private fun SurahAlbumInfoCard(
     surah: com.starception.submission.feature.quran.Surah,
     ayahCount: Int,
     nameTranslation: String,
-    showTitle: Boolean = false,
+    arabicFont: String,
 ) {
-    // Android's AlbumInfoCard: one continuous surface starting flush under the
-    // artwork. The surah name is NOT here — it is the floating overlay that
-    // rests over this card's top zone, anchored to the artwork edge; the
-    // spacer reserves its room, then the translation quote, then the chips.
+    // Keep names in the measured card flow. An absolute overlay cannot reliably
+    // track both the collapsing header and the expanded audio panel.
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
@@ -1366,16 +1311,17 @@ private fun SurahAlbumInfoCard(
                 .padding(horizontal = 24.dp)
                 .padding(top = 10.dp, bottom = 14.dp),
         ) {
-            // Reserve both lines of the floating title (English + Arabic).
-            // The old 44dp slot ended underneath the Arabic baseline, causing
-            // it to overlap the English meaning on iPhone-sized layouts.
-            if (showTitle) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(end = 56.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(surah.nameEnglish, style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold)
-                Text(surah.nameArabic, style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(surah.nameArabic, fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-            } else Spacer(Modifier.height(80.dp))
+            }
+            Spacer(Modifier.height(12.dp))
             if (nameTranslation.isNotBlank()) {
                 Text(
                     text = "\"$nameTranslation\"",
@@ -6172,7 +6118,7 @@ internal fun QuranPlaybackSyncBar(
                 },
             ) {
                 Text(
-                    text = playing.bannerTitle,
+                    text = if (statusText != null) playing.bannerTitle else playing.title,
                     modifier = Modifier.fillMaxWidth().basicMarquee(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -6181,7 +6127,9 @@ internal fun QuranPlaybackSyncBar(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = statusText ?: if (playing.playing) "Playing" else "Paused",
+                    text = statusText ?: listOfNotNull(playing.reciterName,
+                        if (playing.playing) "Playing" else "Paused").joinToString(" · "),
+                    modifier = Modifier.fillMaxWidth().basicMarquee(),
                     style = MaterialTheme.typography.labelMedium,
                     color = stripColor.copy(alpha = 0.7f),
                     maxLines = 1,

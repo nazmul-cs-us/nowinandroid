@@ -33,8 +33,7 @@ actual suspend fun resolveQuranAudioUrl(
     surahNumber: Int,
     translationCode: String,
 ): String? {
-    if (translationCode.equals("ar", ignoreCase = true) ||
-        translationCode.equals("arabic", ignoreCase = true)) {
+    if (quranAudioLanguage(translationCode) == "arabic") {
         val preferences = QuranReciterPreferences()
         preferences.selectedReciterId()?.takeIf { it.matches(Regex("[0-9]+-[0-9]+")) }?.let { id ->
             IosReciterAudioStore.cachedUrl(id, surahNumber)?.let { return it }

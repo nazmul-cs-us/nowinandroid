@@ -329,11 +329,8 @@ fun SharedNavHost(
             // (interruptible mid-flight), the outgoing page recedes a third
             // of the width with a gentle fade. Pop reverses the move.
             enterTransition = {
-                if (isTabSwitch(targetState)) {
-                    fadeIn(tween(260, delayMillis = 55)) + scaleIn(
-                        initialScale = 0.94f,
-                        animationSpec = tween(260),
-                    )
+                if (isTabSwitch(initialState) && isTabSwitch(targetState)) {
+                    fadeIn(tween(180))
                 } else {
                     slideInHorizontally(
                         animationSpec = iosPushSpring(),
@@ -342,11 +339,8 @@ fun SharedNavHost(
                 }
             },
             exitTransition = {
-                if (isTabSwitch(initialState)) {
-                    fadeOut(tween(120)) + scaleOut(
-                        targetScale = 0.98f,
-                        animationSpec = tween(180),
-                    )
+                if (isTabSwitch(initialState) && isTabSwitch(targetState)) {
+                    fadeOut(tween(120))
                 } else {
                     slideOutHorizontally(
                         animationSpec = iosPushSpring(),
@@ -355,11 +349,8 @@ fun SharedNavHost(
                 }
             },
             popEnterTransition = {
-                if (isTabSwitch(targetState)) {
-                    fadeIn(tween(260, delayMillis = 55)) + scaleIn(
-                        initialScale = 0.94f,
-                        animationSpec = tween(260),
-                    )
+                if (isTabSwitch(initialState) && isTabSwitch(targetState)) {
+                    fadeIn(tween(180))
                 } else {
                     slideInHorizontally(
                         animationSpec = iosPushSpring(),
@@ -368,11 +359,8 @@ fun SharedNavHost(
                 }
             },
             popExitTransition = {
-                if (isTabSwitch(targetState)) {
-                    fadeOut(tween(120)) + scaleOut(
-                        targetScale = 0.98f,
-                        animationSpec = tween(180),
-                    )
+                if (isTabSwitch(initialState) && isTabSwitch(targetState)) {
+                    fadeOut(tween(120))
                 } else {
                     slideOutHorizontally(
                         animationSpec = iosPushSpring(),

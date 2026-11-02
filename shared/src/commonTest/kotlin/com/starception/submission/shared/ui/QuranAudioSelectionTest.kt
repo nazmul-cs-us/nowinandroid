@@ -2,6 +2,8 @@ package com.starception.submission.shared.ui
 
 import com.starception.submission.core.assetcache.AssetEntry
 import com.starception.submission.shared.audio.selectQuranAudioAsset
+import com.starception.submission.shared.audio.quranPlaybackReciterName
+import com.starception.submission.shared.audio.QuranReciterSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -34,5 +36,16 @@ class QuranAudioSelectionTest {
             val entry = asset("audio/quran/$language/114 - An-Nas.mp3", "quran_audio_$language")
             assertEquals(entry, selectQuranAudioAsset(114, code, listOf(entry)))
         }
+    }
+    @Test fun arabicOnlyPreferenceIncludesDefaultReciter() {
+        for (code in listOf("", "ar", "arabic", "AR")) {
+            assertEquals("Mishary Rashid Al-Alafasy", quranPlaybackReciterName(code, null))
+        }
+    }
+
+    @Test fun arabicOnlyUsesSelectedReciterAndTranslationsDoNotMislabelIt() {
+        val source = QuranReciterSource("1-2", "Selected voice", "https://example.org", setOf(1))
+        assertEquals("Selected voice", quranPlaybackReciterName("", source))
+        assertNull(quranPlaybackReciterName("en", source))
     }
 }
