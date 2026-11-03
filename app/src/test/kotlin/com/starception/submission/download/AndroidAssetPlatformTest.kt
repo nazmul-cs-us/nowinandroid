@@ -42,6 +42,25 @@ class AndroidAssetPlatformTest {
         get() = File(context.filesDir, "cdn_assets")
 
     @Test
+    fun offlineManifestUsesDiskWithoutAttemptingNetwork() = runBlocking {
+        val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+        org.robolectric.Shadows.shadowOf(connectivity).setActiveNetworkInfo(null)
+        var networkRequests = 0
+        val client = OkHttpClient.Builder().addInterceptor {
+            networkRequests++
+            error("Offline manifest must not request the network")
+        }.build()
+        val platform = AndroidAssetPlatform(context, client)
+        platform.writeCachedText("manifest.json", """
+            {"version":987,"base_url":"https://example.com","total_size":0,"total_files":0,"assets":{},"categories":{}}
+        """.trimIndent())
+        val manager = AssetDownloadManager(context, client)
+        assertFalse(manager.isOnline())
+        assertEquals(987, manager.loadManifest()?.version)
+        assertEquals(0, networkRequests)
+    }
+
+    @Test
     fun bundledAssetPathMapsManifestDirectoriesToPackagedAssets() {
         assertEquals(
             "databases/quran.db",

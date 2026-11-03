@@ -36,6 +36,11 @@ internal class AndroidAssetPlatform(
     private val root = File(context.filesDir, "cdn_assets").apply { mkdirs() }
 
     override suspend fun fetchText(url: String): String? = withContext(Dispatchers.IO) {
+        val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+        val capabilities = connectivity?.getNetworkCapabilities(connectivity.activeNetwork)
+        if (capabilities?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) != true) {
+            return@withContext null
+        }
         runCatching {
             client.newCall(Request.Builder().url(url).build()).execute().use { response ->
                 response.body?.string().takeIf { response.isSuccessful }

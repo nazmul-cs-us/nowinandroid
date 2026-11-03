@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -40,7 +42,7 @@ class HomeHeaderDepthActionTest {
                 )))) {
                     Box(Modifier.align(Alignment.TopEnd).padding(22.dp)) {
                         HomeHeaderDepthActions(
-                            isDarkTheme = false,
+                            onDarkArtwork = false,
                             onSearchClick = { searchClicks++ },
                             onSettingsClick = { settingsClicks++ },
                         )
@@ -49,8 +51,10 @@ class HomeHeaderDepthActionTest {
             }
         }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_header_depth_actions.png")
-        compose.onNodeWithContentDescription("Search").performClick()
-        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.onNodeWithContentDescription("Search")
+            .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithContentDescription("Settings")
+            .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
         assertEquals(1, searchClicks)
         assertEquals(1, settingsClicks)
     }

@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -22,14 +25,19 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
@@ -44,6 +52,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, qualifiers = "w393dp-h852dp", sdk = [35])
@@ -93,16 +103,16 @@ class ImmersiveHomeCoverTest {
         assertFalse(homeCoverHeaderUsesLightText(page = 2, useNightArtwork = false))
     }
 
-    @Test fun daytimePrayerCoverShowsSunBetweenDatePalms() {
+    @Test fun daytimePrayerCoverMatchesTheWindowLitArtworkFamily() {
         compose.setContent {
-            CoverTestScene(dark = false, epochSeconds = 1_793_174_400.0, onOpen = {})
+            CoverTestScene(dark = false, onOpen = {})
         }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_prayer_sun.png")
     }
 
-    @Test fun nighttimePrayerCoverShowsMoonBetweenDatePalms() {
+    @Test fun nighttimePrayerCoverKeepsTheSameInteriorComposition() {
         compose.setContent {
-            CoverTestScene(dark = true, epochSeconds = 1_793_214_000.0, onOpen = {})
+            CoverTestScene(dark = true, onOpen = {})
         }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_prayer_moon.png")
     }
@@ -116,6 +126,38 @@ class ImmersiveHomeCoverTest {
         compose.waitForIdle()
         assertTrue("Artwork should move during the drag", positions.any { it > .05f && it < .95f })
         assertTrue("The next cover should settle", positions.lastOrNull()?.let { it > .95f } == true)
+    }
+
+    @Test fun coverCopyDriftsGentlyAndRecoversWhenSwipeIsCancelled() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent { CoverTestScene(dark = false, onOpen = {}) }
+        val original = compose.onNodeWithText("Make time for Fajr", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        compose.onRoot().performTouchInput {
+            down(Offset(330f, 380f))
+            moveTo(Offset(240f, 380f), delayMillis = 160)
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val duringDrag = compose.onNodeWithText("Make time for Fajr", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        compose.onRoot().captureRoboImage("build/outputs/reference-motion/home-copy-drag.png")
+        assertTrue("Copy should not travel across the screen: before=$original, during=$duringDrag",
+            abs((duringDrag.left - original.left).value) < 12f)
+        compose.onRoot().performTouchInput {
+            moveTo(Offset(330f, 380f), delayMillis = 400)
+            up()
+        }
+        compose.mainClock.advanceTimeBy(800)
+        val restored = compose.onNodeWithText("Make time for Fajr", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(original.left.value, restored.left.value, .5f)
+
+        val directory = File("build/outputs/reference-motion/home-swipe-frames").apply { mkdirs() }
+        compose.onRoot().captureRoboImage(File(directory, "frame-000.png").path)
+        compose.onNodeWithContentDescription("Show insight 2 of 5").performClick()
+        for (frame in 1..18) {
+            compose.mainClock.advanceTimeBy(32)
+            compose.onRoot().captureRoboImage(File(directory, "frame-%03d.png".format(frame)).path)
+        }
+        compose.onNodeWithText("Hadith for Fajr").assertExists()
+        compose.onNodeWithText("Make time for Fajr").assertDoesNotExist()
     }
 
     @Test fun pageMarksExposeAllFourSwipeDestinations() {
@@ -211,6 +253,7 @@ class ImmersiveHomeCoverTest {
         compose.waitForIdle()
         assertEquals(1, selectedPage.intValue)
         compose.onNodeWithText("What will you carry into your next prayer?").fetchSemanticsNode()
+        compose.onNodeWithContentDescription("Expand home options").performScrollTo().performClick()
         compose.onNodeWithText("Prayer now").fetchSemanticsNode()
     }
 
@@ -250,7 +293,7 @@ class ImmersiveHomeCoverTest {
         compose.waitForIdle()
         val reflectionLeft = compose.onNodeWithText("PRAYER REFLECTION")
             .fetchSemanticsNode().boundsInRoot.left
-        val cardsLeft = compose.onNodeWithText("EXPLORE YOUR DAY")
+        val cardsLeft = compose.onNodeWithTag("homeExploreReveal")
             .fetchSemanticsNode().boundsInRoot.left
         assertEquals(reflectionLeft, cardsLeft, .5f)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_scrolled.png")
@@ -293,7 +336,6 @@ class ImmersiveHomeCoverTest {
 private fun CoverTestScene(
     dark: Boolean,
     useNightArtwork: Boolean = dark,
-    epochSeconds: Double? = null,
     onOpen: (Int) -> Unit,
     onScrollPositionChanged: (Float) -> Unit = {},
 ) {
@@ -308,9 +350,6 @@ private fun CoverTestScene(
                 useNightArtwork = useNightArtwork,
                 isDarkTheme = dark,
                 isExpanded = false,
-                epochSeconds = epochSeconds,
-                latitude = epochSeconds?.let { 25.2048 },
-                longitude = epochSeconds?.let { 55.2708 },
             )
             Column(Modifier.fillMaxSize().padding(top = 80.dp, start = 24.dp, end = 24.dp)) {
                 Box(Modifier.requiredWidth(393.dp).height(588.dp)) {
@@ -331,6 +370,13 @@ private fun CoverTestScene(
                         onOpen = onOpen,
                     )
                 }
+                HomeReflectionPrompt(onDarkCover = true, onClick = {})
+            }
+            Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 36.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(homeGreetingForHour(if (useNightArtwork) 21 else 9), style = HomeTypography.greeting,
+                    color = Color.White, modifier = Modifier.weight(1f))
+                com.starception.submission.ui.HomeHeaderDepthActions(onDarkArtwork = true, onSearchClick = {}, onSettingsClick = {})
             }
         }
     }

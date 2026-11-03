@@ -22,7 +22,21 @@ object ReciterCatalog {
         val riwaya: String
     )
 
+    /** Let the picker display saved voices immediately while refreshing the catalog. */
+    suspend fun cached(context: Context): List<Reciter>? = withContext(Dispatchers.IO) {
+        val json = context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+            .getString("catalog_json", null) ?: return@withContext null
+        try { parse(json) } catch (_: org.json.JSONException) { null }
+    }
+
     suspend fun fetch(context: Context? = null): List<Reciter> = withContext(Dispatchers.IO) {
+        if (context != null) {
+            val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+            val capabilities = connectivity?.getNetworkCapabilities(connectivity.activeNetwork)
+            if (capabilities?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) != true) {
+                return@withContext cached(context) ?: throw java.io.IOException("Connect to load the reciter catalogue.")
+            }
+        }
         val preferences = context?.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
         val connection = URL("https://www.mp3quran.net/api/v3/reciters?language=eng")
             .openConnection() as HttpURLConnection
@@ -58,7 +72,9 @@ object ReciterCatalog {
                 add(
                     Reciter(
                         id = "${reciter.optInt("id")}-${moshaf.optInt("id")}",
-                        name = reciter.optString("name"),
+                         // MP3Quran spells this entry "Abdulrahman Alsudaes". Keep
+                         // its stable identity/server while presenting the familiar name.
+                         name = if (reciter.optInt("id") == 54) "Abdul Rahman Al-Sudais" else reciter.optString("name"),
                         server = server.trimEnd('/') + "/",
                         surahs = surahs,
                         riwaya = moshaf.optString("name")
@@ -67,6 +83,17 @@ object ReciterCatalog {
             }
         }
     }.distinctBy { it.id }.sortedWith(compareBy({ it.name }, { it.riwaya }))
+    }
+
+    fun matchesSearch(reciter: Reciter, query: String): Boolean {
+        val aliases = if (reciter.id.substringBefore('-') == "54") {
+            " Abdulrahman Alsudaes Abdur Rahman As Sudais Sudays"
+        } else ""
+        val searchable = (reciter.name + " " + reciter.riwaya + aliases)
+            .lowercase().filter(Char::isLetterOrDigit)
+        return query.lowercase().split(' ', '-', '\'', '’')
+            .map { it.filter(Char::isLetterOrDigit) }
+            .all(searchable::contains)
     }
 
     suspend fun download(context: Context, reciter: Reciter, surah: Int, onProgress: (Float) -> Unit = {}): File {

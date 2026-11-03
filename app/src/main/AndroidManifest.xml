@@ -89,7 +89,7 @@
         android:theme="@style/Theme.Nia.Splash">
         <profileable android:shell="true" tools:targetApi="q" />
 
-        <!-- Video Splash Screen Activity -->
+        <!-- Native spark splash; activity name is retained for installed launcher aliases. -->
         <activity
             android:name=".VideoSplashActivity"
             android:configChanges="orientation|screenSize"

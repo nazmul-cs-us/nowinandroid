@@ -45,7 +45,22 @@ data class CategoryDownloadState(
     val isComplete: Boolean,
     val isDownloading: Boolean = false,
     val progress: Float = 0f,
+    val error: String? = null,
 )
+
+/** Merge live transfer bytes with the last completed-file snapshot without rescanning disk per tick. */
+internal fun CategoryDownloadState.withTransfer(transfer: AssetDownloadManager.DownloadState?): CategoryDownloadState =
+    when (transfer) {
+        is AssetDownloadManager.DownloadState.Downloading -> copy(
+            isDownloading = true,
+            isComplete = false,
+            progress = transfer.progress.coerceIn(0f, 1f),
+            downloadedSize = maxOf(downloadedSize, transfer.bytesDownloaded),
+            error = null,
+        )
+        is AssetDownloadManager.DownloadState.Failed -> copy(isDownloading = false, error = transfer.error.takeUnless { isComplete })
+        else -> this
+    }
 
 /**
  * Overall download screen state.

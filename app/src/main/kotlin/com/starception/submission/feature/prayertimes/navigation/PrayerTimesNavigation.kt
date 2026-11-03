@@ -16,10 +16,12 @@
 
 package com.starception.submission.feature.prayertimes.navigation
 
+import androidx.compose.material3.MaterialTheme
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.starception.submission.feature.prayertimes.PrayerTimesScreen
+import com.starception.submission.feature.prayertimes.homeTypography
 import com.starception.submission.prayer.service.EnhancedLocationService
 import kotlinx.serialization.Serializable
 
@@ -56,31 +58,33 @@ fun NavGraphBuilder.prayerTimesScreen(
     offlineText: String = "No internet connection",
 ) {
     composable<PrayerTimesRoute> {
-        PrayerTimesScreen(
-            onSearchClick = onSearchClick,
-            onSettingsClick = onSettingsClick,
-            onSurahClick = onSurahClick,
-            onSurahClickWithAyah = onSurahClickWithAyah,
-            onHadithClick = onHadithClick,
-            onFortressDuaClick = onFortressDuaClick,
-            onBukhariBookPlayClick = onBukhariBookPlayClick,
-            onShamayelBookPlayClick = onShamayelBookPlayClick,
-            onBukhariFeelingBlessedClick = onBukhariFeelingBlessedClick,
-            onShamayelFeelingBlessedClick = onShamayelFeelingBlessedClick,
-            onMediaSourceClick = onMediaSourceClick,
-            downloadProgress = downloadProgress,
-            downloadLabel = downloadLabel,
-            mediaState = mediaState,
-            onMediaAction = onMediaAction,
-            isTtsPreparing = isTtsPreparing,
-            onPrayerAlertChanged = onPrayerAlertChanged,
-            prayerAlertOverride = prayerAlertOverride,
-            forbiddenPrayerTimeState = forbiddenPrayerTimeState,
-            onSearchSubmit = onSearchSubmit,
-            isSyncingExternal = isSyncingExternal,
-            onSetSyncing = onSetSyncing,
-            isOffline = isOffline,
-            offlineText = offlineText,
-        )
+        MaterialTheme(typography = homeTypography(MaterialTheme.typography)) {
+            PrayerTimesScreen(
+                onSearchClick = onSearchClick,
+                onSettingsClick = onSettingsClick,
+                onSurahClick = onSurahClick,
+                onSurahClickWithAyah = onSurahClickWithAyah,
+                onHadithClick = onHadithClick,
+                onFortressDuaClick = onFortressDuaClick,
+                onBukhariBookPlayClick = onBukhariBookPlayClick,
+                onShamayelBookPlayClick = onShamayelBookPlayClick,
+                onBukhariFeelingBlessedClick = onBukhariFeelingBlessedClick,
+                onShamayelFeelingBlessedClick = onShamayelFeelingBlessedClick,
+                onMediaSourceClick = onMediaSourceClick,
+                downloadProgress = downloadProgress,
+                downloadLabel = downloadLabel,
+                mediaState = mediaState,
+                onMediaAction = onMediaAction,
+                isTtsPreparing = isTtsPreparing,
+                onPrayerAlertChanged = onPrayerAlertChanged,
+                prayerAlertOverride = prayerAlertOverride,
+                forbiddenPrayerTimeState = forbiddenPrayerTimeState,
+                onSearchSubmit = onSearchSubmit,
+                isSyncingExternal = isSyncingExternal,
+                onSetSyncing = onSetSyncing,
+                isOffline = isOffline,
+                offlineText = offlineText,
+            )
+        }
     }
 }

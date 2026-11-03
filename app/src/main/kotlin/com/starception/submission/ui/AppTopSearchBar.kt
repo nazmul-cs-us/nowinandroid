@@ -16,6 +16,7 @@
 
 package com.starception.submission.ui
 
+import androidx.compose.foundation.layout.Column
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -142,6 +143,8 @@ import com.starception.submission.feature.search.SuggestedVerse
 import com.starception.submission.feature.search.SuggestedVerses
 import com.starception.submission.feature.search.VoiceSearchService
 import com.starception.submission.feature.search.WhisperVoiceService
+import com.starception.submission.feature.quran.ReciterCatalog
+import com.starception.submission.settings.components.ReciterDownloadSheet
 import com.starception.submission.ui.search.InMemorySearchResult
 import com.starception.submission.ui.search.PopularSuggestion
 import com.starception.submission.ui.search.SearchHintAnimator
@@ -175,6 +178,9 @@ fun AppTopSearchBar(
     homeImmersiveHeader: Boolean = false,
     homeHeaderLightText: Boolean = false,
     homeGreetingText: String = "Assalamu alaikum",
+    homeLocationText: String = "",
+    homeSupportingText: String = "",
+    homeAlternateSupportingText: String = "",
     homeHeaderVisibility: () -> Float = { 1f },
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
@@ -233,6 +239,8 @@ fun AppTopSearchBar(
     val ayahResults by viewModel.ayahResults.collectAsStateWithLifecycle()
     val fortressDuaResults by viewModel.fortressDuaResults.collectAsStateWithLifecycle()
     val bukhariHadithResults by viewModel.bukhariHadithResults.collectAsStateWithLifecycle()
+    val reciterResults by viewModel.reciterResults.collectAsStateWithLifecycle()
+    var reciterDownloads by remember { mutableStateOf<ReciterCatalog.Reciter?>(null) }
     val currentOnVerseClick by rememberUpdatedState(onVerseClick)
     val currentOnSearchSubmit by rememberUpdatedState(onSearchSubmit)
     val currentOnTopicClick by rememberUpdatedState(onTopicClick)
@@ -326,6 +334,12 @@ fun AppTopSearchBar(
     // is open the glow must wrap that full-width bar, not the collapsed pill.
     var searchViewBarBoundsPx by remember { mutableStateOf<Rect?>(null) }
     var isSearchViewOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(isSearchViewOpen) {
+        if (isSearchViewOpen) viewModel.loadReciters()
+    }
+    reciterDownloads?.let { reciter ->
+        ReciterDownloadSheet(reciter = reciter, onDismiss = { reciterDownloads = null })
+    }
 
     DisposableEffect(whisperService) {
         // Warm the model only when its file is actually present (bundled or
@@ -778,6 +792,12 @@ fun AppTopSearchBar(
                     ayahResults = ayahResults,
                     fortressDuaResults = fortressDuaResults,
                     bukhariHadithResults = bukhariHadithResults,
+                    reciterResults = reciterResults,
+                    onReciterClick = { reciter ->
+                        viewModel.saveSearchQuery(liveQuery)
+                        searchView.hide()
+                        reciterDownloads = reciter
+                    },
                     accentColor = accentColor,
                     titleColor = titleColor,
                     subtitleColor = subtitleColor,
@@ -866,7 +886,7 @@ fun AppTopSearchBar(
                 modifier = Modifier.fillMaxWidth()
                     // The wallpaper reaches into the status area, while the actions
                     // sit below it even when an OEM reports no safe-drawing inset.
-                    .padding(start = 22.dp, end = 22.dp, top = topInset.coerceAtLeast(24.dp) + 18.dp)
+                    .padding(start = 24.dp, end = 24.dp, top = topInset.coerceAtLeast(24.dp) + 12.dp)
                     .graphicsLayer {
                         val visibility = homeHeaderVisibility()
                         alpha = visibility
@@ -875,27 +895,37 @@ fun AppTopSearchBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = homeGreetingText,
-                    style = (if (homeGreetingText.length > 18) MaterialTheme.typography.headlineSmall
-                        else MaterialTheme.typography.headlineMedium).copy(
-                        shadow = Shadow(
-                            color = if (homeHeaderLightText) ComposeColor.Black.copy(alpha = .55f)
-                                else ComposeColor.White.copy(alpha = .55f),
-                            offset = Offset(0f, 1.5f),
-                            blurRadius = 7f,
-                        ),
-                    ),
-                    color = greetingColor,
-                    fontWeight = FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                Column(
                     modifier = Modifier.weight(1f)
                         .clickable { currentOnProfileClick() }
                         .semantics { contentDescription = "Open profile" },
-                )
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    HomeRotatingHeaderText(
+                        primary = homeGreetingText,
+                        alternate = homeLocationText,
+                        style = com.starception.submission.feature.prayertimes.HomeTypography.greeting.copy(
+                            shadow = Shadow(
+                                color = if (homeHeaderLightText) ComposeColor.Black.copy(alpha = .55f)
+                                    else ComposeColor.White.copy(alpha = .55f),
+                                offset = Offset(0f, 1.5f),
+                                blurRadius = 4f,
+                            ),
+                        ),
+                        color = greetingColor,
+                    )
+                    if (homeSupportingText.isNotBlank()) {
+                        HomeRotatingHeaderText(
+                            primary = homeSupportingText,
+                            alternate = homeAlternateSupportingText,
+                            style = com.starception.submission.feature.prayertimes.HomeTypography.caption,
+                            color = greetingColor.copy(alpha = .82f),
+                            fontWeight = FontWeight.Normal,
+                        )
+                    }
+                }
                 HomeHeaderDepthActions(
-                    isDarkTheme = isDarkTheme,
+                    onDarkArtwork = homeHeaderLightText,
                     onSearchClick = { searchViewHolder.value?.show() },
                     onSettingsClick = onSettingsClick,
                 )
@@ -983,64 +1013,6 @@ fun AppTopSearchBar(
                     }
                 }
             }
-        }
-    }
-}
-
-/** Two compact dark actions sit in individual soft circular recesses. */
-@Composable
-internal fun HomeHeaderDepthActions(
-    isDarkTheme: Boolean,
-    onSearchClick: () -> Unit,
-    onSettingsClick: () -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-        HomeHeaderDepthAction("Search", isDarkTheme, onSearchClick) {
-            Icon(Icons.Default.Search, contentDescription = null,
-                tint = ComposeColor.White, modifier = Modifier.size(19.dp))
-        }
-        HomeHeaderDepthAction("Settings", isDarkTheme, onSettingsClick) {
-            Icon(painterResource(R.drawable.ic_app_top_bar_settings_24), contentDescription = null,
-                tint = ComposeColor.White, modifier = Modifier.size(19.dp))
-        }
-    }
-}
-
-@Composable
-private fun HomeHeaderDepthAction(
-    label: String,
-    isDarkTheme: Boolean,
-    onClick: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    Box(
-        modifier = Modifier.size(50.dp)
-            .drawBehind {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        0f to ComposeColor(0xFFE4E3EB).copy(alpha = if (isDarkTheme) .32f else .60f),
-                        .72f to ComposeColor(0xFFE4E3EB).copy(alpha = if (isDarkTheme) .32f else .60f),
-                        1f to ComposeColor.Transparent,
-                        radius = size.minDimension / 2f,
-                    ),
-                )
-            }
-            .semantics { contentDescription = label }
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier.size(37.dp)
-                .shadow(3.dp, CircleShape, ambientColor = ComposeColor.Black.copy(alpha = .12f),
-                    spotColor = ComposeColor.Black.copy(alpha = .20f))
-                .clip(CircleShape)
-                .background(Brush.verticalGradient(listOf(
-                    ComposeColor(0xFF242737), ComposeColor(0xFF0E101A),
-                )))
-                .border(.5.dp, ComposeColor.White.copy(alpha = .10f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            content()
         }
     }
 }
@@ -1227,6 +1199,8 @@ private fun renderSuggestions(
     ayahResults: List<com.starception.submission.core.qurandatabase.AyahEntity>,
     fortressDuaResults: List<com.starception.submission.core.duadatabase.Dua>,
     bukhariHadithResults: List<com.starception.submission.core.hadithdatabase.HadithEntity>,
+    reciterResults: List<ReciterCatalog.Reciter>,
+    onReciterClick: (ReciterCatalog.Reciter) -> Unit,
     accentColor: Int,
     titleColor: Int,
     subtitleColor: Int,
@@ -1304,6 +1278,8 @@ private fun renderSuggestions(
         append("##")
         append(cappedBukhariHadiths.joinToString("|") { "b${it.id}" })
         append("##")
+        append(reciterResults.joinToString("|") { "r${it.id}:${it.name}:${it.riwaya}" })
+        append("##")
         append(ftsTopics.joinToString("|") { it.topic.id })
         append("##")
         append(ftsNews.joinToString("|") { it.id })
@@ -1356,6 +1332,29 @@ private fun renderSuggestions(
         null
     }
     val sections = mutableListOf<RenderableSection>()
+    if (!restrictToSurahs && reciterResults.isNotEmpty()) {
+        sections.add(RenderableSection(title = "Reciters · offline audio", score = INTENT_BOOST) {
+            reciterResults.forEach { reciter ->
+                val row = inflater.inflate(R.layout.app_search_suggestion_item, container, false)
+                row.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
+                    setImageResource(android.R.drawable.stat_sys_download)
+                    imageTintList = ColorStateList.valueOf(accentColor)
+                }
+                row.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
+                    text = reciter.name
+                    setTextColor(titleColor)
+                    typeface = appSearchTypeface(ctx)
+                }
+                row.findViewById<TextView>(R.id.app_search_suggestion_subtitle).apply {
+                    text = "${reciter.riwaya} · ${reciter.surahs.size} surahs · Download audio"
+                    setTextColor(subtitleColor)
+                    typeface = appSearchTypeface(ctx)
+                }
+                row.setOnClickListener { onReciterClick(reciter) }
+                container.addView(row)
+            }
+        })
+    }
     if (!restrictToSurahs &&
         !suppressAmbiguousAllahPrefixVerses &&
         rankedVerses.isNotEmpty()

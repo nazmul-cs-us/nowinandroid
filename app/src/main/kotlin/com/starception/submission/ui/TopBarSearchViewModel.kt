@@ -32,6 +32,7 @@ import com.starception.submission.core.qurandatabase.AyahEntity
 import com.starception.submission.core.qurandatabase.QuranDao
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetRepository
+import com.starception.submission.feature.quran.ReciterCatalog
 import com.starception.submission.ui.search.InMemorySearchResult
 import com.starception.submission.ui.search.InMemorySearchService
 import com.starception.submission.ui.search.SearchTokenizer
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -81,6 +83,37 @@ class TopBarSearchViewModel @Inject constructor(
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val reciterCatalog = MutableStateFlow<List<ReciterCatalog.Reciter>>(emptyList())
+    private var reciterLoadJob: kotlinx.coroutines.Job? = null
+    private var recitersRefreshed = false
+
+    /** Cache-first, loaded on opening search rather than on every keystroke. */
+    fun loadReciters() {
+        if (recitersRefreshed || reciterLoadJob?.isActive == true) return
+        reciterLoadJob = viewModelScope.launch {
+            try {
+                if (reciterCatalog.value.isEmpty()) {
+                    reciterCatalog.value = ReciterCatalog.cached(appContext).orEmpty()
+                }
+                reciterCatalog.value = ReciterCatalog.fetch(appContext)
+                recitersRefreshed = true
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                // Retain cached matches; reopening search retries the catalogue.
+                android.util.Log.w("ReciterSearch", "Could not refresh reciters", failure)
+            }
+        }
+    }
+
+    val reciterResults: StateFlow<List<ReciterCatalog.Reciter>> =
+        combine(_searchQuery, reciterCatalog) { query, catalog ->
+            if (query.trim().length < SEARCH_QUERY_MIN_LENGTH) emptyList()
+            else catalog.filter { ReciterCatalog.matchesSearch(it, query) }.take(8)
+        }.flowOn(Dispatchers.Default).stateIn(
+            viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList(),
+        )
 
     /**
      * Fast path: surahs, Quranic duas, popular verses, and Fortress chapter

@@ -1,5 +1,7 @@
 package com.starception.submission.feature.prayertimes
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -35,6 +37,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,7 +51,6 @@ import com.starception.submission.core.images.resources.home_cover_salah_portrai
 import com.starception.submission.core.images.resources.home_cover_quran_portrait
 import com.starception.submission.core.images.resources.home_cover_qibla_portrait
 import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
-import com.starception.submission.feature.prayertimes.celestial.PrayerHomeCoverCelestialLayer
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.launch
@@ -63,6 +65,12 @@ internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableReso
 }
 
 internal data class HomeCoverCopy(val eyebrow: String, val title: String, val detail: String)
+
+/** Fade through the midpoint instead of superimposing two readable headlines. */
+private fun homeCoverCopyOpacity(pageOffset: Float): Float {
+    val visible = (1f - abs(pageOffset) * 2f).coerceIn(0f, 1f)
+    return visible * visible * (3f - 2f * visible)
+}
 
 internal fun homeGreetingForHour(hour: Int): String = when (hour) {
     in 5..11 -> "Salam, morning"
@@ -131,7 +139,7 @@ internal fun HomeCoverArtworkBlur(
     useNightArtwork: Boolean,
     prayerVisibility: Float,
 ) {
-    val shiftDown = .06f * prayerVisibility
+    val shiftDown = .02f * prayerVisibility
     Box(
         Modifier.fillMaxSize()
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -140,11 +148,9 @@ internal fun HomeCoverArtworkBlur(
                 drawRect(
                     brush = Brush.verticalGradient(
                         0f to Color.Transparent,
-                        (.48f + shiftDown) to Color.Transparent,
-                        (.55f + shiftDown) to Color.White.copy(alpha = .88f),
-                        (.67f + shiftDown) to Color.White.copy(alpha = .88f),
-                        (.76f + shiftDown) to Color.Transparent,
-                        1f to Color.Transparent,
+                        (.72f + shiftDown) to Color.Transparent,
+                        (.82f + shiftDown) to Color.White.copy(alpha = .75f),
+                        1f to Color.White.copy(alpha = .75f),
                     ),
                     blendMode = BlendMode.DstIn,
                 )
@@ -168,7 +174,11 @@ private fun HomeCoverArtworkImages(lowerPage: Int, swipeProgress: Float, useNigh
             contentScale = ContentScale.Crop,
             alignment = Alignment.Center,
             modifier = Modifier.fillMaxSize().graphicsLayer {
-                translationX = (if (layer == 0) -swipeProgress else 1f - swipeProgress) * size.width * .18f
+                // Overscan covers the parallax travel so neither photo exposes
+                // a hard vertical edge while it crossfades over the other.
+                scaleX = 1.12f
+                scaleY = 1.12f
+                translationX = (if (layer == 0) -swipeProgress else 1f - swipeProgress) * size.width * .06f
                 alpha = if (layer == 0) 1f else swipeProgress
             },
         )
@@ -182,40 +192,26 @@ internal fun HomeCoverArtworkBackdrop(
     useNightArtwork: Boolean,
     isDarkTheme: Boolean,
     isExpanded: Boolean,
-    epochSeconds: Double? = null,
-    latitude: Double? = null,
-    longitude: Double? = null,
     scrollOffsetPx: Int = 0,
     coverHeightPx: Int = 0,
 ) {
     val scrollPosition = position.value
     val lowerPage = scrollPosition.toInt().coerceIn(0, 4)
     val swipeProgress = (scrollPosition - lowerPage).coerceIn(0f, 1f)
-    HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
-    if (!useNightArtwork && lowerPage == 0) {
-        // The day scene has a bright blue sky behind the greeting. A local
-        // shadow over the upper sky keeps white type legible without darkening
-        // the water and copy below it.
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-            0f to Color(0xFF101C2B).copy(alpha = .36f),
-            .30f to Color(0xFF101C2B).copy(alpha = .12f),
-            .46f to Color.Transparent,
-        )))
-    }
     val prayerVisibility = when (lowerPage) {
         0 -> 1f - swipeProgress
         4 -> swipeProgress
         else -> 0f
     }
-    if (!isExpanded && prayerVisibility > 0f && epochSeconds != null && latitude != null && longitude != null) {
-        PrayerHomeCoverCelestialLayer(
-            epochSeconds = epochSeconds,
-            latitude = latitude,
-            longitude = longitude,
-            isNight = useNightArtwork,
-            playing = false,
-            modifier = Modifier.graphicsLayer { alpha = prayerVisibility },
-        )
+    HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
+    if (!useNightArtwork && prayerVisibility > 0f) {
+        // Shade the upper window locally so the greeting remains legible while
+        // preserving natural daylight on the prayer rug.
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+            0f to Color(0xFF101C2B).copy(alpha = .36f * prayerVisibility),
+            .30f to Color(0xFF101C2B).copy(alpha = .12f * prayerVisibility),
+            .46f to Color.Transparent,
+        )))
     }
     if (!isExpanded) HomeCoverArtworkBlur(lowerPage, swipeProgress, useNightArtwork, prayerVisibility)
     Box(Modifier.fillMaxSize().background(
@@ -225,9 +221,7 @@ internal fun HomeCoverArtworkBackdrop(
     // cover leaves the viewport, fully cover it so no stale artwork shows
     // through the transparent top of the next section.
     if (!isExpanded && coverHeightPx > 0) {
-        val fadeStart = coverHeightPx * .35f
-        val fadeDistance = coverHeightPx * .50f
-        val feedOpacity = ((scrollOffsetPx - fadeStart) / fadeDistance).coerceIn(0f, 1f)
+            val feedOpacity = homeBackdropFeedOpacity(scrollOffsetPx.toFloat(), coverHeightPx.toFloat())
         if (feedOpacity > 0f) {
             Box(
                 Modifier.fillMaxSize().background(
@@ -260,7 +254,10 @@ internal fun ImmersiveHomeCover(
         if (current != selectedPage) {
             val forward = (selectedPage - current + 5) % 5
             val delta = if (forward <= 2) forward else forward - 5
-            pagerState.scrollToPage(pagerState.settledPage + delta)
+            pagerState.animateScrollToPage(
+                pagerState.settledPage + delta,
+                animationSpec = tween(460, easing = FastOutSlowInEasing),
+            )
         }
     }
     LaunchedEffect(pagerState.settledPage) { onSelectionChanged(pagerState.settledPage % 5) }
@@ -278,7 +275,7 @@ internal fun ImmersiveHomeCover(
             val page = absolutePage % 5
             // Every cover keeps its copy on the same water/floor baseline as
             // Prayer Now so the eyebrow does not jump while swiping pages.
-            val copyBottom = maxHeight * .07f
+            val copyBottom = (maxHeight * .07f).coerceAtLeast(40.dp)
             val useLightText = homeCoverCopyUsesLightText(page, useNightArtwork, isDarkTheme)
             val ink = if (useLightText) Color.White else Color(0xFF211C2B)
             val secondaryInk = ink.copy(alpha = if (useLightText) .80f else .72f)
@@ -286,25 +283,36 @@ internal fun ImmersiveHomeCover(
                 page, currentPrayerName, nextPrayerName, nextPrayerCountdown,
                 readingSurahName, readingSurahNumber,
             )
-            Box(Modifier.fillMaxSize().clipToBounds().clickable { onOpen(page) }) {
+            val pageOffset = pagerState.currentPage - absolutePage + pagerState.currentPageOffsetFraction
+            Box(Modifier.fillMaxSize().clickable { onOpen(page) }) {
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .padding(start = 24.dp, end = 24.dp, bottom = copyBottom),
+                        // Counter the pager's full-width travel. Copy drifts only
+                        // a few pixels, fading out before the incoming copy appears.
+                        // Keep it unclipped at the page edge while counter-translating.
+                        .graphicsLayer {
+                            val offset = pagerState.currentPage - absolutePage + pagerState.currentPageOffsetFraction
+                            translationX = offset * (size.width - 16.dp.toPx())
+                            translationY = abs(offset) * 8.dp.toPx()
+                            alpha = homeCoverCopyOpacity(offset)
+                        }
+                        .then(if (abs(pageOffset) >= .5f) Modifier.clearAndSetSemantics { } else Modifier)
+                        .padding(start = 32.dp, end = 32.dp, bottom = copyBottom),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         eyebrow,
                         color = secondaryInk,
-                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = .7.sp),
+                        style = HomeTypography.eyebrow,
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
                         title,
                         color = ink,
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = HomeTypography.hero,
                         textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Normal,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -312,7 +320,7 @@ internal fun ImmersiveHomeCover(
                         Text(
                             detail,
                             color = secondaryInk,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = HomeTypography.body,
                             textAlign = TextAlign.Center,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -345,7 +353,10 @@ internal fun ImmersiveHomeCover(
                                 val current = pagerState.currentPage % 5
                                 val forward = (index - current + 5) % 5
                                 val delta = if (forward <= 2) forward else forward - 5
-                                pagerState.animateScrollToPage(pagerState.currentPage + delta)
+                            pagerState.animateScrollToPage(
+                                pagerState.currentPage + delta,
+                                animationSpec = tween(460, easing = FastOutSlowInEasing),
+                            )
                             }
                         }
                         .semantics { contentDescription = "Show insight ${index + 1} of 5" },

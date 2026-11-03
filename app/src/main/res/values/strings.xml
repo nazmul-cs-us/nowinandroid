@@ -17,6 +17,21 @@
 <resources>
   <string name="app_name">Deenly</string>
   <string name="prayer_times_title">Home</string>
+  <string name="splash_continue">Continue</string>
+  <string name="home_explore_title">Explore your day</string>
+  <string name="home_explore_subtitle">Read, reflect and reconnect</string>
+  <string name="home_options_expand">Expand home options</string>
+  <string name="home_options_collapse">Collapse home options</string>
+  <string name="home_options_expanded">Expanded</string>
+  <string name="home_options_collapsed">Collapsed</string>
+  <string name="home_option_quran">Quran</string>
+  <string name="home_option_quran_detail">Today’s reading</string>
+  <string name="home_option_hadith">Hadith</string>
+  <string name="home_option_hadith_detail">For this prayer</string>
+  <string name="home_option_qibla">Qibla</string>
+  <string name="home_option_qibla_detail">Find your direction</string>
+  <string name="home_option_settings">Settings</string>
+  <string name="home_option_settings_detail">Make it yours</string>
   <string name="course_title">Course</string>
   <string name="not_connected">Not connected</string>
   <string name="live_notification_title">Prayer Time</string>

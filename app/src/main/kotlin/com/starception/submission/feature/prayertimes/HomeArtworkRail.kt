@@ -1,14 +1,18 @@
 package com.starception.submission.feature.prayertimes
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,9 +48,15 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import com.starception.submission.R
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.home_cover_prayer_day_portrait
 import com.starception.submission.core.images.resources.home_cover_prayer_night_portrait
@@ -123,10 +133,10 @@ internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifi
         if (copyAlpha > 0f) {
             Column(Modifier.align(Alignment.BottomStart).padding(16.dp)
                 .graphicsLayer { alpha = copyAlpha }) {
-                Text(card.label, color = Color.White, style = MaterialTheme.typography.titleMedium,
+                Text(card.label, color = Color.White, style = HomeTypography.section,
                     fontWeight = FontWeight.SemiBold)
                 Text(card.subtitle, color = Color.White.copy(alpha = .85f),
-                    style = MaterialTheme.typography.bodySmall)
+                    style = HomeTypography.caption)
             }
         }
     }
@@ -137,73 +147,46 @@ internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifi
 internal fun HomeArtworkRail(
     focusedPage: Int = 0,
     useNightArtwork: Boolean = false,
+    bottomClearance: Dp = 0.dp,
     onSelect: (HomeArtworkCard, Rect) -> Unit,
 ) {
-    val ink = MaterialTheme.colorScheme.onBackground
-    val largeText = LocalDensity.current.fontScale > 1.3f
     val prayerNow = HomeArtworkCard(
         0, "Prayer now", "Your next prayer",
         if (useNightArtwork) Res.drawable.home_cover_prayer_night_portrait
         else Res.drawable.home_cover_prayer_day_portrait,
     )
     val cards = homeArtworkCards + prayerNow
-    AnimatedContent(
-        targetState = focusedPage.coerceIn(0, 4),
-        transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(160)) },
-        label = "homeFeedSelectedInsight",
-    ) { page ->
-        val feed = homeFeedPage(page)
-        val railCards = feed.railPages.mapNotNull { id -> cards.firstOrNull { it.page == id } }
-        val featuredCard = cards.first { it.page == feed.featuredPage }
-        val railState = rememberLazyListState()
-        val railSurface = if (LocalDarkTheme.current) Color(0xFF080B14)
-            else MaterialTheme.colorScheme.background
-        Column {
-            HomeFeedSectionLabel("EXPLORE YOUR DAY")
-            Spacer(Modifier.height(14.dp))
-            Box(Modifier.drawWithContent {
-                drawContent()
-                if (railState.canScrollForward) {
-                    val fadeWidth = 24.dp.toPx()
-                    drawRect(
-                        brush = Brush.horizontalGradient(
-                            listOf(Color.Transparent, railSurface),
-                            startX = size.width - fadeWidth,
-                            endX = size.width,
-                        ),
-                        topLeft = Offset(size.width - fadeWidth, 0f),
-                        size = Size(fadeWidth, size.height),
-                    )
-                }
-            }) {
-                LazyRow(
-                    state = railState,
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
-                ) {
-                    items(railCards, key = HomeArtworkCard::page) { card ->
-                        Column(Modifier.width(if (largeText) 142.dp else 124.dp)) {
-                            ArtworkCard(card, Modifier.fillMaxWidth(), 126.dp, onSelect, compact = true)
-                            Spacer(Modifier.height(8.dp))
-                            Text(card.label, color = ink, style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = if (largeText) 2 else 1,
-                                overflow = TextOverflow.Ellipsis)
-                            Text(card.subtitle, color = ink.copy(alpha = .62f),
-                                style = MaterialTheme.typography.bodySmall, maxLines = 1,
-                                overflow = TextOverflow.Ellipsis)
+    FluidHomeReveal(
+        title = stringResource(R.string.home_explore_title),
+        subtitle = stringResource(R.string.home_explore_subtitle),
+        bottomClearance = bottomClearance,
+    ) { enabled, collapse ->
+        AnimatedContent(
+            targetState = focusedPage.coerceIn(0, 4),
+            transitionSpec = {
+                (fadeIn(tween(260, delayMillis = 140)) togetherWith fadeOut(tween(140)))
+                    .using(SizeTransform { _, _ -> tween(400, easing = FastOutSlowInEasing) })
+            },
+            label = "homeExploreDestinations",
+        ) { page ->
+            val feed = homeFeedPage(page)
+            val destinations = (feed.railPages + feed.featuredPage).map { destination -> cards.first { it.page == destination } }
+            BoxWithConstraints {
+                val columns = if (maxWidth < 280.dp || LocalDensity.current.fontScale > 1.5f) 1 else 2
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    destinations.chunked(columns).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            row.forEach { card ->
+                                ArtworkCard(card, Modifier.weight(1f), 128.dp, enabled = enabled && page == focusedPage,
+                                    onSelect = { selected, bounds ->
+                                        collapse()
+                                        onSelect(selected, bounds)
+                                    })
+                            }
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(32.dp))
-            HomeFeedSectionLabel("SUGGESTED FOR YOU")
-            Spacer(Modifier.height(16.dp))
-            ArtworkCard(featuredCard, Modifier.fillMaxWidth(), 224.dp, onSelect)
-            Spacer(Modifier.height(10.dp))
-            Text(featuredCard.label, color = ink, style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold)
-            Text(featuredCard.subtitle, color = ink.copy(alpha = .62f),
-                style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -217,38 +200,29 @@ internal fun HomeReflectionPrompt(
     val ink = if (onDarkCover) Color.White else MaterialTheme.colorScheme.onBackground
     Column(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
-            .padding(top = 10.dp, bottom = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(top = 12.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         HomeSectionDivider(ink)
         AnimatedContent(
             targetState = focusedPage.coerceIn(0, 4),
-            transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(160)) },
+            transitionSpec = {
+                (fadeIn(tween(260, delayMillis = 140)) togetherWith fadeOut(tween(140)))
+                    .using(SizeTransform { _, _ -> tween(400, easing = FastOutSlowInEasing) })
+            },
             label = "homeReflectionSelectedInsight",
         ) { page ->
             val feed = homeFeedPage(page)
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(feed.eyebrow, style = MaterialTheme.typography.labelSmall,
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(feed.eyebrow, style = HomeTypography.eyebrow,
                     color = ink.copy(alpha = .72f))
                 Text(
                     feed.prompt,
-                    style = if (onDarkCover) MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal)
-                        else MaterialTheme.typography.titleLarge,
+                    style = HomeTypography.reflection,
                     color = ink,
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun HomeFeedSectionLabel(text: String) {
-    val ink = MaterialTheme.colorScheme.onBackground
-    Column {
-        HomeSectionDivider(ink)
-        Spacer(Modifier.height(18.dp))
-        Text(text, color = ink.copy(alpha = .82f), style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium)
     }
 }
 
@@ -273,31 +247,26 @@ private fun ArtworkCard(
     modifier: Modifier,
     height: androidx.compose.ui.unit.Dp,
     onSelect: (HomeArtworkCard, Rect) -> Unit,
-    compact: Boolean = false,
+    enabled: Boolean,
 ) {
-    val measuredHeight = if (LocalDensity.current.fontScale > 1.3f) height + 24.dp else height
-    val dark = LocalDarkTheme.current
-    val shape = RoundedCornerShape(if (compact) 22.dp else 28.dp)
-    val edge = Brush.verticalGradient(
-        0f to Color.White.copy(alpha = if (dark) .28f else .52f),
-        .45f to Color.White.copy(alpha = if (dark) .10f else .20f),
-        1f to Color.Black.copy(alpha = if (dark) .26f else .14f),
-    )
+    val shape = RoundedCornerShape(18.dp)
+    val ink = androidx.compose.material3.LocalContentColor.current
     var bounds by remember { mutableStateOf(Rect.Zero) }
-    HomeArtworkScene(
-        card = card,
-        copyAlpha = 0f,
-        modifier = modifier.height(measuredHeight)
+    Column(
+        modifier = modifier
             .testTag("homeArtworkCard-${card.page}")
-            .onGloballyPositioned { bounds = it.boundsInWindow() }
-            .then(if (dark) Modifier else Modifier.shadow(
-                elevation = if (compact) 4.dp else 6.dp,
-                shape = shape,
-                ambientColor = Color.Black.copy(alpha = .08f),
-                spotColor = Color.Black.copy(alpha = .12f),
-            ))
             .clip(shape)
-            .border(1.dp, edge, shape)
-            .clickable { if (bounds.width > 0f) onSelect(card, bounds) },
-    )
+            .clickable(enabled = enabled, role = Role.Button) { if (bounds.width > 0f) onSelect(card, bounds) }
+            .semantics { contentDescription = "${card.label}. ${card.subtitle}" }
+            .padding(8.dp),
+    ) {
+        HomeArtworkScene(card, copyAlpha = 0f,
+            modifier = Modifier.fillMaxWidth().height(height)
+                .onGloballyPositioned { bounds = it.boundsInWindow() }
+                .clip(RoundedCornerShape(12.dp)))
+        Column(Modifier.padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 4.dp)) {
+            Text(card.label, color = ink, style = HomeTypography.cardTitle)
+            Text(card.subtitle, color = ink.copy(alpha = .78f), style = HomeTypography.caption)
+        }
+    }
 }

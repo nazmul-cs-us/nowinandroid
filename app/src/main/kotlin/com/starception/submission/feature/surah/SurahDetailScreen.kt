@@ -1241,6 +1241,7 @@ fun SurahDetailScreen(
                         initiallyExpanded = true,
                         manageDownloads = false,
                         surahNumber = surahNumber,
+                        modifier = Modifier.weight(1f, fill = false),
                         onPreviewStart = {
                             playbackService?.let { service ->
                                 if (service.isPlaying()) service.togglePlayPause()
@@ -1254,7 +1255,6 @@ fun SurahDetailScreen(
                             playbackService?.playSurah(surahNumber - 1)
                         },
                     )
-                    Spacer(Modifier.height(24.dp))
                 }
             }
         }
@@ -1793,6 +1793,11 @@ fun SurahDetailScreen(
                         sectionTitle = "Reciter",
                         manageDownloads = false,
                         surahNumber = surahNumber,
+                        onPreviewStart = {
+                            playbackService?.let { service ->
+                                if (service.isPlaying()) service.togglePlayPause()
+                            }
+                        },
                         onReciterSelected = {
                             showFloatingToolbar = false
                             playbackService?.playSurah(surahNumber - 1)

@@ -278,7 +278,6 @@ import com.starception.submission.feature.prayertimes.components.CompassProgress
 import com.starception.submission.feature.prayertimes.components.GlobePopupScreen
 import com.starception.submission.feature.prayertimes.components.rememberParallaxTilt
 import com.starception.submission.feature.prayertimes.celestial.PrayerSkyCelestialLayer
-import com.starception.submission.feature.prayertimes.celestial.PrayerHomeCoverCelestialLayer
 import com.starception.submission.feature.prayertimes.utils.calculateQiblaDirection
 import com.starception.submission.feature.prayertimes.weather.AnimatedPrayerWeatherIcon
 import com.starception.submission.feature.prayertimes.weather.CurrentWeather
@@ -3206,30 +3205,22 @@ private fun PrayerPosterInsightCard(
             } else {
                 ImageRes.drawable.prayer_now_insight_day
             },
-            animateWater = !effectiveIsNight,
+            animateWater = !fluidFullBleed && !effectiveIsNight,
             // The artwork drifts up to 4dp vertically. Keep a little overscan
             // even in portrait so the light Surface cannot peek through at top.
             backgroundBaseScale = PRAYER_POSTER_ARTWORK_SCALE,
-            backgroundLayer = if (latitude != null && longitude != null) {
+            // The portrait photograph already includes its window lighting;
+            // sky effects belong to the illustrated landscape scene.
+            backgroundLayer = if (!fluidFullBleed && latitude != null && longitude != null) {
                 {
-                    if (fluidFullBleed) {
-                        PrayerHomeCoverCelestialLayer(
-                            epochSeconds = epochSeconds,
-                            latitude = latitude,
-                            longitude = longitude,
-                            isNight = effectiveIsNight,
-                            forceSunForTesting = forceSunForTesting,
-                        )
-                    } else {
-                        PrayerSkyCelestialLayer(
-                            epochSeconds = epochSeconds,
-                            latitude = latitude,
-                            longitude = longitude,
-                            isNight = effectiveIsNight,
-                            replayKey = isFocused,
-                            forceSunForTesting = forceSunForTesting,
-                        )
-                    }
+                    PrayerSkyCelestialLayer(
+                        epochSeconds = epochSeconds,
+                        latitude = latitude,
+                        longitude = longitude,
+                        isNight = effectiveIsNight,
+                        replayKey = isFocused,
+                        forceSunForTesting = forceSunForTesting,
+                    )
                 }
             } else {
                 null

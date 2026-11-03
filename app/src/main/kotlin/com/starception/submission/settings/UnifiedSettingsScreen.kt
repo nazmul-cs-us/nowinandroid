@@ -128,7 +128,7 @@ fun UnifiedSettingsScreen(
     val listState = rememberLazyListState()
 
     // Absolute LazyColumn indices include the hero and the three group labels.
-    val sectionItemIndices = remember(contentCategories.isNotEmpty()) {
+    val sectionItemIndices = remember {
         buildMap {
             put("appearance", 2)
             put("widget", 3)
@@ -139,8 +139,8 @@ fun UnifiedSettingsScreen(
             put("tts", 9)
             put("salah", 10)
             put("content", 12)
-            put("about", if (contentCategories.isNotEmpty()) 13 else 12)
-            put("developer", if (contentCategories.isNotEmpty()) 14 else 13)
+            put("about", 13)
+            put("developer", 14)
         }
     }
     var skipInitialExpandScroll by remember { mutableStateOf(true) }
@@ -497,7 +497,7 @@ fun UnifiedSettingsScreen(
                     item { SettingsGroupLabel("App & support") }
 
                     // Content Management Section
-                    if (contentCategories.isNotEmpty()) {
+                    // Reciter audio remains manageable even if the asset manifest is offline.
                         item {
                             SettingsSection(
                                 title = "Content & Storage",
@@ -506,7 +506,7 @@ fun UnifiedSettingsScreen(
                                 isExpanded = expandedSections.contains("content"),
                                 onToggleExpanded = { viewModel.toggleSection("content") },
                             ) {
-                                ContentManagementSection(
+                                if (contentCategories.isNotEmpty()) ContentManagementSection(
                                     categories = contentCategories,
                                     totalDownloadedSize = totalDownloadedSize,
                                     onDownloadCategory = viewModel::downloadContent,
@@ -515,7 +515,6 @@ fun UnifiedSettingsScreen(
                                 ReciterStorageSection()
                             }
                         }
-                    }
 
                     // About Section
                     item {

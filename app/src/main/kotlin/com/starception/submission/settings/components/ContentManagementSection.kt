@@ -35,7 +35,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -130,7 +134,7 @@ private fun ContentGroupCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onToggleExpanded)
+                    .clickable(role = Role.Button, onClick = onToggleExpanded)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -178,13 +182,12 @@ private fun ContentGroupCard(
                             text = groupDescription,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
                         )
                     }
                     Text(
-                        text = "$completedCount/${categories.size} items  \u00b7  ${AssetDownloadViewModel.formatSize(totalSize)}",
+                        text = "$completedCount/${categories.size} available offline · ${AssetDownloadViewModel.formatSize(downloadedSize)} saved",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
@@ -197,9 +200,9 @@ private fun ContentGroupCard(
             }
 
             // Group progress bar (only when not all complete)
-            if (!allComplete && totalSize > 0) {
+            if (!allComplete && totalSize > 0 && categories.any { it.isDownloading }) {
                 LinearProgressIndicator(
-                    progress = { downloadedSize.toFloat() / totalSize },
+                    progress = { (downloadedSize.toFloat() / totalSize).coerceIn(0f, 1f) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
@@ -227,7 +230,7 @@ private fun ContentGroupCard(
                         ContentCategoryRow(
                             state = cat,
                             onDownload = { onDownloadCategory(cat.categoryKey) },
-                            onDelete = if (cat.isComplete && !cat.required) {
+                            onDelete = if (cat.downloadedSize > 0 && !cat.required && !cat.isDownloading) {
                                 { onDeleteCategory(cat.categoryKey) }
                             } else {
                                 null
@@ -241,57 +244,43 @@ private fun ContentGroupCard(
 }
 
 @Composable
-private fun ContentCategoryRow(
+internal fun ContentCategoryRow(
     state: CategoryDownloadState,
     onDownload: () -> Unit,
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Small status indicator
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(
-                    if (state.isComplete) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant
-                    },
-                ),
-        )
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
+        Column {
             Text(
                 text = state.displayName,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                text = if (state.isComplete) {
-                    AssetDownloadViewModel.formatSize(state.totalSize)
+                text = if (state.isDownloading) {
+                    "Downloading · ${(state.progress * 100).toInt()}%"
+                } else if (state.isComplete) {
+                    "Available offline · ${AssetDownloadViewModel.formatSize(state.totalSize)}"
                 } else if (state.downloadedSize > 0) {
-                    "${AssetDownloadViewModel.formatSize(state.downloadedSize)} / ${AssetDownloadViewModel.formatSize(state.totalSize)}"
+                    "${AssetDownloadViewModel.formatSize(state.downloadedSize)} of ${AssetDownloadViewModel.formatSize(state.totalSize)} saved"
                 } else {
-                    AssetDownloadViewModel.formatSize(state.totalSize)
+                    "Not downloaded · ${AssetDownloadViewModel.formatSize(state.totalSize)}"
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (!state.isComplete && state.progress > 0f) {
+            if (state.isDownloading) {
                 Spacer(modifier = Modifier.height(4.dp))
                 LinearProgressIndicator(
-                    progress = { state.progress },
+                    progress = { state.progress.coerceIn(0f, 1f) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(3.dp)
@@ -299,25 +288,27 @@ private fun ContentCategoryRow(
                 )
             }
         }
-
-        // Action
-        if (!state.isComplete) {
-            IconButton(onClick = onDownload, modifier = Modifier.size(32.dp)) {
-                FlaticonIcon(
-                    glyph = FlaticonIcons.DOWNLOAD,
-                    contentDescription = "Download",
-                    tint = MaterialTheme.colorScheme.primary,
-                    fontSize = 18.sp,
-                )
+        state.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        // Full-sized labeled controls remain reachable at large font sizes.
+        if (state.isDownloading) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Text("You can leave this screen while downloading.", style = MaterialTheme.typography.bodySmall)
             }
-        } else if (onDelete != null) {
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                FlaticonIcon(
-                    glyph = FlaticonIcons.DELETE,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error,
-                    fontSize = 18.sp,
-                )
+        } else {
+            if (!state.isComplete) TextButton(onClick = onDownload, modifier = Modifier.semantics {
+                contentDescription = "Download ${state.displayName}"
+            }) {
+                Text(when {
+                    state.error != null -> "Retry download"
+                    state.downloadedSize > 0 -> "Download remaining"
+                    else -> "Download"
+                })
+            }
+            if (onDelete != null) TextButton(onClick = onDelete, modifier = Modifier.semantics {
+                contentDescription = "Remove ${state.displayName}"
+            }) {
+                Text("Remove download", color = MaterialTheme.colorScheme.error)
             }
         }
     }

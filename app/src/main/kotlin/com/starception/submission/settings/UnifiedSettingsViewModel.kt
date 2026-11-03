@@ -31,6 +31,7 @@ import com.starception.submission.core.topicsdatabase.TopicsDatabase
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetDownloadViewModel
 import com.starception.submission.download.CategoryDownloadState
+import com.starception.submission.download.withTransfer
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
@@ -61,6 +62,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -163,7 +167,11 @@ class UnifiedSettingsViewModel @Inject constructor(
 
     // Content management
     private val _contentCategories = MutableStateFlow<List<CategoryDownloadState>>(emptyList())
-    val contentCategories: StateFlow<List<CategoryDownloadState>> = _contentCategories.asStateFlow()
+    val contentCategories: StateFlow<List<CategoryDownloadState>> = combine(
+        _contentCategories, downloadManager.categoryTransfers,
+    ) { categories, transfers ->
+        categories.map { it.withTransfer(transfers[it.categoryKey]) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _totalDownloadedSize = MutableStateFlow(0L)
     val totalDownloadedSize: StateFlow<Long> = _totalDownloadedSize.asStateFlow()
@@ -176,6 +184,15 @@ class UnifiedSettingsViewModel @Inject constructor(
         loadVoiceSettings()
         loadTtsSettings()
         loadContentManagement()
+        viewModelScope.launch {
+            // Refresh completed-file counts when a transfer starts/finishes, including
+            // downloads started before this Settings ViewModel was created.
+            downloadManager.categoryTransfers
+                .map { transfers -> transfers.mapValues { (_, state) -> state is AssetDownloadManager.DownloadState.Downloading } }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { refreshContentCategories() }
+        }
     }
 
     private fun loadPrayerSettings() {
@@ -1247,15 +1264,13 @@ class UnifiedSettingsViewModel @Inject constructor(
     }
 
     fun downloadContent(categoryKey: String) {
+        if (downloadManager.categoryTransfers.value[categoryKey] is AssetDownloadManager.DownloadState.Downloading) return
         viewModelScope.launch {
             try {
                 val manifest = downloadManager.loadManifest() ?: return@launch
                 downloadManager.launchCategoryDownload(
                     category = categoryKey,
                     manifest = manifest,
-                    onProgress = { _, _, _ ->
-                        refreshContentCategories(manifest)
-                    },
                     onFinished = {
                         refreshContentCategories(manifest)
                     },

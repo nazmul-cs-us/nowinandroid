@@ -1985,6 +1985,7 @@ fun PrayerTimesScreen(
     }
 
     val prayerContentHeights = remember(LocalDensity.current.fontScale) { mutableStateMapOf<String, Dp>() }
+    val compactPrayerContentHeights = remember(LocalDensity.current.fontScale) { mutableStateMapOf<String, Dp>() }
 
     // INTERACTIVE PRAYER CARD HELPER - Creates prayer card with long-press dial functionality
     @Composable
@@ -2376,8 +2377,9 @@ fun PrayerTimesScreen(
                             ),
                         verticalPadding = if (compactTile) 11.dp else 16.dp,
                         onMinimumHeightChange = { minimum ->
-                            if (!compactTile && prayerContentHeights[prayerName] != minimum) {
-                                prayerContentHeights[prayerName] = minimum
+                            val heights = if (compactTile) compactPrayerContentHeights else prayerContentHeights
+                            if (heights[prayerName] != minimum) {
+                                heights[prayerName] = minimum
                             }
                         },
                     ) {
@@ -2412,7 +2414,7 @@ fun PrayerTimesScreen(
                                         ),
                                     ),
                                     color = titleColor,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontWeight = FontWeight.Medium,
                                     overflow = TextOverflow.Ellipsis,
                                     maxLines = 1,
                                     modifier = Modifier.weight(1f),
@@ -2599,9 +2601,11 @@ fun PrayerTimesScreen(
                                             fontSize = if (compactTile) 19.sp else 24.sp,
                                             lineHeight = if (compactTile) 22.sp else 30.sp,
                                             platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                            fontFeatureSettings = "tnum",
                                         ),
                                         color = baseColor,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.alignByBaseline(),
                                     )
 
                                     Spacer(modifier = Modifier.width(if (compactTile) 2.dp else 4.dp))
@@ -2611,10 +2615,12 @@ fun PrayerTimesScreen(
                                         text = amPm,
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             fontSize = if (compactTile) 11.sp else 14.sp,
+                                            lineHeight = if (compactTile) 14.sp else 18.sp,
+                                            platformStyle = PlatformTextStyle(includeFontPadding = false),
                                         ),
                                         color = baseColor.copy(alpha = 0.85f),
                                         fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.padding(bottom = 2.dp),
+                                        modifier = Modifier.alignByBaseline(),
                                     )
                                 }
 
@@ -3066,6 +3072,23 @@ fun PrayerTimesScreen(
                     currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
                 } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
                 val coverReadingDate = LocalDate.now()
+                val currentHomeWeather by rememberCurrentWeatherLoadState(prayerTimes?.location)
+                val homeDateLabel = coverReadingDate.format(
+                    java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d", java.util.Locale.getDefault()),
+                )
+                val homeTemperature = (currentHomeWeather as? CurrentWeatherLoadState.Available)
+                    ?.weather?.temperatureCelsius?.roundToInt()?.let { "$it°C" }
+                val homeCity = prayerTimes?.location?.city?.trim()?.takeIf { it.isNotBlank() }
+                val homeHijriDate = remember(coverReadingDate, java.util.Locale.getDefault()) {
+                    runCatching {
+                        java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy G", java.util.Locale.getDefault())
+                            .format(java.time.chrono.HijrahChronology.INSTANCE.date(coverReadingDate))
+                    }.getOrNull()
+                }
+                val homeSupportingText = listOfNotNull(homeDateLabel, homeTemperature).joinToString(" · ")
+                val homeAlternateSupportingText = homeHijriDate?.let {
+                    listOfNotNull(it, homeTemperature).joinToString(" · ")
+                }.orEmpty()
                 val coverReading = remember(coverReadingDate) {
                     com.starception.submission.feature.quran.dailyReading(
                         kotlinx.datetime.LocalDate(
@@ -3086,7 +3109,29 @@ fun PrayerTimesScreen(
                     ?.first
                     ?.let(::getPrayerDisplayName)
                     .orEmpty()
-                val coverEpochSeconds = remember(currentTime) { System.currentTimeMillis() / 1000.0 }
+                val homeLightStatusIcons = with(LocalDensity.current) {
+                    homeStatusBarUsesLightIcons(
+                        coverUsesLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
+                        scrollOffset = portraitScrollState.value.toDp().value,
+                        coverHeight = insightHeightPx.toDp().value,
+                        isDarkTheme = darkHome,
+                        feedBackground = MaterialTheme.colorScheme.background,
+                        readerExpanded = insightTileExpanded,
+                    )
+                }
+                val bannerLightStatusIcons = homeBannerUsesLightIcons(
+                    reveal = syncState.wobbleIntensity,
+                    bannerBackground = MaterialTheme.colorScheme.tertiaryContainer,
+                )
+                LaunchedEffect(homeLightStatusIcons, bannerLightStatusIcons, outerIsLandscape) {
+                    com.starception.submission.ui.HomeSystemBarAppearance.update(
+                        homeLightStatusIcons.takeUnless { outerIsLandscape },
+                        bannerLightStatusIcons.takeUnless { outerIsLandscape },
+                    )
+                }
+                DisposableEffect(Unit) {
+                    onDispose { com.starception.submission.ui.HomeSystemBarAppearance.update(null) }
+                }
                 Box(Modifier.fillMaxSize().then(
                     if (darkHome) Modifier.background(Color(0xFF080B14))
                     else Modifier.background(mainPageBackgroundBrush()),
@@ -3097,9 +3142,6 @@ fun PrayerTimesScreen(
                         useNightArtwork = prayerArtworkNight,
                         isDarkTheme = darkHome,
                         isExpanded = insightTileExpanded,
-                        epochSeconds = coverEpochSeconds,
-                        latitude = prayerTimes?.location?.latitude,
-                        longitude = prayerTimes?.location?.longitude,
                         scrollOffsetPx = portraitScrollState.value,
                         coverHeightPx = insightHeightPx,
                     )
@@ -3115,6 +3157,9 @@ fun PrayerTimesScreen(
                     homeImmersiveHeader = !outerIsLandscape,
                     homeHeaderLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
                     homeGreetingText = homeGreetingForHour(currentTime.hour),
+                    homeLocationText = homeCity.orEmpty(),
+                    homeSupportingText = homeSupportingText,
+                    homeAlternateSupportingText = homeAlternateSupportingText,
                     homeHeaderVisibility = {
                         if (insightTileExpanded) 0f else
                             (1f - portraitScrollState.value / headerFadeDistancePx).coerceIn(0f, 1f)
@@ -3380,19 +3425,28 @@ fun PrayerTimesScreen(
                                             LandscapeLocationWeatherTile(
                                                 locationString = location,
                                                 locationData = prayerTimes?.location,
+                                                weatherState = currentHomeWeather,
                                                 thresholds = prayerWeatherThresholds,
                                                 onLongPress = { showWeatherThresholds = true },
                                                 modifier = Modifier.fillMaxWidth(),
                                             )
                                         }
 
-                                        // Right column: compact header + all six prayer cards. The rows
-                                        // share the measured height so the last pair cannot fall behind
-                                        // the bottom edge or require a hidden initial scroll.
+                                        // Share available height, but allow scrolling when the measured
+                                        // text needs more room than a short landscape viewport provides.
+                                        val scheduleDensity = LocalDensity.current
+                                        var scheduleViewportHeight by remember { mutableStateOf(0.dp) }
+                                        val scheduleHeaderHeight = 44.dp * LocalDensity.current.fontScale
+                                        val scheduleRowHeight = ((scheduleViewportHeight - scheduleHeaderHeight - 18.dp) / 3)
+                                            .coerceAtLeast(compactPrayerContentHeights.values.maxOrNull() ?: 68.dp)
                                         Column(
                                             modifier = Modifier
                                                 .weight(0.5f)
-                                                .fillMaxHeight(),
+                                                .fillMaxHeight()
+                                                .onSizeChanged {
+                                                    scheduleViewportHeight = with(scheduleDensity) { it.height.toDp() }
+                                                }
+                                                .verticalScroll(rememberScrollState()),
                                             verticalArrangement = Arrangement.spacedBy(6.dp),
                                         ) {
                                             // Get ordered prayers
@@ -3425,20 +3479,20 @@ fun PrayerTimesScreen(
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .height(40.dp),
+                                                    .heightIn(min = scheduleHeaderHeight),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 Column {
                                                     Text(
                                                         text = "Prayer times",
-                                                        style = MaterialTheme.typography.titleMedium,
+                                                        style = HomeTypography.section,
                                                         color = MaterialTheme.colorScheme.onBackground,
-                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontWeight = FontWeight.Medium,
                                                     )
                                                     Text(
                                                         text = "Today’s schedule",
-                                                        style = MaterialTheme.typography.labelSmall,
+                                                        style = HomeTypography.caption,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     )
                                                 }
@@ -3461,7 +3515,7 @@ fun PrayerTimesScreen(
                                                 Row(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .weight(1f),
+                                                        .height(scheduleRowHeight),
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                 ) {
                                                     // First card in row
@@ -3634,14 +3688,7 @@ fun PrayerTimesScreen(
                                                             } else {
                                                                 // Begin the fade inside the artwork so the reflection
                                                                 // does not start with a hard, opaque horizontal seam.
-                                                                Brush.verticalGradient(
-                                                                    0f to Color.Transparent,
-                                                                    .35f to Color(0xFF0B1020).copy(alpha = .94f),
-                                                                    .68f to Color(0xFF0B1020),
-                                                                    1f to ambientScheme.background,
-                                                                    startY = start,
-                                                                    endY = start + 450.dp.toPx(),
-                                                                )
+                                                                homeReflectionScrim(start, start + 450.dp.toPx(), ambientScheme.background)
                                                             },
                                                             topLeft = Offset(0f, start),
                                                             size = androidx.compose.ui.geometry.Size(size.width, lowerHeight),
@@ -3895,10 +3942,11 @@ fun PrayerTimesScreen(
                                             HomeReflectionPrompt(focusedPage = coverPage, onDarkCover = !darkHome) {
                                                 feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
                                             }
-                                            Spacer(Modifier.height(20.dp))
+                                            Spacer(Modifier.height(16.dp))
                                             HomeArtworkRail(
                                                 focusedPage = coverPage,
                                                 useNightArtwork = prayerArtworkNight,
+                                                bottomClearance = navigationClearance + 16.dp,
                                             ) { card, source ->
                                                 if (morphRequest != null || insightTileExpanded) return@HomeArtworkRail
                                                 if (source.width > 0f && insightTopInWindowPx.isFinite()) {
@@ -3941,13 +3989,13 @@ fun PrayerTimesScreen(
                                             ) {
                                                 Text(
                                                     text = "Prayer times",
-                                                    style = MaterialTheme.typography.titleMedium,
+                                                    style = HomeTypography.section,
                                                     color = MaterialTheme.colorScheme.onBackground,
-                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontWeight = FontWeight.Medium,
                                                 )
                                                 Text(
                                                     text = "Today’s schedule",
-                                                    style = MaterialTheme.typography.labelSmall,
+                                                    style = HomeTypography.caption,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
                                             }
@@ -4545,7 +4593,7 @@ fun PrayerTimesScreen(
                                                                     null
                                                                 }
 
-                                                                val currentWeatherState by rememberCurrentWeatherLoadState(locationData)
+                                                                val currentWeatherState = currentHomeWeather
 
                                                                 val supportingLocation = locationDetail.takeIf { it.isNotBlank() }
                                                                     ?: countryCode.orEmpty()
@@ -4836,7 +4884,7 @@ fun PrayerTimesScreen(
                                             }
                                         }
 
-                                        Spacer(Modifier.height(4.dp))
+                                        Spacer(Modifier.height(navigationClearance + 16.dp))
                                         }
                                     }
                                     morphRequest?.takeIf { morphVisible }?.let { request ->
@@ -5383,6 +5431,7 @@ private fun LandscapeTemperatureLoadingPlaceholder() {
 private fun LandscapeLocationWeatherTile(
     locationString: String,
     locationData: com.starception.submission.prayer.model.Location?,
+    weatherState: CurrentWeatherLoadState,
     thresholds: PrayerWeatherThresholds,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
@@ -5414,8 +5463,6 @@ private fun LandscapeLocationWeatherTile(
     val fallbackDetail = locationData?.countryCode?.trim()?.uppercase()
         ?.takeIf { it.length in 2..3 }
         ?: locationData?.country?.trim().orEmpty()
-
-    val weatherState by rememberCurrentWeatherLoadState(locationData)
 
     Surface(
         modifier = modifier

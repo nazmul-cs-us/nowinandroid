@@ -345,12 +345,22 @@ internal fun NiaAppContent(
     val view = LocalView.current
     val shouldHideStatusBar = appState.shouldHideStatusBar
     val isDarkTheme = LocalDarkTheme.current
-    DisposableEffect(shouldHideStatusBar, isDarkTheme, insightImmersive) {
-        val window = (view.context as? Activity)?.window ?: return@DisposableEffect onDispose {}
+    val homeSystemBarState by HomeSystemBarAppearance.appearance.collectAsStateWithLifecycle()
+    val searchOpen by com.starception.submission.ui.search.SearchPrefillBus.isSearchOpen.collectAsStateWithLifecycle()
+    val darkStatusIcons = useDarkStatusBarIcons(
+        darkTheme = isDarkTheme,
+        homePortrait = !isLandscape && appState.currentTopLevelDestination == TopLevelDestination.HOME,
+        homeLightIcons = homeSystemBarState.lightIcons,
+        searchOpen = searchOpen,
+        insightImmersive = insightImmersive,
+        homeBannerLightIcons = homeSystemBarState.bannerLightIcons,
+    )
+    DisposableEffect(view, shouldHideStatusBar, darkStatusIcons, isDarkTheme, insightImmersive) {
+        val window = view.context.findActivity()?.window ?: return@DisposableEffect onDispose {}
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         // The app theme can differ from the device theme, so edge-to-edge cannot
         // rely on enableEdgeToEdge's one-time system setting for icon contrast.
-        insetsController.isAppearanceLightStatusBars = !isDarkTheme && !insightImmersive
+        insetsController.isAppearanceLightStatusBars = darkStatusIcons
         insetsController.isAppearanceLightNavigationBars = !isDarkTheme && !insightImmersive
         if (shouldHideStatusBar) {
             // Detail screens and Settings: hide status bar (immersive)
@@ -443,30 +453,16 @@ private fun NiaFloatingBottomBar(
     val latestUnreadDestinations = rememberUpdatedState(unreadDestinations)
     val pill = remember(appState, vertical) {
         @Composable { sizeModifier: Modifier ->
-            val darkTheme = LocalDarkTheme.current
-            val colorScheme = MaterialTheme.colorScheme
-            val portraitDark = darkTheme && !vertical
-            val portraitLight = !darkTheme && !vertical
+            val showLabels = !vertical
             // Keep the same full-height portrait navigation on Home and the
             // other destinations; the compact Home variant shortened the pill.
             val navBarHeight = if (vertical) 50.dp else 56.dp
             val capsuleGap = 4.dp
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
-                color = if (portraitDark) {
-                    Color(0xFF122033).copy(alpha = .86f)
-                } else if (portraitLight) {
-                    Color.White.copy(alpha = .94f)
-                } else if (darkTheme) {
-                    colorScheme.surfaceContainer
-                } else {
-                    colorScheme.surfaceContainerHighest
-                },
-                border = if (portraitDark || portraitLight) BorderStroke(
-                    1.dp,
-                    Color.White.copy(alpha = if (portraitDark) .27f else .76f),
-                ) else null,
-                shadowElevation = if (portraitDark || portraitLight) 8.dp else 4.dp,
+                color = FloatingNavigationColors.surface,
+                border = BorderStroke(1.dp, FloatingNavigationColors.outline),
+                shadowElevation = 4.dp,
                 modifier = sizeModifier,
             ) {
                 val destinations = appState.topLevelDestinations
@@ -545,15 +541,7 @@ private fun NiaFloatingBottomBar(
                         animationSpec = NiaMotion.effectsDefault(),
                         label = "navBubbleAlpha",
                     )
-                    val bubbleColor = if (portraitDark) {
-                        Color.White.copy(alpha = .22f)
-                    } else if (portraitLight) {
-                        Color(0xFF211C2B)
-                    } else if (darkTheme) {
-                        colorScheme.surfaceBright
-                    } else {
-                        Color.White
-                    }
+                    val bubbleColor = FloatingNavigationColors.selectedSurface
                     Canvas(
                         modifier = Modifier
                             .matchParentSize()
@@ -598,11 +586,11 @@ private fun NiaFloatingBottomBar(
                     ) {
                         val hasUnread = latestUnreadDestinations.value.contains(destination)
                         val interactionSource = remember(destination) { MutableInteractionSource() }
-                        val contentTint = if (portraitLight) {
-                            if (selected) Color.White else Color(0xFF211C2B)
-                        } else if (portraitDark) {
-                            Color.White
-                        } else MaterialTheme.colorScheme.onSurface
+                        val contentTint by animateColorAsState(
+                            if (selected) FloatingNavigationColors.active else FloatingNavigationColors.content,
+                            animationSpec = NiaMotion.effectsDefault(),
+                            label = "navigationContentTint",
+                        )
                         Box(
                             modifier = weight
                                 .fillMaxSize()
@@ -644,16 +632,18 @@ private fun NiaFloatingBottomBar(
                                         contentDescription = stringResource(destination.iconTextId),
                                         tint = contentTint,
                                         modifier = Modifier.size(
-                                            if (portraitDark || portraitLight) 19.dp else if (vertical) 22.dp else 24.dp,
+                                            if (showLabels) 19.dp else 22.dp,
                                         ),
                                     )
                                 }
-                                if (portraitDark || portraitLight) {
+                                if (showLabels) {
                                     Text(
                                         text = stringResource(destination.iconTextId),
                                         color = contentTint,
-                                        fontSize = 9.sp,
-                                        lineHeight = 11.sp,
+                                        style = com.starception.submission.feature.prayertimes.HomeTypography.caption,
+                                        fontSize = 10.sp,
+                                        lineHeight = 12.sp,
+                                        fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
@@ -777,6 +767,15 @@ private fun NiaFloatingBottomBar(
  * generation sparkle, then morphs directly into the suggestion. The thinking
  * surface stays present throughout so the result never appears after a blank gap.
  */
+/** Shared charcoal/slate chrome, matching the iOS navigation reference. */
+private object FloatingNavigationColors {
+    val surface = Color(0xFF1B1E2A).copy(alpha = .97f)
+    val selectedSurface = Color(0xFF393E4A)
+    val outline = Color(0xFF323B52)
+    val content = Color(0xFFE3E7F2)
+    val active = Color(0xFF38B9FF)
+}
+
 private enum class VoiceAssistantSurface {
     Button,
     Composer,
@@ -905,8 +904,8 @@ private fun VoiceAssistantButton(
         }
     }
     val nudgeGlowPulse = nudgeGlow.value
-    val container = MaterialTheme.colorScheme.onSurface
-    val barColor = MaterialTheme.colorScheme.surface
+    val container = FloatingNavigationColors.surface
+    val barColor = FloatingNavigationColors.content
     val quizOpen by VoiceAssistantNudgeBus.quizOpen.collectAsStateWithLifecycle()
     val generatedQuizQuestion by VoiceAssistantNudgeBus.generatedQuizQuestion
         .collectAsStateWithLifecycle()
@@ -1142,6 +1141,7 @@ private fun VoiceAssistantButton(
                 VoiceAssistantSurface.Button -> Surface(
                     shape = RoundedCornerShape(containerCorner),
                     color = containerColor,
+                    border = BorderStroke(1.dp, FloatingNavigationColors.outline),
                     shadowElevation = containerElevation,
                     modifier = Modifier
                         .sharedBounds(

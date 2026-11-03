@@ -25,6 +25,7 @@ import com.starception.submission.core.assetcache.AssetSource
 import com.starception.submission.core.assetcache.CloudAssetRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -79,6 +81,8 @@ class AssetDownloadManager @Inject constructor(
     private val cdnAssetsDir = File(context.filesDir, CDN_ASSETS_DIR)
     private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val downloadStates = mutableMapOf<String, MutableStateFlow<DownloadState>>()
+    private val mutableCategoryTransfers = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
+    val categoryTransfers = mutableCategoryTransfers.asStateFlow()
     private var cachedManifest: AssetManifest? = null
 
     /**
@@ -327,6 +331,9 @@ class AssetDownloadManager @Inject constructor(
         val category = manifest.assets[cdnKey]?.category ?: ""
         _globalDownloadLabel.value = AssetDownloadViewModel.formatCategoryName(category)
         beginGlobalDownload()
+        mutableCategoryTransfers.update {
+            it + (category to DownloadState.Downloading(0f, 0L, manifest.categories[category]?.totalSize ?: 0L))
+        }
         try {
             downloadAssetInternal(cdnKey, manifest, stateFlow)
         } finally {
@@ -418,6 +425,9 @@ class AssetDownloadManager @Inject constructor(
                     assetChanged
                 ) {
                     _globalDownloadProgress.value = fraction
+                    mutableCategoryTransfers.update {
+                        it + (category to DownloadState.Downloading(fraction, progress.bytesDownloaded, progress.totalBytes))
+                    }
                     onProgress?.invoke(fraction, progress.bytesDownloaded, progress.totalBytes)
                     lastReportedProgress = fraction
                 }
@@ -434,7 +444,20 @@ class AssetDownloadManager @Inject constructor(
             val categoryComplete = result.isComplete &&
                 (partedModelFor(category)?.let { assemblePartedModel(it) } ?: true)
             if (categoryComplete) _categoryCompleted.tryEmit(category)
+            mutableCategoryTransfers.update {
+                if (categoryComplete) it - category else it + (category to DownloadState.Failed(
+                    "Download incomplete. Check your connection and retry; saved files are kept.",
+                ))
+            }
             return@withContext categoryComplete
+        } catch (cancelled: CancellationException) {
+            mutableCategoryTransfers.update { it - category }
+            throw cancelled
+        } catch (failure: Exception) {
+            mutableCategoryTransfers.update {
+                it + (category to DownloadState.Failed("Couldn’t download this content. Check your connection and retry."))
+            }
+            throw failure
         } finally {
             endGlobalDownload()
         }
@@ -442,9 +465,8 @@ class AssetDownloadManager @Inject constructor(
 
     suspend fun loadManifest(): AssetManifest? = withContext(Dispatchers.IO) {
         cachedManifest?.let { return@withContext it }
-        // Loading the manifest hits the network. Offline, skip it so callers fail fast
-        // instead of blocking on the OkHttp timeout.
-        if (!isOnline()) return@withContext null
+        // The Android platform skips network fetches offline; the repository can
+        // still read its disk/bundled manifest to expose saved content in Settings.
         sharedAssets.loadManifest()?.also { manifest ->
             cachedManifest = manifest
             Log.i(TAG, "Loaded shared Cloudflare manifest (version=${manifest.version})")
