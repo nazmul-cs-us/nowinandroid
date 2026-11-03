@@ -34,6 +34,7 @@ import android.content.Context
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.starception.submission.download.CategoryDownloadState
 import com.starception.submission.feature.quran.ReciterChoiceRow
+import com.starception.submission.feature.quran.ReciterCatalog
 import com.starception.submission.feature.quran.ReciterDownloadManager.DownloadStatus
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -99,6 +100,8 @@ class ReciterDownloadUiTest {
             compose.onAllNodes(hasText("Abdul Rahman Al-Sudais")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Reciters & offline audio").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Preview Abdul Rahman Al-Sudais")
+            .assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         compose.onNodeWithContentDescription("Manage downloads for Abdul Rahman Al-Sudais")
             .assertHeightIsAtLeast(48.dp).performClick()
         // Opening download details must not change the selected voice.
@@ -139,6 +142,33 @@ class ReciterDownloadUiTest {
         assertEquals(1, removed)
         File("build/outputs/reciter-ui").mkdirs()
         compose.onRoot().captureRoboImage("build/outputs/reciter-ui/offline-retry-large-text.png")
+    }
+
+    @Test fun storagePreviewAndDownloadControlsDoNotSelectTheReciter() {
+        val playing = mutableStateOf(false)
+        var selections = 0
+        var downloadDetails = 0
+        val reciter = ReciterCatalog.Reciter("54-54", "Abdul Rahman Al-Sudais",
+            "https://example.org/", setOf(1, 2), "Hafs")
+        compose.setContent {
+            MaterialTheme {
+                ReciterLibraryRow(reciter, DownloadStatus(totalSurahs = 2), false, false,
+                    onSelect = { selections++ },
+                    onToggleDownloads = { downloadDetails++ },
+                    onDownload = {}, onCancel = {}, onRemove = {},
+                    onPreview = { playing.value = !playing.value },
+                    previewing = playing.value, previewLoading = false)
+            }
+        }
+        compose.onNodeWithContentDescription("Preview Abdul Rahman Al-Sudais")
+            .assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithContentDescription("Stop preview of Abdul Rahman Al-Sudais")
+            .assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("Manage downloads for Abdul Rahman Al-Sudais").performClick()
+        assertEquals(0, selections)
+        assertEquals(1, downloadDetails)
+        compose.onNodeWithText("Abdul Rahman Al-Sudais").performClick()
+        assertEquals(1, selections)
     }
 
     @Test fun previewDoesNotSelectAndCompletedAudioHasNoDownloadAction() {

@@ -25,7 +25,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
@@ -64,19 +65,15 @@ internal fun AppHeaderActions(
     onSettingsClick: () -> Unit,
 ) {
     Box {
-        Box(
-            Modifier.matchParentSize()
-                .blur(1.6.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                .sculptedActionSurround(onDarkArtwork),
-        )
+        AppActionSurround(onDarkArtwork, Modifier.matchParentSize())
         Row {
-            HeaderAction(onSearchClick) {
+            AppActionButton(onSearchClick, showSurround = false) {
                 HeaderActionIcon(
                     painter = painterResource(R.drawable.ic_home_search_fine),
                     contentDescription = stringResource(R.string.app_top_bar_search_hint),
                 )
             }
-            HeaderAction(onSettingsClick) {
+            AppActionButton(onSettingsClick, showSurround = false) {
                 HeaderActionIcon(
                     painter = painterResource(R.drawable.ic_home_settings_fine),
                     contentDescription = stringResource(R.string.app_top_bar_settings_icon_description),
@@ -86,8 +83,18 @@ internal fun AppHeaderActions(
     }
 }
 
-private fun Modifier.sculptedActionSurround(onDarkArtwork: Boolean) = drawWithCache {
-    val path = (PairedActionShape.createOutline(size, layoutDirection, this) as Outline.Generic).path
+@Composable
+internal fun AppActionSurround(
+    onDarkArtwork: Boolean,
+    modifier: Modifier = Modifier,
+    paired: Boolean = true,
+) {
+    Box(modifier.blur(1.6.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+        .sculptedActionSurround(onDarkArtwork, if (paired) PairedActionShape else CircleShape))
+}
+
+private fun Modifier.sculptedActionSurround(onDarkArtwork: Boolean, shape: Shape) = drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
     val end = Offset(size.width, size.height)
     val upperLight = Brush.linearGradient(
         0f to Color.White.copy(alpha = if (onDarkArtwork) .012f else .015f),
@@ -111,12 +118,12 @@ private fun Modifier.sculptedActionSurround(onDarkArtwork: Boolean) = drawWithCa
     val shadeOffset = 1.4.dp.toPx()
     onDrawBehind {
         translate(left = shadeOffset, top = shadeOffset) {
-            featheredStrokes.forEach { drawPath(path, lowerShade, style = it) }
+            featheredStrokes.forEach { drawOutline(outline, lowerShade, style = it) }
         }
         translate(left = -lightOffset, top = -lightOffset) {
-            featheredStrokes.forEach { drawPath(path, upperLight, style = it) }
+            featheredStrokes.forEach { drawOutline(outline, upperLight, style = it) }
         }
-        drawPath(path, surface)
+        drawOutline(outline, surface)
     }
 }
 
@@ -126,28 +133,37 @@ private fun HeaderActionIcon(painter: Painter, contentDescription: String) {
 }
 
 @Composable
-private fun HeaderAction(onClick: () -> Unit, content: @Composable () -> Unit) {
+internal fun AppActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    showSurround: Boolean = true,
+    onDarkArtwork: Boolean = true,
+    content: @Composable () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val depth by animateFloatAsState(if (pressed) 1f else 0f, tween(120), label = "headerActionPress")
-    IconButton(onClick = onClick, interactionSource = interaction, modifier = Modifier.size(48.dp)) {
-        Box(
-            Modifier.size(36.dp)
-                .graphicsLayer {
-                    scaleX = 1f - depth * .035f
-                    scaleY = scaleX
-                    translationY = depth * .7.dp.toPx()
-                }
-                .shadow(2.dp, CircleShape)
-                .background(Color(0xFF101017), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
+    Box(modifier.size(48.dp), contentAlignment = Alignment.Center) {
+        if (showSurround) {
+            AppActionSurround(onDarkArtwork, Modifier.size(44.dp), paired = false)
+        }
+        IconButton(onClick = onClick, interactionSource = interaction, modifier = Modifier.size(48.dp)) {
             Box(
-                Modifier.graphicsLayer {
-                    alpha = 1f - depth * .16f
-                },
+                Modifier.size(36.dp)
+                    .graphicsLayer {
+                        scaleX = 1f - depth * .035f
+                        scaleY = scaleX
+                        translationY = depth * .7.dp.toPx()
+                    }
+                    .shadow(2.dp, CircleShape)
+                    .background(Color(0xFF101017), CircleShape),
                 contentAlignment = Alignment.Center,
-            ) { content() }
+            ) {
+                Box(
+                    Modifier.graphicsLayer { alpha = 1f - depth * .16f },
+                    contentAlignment = Alignment.Center,
+                ) { content() }
+            }
         }
     }
 }

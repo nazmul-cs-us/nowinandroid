@@ -411,6 +411,9 @@ fun AppTopSearchBar(
                 val searchView = root.findViewById<SearchView>(R.id.app_search_view)
                 searchViewHolder.value = searchView
                 val appBar = root.findViewById<AppBarLayout>(R.id.app_bar_layout)
+                // Home renders its controls in Compose. Keep the native anchor
+                // measured, but keep its whole toolbar out of hit testing.
+                appBar.visibility = if (homeImmersiveHeader) View.INVISIBLE else View.VISIBLE
                 val leading = root.findViewById<MaterialButton>(R.id.leading_button)
                 val settings = root.findViewById<MaterialButton>(R.id.settings_button)
                 val contentContainer = root.findViewById<FrameLayout>(R.id.content_container)
@@ -883,6 +886,15 @@ fun AppTopSearchBar(
                         )
                     }
                 }
+                // Reserve the fixed actions' space while only the greeting fades.
+                Box(Modifier.width(96.dp))
+            }
+        }
+        if (homeImmersiveHeader && homeHeaderActionsVisible && !isSearchViewOpen) {
+            Box(
+                Modifier.align(Alignment.TopEnd)
+                    .padding(end = 24.dp, top = topInset.coerceAtLeast(24.dp) + 12.dp),
+            ) {
                 AppHeaderActions(
                     onDarkArtwork = homeHeaderLightText,
                     onSearchClick = { searchViewHolder.value?.show() },
@@ -890,11 +902,10 @@ fun AppTopSearchBar(
                 )
             }
         }
-        if (!isSearchViewOpen && (!homeImmersiveHeader || (!showHomeHeader && homeHeaderActionsVisible))) {
+        if (!isSearchViewOpen && !homeImmersiveHeader) {
             Row(
                 modifier = Modifier.fillMaxWidth()
-                    .then(if (homeImmersiveHeader) Modifier.background(MaterialTheme.colorScheme.background) else Modifier)
-                    .padding(start = if (homeImmersiveHeader) 24.dp else 64.dp, end = 24.dp, top = topInset + 4.dp),
+                    .padding(start = 64.dp, end = 24.dp, top = topInset + 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {

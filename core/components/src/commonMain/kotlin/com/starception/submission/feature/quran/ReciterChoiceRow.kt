@@ -60,17 +60,7 @@ fun ReciterChoiceRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (onPreview != null) {
-                FilledTonalIconButton(onClick = onPreview, enabled = enabled,
-                    modifier = Modifier.size(48.dp).semantics {
-                        contentDescription = if (previewing) "Stop preview of $name" else "Preview $name"
-                    }) {
-                    if (previewLoading) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(if (previewing) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                            contentDescription = null)
-                    }
-                }
+                ReciterPreviewButton(name, onPreview, previewing, previewLoading, enabled)
             } else Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                 Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
                     Icon(Icons.Filled.Headphones, contentDescription = null,
@@ -87,6 +77,28 @@ fun ReciterChoiceRow(
             }
             RadioButton(selected = selected, onClick = null, enabled = enabled,
                 modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+/** Shared by the reader's choice rows and the settings download library. */
+@Composable
+fun ReciterPreviewButton(
+    name: String,
+    onPreview: () -> Unit,
+    previewing: Boolean,
+    previewLoading: Boolean,
+    enabled: Boolean = true,
+) {
+    FilledTonalIconButton(onClick = onPreview, enabled = enabled,
+        modifier = Modifier.size(48.dp).semantics {
+            contentDescription = if (previewing) "Stop preview of $name" else "Preview $name"
+        }) {
+        if (previewLoading) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(if (previewing) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                contentDescription = null)
         }
     }
 }

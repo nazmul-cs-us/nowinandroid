@@ -316,6 +316,8 @@ import android.view.accessibility.AccessibilityManager as AndroidAccessibilityMa
 import androidx.compose.ui.graphics.lerp as lerpColor
 import com.starception.submission.core.images.resources.Res as ImageRes
 import com.starception.submission.ui.VoiceNudgeSparkles
+import com.starception.submission.ui.AppActionButton
+import com.starception.submission.ui.AppActionSurround
 import kotlinx.datetime.LocalDate as KotlinLocalDate
 import org.jetbrains.compose.resources.painterResource as composePainterResource
 
@@ -2732,33 +2734,42 @@ internal fun SwipeableBigTiles(
                     2 -> Icons.Default.PlayArrow
                     else -> Icons.Default.ChevronRight
                 }
-                Surface(
+                AppActionSurround(
+                    onDarkArtwork = true,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 12.dp, top = controlTopInset)
+                        .size(width = 96.dp, height = 48.dp)
+                        .graphicsLayer { alpha = closeMorphProgress }
+                        .zIndex(4f),
+                )
+                AppActionButton(
                     onClick = {
                         interactionEpoch++
                         setExpansionExtent(0f)
                     },
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.48f),
+                    showSurround = false,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(start = 12.dp, end = 12.dp, top = controlTopInset, bottom = 12.dp)
                         // Start over the action immediately to the left, then
                         // travel one control slot into the close position.
-                        .size(40.dp)
                         .graphicsLayer {
-                            translationX = -52.dp.toPx() * (1f - closeMorphProgress)
+                            translationX = -48.dp.toPx() * (1f - closeMorphProgress)
                             alpha = (closeMorphProgress * 3f).coerceIn(0f, 1f)
                         }
-                        .zIndex(4f)
-                        .semantics { contentDescription = "Collapse insight" },
+                        .zIndex(4f),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.semantics { contentDescription = "Collapse insight" },
+                    ) {
                         Icon(
                             imageVector = sourceIcon,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(18.dp)
                                 .graphicsLayer {
                                     alpha = (1f - closeMorphProgress * 2f).coerceIn(0f, 1f)
                                     rotationZ = -30f * closeMorphProgress
@@ -2769,7 +2780,7 @@ internal fun SwipeableBigTiles(
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(18.dp)
                                 .graphicsLayer {
                                     alpha = (closeMorphProgress * 2f - 0.3f).coerceIn(0f, 1f)
                                     rotationZ = 30f * (1f - closeMorphProgress)
@@ -4043,10 +4054,15 @@ internal fun InsightPreviewCard(
                     }
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
-                    .padding(start = tagInset, end = tagInset, top = tagTopInset, bottom = tagInset)
+                    .padding(
+                        start = tagInset,
+                        end = if (fluidFullBleed && isExpanded) 12.dp else tagInset,
+                        top = tagTopInset,
+                        bottom = tagInset,
+                    )
                     .padding(end = when {
+                        fluidFullBleed && isExpanded -> 48.dp // Shared action pair's close slot.
                         editorialExpanded -> 52.dp
-                        fluidFullBleed && isExpanded -> 64.dp // Reserve the close button's corner.
                         else -> 0.dp
                     }),
                 verticalAlignment = Alignment.CenterVertically,
@@ -4114,16 +4130,13 @@ internal fun InsightPreviewCard(
 
                         if (readingSurahIndex != null && onReadingPlayPause != null) {
                             val isCurrentReading = readingPlayback.surahIndex == readingSurahIndex
-                            Surface(
+                            AppActionButton(
                                 onClick = if (readingPlayback.error != null) {
                                     onReadingRetry ?: onReadingPlayPause
                                 } else {
                                     onReadingPlayPause
                                 },
-                                shape = CircleShape,
-                                color = Color.Black.copy(alpha = 0.42f),
-                                shadowElevation = 0.dp,
-                                modifier = Modifier.size(if (useCompactReadingHeader) 36.dp else 40.dp),
+                                showSurround = !(fluidFullBleed && isExpanded),
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     when {
@@ -4132,7 +4145,7 @@ internal fun InsightPreviewCard(
                                                 progress = { readingPlayback.downloadProgress.coerceIn(0.02f, 1f) },
                                                 color = Color.White,
                                                 strokeWidth = 2.dp,
-                                                modifier = Modifier.size(if (useCompactReadingHeader) 20.dp else 22.dp),
+                                                modifier = Modifier.size(18.dp),
                                             )
                                         }
 
@@ -4140,7 +4153,7 @@ internal fun InsightPreviewCard(
                                             CircularProgressIndicator(
                                                 color = Color.White,
                                                 strokeWidth = 2.dp,
-                                                modifier = Modifier.size(if (useCompactReadingHeader) 20.dp else 22.dp),
+                                                modifier = Modifier.size(18.dp),
                                             )
                                         }
 
@@ -4149,7 +4162,7 @@ internal fun InsightPreviewCard(
                                                 imageVector = Icons.Default.Refresh,
                                                 contentDescription = "Retry daily Surah audio",
                                                 tint = Color.White,
-                                                modifier = Modifier.size(if (useCompactReadingHeader) 18.dp else 20.dp),
+                                                modifier = Modifier.size(18.dp),
                                             )
                                         }
 
@@ -4158,7 +4171,7 @@ internal fun InsightPreviewCard(
                                                 imageVector = Icons.Default.Pause,
                                                 contentDescription = "Pause daily Surah",
                                                 tint = Color.White,
-                                                modifier = Modifier.size(if (useCompactReadingHeader) 18.dp else 20.dp),
+                                                modifier = Modifier.size(18.dp),
                                             )
                                         }
 
@@ -4167,7 +4180,7 @@ internal fun InsightPreviewCard(
                                                 imageVector = Icons.Default.PlayArrow,
                                                 contentDescription = "Listen to daily Surah",
                                                 tint = Color.White,
-                                                modifier = Modifier.size(if (useCompactReadingHeader) 19.dp else 21.dp),
+                                                modifier = Modifier.size(18.dp),
                                             )
                                         }
                                     }
@@ -4176,21 +4189,9 @@ internal fun InsightPreviewCard(
                         }
 
                         if (directionalHintBearing != null) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color.Black.copy(alpha = 0.38f),
-                                shadowElevation = 0.dp,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .graphicsLayer {
-                                        val pulse = if (isFocused) {
-                                            ambientMotion * 0.035f
-                                        } else {
-                                            0f
-                                        }
-                                        scaleX = 1f + pulse
-                                        scaleY = 1f + pulse
-                                    },
+                            AppActionButton(
+                                onClick = onClick ?: {},
+                                showSurround = !(fluidFullBleed && isExpanded),
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
@@ -4202,7 +4203,7 @@ internal fun InsightPreviewCard(
                                         },
                                         tint = Color.White,
                                         modifier = Modifier
-                                            .size(20.dp)
+                                            .size(18.dp)
                                             .rotate(animatedDirectionalRotation),
                                     )
                                 }
@@ -4211,64 +4212,16 @@ internal fun InsightPreviewCard(
                             // a second text button here crowded the header and wrapped during
                             // pull-to-sync, so reading exposes only its distinct Play action.
                         } else if (onClick != null && !isReadingHeader) {
-                            Surface(
-                                modifier = (
-                                    if (actionLabel != null) {
-                                        Modifier.height(40.dp)
-                                    } else {
-                                        Modifier.size(40.dp)
-                                    }
-                                    )
-                                    .graphicsLayer {
-                                        val pulse = if (isFocused) {
-                                            ((ambientMotion + 1f) * 0.5f) * 0.025f
-                                        } else {
-                                            0f
-                                        }
-                                        scaleX = 1f + pulse
-                                        scaleY = 1f + pulse
-                                    },
-                                shape = CircleShape,
-                                color = Color.Black.copy(alpha = 0.34f),
-                                shadowElevation = 0.dp,
+                            AppActionButton(
+                                onClick = onClick,
+                                showSurround = !(fluidFullBleed && isExpanded),
                             ) {
-                                Row(
-                                    modifier = if (actionLabel != null) {
-                                        Modifier.padding(
-                                            start = if (isReadingHeader) 8.dp else 11.dp,
-                                            end = if (isReadingHeader) 4.dp else 7.dp,
-                                        )
-                                    } else {
-                                        Modifier
-                                    },
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    actionLabel?.let {
-                                        Text(
-                                            text = it,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                        )
-                                    }
-                                    Icon(
-                                        imageVector = actionIcon ?: Icons.Default.ChevronRight,
-                                        contentDescription = actionDescription,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(
-                                            if (actionIcon != null) {
-                                                20.dp
-                                            } else if (isReadingHeader) {
-                                                16.dp
-                                            } else if (actionLabel != null) {
-                                                18.dp
-                                            } else {
-                                                20.dp
-                                            },
-                                        ),
-                                    )
-                                }
+                                Icon(
+                                    imageVector = actionIcon ?: Icons.Default.ChevronRight,
+                                    contentDescription = actionDescription ?: actionLabel ?: label,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp),
+                                )
                             }
                         }
                     }

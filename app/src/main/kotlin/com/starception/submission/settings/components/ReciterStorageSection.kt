@@ -69,6 +69,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.download.AssetDownloadViewModel
 import com.starception.submission.feature.quran.ReciterCatalog
 import com.starception.submission.feature.quran.ReciterChoiceRow
+import com.starception.submission.feature.quran.ReciterPreviewButton
 import com.starception.submission.feature.quran.ReciterDownloadManager
 import com.starception.submission.feature.quran.ReciterGroup
 import com.starception.submission.feature.quran.ReciterGroupFilters
@@ -227,16 +228,24 @@ private fun ReciterBrowser(
                 ReciterChoiceRow(name = "Mishary Rashid Al-Alafasy",
                     description = if (manageDownloads) "Default · Downloads in Audio" else "Default recitation",
                     selected = selection.id == null,
-                    onPreview = if (manageDownloads) null else ({
+                    onPreview = {
                         dismissKeyboard()
                         preview.toggle("default-cdn",
                             "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/${surahNumber ?: 1}.mp3", onPreviewStart)
-                    }),
+                    },
                     previewing = preview.activeId == "default-cdn",
                     previewLoading = preview.activeId == "default-cdn" && preview.loading,
                     onSelect = { preview.stop(); dismissKeyboard(); store.select(null); onReciterSelected() })
             }
             items(filtered, key = { it.id }) { reciter ->
+                val onPreview = {
+                    dismissKeyboard()
+                    val sample = surahNumber ?: reciter.surahs.minOrNull() ?: 1
+                    val source = manager.cachedFile(reciter, sample)?.absolutePath
+                        ?: reciter.server.trimEnd('/') + "/" +
+                            "%03d.mp3".format(java.util.Locale.US, sample)
+                    preview.toggle(reciter.id, source, onPreviewStart)
+                }
                 val select = {
                     preview.stop()
                     dismissKeyboard()
@@ -256,16 +265,17 @@ private fun ReciterBrowser(
                         },
                         onDownload = { manager.download(reciter) },
                         onCancel = { manager.cancel(reciter.id) },
-                        onRemove = { manager.delete(reciter) })
+                        onRemove = {
+                            if (preview.activeId == reciter.id) preview.stop()
+                            manager.delete(reciter)
+                        },
+                        onPreview = onPreview,
+                        previewing = preview.activeId == reciter.id,
+                        previewLoading = preview.activeId == reciter.id && preview.loading)
                 } else {
                     ReciterChoiceRow(name = reciter.name, description = reciterDescription(reciter),
                         selected = selection.id == reciter.id, onSelect = select,
-                        onPreview = {
-                            dismissKeyboard()
-                            val sample = surahNumber ?: reciter.surahs.minOrNull() ?: 1
-                            preview.toggle(reciter.id, reciter.server.trimEnd('/') + "/" +
-                                "%03d.mp3".format(java.util.Locale.US, sample), onPreviewStart)
-                        }, previewing = preview.activeId == reciter.id,
+                        onPreview = onPreview, previewing = preview.activeId == reciter.id,
                         previewLoading = preview.activeId == reciter.id && preview.loading)
                 }
             }
@@ -287,6 +297,9 @@ internal fun ReciterLibraryRow(
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onRemove: () -> Unit,
+    onPreview: () -> Unit,
+    previewing: Boolean,
+    previewLoading: Boolean,
 ) {
     Surface(shape = RoundedCornerShape(16.dp),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -310,6 +323,7 @@ internal fun ReciterLibraryRow(
                         }
                     }
                 }
+                ReciterPreviewButton(reciter.name, onPreview, previewing, previewLoading)
                 IconButton(onClick = onToggleDownloads, modifier = Modifier.size(48.dp)) {
                     Icon(when {
                         expanded -> Icons.Filled.ExpandLess

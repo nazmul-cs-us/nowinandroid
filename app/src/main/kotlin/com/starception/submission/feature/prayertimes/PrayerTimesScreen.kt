@@ -3116,6 +3116,7 @@ fun PrayerTimesScreen(
                     ?.first
                     ?.let(::getPrayerDisplayName)
                     .orEmpty()
+                val headerFadeDistancePx = with(LocalDensity.current) { 96.dp.toPx() }
                 val homeLightStatusIcons = with(LocalDensity.current) {
                     homeStatusBarUsesLightIcons(
                         coverUsesLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
@@ -3153,7 +3154,6 @@ fun PrayerTimesScreen(
                         coverHeightPx = insightHeightPx,
                     )
                 }
-                val headerFadeDistancePx = with(LocalDensity.current) { 96.dp.toPx() }
                 com.starception.submission.ui.AppTopSearchBar(
                     title = stringResource(R.string.prayer_times_title),
                     onSettingsClick = onSettingsClick,

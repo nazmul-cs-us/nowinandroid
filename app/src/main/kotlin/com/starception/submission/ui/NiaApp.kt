@@ -57,6 +57,9 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
@@ -441,14 +444,17 @@ private fun NiaFloatingBottomBar(
     val isSearchOpen by com.starception.submission.ui.search.SearchPrefillBus
         .isSearchOpen.collectAsStateWithLifecycle()
     if (isSearchOpen) return
-    val darkNavigation = LocalDarkTheme.current
+    val glassAppearance = rememberNavigationGlassAppearance(backdrop, LocalDarkTheme.current)
+    val glassColors = animatedNavigationGlassColors(glassAppearance.dark)
+    val latestGlassColors = rememberUpdatedState(glassColors)
 
     // Once the bot has become a Now Nudge, the destination pill can expand into
     // its vacated slot. On dismissal this value drives the slot open again while
     // the same shared-bounds surface returns to the bot.
     var nudgeOccupiesNavigation by remember { mutableStateOf(false) }
     val voiceSlotWidth by animateDpAsState(
-        targetValue = if (nudgeOccupiesNavigation) 0.dp else 54.dp,
+        targetValue = if (nudgeOccupiesNavigation) 0.dp else
+            FloatingNavigationDimensions.controlSize + FloatingNavigationDimensions.controlGap,
         animationSpec = NiaMotion.spatialSlow(),
         label = "bottomNavigationVoiceSlotWidth",
     )
@@ -462,19 +468,20 @@ private fun NiaFloatingBottomBar(
     // which looks like a jump instead of a travelling liquid mass.
     val latestCurrentDestination = rememberUpdatedState(currentDestination)
     val latestUnreadDestinations = rememberUpdatedState(unreadDestinations)
-    val pill = remember(appState, vertical, backdrop, darkNavigation) {
+    val pill = remember(appState, vertical, backdrop) {
         @Composable { sizeModifier: Modifier ->
+            val colors = latestGlassColors.value
             val showLabels = !vertical
             // Keep the same full-height portrait navigation on Home and the
             // other destinations; the compact Home variant shortened the pill.
-            val navBarHeight = if (vertical) 50.dp else 56.dp
+            val navBarHeight = if (vertical) 50.dp else FloatingNavigationDimensions.controlSize
             val capsuleGap = 4.dp
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
                 color = Color.Transparent,
-                border = BorderStroke(.5.dp, FloatingNavigationColors.rim),
-                shadowElevation = 6.dp,
-                modifier = sizeModifier.navigationGlass(backdrop, RoundedCornerShape(navBarHeight / 2), darkNavigation),
+                // navigationGlass owns the exterior-only shadow.
+                shadowElevation = 0.dp,
+                modifier = sizeModifier.navigationGlass(backdrop, RoundedCornerShape(navBarHeight / 2), colors),
             ) {
                 val destinations = appState.topLevelDestinations
                 val selectedIndex = destinations.indexOfFirst { destination ->
@@ -488,7 +495,7 @@ private fun NiaFloatingBottomBar(
                         // voice action read as floating controls instead of a full-height
                         // sidebar.
                         Modifier
-                            .width(56.dp)
+                            .width(FloatingNavigationDimensions.controlSize)
                             .height((destinations.size * 44 + 12).dp)
                             .padding(vertical = 6.dp)
                     } else {
@@ -497,7 +504,7 @@ private fun NiaFloatingBottomBar(
                 ) {
                     // Size of a single item cell along the main axis, and the
                     // bubble's target position for the selected tab.
-                    val horizontalContentInset = 12.dp
+                    val horizontalContentInset = 4.dp
                     val itemExtent = if (vertical) {
                         maxHeight / destinations.size
                     } else {
@@ -508,7 +515,7 @@ private fun NiaFloatingBottomBar(
                     val bubbleMainSize = if (vertical) {
                         38.dp
                     } else {
-                        itemExtent + (horizontalContentInset - capsuleGap) * 2
+                        itemExtent
                     }
                     val bubbleTarget = if (vertical) {
                         itemExtent * selectedIndex.coerceAtLeast(0) +
@@ -519,32 +526,19 @@ private fun NiaFloatingBottomBar(
                             (itemExtent - bubbleMainSize) / 2
                     }
 
-                    // Match the reference motion: the edge facing the destination
-                    // moves first, then the opposite edge follows. Height and corner
-                    // radius never change, so the indicator remains one clean capsule.
+                    // Move a single, consistently inset selection capsule. Delaying
+                    // one edge made long jumps stretch across unrelated tabs.
                     val density = LocalDensity.current
                     val targetPx = with(density) { bubbleTarget.toPx() }
                     val leadingPosition = remember { Animatable(targetPx) }
-                    val trailingPosition = remember { Animatable(targetPx) }
                     LaunchedEffect(targetPx, selectedIndex) {
                         if (selectedIndex < 0 || abs(targetPx - leadingPosition.value) < 0.5f) {
                             return@LaunchedEffect
                         }
-                        coroutineScope {
-                            launch {
-                                leadingPosition.animateTo(
-                                    targetValue = targetPx,
-                                    animationSpec = NiaMotion.spatialDefault(),
-                                )
-                            }
-                            launch {
-                                delay(85)
-                                trailingPosition.animateTo(
-                                    targetValue = targetPx,
-                                    animationSpec = NiaMotion.spatialDefault(),
-                                )
-                            }
-                        }
+                        leadingPosition.animateTo(
+                            targetValue = targetPx,
+                            animationSpec = NiaMotion.spatialDefault(),
+                        )
                     }
                     val bubbleAlpha by animateFloatAsState(
                         // Hidden when no top-level tab is selected (detail screens).
@@ -567,36 +561,21 @@ private fun NiaFloatingBottomBar(
                         val bubbleOrigin: Offset
                         val bubbleSize: Size
                         if (vertical) {
-                            val top = minOf(leadingPosition.value, trailingPosition.value)
-                            val bottom = maxOf(leadingPosition.value, trailingPosition.value) + mainSize
+                            val top = leadingPosition.value
+                            val bottom = top + mainSize
                             bubbleOrigin = Offset(size.width / 2f - halfCross, top)
                             bubbleSize = Size(crossSize, bottom - top)
                         } else {
-                            val left = minOf(leadingPosition.value, trailingPosition.value)
-                            val right = maxOf(leadingPosition.value, trailingPosition.value) + mainSize
+                            val left = leadingPosition.value
+                            val right = left + mainSize
                             bubbleOrigin = Offset(left, size.height / 2f - halfCross)
                             bubbleSize = Size(right - left, crossSize)
                         }
                         drawRoundRect(
-                            brush = Brush.verticalGradient(
-                                FloatingNavigationColors.selection,
-                                startY = bubbleOrigin.y,
-                                endY = bubbleOrigin.y + bubbleSize.height,
-                            ),
+                            color = colors.selection,
                             topLeft = bubbleOrigin,
                             size = bubbleSize,
                             cornerRadius = CornerRadius(halfCross, halfCross),
-                        )
-                        drawRoundRect(
-                            brush = Brush.verticalGradient(
-                                listOf(Color.White.copy(alpha = .14f), Color.White.copy(alpha = .025f)),
-                                startY = bubbleOrigin.y,
-                                endY = bubbleOrigin.y + bubbleSize.height,
-                            ),
-                            topLeft = bubbleOrigin,
-                            size = bubbleSize,
-                            cornerRadius = CornerRadius(halfCross, halfCross),
-                            style = Stroke(.5.dp.toPx()),
                         )
                     }
 
@@ -610,16 +589,25 @@ private fun NiaFloatingBottomBar(
                     ) {
                         val hasUnread = latestUnreadDestinations.value.contains(destination)
                         val interactionSource = remember(destination) { MutableInteractionSource() }
-                        val contentTint by animateColorAsState(
-                            if (selected) FloatingNavigationColors.active else FloatingNavigationColors.content,
-                            animationSpec = NiaMotion.effectsDefault(),
-                            label = "navigationContentTint",
+                        val pressed by interactionSource.collectIsPressedAsState()
+                        val pressScale by animateFloatAsState(
+                            if (pressed) .93f else 1f,
+                            animationSpec = NiaMotion.spatialFast(),
+                            label = "navigationPressScale",
                         )
+                        val selectedFraction by animateFloatAsState(
+                            if (selected) 1f else 0f,
+                            animationSpec = NiaMotion.effectsDefault(),
+                            label = "navigationSelectionTint",
+                        )
+                        val contentTint = androidx.compose.ui.graphics.lerp(colors.content, colors.active, selectedFraction)
                         Box(
                             modifier = weight
                                 .fillMaxSize()
                                 .clip(RoundedCornerShape(50))
-                                .clickable(
+                                .selectable(
+                                    selected = selected,
+                                    role = Role.Tab,
                                     interactionSource = interactionSource,
                                     indication = null,
                                 ) { appState.navigateToTopLevelDestination(destination) }
@@ -627,39 +615,20 @@ private fun NiaFloatingBottomBar(
                                 .then(if (hasUnread) Modifier.notificationDot() else Modifier),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                AnimatedContent(
-                                    targetState = selected,
-                                    transitionSpec = {
-                                        (
-                                            fadeIn(NiaMotion.effectsFast()) +
-                                                scaleIn(
-                                                    initialScale = 0.7f,
-                                                    animationSpec = NiaMotion.spatialFast(),
-                                                )
-                                            ) togetherWith (
-                                            fadeOut(NiaMotion.effectsFast()) +
-                                                scaleOut(
-                                                    targetScale = 0.82f,
-                                                    animationSpec = NiaMotion.spatialFast(),
-                                                )
-                                            )
-                                    },
-                                    label = "floatingNavigationIconMorph",
-                                ) { active ->
-                                    Icon(
-                                        imageVector = if (active) {
-                                            destination.selectedIcon
-                                        } else {
-                                            destination.unselectedIcon
-                                        },
-                                        contentDescription = stringResource(destination.iconTextId),
-                                        tint = contentTint,
-                                        modifier = Modifier.size(
-                                            if (showLabels) 19.dp else 22.dp,
-                                        ),
-                                    )
-                                }
+                            Column(
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = pressScale
+                                    scaleY = pressScale
+                                },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(1.dp),
+                            ) {
+                                Icon(
+                                    imageVector = destination.selectedIcon,
+                                    contentDescription = stringResource(destination.iconTextId),
+                                    tint = contentTint,
+                                    modifier = Modifier.size(22.dp),
+                                )
                                 if (showLabels) {
                                     Text(
                                         text = stringResource(destination.iconTextId),
@@ -667,7 +636,7 @@ private fun NiaFloatingBottomBar(
                                         style = com.starception.submission.feature.prayertimes.HomeTypography.caption,
                                         fontSize = 10.sp,
                                         lineHeight = 12.sp,
-                                        fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                                        fontWeight = FontWeight.Medium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
@@ -717,14 +686,15 @@ private fun NiaFloatingBottomBar(
             .collectAsStateWithLifecycle()
         VoiceAssistantButton(
             backdrop = backdrop,
+            glassColors = glassColors,
             listening = listening,
             processing = processing,
             level = level,
             nudge = nudge,
             generatingSuggestion = generatingSuggestion,
             verticalLayout = vertical,
-            // Tracks navBarHeight so the voice button stays proportional to the pill.
-            buttonSize = if (vertical) 44.dp else 48.dp,
+            // Match the portrait pill's height and the landscape rail's width.
+            buttonSize = FloatingNavigationDimensions.controlSize,
             onVoiceClick = {
                 com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch()
             },
@@ -752,8 +722,8 @@ private fun NiaFloatingBottomBar(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            pill(Modifier.width(56.dp))
-            Spacer(modifier = Modifier.height(8.dp))
+            pill(Modifier.width(FloatingNavigationDimensions.controlSize).then(glassAppearance.samplingModifier))
+            Spacer(modifier = Modifier.height(FloatingNavigationDimensions.controlGap))
             voiceButton(Modifier)
         }
     } else {
@@ -767,7 +737,8 @@ private fun NiaFloatingBottomBar(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                    .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
+                    .then(glassAppearance.samplingModifier),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 pill(Modifier.weight(1f))
@@ -795,14 +766,11 @@ private fun NiaFloatingBottomBar(
 /** Neutral translucent charcoal, with a softly lit rim and selected capsule. */
 private object FloatingNavigationColors {
     val surface = Color(0xFF242428).copy(alpha = .94f)
-    val rim = Brush.verticalGradient(
-        0f to Color.White.copy(alpha = .24f),
-        .48f to Color.White.copy(alpha = .07f),
-        1f to Color.White.copy(alpha = .12f),
-    )
-    val selection = listOf(Color.White.copy(alpha = .17f), Color.White.copy(alpha = .11f))
-    val content = Color(0xFFE6E6EB)
-    val active = Color(0xFF66B8FF)
+}
+
+private object FloatingNavigationDimensions {
+    val controlSize = 56.dp
+    val controlGap = 8.dp
 }
 
 private enum class VoiceAssistantSurface {
@@ -863,6 +831,7 @@ private const val NUDGE_RETURN_CONTENT_HOLD_MILLIS =
 @Composable
 private fun VoiceAssistantButton(
     backdrop: Backdrop,
+    glassColors: NavigationGlassColors,
     listening: Boolean,
     processing: Boolean,
     level: Float,
@@ -935,7 +904,7 @@ private fun VoiceAssistantButton(
     }
     val nudgeGlowPulse = nudgeGlow.value
     val container = FloatingNavigationColors.surface
-    val barColor = FloatingNavigationColors.content
+    val barColor = glassColors.content
     val quizOpen by VoiceAssistantNudgeBus.quizOpen.collectAsStateWithLifecycle()
     val generatedQuizQuestion by VoiceAssistantNudgeBus.generatedQuizQuestion
         .collectAsStateWithLifecycle()
@@ -1101,7 +1070,7 @@ private fun VoiceAssistantButton(
     )
     val containerElevation by animateDpAsState(
         targetValue = when (assistantSurface) {
-            VoiceAssistantSurface.Button -> 6.dp
+            VoiceAssistantSurface.Button -> 3.dp
             VoiceAssistantSurface.Composer -> 4.dp
             VoiceAssistantSurface.Thinking -> 3.dp
             VoiceAssistantSurface.Nudge -> 3.dp
@@ -1171,8 +1140,7 @@ private fun VoiceAssistantButton(
                 VoiceAssistantSurface.Button -> Surface(
                     shape = RoundedCornerShape(containerCorner),
                     color = Color.Transparent,
-                    border = BorderStroke(.5.dp, FloatingNavigationColors.rim),
-                    shadowElevation = containerElevation,
+                    shadowElevation = 0.dp,
                     modifier = Modifier
                         .sharedBounds(
                             sharedContentState = voiceContainerState,
@@ -1188,7 +1156,7 @@ private fun VoiceAssistantButton(
                             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                         )
                         .size(buttonSize)
-                        .navigationGlass(backdrop, RoundedCornerShape(containerCorner), LocalDarkTheme.current)
+                        .navigationGlass(backdrop, RoundedCornerShape(containerCorner), glassColors)
                         .clip(RoundedCornerShape(containerCorner))
                 .pointerInput(
                     nudge?.id,
@@ -1271,7 +1239,7 @@ private fun VoiceAssistantButton(
             ) {
                 Canvas(
                     modifier = Modifier
-                        .size(if (buttonSize < 56.dp) 25.dp else 30.dp)
+                        .size(24.dp)
                         .graphicsLayer {
                             val iconScale = 1f + 0.25f * processingBlend - 0.10f * nudgeBlend
                             scaleX = iconScale
