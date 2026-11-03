@@ -2718,7 +2718,8 @@ internal fun SwipeableBigTiles(
                 }
             }
 
-            if (isImmersive || (immersiveHome && expansionProgress > 0.64f)) {
+            val closeMorphProgress = insightActionSeparationProgress(expansionProgress)
+            if (closeMorphProgress > 0f && (isImmersive || immersiveHome)) {
                 val controlTopInset = if (focusedActionTopInWindowPx.isFinite()) {
                     with(density) {
                         calculateFocusedInsightControlTopInset(
@@ -2728,7 +2729,6 @@ internal fun SwipeableBigTiles(
                 } else {
                     immersiveInsightControlTopInset(stripTopInWindowPx)
                 }
-                val closeMorphProgress = ((expansionProgress - 0.64f) / 0.34f).coerceIn(0f, 1f)
                 val sourceIcon = when (pagerState.currentPage % insightPageCount) {
                     0, 3 -> Icons.Default.Navigation
                     2 -> Icons.Default.PlayArrow
@@ -2736,11 +2736,11 @@ internal fun SwipeableBigTiles(
                 }
                 AppActionSurround(
                     onDarkArtwork = true,
+                    separationFraction = closeMorphProgress,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(end = 12.dp, top = controlTopInset)
                         .size(width = 96.dp, height = 48.dp)
-                        .graphicsLayer { alpha = closeMorphProgress }
                         .zIndex(4f),
                 )
                 AppActionButton(
@@ -3276,6 +3276,14 @@ internal fun calculateImmersiveInsightControlInset(safeTop: Dp, occupiedTop: Dp)
 internal fun calculateFocusedInsightControlTopInset(focusedDelta: Dp): Dp =
     focusedDelta.coerceAtLeast(12.dp)
 
+// Use the tile's existing animated progress in both layers. A second animation
+// would lag behind drag resizing and leave the engraved wells off-center.
+private fun insightActionPlacementProgress(expansion: Float): Float =
+    ((expansion - 0.35f) / 0.29f).coerceIn(0f, 1f)
+
+private fun insightActionSeparationProgress(expansion: Float): Float =
+    ((expansion - 0.64f) / 0.34f).coerceIn(0f, 1f)
+
 @Composable
 internal fun InsightPreviewCard(
     label: String,
@@ -3492,8 +3500,11 @@ internal fun InsightPreviewCard(
             val cardMaxWidth = maxWidth
             val tagInset = if (editorialExpanded) 10.dp else
                 (11f - (5f * compactProgress) + (3f * expansionProgress)).dp
-            val tagTopInset = if (fluidFullBleed && isExpanded) {
-                immersiveInsightControlTopInset(cardTopInWindowPx)
+            val actionPlacement = if (fluidFullBleed) insightActionPlacementProgress(expansionProgress) else 0f
+            val sharedActionSurround = fluidFullBleed && insightActionSeparationProgress(expansionProgress) > 0f
+            val tagTopInset = if (fluidFullBleed) {
+                val expandedInset = immersiveInsightControlTopInset(cardTopInWindowPx)
+                lerp(tagInset.value, expandedInset.value, actionPlacement).dp
             } else {
                 tagInset
             }
@@ -4056,12 +4067,12 @@ internal fun InsightPreviewCard(
                     .fillMaxWidth()
                     .padding(
                         start = tagInset,
-                        end = if (fluidFullBleed && isExpanded) 12.dp else tagInset,
+                        end = if (fluidFullBleed) lerp(tagInset.value, 12f, actionPlacement).dp else tagInset,
                         top = tagTopInset,
                         bottom = tagInset,
                     )
                     .padding(end = when {
-                        fluidFullBleed && isExpanded -> 48.dp // Shared action pair's close slot.
+                        fluidFullBleed -> (48f * actionPlacement).dp // Make room before the close action splits off.
                         editorialExpanded -> 52.dp
                         else -> 0.dp
                     }),
@@ -4136,7 +4147,7 @@ internal fun InsightPreviewCard(
                                 } else {
                                     onReadingPlayPause
                                 },
-                                showSurround = !(fluidFullBleed && isExpanded),
+                                showSurround = !sharedActionSurround,
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     when {
@@ -4191,7 +4202,7 @@ internal fun InsightPreviewCard(
                         if (directionalHintBearing != null) {
                             AppActionButton(
                                 onClick = onClick ?: {},
-                                showSurround = !(fluidFullBleed && isExpanded),
+                                showSurround = !sharedActionSurround,
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
@@ -4214,7 +4225,7 @@ internal fun InsightPreviewCard(
                         } else if (onClick != null && !isReadingHeader) {
                             AppActionButton(
                                 onClick = onClick,
-                                showSurround = !(fluidFullBleed && isExpanded),
+                                showSurround = !sharedActionSurround,
                             ) {
                                 Icon(
                                     imageVector = actionIcon ?: Icons.Default.ChevronRight,

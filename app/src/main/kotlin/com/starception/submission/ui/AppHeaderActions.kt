@@ -31,6 +31,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.starception.submission.R
+import kotlin.math.PI
+import kotlin.math.acos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 @Composable
 internal fun AppHeaderActions(
@@ -65,12 +69,13 @@ internal fun AppActionSurround(
     onDarkArtwork: Boolean,
     modifier: Modifier = Modifier,
     paired: Boolean = true,
+    separationFraction: Float = 1f,
 ) {
     // Engrave the surround into the underlying surface using inset light/shadow.
     // Share the buttons' bounds so the circular lobes stay concentric with them.
     Box(
         modifier.drawWithCache {
-            val path = if (paired) pairedActionPath(size.width, size.height) else Path().apply {
+            val path = if (paired) pairedActionPath(size.width, size.height, separationFraction) else Path().apply {
                 addOval(Rect(0f, 0f, size.width, size.height))
             }
             val surface = Brush.linearGradient(
@@ -112,26 +117,40 @@ internal fun AppActionSurround(
 }
 
 /** One continuous contour: no overlapping oval outlines or seam between the actions. */
-private fun pairedActionPath(width: Float, height: Float): Path {
-    val radius = height * (23f / 48f)
+private fun pairedActionPath(width: Float, height: Float, separationFraction: Float): Path {
+    if (width <= 0f || height <= 0f) return Path()
+    val progress = separationFraction.coerceIn(0f, 1f)
+    // Start at the single action's 44dp recess. A small volume swell gives the
+    // joining surface some elasticity; both resting states keep their old size.
+    val swell = sin(PI.toFloat() * progress) * 1.25f
+    val radius = height * ((22f + progress + swell) / 48f)
     val left = width * .25f
-    val right = width * .75f
-    val middle = width / 2f
+    val distance = width * .5f * progress
+    val right = left + distance
+    val middle = (left + right) / 2f
     val y = height / 2f
-    val shoulderX = radius * .5f
-    val shoulderY = radius * .866025f
-    // Join at 60 degrees with tangent-aligned handles for a smooth, shallow neck.
-    val handle = (right - left - radius) / 2f
-    val neckControlY = shoulderY - handle * .577350f
+    // Let the join widen from a circle into the engraved pair. Keeping the
+    // shoulders inside the gap prevents crossed curves while the lobes overlap.
+    val shoulderX = minOf(radius * .5f, distance * .24f)
+    val shoulderY = sqrt(radius * radius - shoulderX * shoulderX)
+    val shoulderAngle = acos(shoulderX / radius) * (180f / PI.toFloat())
+    val handle = (distance - 2f * shoulderX) / 2f
+    val neckControlY = shoulderY - handle * shoulderX / shoulderY
     return Path().apply {
         moveTo(left + shoulderX, y + shoulderY)
-        arcTo(Rect(left - radius, y - radius, left + radius, y + radius), 60f, 240f, false)
+        arcTo(
+            Rect(left - radius, y - radius, left + radius, y + radius),
+            shoulderAngle, 360f - 2f * shoulderAngle, false,
+        )
         cubicTo(
             middle, y - neckControlY,
             middle, y - neckControlY,
             right - shoulderX, y - shoulderY,
         )
-        arcTo(Rect(right - radius, y - radius, right + radius, y + radius), 240f, 240f, false)
+        arcTo(
+            Rect(right - radius, y - radius, right + radius, y + radius),
+            180f + shoulderAngle, 360f - 2f * shoulderAngle, false,
+        )
         cubicTo(
             middle, y + neckControlY,
             middle, y + neckControlY,

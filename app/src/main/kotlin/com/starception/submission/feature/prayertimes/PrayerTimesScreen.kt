@@ -3162,12 +3162,14 @@ fun PrayerTimesScreen(
                     pillContainerColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color(0xFF25362B) else Color(0xFFF7F5FB),
                     pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF191724),
                     homeImmersiveHeader = !outerIsLandscape,
-                    homeHeaderActionsVisible = !insightTileExpanded,
+                    // Keep the home actions hidden until the reader's closing
+                    // motion has cleared the header, including its fluid recess.
+                    homeHeaderActionsVisible = !insightTileExpanded && !insightReaderOpen,
                     homeHeaderLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
                     homeGreetingText = homeGreetingForHour(currentTime.hour),
                     homeSupportingTexts = homeSupportingTexts,
                     homeHeaderVisibility = {
-                        if (insightTileExpanded) 0f else
+                        if (insightTileExpanded || insightReaderOpen) 0f else
                             (1f - portraitScrollState.value / headerFadeDistancePx).coerceIn(0f, 1f)
                     },
                     topInset = dynamicTopInset,
