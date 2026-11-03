@@ -47,7 +47,7 @@ internal fun homeStatusBarUsesLightIcons(
     val artworkTone = if (coverUsesLightText) Color(0xFF102033) else Color(0xFFDDE4E8)
     var background = lerp(
         artworkTone,
-        if (isDarkTheme) Color(0xFF080B14) else Color.White,
+        if (isDarkTheme) Color(0xFF080B14) else feedBackground,
         homeBackdropFeedOpacity(scrollOffset, coverHeight),
     )
     if (!isDarkTheme) {

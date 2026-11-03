@@ -3123,7 +3123,8 @@ fun PrayerTimesScreen(
                         scrollOffset = portraitScrollState.value.toDp().value,
                         coverHeight = insightHeightPx.toDp().value,
                         isDarkTheme = darkHome,
-                        feedBackground = MaterialTheme.colorScheme.background,
+                        feedBackground = if (outerIsLandscape) MaterialTheme.colorScheme.background
+                            else Color(0xFF080B14),
                         readerExpanded = insightTileExpanded,
                     )
                 }
@@ -3141,14 +3142,14 @@ fun PrayerTimesScreen(
                     onDispose { com.starception.submission.ui.HomeSystemBarAppearance.update(null) }
                 }
                 Box(Modifier.fillMaxSize().then(
-                    if (darkHome) Modifier.background(Color(0xFF080B14))
+                    if (darkHome || !outerIsLandscape) Modifier.background(Color(0xFF080B14))
                     else Modifier.background(mainPageBackgroundBrush()),
                 )) {
                 if (!outerIsLandscape) {
                     HomeCoverArtworkBackdrop(
                         position = coverScrollPosition,
                         useNightArtwork = prayerArtworkNight,
-                        isDarkTheme = darkHome,
+                        isDarkTheme = true,
                         isExpanded = insightTileExpanded,
                         scrollOffsetPx = portraitScrollState.value,
                         coverHeightPx = insightHeightPx,
@@ -3606,7 +3607,7 @@ fun PrayerTimesScreen(
                                     val feedTypography = MaterialTheme.typography
                                     val feedShapes = MaterialTheme.shapes
                                     androidx.compose.material3.MaterialTheme(
-                                        colorScheme = if (darkHome) {
+                                        colorScheme = if (darkHome || !outerIsLandscape) {
                                             androidx.compose.material3.darkColorScheme(
                                                 primary = feedAccent,
                                                 background = Color(0xFF080B14),
@@ -3679,32 +3680,25 @@ fun PrayerTimesScreen(
                                             .drawBehind {
                                                 if (!insightTileExpanded && insightHeightPx > 0) {
                                                     val coverBottom = insightHeightPx.toFloat() + 8.dp.toPx()
-                                                    val start = if (darkHome) coverBottom
-                                                        else (coverBottom - 150.dp.toPx()).coerceAtLeast(0f)
+                                                    val start = (coverBottom - 150.dp.toPx()).coerceAtLeast(0f)
                                                     val lowerHeight = (size.height - start).coerceAtLeast(0f)
                                                     if (lowerHeight > 0f) {
                                                         drawRect(
-                                                            brush = if (darkHome) {
-                                                                Brush.verticalGradient(
-                                                                    colors = listOf(Color.Transparent, Color(0xFF080B14)),
-                                                                    startY = coverBottom,
-                                                                    endY = start + 116.dp.toPx(),
-                                                                )
-                                                            } else {
-                                                                // Begin the fade inside the artwork so the reflection
-                                                                // does not start with a hard, opaque horizontal seam.
-                                                                homeReflectionScrim(start, start + 450.dp.toPx(), ambientScheme.background)
-                                                            },
+                                                            // Start inside the artwork and carry the reflection's
+                                                            // ink into the entire feed, with no pale horizontal seam.
+                                                            brush = homeReflectionScrim(
+                                                                start, start + 450.dp.toPx(), Color(0xFF080B14),
+                                                            ),
                                                             topLeft = Offset(0f, start),
                                                             size = androidx.compose.ui.geometry.Size(size.width, lowerHeight),
                                                         )
-                                                        // Low, diffused color gives the reflection depth without
-                                                        // turning its text into a card or tinting the white feed.
+                                                         // Low, diffused color gives the reflection depth without
+                                                         // turning its text into a card.
                                                         val glowY = coverBottom + 118.dp.toPx()
                                                         val glowRadius = size.width * 1.08f
                                                         val glowTop = (coverBottom - 220.dp.toPx()).coerceAtLeast(0f)
                                                         val glowBottom = (coverBottom + 450.dp.toPx()).coerceAtMost(size.height)
-                                                        clipRect(top = glowTop, bottom = glowBottom) {
+                                                         clipRect(top = glowTop, bottom = glowBottom) {
                                                             drawRect(
                                                                 brush = Brush.radialGradient(
                                                                     0f to Color(0xFF9865A9).copy(alpha = .48f),
@@ -3723,7 +3717,24 @@ fun PrayerTimesScreen(
                                                                     radius = glowRadius,
                                                                 ),
                                                             )
-                                                        }
+                                                         }
+                                                         // The same violet-to-blue light continues beneath the
+                                                         // artwork rail, prayer schedule and the bottom of Home.
+                                                         val feedStart = coverBottom + 420.dp.toPx()
+                                                         if (size.height > feedStart) {
+                                                             drawRect(
+                                                                 brush = Brush.verticalGradient(
+                                                                     0f to Color(0xFF080B14),
+                                                                     .42f to Color(0xFF211B35),
+                                                                     .76f to Color(0xFF11263E),
+                                                                     1f to Color(0xFF080B14),
+                                                                     startY = feedStart,
+                                                                     endY = size.height,
+                                                                 ),
+                                                                 topLeft = Offset(0f, feedStart),
+                                                                 size = androidx.compose.ui.geometry.Size(size.width, size.height - feedStart),
+                                                             )
+                                                         }
                                                     }
                                                 }
                                             }
@@ -4878,7 +4889,10 @@ fun PrayerTimesScreen(
                                             }
                                         }
 
-                                        Spacer(Modifier.height(navigationClearance + 16.dp))
+                                        // The ComposeView's viewport already ends above the floating
+                                        // bar. Reserving its height again here creates an empty band
+                                        // after Location at the end of the scrollable feed.
+                                        Spacer(Modifier.height(navigationBarInset + 8.dp))
                                         }
                                     }
                                     morphRequest?.takeIf { morphVisible }?.let { request ->

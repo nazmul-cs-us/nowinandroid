@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -18,16 +17,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawOutline
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
@@ -36,36 +32,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.starception.submission.R
 
-/** The reference's soft paired surround, with two separate matte-black faces. */
-private val PairedActionShape = GenericShape { size, _ ->
-    val radius = size.height * (22f / 48f)
-    val left = size.width * .25f
-    val right = size.width * .75f
-    val middle = size.width / 2f
-    val y = size.height / 2f
-    val diagonal = radius * .707107f
-    moveTo(left + diagonal, y + diagonal)
-    arcTo(Rect(left - radius, y - radius, left + radius, y + radius), 45f, 270f, false)
-    cubicTo(
-        middle - radius * .2f, y - radius * .16f,
-        middle + radius * .2f, y - radius * .16f, right - diagonal, y - diagonal,
-    )
-    arcTo(Rect(right - radius, y - radius, right + radius, y + radius), 225f, 270f, false)
-    cubicTo(
-        middle + radius * .2f, y + radius * .16f,
-        middle - radius * .2f, y + radius * .16f, left + diagonal, y + diagonal,
-    )
-    close()
-}
-
 @Composable
 internal fun AppHeaderActions(
     onDarkArtwork: Boolean,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
 ) {
-    Box {
-        AppActionSurround(onDarkArtwork, Modifier.matchParentSize())
+    Box(contentAlignment = Alignment.Center) {
+        AppActionSurround(
+            onDarkArtwork = onDarkArtwork,
+            modifier = Modifier.matchParentSize(),
+        )
         Row {
             AppActionButton(onSearchClick, showSurround = false) {
                 HeaderActionIcon(
@@ -89,41 +66,78 @@ internal fun AppActionSurround(
     modifier: Modifier = Modifier,
     paired: Boolean = true,
 ) {
-    Box(modifier.blur(1.6.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-        .sculptedActionSurround(onDarkArtwork, if (paired) PairedActionShape else CircleShape))
+    // Engrave the surround into the underlying surface using inset light/shadow.
+    // Share the buttons' bounds so the circular lobes stay concentric with them.
+    Box(
+        modifier.drawWithCache {
+            val path = if (paired) pairedActionPath(size.width, size.height) else Path().apply {
+                addOval(Rect(0f, 0f, size.width, size.height))
+            }
+            val surface = Brush.linearGradient(
+                colors = listOf(
+                    Color.Black.copy(alpha = if (onDarkArtwork) .12f else .09f),
+                    Color.Black.copy(alpha = .035f),
+                ),
+                start = Offset.Zero,
+                end = Offset(size.width, size.height),
+            )
+            // Shift the area outside the contour into the clipped recess. This
+            // casts a shadow INSIDE its upper-left edge, rather than a raised
+            // button's drop shadow outside the lower-right edge. Layered offsets
+            // feather the lip without requiring Android 12 RenderEffect blur.
+            val reach = 8.dp.toPx()
+            val outside = Path.combine(
+                PathOperation.Difference,
+                Path().apply { addRect(Rect(-reach, -reach, size.width + reach, size.height + reach)) },
+                path,
+            )
+            val offsets = (1..12).map { it / 12f * 2.5.dp.toPx() }
+            val innerShade = Color.Black.copy(alpha = if (onDarkArtwork) .028f else .020f)
+            val innerLight = Color.White.copy(alpha = if (onDarkArtwork) .025f else .035f)
+            onDrawBehind {
+                drawPath(path, surface)
+                clipPath(path) {
+                    offsets.forEach { offset ->
+                        translate(left = offset, top = offset) {
+                            drawPath(outside, innerShade)
+                        }
+                        translate(left = -offset, top = -offset) {
+                            drawPath(outside, innerLight)
+                        }
+                    }
+                }
+            }
+        },
+    )
 }
 
-private fun Modifier.sculptedActionSurround(onDarkArtwork: Boolean, shape: Shape) = drawWithCache {
-    val outline = shape.createOutline(size, layoutDirection, this)
-    val end = Offset(size.width, size.height)
-    val upperLight = Brush.linearGradient(
-        0f to Color.White.copy(alpha = if (onDarkArtwork) .012f else .015f),
-        .55f to Color.White.copy(alpha = .003f),
-        1f to Color.Transparent,
-        start = Offset.Zero,
-        end = end,
-    )
-    val lowerShade = Brush.linearGradient(
-        0f to Color.Transparent,
-        .45f to Color.Black.copy(alpha = .003f),
-        1f to Color.Black.copy(alpha = .016f),
-        start = Offset.Zero,
-        end = end,
-    )
-    val surface = Brush.verticalGradient(listOf(Color.White.copy(alpha = .035f), Color.Black.copy(alpha = .045f)))
-    // Closely spaced translucent bands give a feathered edge on older Android
-    // versions too. There is deliberately no hard outline around this surround.
-    val featheredStrokes = (24 downTo 1).map { Stroke(it * .3.dp.toPx()) }
-    val lightOffset = .7.dp.toPx()
-    val shadeOffset = 1.4.dp.toPx()
-    onDrawBehind {
-        translate(left = shadeOffset, top = shadeOffset) {
-            featheredStrokes.forEach { drawOutline(outline, lowerShade, style = it) }
-        }
-        translate(left = -lightOffset, top = -lightOffset) {
-            featheredStrokes.forEach { drawOutline(outline, upperLight, style = it) }
-        }
-        drawOutline(outline, surface)
+/** One continuous contour: no overlapping oval outlines or seam between the actions. */
+private fun pairedActionPath(width: Float, height: Float): Path {
+    val radius = height * (23f / 48f)
+    val left = width * .25f
+    val right = width * .75f
+    val middle = width / 2f
+    val y = height / 2f
+    val shoulderX = radius * .5f
+    val shoulderY = radius * .866025f
+    // Join at 60 degrees with tangent-aligned handles for a smooth, shallow neck.
+    val handle = (right - left - radius) / 2f
+    val neckControlY = shoulderY - handle * .577350f
+    return Path().apply {
+        moveTo(left + shoulderX, y + shoulderY)
+        arcTo(Rect(left - radius, y - radius, left + radius, y + radius), 60f, 240f, false)
+        cubicTo(
+            middle, y - neckControlY,
+            middle, y - neckControlY,
+            right - shoulderX, y - shoulderY,
+        )
+        arcTo(Rect(right - radius, y - radius, right + radius, y + radius), 240f, 240f, false)
+        cubicTo(
+            middle, y + neckControlY,
+            middle, y + neckControlY,
+            left + shoulderX, y + shoulderY,
+        )
+        close()
     }
 }
 
@@ -155,8 +169,7 @@ internal fun AppActionButton(
                         scaleY = scaleX
                         translationY = depth * .7.dp.toPx()
                     }
-                    .shadow(2.dp, CircleShape)
-                    .background(Color(0xFF101017), CircleShape),
+                    .background(Color(0xFF0B0A12), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(

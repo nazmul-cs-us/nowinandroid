@@ -243,7 +243,9 @@ dependencies {
     implementation("mil.nga:sqlite-android:3500400")
 
     // AndroidLiquidGlass library for glassmorphism effects
-    implementation("io.github.kyant0:backdrop:1.0.0")
+    // Scope-aware layer recording preserves the draw node when snapshots replay
+    // the backdrop. 1.0.0 can re-enter the wrong subtree and overflow RenderThread.
+    implementation("io.github.kyant0:backdrop:1.0.6")
     implementation("io.github.kyant0:capsule:2.1.2")
 
     // Sherpa-ONNX provided via api() from feature/search

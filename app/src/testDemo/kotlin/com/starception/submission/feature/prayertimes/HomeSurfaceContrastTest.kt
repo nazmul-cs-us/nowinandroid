@@ -33,6 +33,17 @@ class HomeSurfaceContrastTest {
         assertTrue(icons(coverLightText = false, darkTheme = false, reader = true))
     }
 
+    @Test fun darkGradientFeedKeepsWhiteIconsInLightAppTheme() {
+        assertTrue(homeStatusBarUsesLightIcons(
+            coverUsesLightText = true,
+            scrollOffset = 1100f,
+            coverHeight = 550f,
+            isDarkTheme = false,
+            feedBackground = Color(0xFF080B14),
+            readerExpanded = false,
+        ))
+    }
+
     private fun icons(
         coverLightText: Boolean,
         darkTheme: Boolean,
