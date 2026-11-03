@@ -15,6 +15,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -173,8 +177,23 @@ class FluidHomeRevealTest {
 @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 @Composable
 private fun ExploreTestContent(bottomClearance: androidx.compose.ui.unit.Dp = 0.dp, onSelect: (Int) -> Unit = {}) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     CompositionLocalProvider(LocalInspectionMode provides true) {
         org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
     }
-    HomeArtworkRail(bottomClearance = bottomClearance, onSelect = { card, _ -> onSelect(card.page) })
+    Column {
+        HomeReflectionPrompt(
+            exploreExpanded = expanded,
+            onExploreToggle = { expanded = !expanded },
+            exploreContent = {
+                HomeArtworkRail(
+                    bottomClearance = bottomClearance,
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it },
+                    onSelect = { card, _ -> onSelect(card.page) },
+                )
+            },
+            onClick = {},
+        )
+    }
 }

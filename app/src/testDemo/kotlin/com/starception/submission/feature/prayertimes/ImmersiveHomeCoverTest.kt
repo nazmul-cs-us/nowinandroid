@@ -221,6 +221,7 @@ class ImmersiveHomeCoverTest {
 
     @Test fun swipingCoverUpdatesTheFollowupFeed() {
         val selectedPage = mutableIntStateOf(0)
+        val exploreExpanded = mutableIntStateOf(0)
         compose.setContent {
             CompositionLocalProvider(LocalInspectionMode provides true) {
                 org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
@@ -242,8 +243,20 @@ class ImmersiveHomeCoverTest {
                                 onOpen = {},
                             )
                         }
-                        HomeReflectionPrompt(focusedPage = selectedPage.intValue, onClick = {})
-                        HomeArtworkRail(focusedPage = selectedPage.intValue, onSelect = { _, _ -> })
+                         HomeReflectionPrompt(
+                             focusedPage = selectedPage.intValue,
+                             exploreExpanded = exploreExpanded.intValue != 0,
+                             onExploreToggle = { exploreExpanded.intValue = 1 - exploreExpanded.intValue },
+                             exploreContent = {
+                                 HomeArtworkRail(
+                                     focusedPage = selectedPage.intValue,
+                                     expanded = exploreExpanded.intValue != 0,
+                                     onExpandedChange = { exploreExpanded.intValue = if (it) 1 else 0 },
+                                     onSelect = { _, _ -> },
+                                 )
+                             },
+                             onClick = {},
+                         )
                     }
                 }
             }
@@ -276,20 +289,32 @@ class ImmersiveHomeCoverTest {
             CompositionLocalProvider(LocalDarkTheme provides true) {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     val scroll = rememberScrollState()
+                    val expanded = remember { androidx.compose.runtime.mutableStateOf(false) }
                     LaunchedEffect(scroll) { scroll.scrollTo(500) }
                     Column(Modifier.fillMaxWidth().height(852.dp)
                         .background(Color(0xFF080B14))
                         .verticalScroll(scroll)
                         .padding(horizontal = 24.dp)) {
                         Spacer(Modifier.height(588.dp))
-                        HomeReflectionPrompt(onClick = {})
-                        Spacer(Modifier.height(20.dp))
-                        HomeArtworkRail(onSelect = { _, _ -> })
+                         HomeReflectionPrompt(
+                             exploreExpanded = expanded.value,
+                             onExploreToggle = { expanded.value = !expanded.value },
+                             exploreContent = {
+                                 HomeArtworkRail(
+                                     expanded = expanded.value,
+                                     onExpandedChange = { expanded.value = it },
+                                     onSelect = { _, _ -> },
+                                 )
+                             },
+                             onClick = {},
+                         )
                         Spacer(Modifier.height(200.dp))
                     }
                 }
             }
         }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Expand home options").performScrollTo().performClick()
         compose.waitForIdle()
         val reflectionLeft = compose.onNodeWithText("PRAYER REFLECTION")
             .fetchSemanticsNode().boundsInRoot.left

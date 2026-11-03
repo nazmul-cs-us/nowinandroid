@@ -3067,6 +3067,7 @@ fun PrayerTimesScreen(
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
                 val darkHome = LocalDarkTheme.current
                 var coverPage by rememberSaveable { mutableIntStateOf(0) }
+                var exploreExpanded by rememberSaveable { mutableStateOf(false) }
                 val coverScrollPosition = remember { mutableFloatStateOf(coverPage.toFloat()) }
                 val prayerArtworkNight = prayerTimes?.let {
                     currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
@@ -3957,36 +3958,44 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileExpanded) {
-                                            HomeReflectionPrompt(focusedPage = coverPage, onDarkCover = !darkHome) {
-                                                feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
-                                            }
-                                            Spacer(Modifier.height(16.dp))
-                                            HomeArtworkRail(
+                                            HomeReflectionPrompt(
                                                 focusedPage = coverPage,
-                                                useNightArtwork = prayerArtworkNight,
-                                                bottomClearance = navigationClearance + 16.dp,
-                                            ) { card, source ->
-                                                if (morphRequest != null || insightTileExpanded) return@HomeArtworkRail
-                                                if (source.width > 0f && insightTopInWindowPx.isFinite()) {
-                                                    val top = (insightTopInWindowPx + portraitScrollState.value)
-                                                        .coerceAtLeast(0f)
-                                                    val left = 0f
-                                                    val width = with(morphDensity) { configuration.screenWidthDp.dp.toPx() }
-                                                    val height = with(morphDensity) { portraitImmersiveInsightHeight.toPx() }
-                                                    morphToken++
-                                                    morphReversing = false
-                                                    morphVisible = true
-                                                    morphOpened = false
-                                                    morphRequest = ArtworkMorphRequest(
-                                                        card = card,
-                                                        from = source,
-                                                        to = androidx.compose.ui.geometry.Rect(left, top, left + width, top + height),
-                                                        token = morphToken,
-                                                        sourceScroll = portraitScrollState.value,
-                                                    )
-                                                }
-                                                coverPage = card.page
-                                                feedPageRequest = card.page to ((feedPageRequest?.second ?: 0) + 1)
+                                                onDarkCover = !darkHome,
+                                                exploreExpanded = exploreExpanded,
+                                                onExploreToggle = { exploreExpanded = !exploreExpanded },
+                                                exploreContent = {
+                                                    HomeArtworkRail(
+                                                        focusedPage = coverPage,
+                                                        useNightArtwork = prayerArtworkNight,
+                                                        bottomClearance = navigationClearance + 16.dp,
+                                                        expanded = exploreExpanded,
+                                                        onExpandedChange = { exploreExpanded = it },
+                                                    ) { card, source ->
+                                                        if (morphRequest != null || insightTileExpanded) return@HomeArtworkRail
+                                                        if (source.width > 0f && insightTopInWindowPx.isFinite()) {
+                                                            val top = (insightTopInWindowPx + portraitScrollState.value)
+                                                                .coerceAtLeast(0f)
+                                                            val left = 0f
+                                                            val width = with(morphDensity) { configuration.screenWidthDp.dp.toPx() }
+                                                            val height = with(morphDensity) { portraitImmersiveInsightHeight.toPx() }
+                                                            morphToken++
+                                                            morphReversing = false
+                                                            morphVisible = true
+                                                            morphOpened = false
+                                                            morphRequest = ArtworkMorphRequest(
+                                                                card = card,
+                                                                from = source,
+                                                                to = androidx.compose.ui.geometry.Rect(left, top, left + width, top + height),
+                                                                token = morphToken,
+                                                                sourceScroll = portraitScrollState.value,
+                                                            )
+                                                        }
+                                                        coverPage = card.page
+                                                        feedPageRequest = card.page to ((feedPageRequest?.second ?: 0) + 1)
+                                                    }
+                                                },
+                                            ) {
+                                                feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
                                             }
                                             Spacer(Modifier.height(28.dp))
                                         }

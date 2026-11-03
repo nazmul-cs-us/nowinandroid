@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,10 +44,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.border
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -148,6 +156,9 @@ internal fun HomeArtworkRail(
     focusedPage: Int = 0,
     useNightArtwork: Boolean = false,
     bottomClearance: Dp = 0.dp,
+    modifier: Modifier = Modifier,
+    expanded: Boolean = false,
+    onExpandedChange: (Boolean) -> Unit = {},
     onSelect: (HomeArtworkCard, Rect) -> Unit,
 ) {
     val prayerNow = HomeArtworkCard(
@@ -159,7 +170,10 @@ internal fun HomeArtworkRail(
     FluidHomeReveal(
         title = stringResource(R.string.home_explore_title),
         subtitle = stringResource(R.string.home_explore_subtitle),
+        modifier = modifier,
         bottomClearance = bottomClearance,
+        expanded = expanded,
+        onExpandedChange = onExpandedChange,
     ) { enabled, collapse ->
         AnimatedContent(
             targetState = focusedPage.coerceIn(0, 4),
@@ -195,15 +209,49 @@ internal fun HomeArtworkRail(
 internal fun HomeReflectionPrompt(
     focusedPage: Int = 0,
     onDarkCover: Boolean = false,
+    exploreExpanded: Boolean = false,
+    onExploreToggle: () -> Unit = {},
+    exploreContent: @Composable () -> Unit = {},
     onClick: () -> Unit,
 ) {
     val ink = if (onDarkCover) Color.White else MaterialTheme.colorScheme.onBackground
+    val haptics = LocalHapticFeedback.current
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (exploreExpanded) 180f else 0f,
+        label = "homeExploreDividerArrow",
+    )
     Column(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
-            .padding(top = 12.dp, bottom = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        HomeSectionDivider(ink)
+        Box(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth().padding(top = 24.dp)) { HomeSectionDivider(ink) }
+            // The panel starts at the divider's center, directly beneath its arrow.
+            // As it grows it replaces the line rather than appearing below the reflection.
+            Box(Modifier.fillMaxWidth().padding(top = 24.dp)) { exploreContent() }
+            IconButton(
+                onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onExploreToggle()
+                },
+                modifier = Modifier.align(Alignment.TopCenter).testTag("homeExploreDividerToggle"),
+            ) {
+                Box(
+                    Modifier.width(40.dp).height(40.dp)
+                        .background(Color(0xFF1B1E2A), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.ExpandMore,
+                        contentDescription = stringResource(
+                            if (exploreExpanded) R.string.home_options_collapse else R.string.home_options_expand,
+                        ),
+                        tint = Color.White,
+                        modifier = Modifier.graphicsLayer { rotationZ = arrowRotation },
+                    )
+                }
+            }
+        }
         AnimatedContent(
             targetState = focusedPage.coerceIn(0, 4),
             transitionSpec = {
@@ -213,7 +261,7 @@ internal fun HomeReflectionPrompt(
             label = "homeReflectionSelectedInsight",
         ) { page ->
             val feed = homeFeedPage(page)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(feed.eyebrow, style = HomeTypography.eyebrow,
                     color = ink.copy(alpha = .72f))
                 Text(

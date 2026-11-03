@@ -6,24 +6,15 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,14 +24,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
@@ -50,23 +39,17 @@ import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
-import com.starception.submission.R
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -80,16 +63,16 @@ internal fun FluidHomeReveal(
     subtitle: String,
     modifier: Modifier = Modifier,
     bottomClearance: Dp = 0.dp,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     content: @Composable (enabled: Boolean, collapse: () -> Unit) -> Unit,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
     val transition = updateTransition(expanded, label = "homeOptions")
     val progress by transition.animateFloat(
         transitionSpec = { tween(760, easing = LinearEasing) },
         label = "fluidSeparation",
     ) { if (it) 1f else 0f }
     val bringIntoView = remember { BringIntoViewRequester() }
-    val haptics = LocalHapticFeedback.current
     // Match the floating navigation even in light mode; a pale fill looked like
     // a disconnected white card over Home's artwork.
     val panelColor = Color(0xFF1B1E2A).copy(alpha = .97f)
@@ -101,13 +84,7 @@ internal fun FluidHomeReveal(
     val clearancePx = with(LocalDensity.current) { bottomClearance.toPx() }
     val trailingEdgeHeightPx = with(LocalDensity.current) { 160.dp.toPx() }
     val actionable = expanded && progress >= .99f
-    val stateLabel = stringResource(if (expanded) R.string.home_options_expanded else R.string.home_options_collapsed)
-    val toggleLabel = stringResource(if (expanded) R.string.home_options_collapse else R.string.home_options_expand)
-    val toggle = {
-        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        expanded = !expanded
-    }
-    BackHandler(enabled = expanded) { expanded = false }
+    BackHandler(enabled = expanded) { onExpandedChange(false) }
     LaunchedEffect(transition.currentState, transition.targetState, measuredSize, clearancePx) {
         if (transition.currentState && transition.targetState) {
             // The home navigation floats over the scroll viewport. Include its
@@ -128,14 +105,21 @@ internal fun FluidHomeReveal(
             .bringIntoViewRequester(bringIntoView)
             .clipToBounds()
             .drawBehind {
-                val header = headerHeight.toFloat()
-                if (header <= 0f) return@drawBehind
+                val header = headerHeight * fluidPhase(progress, 0f, .42f)
+                if (header <= 0f || progress <= 0f) return@drawBehind
                 val radius = 24.dp.toPx()
                 val gap = fluidGap(progress) * 28.dp.toPx()
                 val lowerTop = header + gap
-                val lowerHeight = bodyHeight * fluidPhase(progress, 0f, .76f)
+                val lowerHeight = bodyHeight * fluidPhase(progress, .18f, .76f)
+                // The first material appears at the arrow on the divider, then
+                // spreads sideways and down into the full-width panel.
+                val halfWidth = 20.dp.toPx() + (size.width / 2f - 20.dp.toPx()) *
+                    fluidPhase(progress, 0f, .38f)
                 var outline = Path().apply {
-                    addRoundRect(RoundRect(Rect(0f, 0f, size.width, header), CornerRadius(radius)))
+                    addRoundRect(RoundRect(
+                        Rect(size.width / 2f - halfWidth, 0f, size.width / 2f + halfWidth, header),
+                        CornerRadius(min(radius, min(halfWidth, header / 2f))),
+                    ))
                 }
                 if (lowerHeight > .5f) {
                     val lowerRadius = min(radius, lowerHeight / 2f)
@@ -195,29 +179,24 @@ internal fun FluidHomeReveal(
         content = {
             Column(
                 Modifier.fillMaxWidth().onSizeChanged { headerHeight = it.height }
-                    .clickable(role = Role.Button, onClick = toggle)
-                    .semantics { stateDescription = stateLabel }
-                    .padding(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 36.dp),
+                    .then(if (expanded) Modifier.clickable(role = Role.Button) { onExpandedChange(false) } else Modifier)
+                    .then(if (expanded || progress > 0f) Modifier.padding(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 36.dp) else Modifier)
+                    .graphicsLayer { alpha = fluidPhase(progress, 0f, .3f) },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(
-                    title,
-                    style = HomeTypography.section,
-                    color = panelContent,
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    subtitle,
-                    style = HomeTypography.body,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    color = panelContent.copy(alpha = .78f),
-                )
+                if (expanded || progress > 0f) {
+                    Text(title, style = HomeTypography.section, color = panelContent)
+                    Spacer(Modifier.height(6.dp))
+                    Text(subtitle, style = HomeTypography.body,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        color = panelContent.copy(alpha = .78f))
+                }
             }
             Box(
                 Modifier.fillMaxWidth().onSizeChanged { bodyHeight = it.height }
                     .graphicsLayer { alpha = fluidPhase(progress, .18f, .66f) }
                     .drawWithContent {
-                        val visibleHeight = size.height * fluidPhase(progress, 0f, .76f)
+                        val visibleHeight = size.height * fluidPhase(progress, .18f, .76f)
                         if (visibleHeight > 0f) {
                             val outline = Path().apply {
                                 addRoundRect(RoundRect(
@@ -232,26 +211,7 @@ internal fun FluidHomeReveal(
                     .padding(16.dp),
             ) {
                 CompositionLocalProvider(LocalContentColor provides panelContent) {
-                    content(actionable) { expanded = false }
-                }
-            }
-            IconButton(
-                onClick = toggle,
-                modifier = Modifier.size(48.dp)
-                    .semantics { stateDescription = stateLabel },
-            ) {
-                Box(
-                    Modifier.size(40.dp).shadow(2.dp, RoundedCornerShape(14.dp))
-                        .background(panelColor, RoundedCornerShape(14.dp))
-                        .border(1.dp, panelOutline, RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Outlined.ExpandMore,
-                        contentDescription = toggleLabel,
-                        tint = panelContent,
-                        modifier = Modifier.size(23.dp).graphicsLayer { rotationZ = 180f * progress },
-                    )
+                    content(actionable) { onExpandedChange(false) }
                 }
             }
         },
@@ -260,16 +220,16 @@ internal fun FluidHomeReveal(
         val childConstraints = Constraints(minWidth = width, maxWidth = width)
         val header = measurables[0].measure(childConstraints)
         val body = measurables[1].measure(childConstraints)
-        val toggleSize = 48.dp.roundToPx()
-        val button = measurables[2].measure(Constraints.fixed(toggleSize, toggleSize))
-        val gap = fluidGap(progress) * 28.dp.toPx()
-        val bodyTop = header.height + gap
-        val buttonTop = header.height - toggleSize / 2f + max(0f, gap) / 2f
-        val height = max(bodyTop + body.height * fluidPhase(progress, 0f, .76f), buttonTop + toggleSize) + 8.dp.toPx()
+        val gap = if (progress > 0f) fluidGap(progress) * 28.dp.toPx() else 0f
+        val visibleHeader = header.height * fluidPhase(progress, 0f, .42f)
+        val bodyTop = visibleHeader + gap
+        val height = if (progress > 0f) {
+            max(visibleHeader, bodyTop + body.height * fluidPhase(progress, .18f, .76f)) +
+                8.dp.toPx() * fluidPhase(progress, 0f, .5f)
+        } else 0f
         layout(width, constraints.constrainHeight(height.roundToInt())) {
             header.placeRelative(0, 0)
             body.placeRelative(0, bodyTop.roundToInt())
-            button.placeRelative((width - toggleSize) / 2, buttonTop.roundToInt())
         }
     }
 }
