@@ -41,7 +41,7 @@ class HomeHeaderDepthActionTest {
                     Color(0xFF6C8190), Color(0xFFB4B6B8),
                 )))) {
                     Box(Modifier.align(Alignment.TopEnd).padding(22.dp)) {
-                        HomeHeaderDepthActions(
+                        AppHeaderActions(
                             onDarkArtwork = false,
                             onSearchClick = { searchClicks++ },
                             onSettingsClick = { settingsClicks++ },

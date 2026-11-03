@@ -36,11 +36,8 @@ import org.jetbrains.compose.resources.Font
  * Multiplatform's `Font()` is itself composable — it reads from the generated
  * resource table, which needs composition scope.
  *
- * Note the deliberate difference from Android's [ubuntuInspiredFontFamily] in
- * core:designsystem, which lists Google downloadable fonts *first* and falls back
- * to the bundled TTFs only while a download is in flight or unavailable. That is
- * an Android-specific size optimisation with no Compose Multiplatform equivalent,
- * so Android keeps its own definition and this one always uses bundled fonts.
+ * Like Android's ubuntuInspiredFontFamily in core:designsystem, this uses
+ * bundled fonts so UI typography is consistent immediately, even offline.
  *
  * The four TTFs are consequently duplicated: `core:designsystem/res/font` for
  * Android's resource system, and this module's `composeResources/font` for the

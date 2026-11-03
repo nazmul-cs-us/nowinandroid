@@ -6734,10 +6734,9 @@ private fun MushafPagerView(
     }
 
     val translationSpanStyle = SpanStyle(
-        // Book-like typography distinguishes the translation gently without
-        // making it feel like secondary UI chrome.
+        // Keep translations in the app's Ubuntu family alongside the Arabic face.
         fontSize = (typesetFontSize * MUSHAF_TRANSLATION_FONT_SCALE).sp,
-        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+        fontFamily = com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f),
         fontWeight = FontWeight.Normal,
         letterSpacing = 0.sp,
@@ -6749,7 +6748,7 @@ private fun MushafPagerView(
     )
     val translationSeparatorSpanStyle = SpanStyle(
         fontSize = (typesetFontSize * 0.12f).sp,
-        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+        fontFamily = com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily,
     )
     val translationSeparatorParagraphStyle = ParagraphStyle(
         textDirection = androidx.compose.ui.text.style.TextDirection.Content,

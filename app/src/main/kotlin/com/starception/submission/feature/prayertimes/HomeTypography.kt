@@ -3,14 +3,14 @@ package com.starception.submission.feature.prayertimes
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
+import com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /** A restrained editorial scale for the artwork-led home, independent of dashboard labels. */
 internal object HomeTypography {
     private val base = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = ubuntuInspiredFontFamily,
         platformStyle = PlatformTextStyle(includeFontPadding = false),
     )
     val greeting = base.copy(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Medium, letterSpacing = (-.25).sp)
@@ -25,7 +25,7 @@ internal object HomeTypography {
 
 /** Keep schedule, location and banner copy in the same family as the cover. */
 internal fun homeTypography(base: Typography): Typography {
-    fun TextStyle.home() = copy(fontFamily = FontFamily.SansSerif, letterSpacing = 0.sp)
+    fun TextStyle.home() = copy(fontFamily = ubuntuInspiredFontFamily, letterSpacing = 0.sp)
     return base.copy(
         displayLarge = base.displayLarge.home(),
         displayMedium = base.displayMedium.home(),

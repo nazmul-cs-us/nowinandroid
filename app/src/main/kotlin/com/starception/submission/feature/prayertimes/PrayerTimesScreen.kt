@@ -3076,19 +3076,26 @@ fun PrayerTimesScreen(
                 val homeDateLabel = coverReadingDate.format(
                     java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d", java.util.Locale.getDefault()),
                 )
-                val homeTemperature = (currentHomeWeather as? CurrentWeatherLoadState.Available)
-                    ?.weather?.temperatureCelsius?.roundToInt()?.let { "$it°C" }
-                val homeCity = prayerTimes?.location?.city?.trim()?.takeIf { it.isNotBlank() }
+                val homeWeather = (currentHomeWeather as? CurrentWeatherLoadState.Available)?.weather?.let {
+                    "${it.temperatureCelsius.roundToInt()}°C · ${weatherConditionLabel(it)}"
+                }
+                val homePlace = remember(location, prayerTimes?.location) {
+                    prayerLocationLabel(prayerTimes?.location) {
+                        getLocationWithCountryCode(location, prayerTimes?.location)
+                    }.singleLine
+                }
                 val homeHijriDate = remember(coverReadingDate, java.util.Locale.getDefault()) {
                     runCatching {
                         java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy G", java.util.Locale.getDefault())
                             .format(java.time.chrono.HijrahChronology.INSTANCE.date(coverReadingDate))
                     }.getOrNull()
                 }
-                val homeSupportingText = listOfNotNull(homeDateLabel, homeTemperature).joinToString(" · ")
-                val homeAlternateSupportingText = homeHijriDate?.let {
-                    listOfNotNull(it, homeTemperature).joinToString(" · ")
-                }.orEmpty()
+                val homeSupportingTexts = listOfNotNull(
+                    homeDateLabel,
+                    homeHijriDate,
+                    homePlace.takeIf { it.isNotBlank() },
+                    homeWeather,
+                )
                 val coverReading = remember(coverReadingDate) {
                     com.starception.submission.feature.quran.dailyReading(
                         kotlinx.datetime.LocalDate(
@@ -3153,13 +3160,11 @@ fun PrayerTimesScreen(
                     modifier = Modifier,
                     pillContainerColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color(0xFF25362B) else Color(0xFFF7F5FB),
                     pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF191724),
-                    homeCornerAction = !outerIsLandscape,
                     homeImmersiveHeader = !outerIsLandscape,
+                    homeHeaderActionsVisible = !insightTileExpanded,
                     homeHeaderLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
                     homeGreetingText = homeGreetingForHour(currentTime.hour),
-                    homeLocationText = homeCity.orEmpty(),
-                    homeSupportingText = homeSupportingText,
-                    homeAlternateSupportingText = homeAlternateSupportingText,
+                    homeSupportingTexts = homeSupportingTexts,
                     homeHeaderVisibility = {
                         if (insightTileExpanded) 0f else
                             (1f - portraitScrollState.value / headerFadeDistancePx).coerceIn(0f, 1f)
@@ -4556,21 +4561,11 @@ fun PrayerTimesScreen(
                                                                 verticalAlignment = Alignment.CenterVertically,
                                                             ) {
                                                                 val locationData = prayerTimes?.location
-                                                                val city = locationData?.city?.trim().orEmpty()
-                                                                val area = locationData?.area?.trim().takeUnless { it.isNullOrEmpty() }
-                                                                    ?: locationData?.subLocality?.trim().takeUnless { it.isNullOrEmpty() }
-                                                                val countryCode = locationData?.countryCode?.trim()?.uppercase()
-                                                                    ?.takeIf { it.length in 2..3 }
-                                                                val locationTitle = city.ifBlank {
+                                                                val locationLabel = prayerLocationLabel(locationData) {
                                                                     getLocationWithCountryCode(location, locationData)
                                                                 }
-                                                                val locationDetail = area
-                                                                    ?.takeUnless { it.equals(locationTitle, ignoreCase = true) }
-                                                                    ?: locationData?.administrativeArea?.trim()
-                                                                        ?.takeUnless {
-                                                                            it.isEmpty() || it.equals(locationTitle, ignoreCase = true)
-                                                                        }
-                                                                    ?: locationData?.country?.trim().orEmpty()
+                                                                val locationTitle = locationLabel.title
+                                                                val locationDetail = locationLabel.detail
 
                                                                 // Check if location text contains Arabic (Unicode range 0600-06FF)
                                                                 val containsArabic = (locationTitle + locationDetail)
@@ -4595,8 +4590,7 @@ fun PrayerTimesScreen(
 
                                                                 val currentWeatherState = currentHomeWeather
 
-                                                                val supportingLocation = locationDetail.takeIf { it.isNotBlank() }
-                                                                    ?: countryCode.orEmpty()
+                                                                val supportingLocation = locationDetail
 
                                                                 // Name and chevron claim the row's spare width as a group. The
                                                                 // continuously animated marker occupies the 32dp reserved by

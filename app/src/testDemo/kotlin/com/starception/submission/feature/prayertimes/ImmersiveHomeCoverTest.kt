@@ -376,7 +376,7 @@ private fun CoverTestScene(
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(homeGreetingForHour(if (useNightArtwork) 21 else 9), style = HomeTypography.greeting,
                     color = Color.White, modifier = Modifier.weight(1f))
-                com.starception.submission.ui.HomeHeaderDepthActions(onDarkArtwork = true, onSearchClick = {}, onSettingsClick = {})
+                com.starception.submission.ui.AppHeaderActions(onDarkArtwork = true, onSearchClick = {}, onSettingsClick = {})
             }
         }
     }

@@ -31,7 +31,6 @@ import android.util.TypedValue
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -174,13 +173,11 @@ fun AppTopSearchBar(
     topInset: Dp = 0.dp,
     pillContainerColor: ComposeColor = ComposeColor.Unspecified,
     pillContentColor: ComposeColor = ComposeColor.Unspecified,
-    homeCornerAction: Boolean = false,
     homeImmersiveHeader: Boolean = false,
+    homeHeaderActionsVisible: Boolean = true,
     homeHeaderLightText: Boolean = false,
     homeGreetingText: String = "Assalamu alaikum",
-    homeLocationText: String = "",
-    homeSupportingText: String = "",
-    homeAlternateSupportingText: String = "",
+    homeSupportingTexts: List<String> = emptyList(),
     homeHeaderVisibility: () -> Float = { 1f },
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
@@ -452,8 +449,10 @@ fun AppTopSearchBar(
                     searchViewBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
                 }
                 searchView.addTransitionListener { _, _, newState ->
-                    isSearchViewOpen = newState == SearchView.TransitionState.SHOWN ||
-                        newState == SearchView.TransitionState.SHOWING
+                    isSearchViewOpen = newState != SearchView.TransitionState.HIDDEN
+                    // SearchView restores its native anchor at the end of the
+                    // close animation; the shared Compose controls own that UI.
+                    if (newState == SearchView.TransitionState.HIDDEN) searchBar.visibility = View.INVISIBLE
                     // Ambient surfaces (home Ask bar) hide while search is open.
                     com.starception.submission.ui.search.SearchPrefillBus.setSearchOpen(isSearchViewOpen)
                 }
@@ -463,7 +462,7 @@ fun AppTopSearchBar(
                 // phrase so the pill isn't blank for the one frame before the
                 // singleton emits.
                 searchBar.hint = SearchHints.hintFor()
-                // Match the rest of the app — Roboto Serif (downloadable Google Font),
+                // Match the rest of the app — bundled Ubuntu Sans,
                 // same family Compose uses via NiaTheme. SearchBar/SearchView are View
                 // components so they ignore Compose Typography and default to system sans.
                 val appTypeface = appSearchTypeface(ctx)
@@ -577,18 +576,20 @@ fun AppTopSearchBar(
                 val searchView = root.findViewById<SearchView>(R.id.app_search_view)
                 leading.alpha = if (homeImmersiveHeader) 0f else 1f
                 leading.isClickable = !homeImmersiveHeader
-                searchBar.alpha = if (homeImmersiveHeader) 0f else 1f
-                searchBar.isClickable = !homeImmersiveHeader
-                settings.visibility = if (homeImmersiveHeader) View.INVISIBLE else View.VISIBLE
-                settings.isClickable = !homeImmersiveHeader
+                // Retain the measured native anchor for SearchView's transition,
+                // but present the same Compose action pair on every page.
+                searchBar.visibility = View.INVISIBLE
+                searchBar.isClickable = false
+                settings.visibility = View.INVISIBLE
+                settings.isClickable = false
                 val homeAccessibility = if (homeImmersiveHeader) {
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 } else {
                     View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
                 }
                 leading.importantForAccessibility = homeAccessibility
-                searchBar.importantForAccessibility = homeAccessibility
-                settings.importantForAccessibility = homeAccessibility
+                searchBar.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                settings.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
                 // Drive the SearchBar's hint from the typewriter state; the
                 // SearchView shows its own static placeholder when expanded.
                 // While voice capture is live the hints are cleared so the centered
@@ -659,50 +660,7 @@ fun AppTopSearchBar(
                     leading.iconSize = (34f * density).toInt()
                     leading.iconTint = ColorStateList.valueOf(titleColor)
                 }
-                if (homeCornerAction) {
-                    // An inset dark control keeps the Settings action distinct
-                    // from the pearl/light or artwork/dark home canvas.
-                    settingsHalo.visibility = View.VISIBLE
-                    settingsHalo.alpha = if (isDarkTheme) .62f else 1f
-                    settings.backgroundTintList = ColorStateList.valueOf(
-                        if (isDarkTheme) Color.rgb(17, 29, 44) else Color.rgb(30, 25, 42),
-                    )
-                    settings.strokeColor = ColorStateList.valueOf(
-                        if (isDarkTheme) Color.argb(105, 255, 255, 255)
-                        else Color.rgb(234, 224, 246),
-                    )
-                    settings.strokeWidth = (2f * density).toInt()
-                    settings.cornerRadius = (24f * density).toInt()
-                    settings.iconSize = (22f * density).toInt()
-                    settings.elevation = 5f * density
-                    settings.iconTint = ColorStateList.valueOf(Color.WHITE)
-                    settings.setOnTouchListener { button, event ->
-                        when (event.actionMasked) {
-                            MotionEvent.ACTION_DOWN -> {
-                                button.animate().scaleX(.91f).scaleY(.91f).setDuration(130).start()
-                                settingsHalo.animate().scaleX(.95f).scaleY(.95f)
-                                    .alpha(if (isDarkTheme) .48f else .75f).setDuration(130).start()
-                            }
-                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                                button.animate().scaleX(1f).scaleY(1f).setDuration(180).start()
-                                settingsHalo.animate().scaleX(1f).scaleY(1f)
-                                    .alpha(if (isDarkTheme) .62f else 1f).setDuration(180).start()
-                            }
-                        }
-                        false
-                    }
-                } else {
-                    settingsHalo.visibility = View.GONE
-                    settings.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
-                    settings.strokeWidth = 0
-                    settings.iconSize = (26f * density).toInt()
-                    settings.elevation = 0f
-                    settings.iconTint = ColorStateList.valueOf(titleColor)
-                    settings.setOnTouchListener(null)
-                    settings.scaleX = 1f
-                    settings.scaleY = 1f
-                }
-                if (homeImmersiveHeader) settingsHalo.visibility = View.GONE
+                settingsHalo.visibility = View.GONE
                 searchBar.navigationIcon?.mutate()?.setTint(pillTextColor)
                 for (i in 0 until searchBar.menu.size()) {
                     searchBar.menu.getItem(i).icon?.mutate()?.setTint(pillTextColor)
@@ -876,7 +834,7 @@ fun AppTopSearchBar(
         val showHomeHeader by remember(homeHeaderVisibility) {
             derivedStateOf { homeHeaderVisibility() > .001f }
         }
-        if (homeImmersiveHeader && !isSearchViewOpen && showHomeHeader) {
+        if (homeImmersiveHeader && homeHeaderActionsVisible && !isSearchViewOpen && showHomeHeader) {
             val greetingColor by animateColorAsState(
                 targetValue = if (homeHeaderLightText) ComposeColor.White else ComposeColor(0xFF1F1A2A),
                 animationSpec = tween(220),
@@ -901,9 +859,8 @@ fun AppTopSearchBar(
                         .semantics { contentDescription = "Open profile" },
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    HomeRotatingHeaderText(
-                        primary = homeGreetingText,
-                        alternate = homeLocationText,
+                    Text(
+                        text = homeGreetingText,
                         style = com.starception.submission.feature.prayertimes.HomeTypography.greeting.copy(
                             shadow = Shadow(
                                 color = if (homeHeaderLightText) ComposeColor.Black.copy(alpha = .55f)
@@ -913,19 +870,44 @@ fun AppTopSearchBar(
                             ),
                         ),
                         color = greetingColor,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    if (homeSupportingText.isNotBlank()) {
+                    if (homeSupportingTexts.any(String::isNotBlank)) {
                         HomeRotatingHeaderText(
-                            primary = homeSupportingText,
-                            alternate = homeAlternateSupportingText,
+                            texts = homeSupportingTexts,
                             style = com.starception.submission.feature.prayertimes.HomeTypography.caption,
                             color = greetingColor.copy(alpha = .82f),
                             fontWeight = FontWeight.Normal,
                         )
                     }
                 }
-                HomeHeaderDepthActions(
+                AppHeaderActions(
                     onDarkArtwork = homeHeaderLightText,
+                    onSearchClick = { searchViewHolder.value?.show() },
+                    onSettingsClick = onSettingsClick,
+                )
+            }
+        }
+        if (!isSearchViewOpen && (!homeImmersiveHeader || (!showHomeHeader && homeHeaderActionsVisible))) {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .then(if (homeImmersiveHeader) Modifier.background(MaterialTheme.colorScheme.background) else Modifier)
+                    .padding(start = if (homeImmersiveHeader) 24.dp else 64.dp, end = 24.dp, top = topInset + 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                AppHeaderActions(
+                    onDarkArtwork = isDarkTheme,
                     onSearchClick = { searchViewHolder.value?.show() },
                     onSettingsClick = onSettingsClick,
                 )
@@ -1333,7 +1315,7 @@ private fun renderSuggestions(
     }
     val sections = mutableListOf<RenderableSection>()
     if (!restrictToSurahs && reciterResults.isNotEmpty()) {
-        sections.add(RenderableSection(title = "Reciters · offline audio", score = INTENT_BOOST) {
+        sections.add(RenderableSection(title = "Reciters · offline audio", score = 1.0) {
             reciterResults.forEach { reciter ->
                 val row = inflater.inflate(R.layout.app_search_suggestion_item, container, false)
                 row.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
@@ -1616,15 +1598,12 @@ private const val EMPTY_STATE_VERSES_BATCH = 8
 
 private var cachedAppSearchTypeface: Typeface? = null
 
-/**
- * Ubuntu Sans is a downloadable Google Play Services font. Emulator images
- * without the font provider can throw Resources.NotFoundException instead of
- * returning null, so every View-based search surface uses this safe fallback.
- */
+/** Use the same bundled Ubuntu Sans family as Compose on View-based search surfaces. */
 private fun appSearchTypeface(context: Context): Typeface {
     cachedAppSearchTypeface?.let { return it }
     return (
         runCatching { ResourcesCompat.getFont(context, R.font.ubuntu_sans) }.getOrNull()
+            ?: ResourcesCompat.getFont(context, com.starception.submission.core.designsystem.R.font.ubuntu_sans_regular)
             ?: Typeface.create("sans-serif", Typeface.NORMAL)
         ).also { cachedAppSearchTypeface = it }
 }

@@ -208,6 +208,9 @@ import com.starception.submission.settings.navigation.navigateToSettings
 import com.starception.submission.ui.search.VoiceAssistantNudgeBus
 import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
 import com.starception.submission.usersettings.ui.CountrySwitchViewModel
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -388,21 +391,27 @@ internal fun NiaAppContent(
             deepLinkCourseId = deepLinkCourseId,
         )
     } else {
-        Box(modifier = Modifier.fillMaxSize().background(mainPageBackgroundBrush())) {
-            NiaMainContent(
-                appState = appState,
-                snackbarHostState = snackbarHostState,
-                onTopAppBarActionClick = onTopAppBarActionClick,
-                modifier = modifier,
-                isLandscape = isLandscape,
-                mainViewModel = mainViewModel,
-                deepLinkCourseId = deepLinkCourseId,
-            )
+        val navigationBackdrop = rememberLayerBackdrop()
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Record only the page, never the navigation itself (which would
+            // feed its previous frame back into the glass).
+            Box(Modifier.fillMaxSize().layerBackdrop(navigationBackdrop).background(mainPageBackgroundBrush())) {
+                NiaMainContent(
+                    appState = appState,
+                    snackbarHostState = snackbarHostState,
+                    onTopAppBarActionClick = onTopAppBarActionClick,
+                    modifier = modifier,
+                    isLandscape = isLandscape,
+                    mainViewModel = mainViewModel,
+                    deepLinkCourseId = deepLinkCourseId,
+                )
+            }
             if (!shouldHideBottomBar) {
                 NiaFloatingBottomBar(
                     appState = appState,
                     unreadDestinations = unreadDestinations,
                     currentDestination = currentDestination,
+                    backdrop = navigationBackdrop,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -425,12 +434,14 @@ private fun NiaFloatingBottomBar(
     appState: NiaAppState,
     unreadDestinations: Set<TopLevelDestination>,
     currentDestination: NavDestination?,
+    backdrop: Backdrop,
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
 ) {
     val isSearchOpen by com.starception.submission.ui.search.SearchPrefillBus
         .isSearchOpen.collectAsStateWithLifecycle()
     if (isSearchOpen) return
+    val darkNavigation = LocalDarkTheme.current
 
     // Once the bot has become a Now Nudge, the destination pill can expand into
     // its vacated slot. On dismissal this value drives the slot open again while
@@ -451,7 +462,7 @@ private fun NiaFloatingBottomBar(
     // which looks like a jump instead of a travelling liquid mass.
     val latestCurrentDestination = rememberUpdatedState(currentDestination)
     val latestUnreadDestinations = rememberUpdatedState(unreadDestinations)
-    val pill = remember(appState, vertical) {
+    val pill = remember(appState, vertical, backdrop, darkNavigation) {
         @Composable { sizeModifier: Modifier ->
             val showLabels = !vertical
             // Keep the same full-height portrait navigation on Home and the
@@ -460,10 +471,10 @@ private fun NiaFloatingBottomBar(
             val capsuleGap = 4.dp
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
-                color = FloatingNavigationColors.surface,
-                border = BorderStroke(1.dp, FloatingNavigationColors.outline),
-                shadowElevation = 4.dp,
-                modifier = sizeModifier,
+                color = Color.Transparent,
+                border = BorderStroke(.5.dp, FloatingNavigationColors.rim),
+                shadowElevation = 6.dp,
+                modifier = sizeModifier.navigationGlass(backdrop, RoundedCornerShape(navBarHeight / 2), darkNavigation),
             ) {
                 val destinations = appState.topLevelDestinations
                 val selectedIndex = destinations.indexOfFirst { destination ->
@@ -541,7 +552,6 @@ private fun NiaFloatingBottomBar(
                         animationSpec = NiaMotion.effectsDefault(),
                         label = "navBubbleAlpha",
                     )
-                    val bubbleColor = FloatingNavigationColors.selectedSurface
                     Canvas(
                         modifier = Modifier
                             .matchParentSize()
@@ -553,27 +563,41 @@ private fun NiaFloatingBottomBar(
                         } else {
                             (navBarHeight - capsuleGap * 2).toPx()
                         }
+                        val halfCross = crossSize / 2f
+                        val bubbleOrigin: Offset
+                        val bubbleSize: Size
                         if (vertical) {
-                            val halfCross = crossSize / 2f
                             val top = minOf(leadingPosition.value, trailingPosition.value)
                             val bottom = maxOf(leadingPosition.value, trailingPosition.value) + mainSize
-                            drawRoundRect(
-                                color = bubbleColor,
-                                topLeft = Offset(size.width / 2f - halfCross, top),
-                                size = Size(crossSize, bottom - top),
-                                cornerRadius = CornerRadius(halfCross, halfCross),
-                            )
+                            bubbleOrigin = Offset(size.width / 2f - halfCross, top)
+                            bubbleSize = Size(crossSize, bottom - top)
                         } else {
-                            val halfCross = crossSize / 2f
                             val left = minOf(leadingPosition.value, trailingPosition.value)
                             val right = maxOf(leadingPosition.value, trailingPosition.value) + mainSize
-                            drawRoundRect(
-                                color = bubbleColor,
-                                topLeft = Offset(left, size.height / 2f - halfCross),
-                                size = Size(right - left, crossSize),
-                                cornerRadius = CornerRadius(halfCross, halfCross),
-                            )
+                            bubbleOrigin = Offset(left, size.height / 2f - halfCross)
+                            bubbleSize = Size(right - left, crossSize)
                         }
+                        drawRoundRect(
+                            brush = Brush.verticalGradient(
+                                FloatingNavigationColors.selection,
+                                startY = bubbleOrigin.y,
+                                endY = bubbleOrigin.y + bubbleSize.height,
+                            ),
+                            topLeft = bubbleOrigin,
+                            size = bubbleSize,
+                            cornerRadius = CornerRadius(halfCross, halfCross),
+                        )
+                        drawRoundRect(
+                            brush = Brush.verticalGradient(
+                                listOf(Color.White.copy(alpha = .14f), Color.White.copy(alpha = .025f)),
+                                startY = bubbleOrigin.y,
+                                endY = bubbleOrigin.y + bubbleSize.height,
+                            ),
+                            topLeft = bubbleOrigin,
+                            size = bubbleSize,
+                            cornerRadius = CornerRadius(halfCross, halfCross),
+                            style = Stroke(.5.dp.toPx()),
+                        )
                     }
 
                     // Compact icons retain visible labels on Home and accessibility
@@ -692,6 +716,7 @@ private fun NiaFloatingBottomBar(
         val generatingSuggestion by VoiceAssistantNudgeBus.generatingSuggestion
             .collectAsStateWithLifecycle()
         VoiceAssistantButton(
+            backdrop = backdrop,
             listening = listening,
             processing = processing,
             level = level,
@@ -767,13 +792,17 @@ private fun NiaFloatingBottomBar(
  * generation sparkle, then morphs directly into the suggestion. The thinking
  * surface stays present throughout so the result never appears after a blank gap.
  */
-/** Shared charcoal/slate chrome, matching the iOS navigation reference. */
+/** Neutral translucent charcoal, with a softly lit rim and selected capsule. */
 private object FloatingNavigationColors {
-    val surface = Color(0xFF1B1E2A).copy(alpha = .97f)
-    val selectedSurface = Color(0xFF393E4A)
-    val outline = Color(0xFF323B52)
-    val content = Color(0xFFE3E7F2)
-    val active = Color(0xFF38B9FF)
+    val surface = Color(0xFF242428).copy(alpha = .94f)
+    val rim = Brush.verticalGradient(
+        0f to Color.White.copy(alpha = .24f),
+        .48f to Color.White.copy(alpha = .07f),
+        1f to Color.White.copy(alpha = .12f),
+    )
+    val selection = listOf(Color.White.copy(alpha = .17f), Color.White.copy(alpha = .11f))
+    val content = Color(0xFFE6E6EB)
+    val active = Color(0xFF66B8FF)
 }
 
 private enum class VoiceAssistantSurface {
@@ -833,6 +862,7 @@ private const val NUDGE_RETURN_CONTENT_HOLD_MILLIS =
 
 @Composable
 private fun VoiceAssistantButton(
+    backdrop: Backdrop,
     listening: Boolean,
     processing: Boolean,
     level: Float,
@@ -1071,7 +1101,7 @@ private fun VoiceAssistantButton(
     )
     val containerElevation by animateDpAsState(
         targetValue = when (assistantSurface) {
-            VoiceAssistantSurface.Button -> 2.dp
+            VoiceAssistantSurface.Button -> 6.dp
             VoiceAssistantSurface.Composer -> 4.dp
             VoiceAssistantSurface.Thinking -> 3.dp
             VoiceAssistantSurface.Nudge -> 3.dp
@@ -1140,8 +1170,8 @@ private fun VoiceAssistantButton(
                 when (surface) {
                 VoiceAssistantSurface.Button -> Surface(
                     shape = RoundedCornerShape(containerCorner),
-                    color = containerColor,
-                    border = BorderStroke(1.dp, FloatingNavigationColors.outline),
+                    color = Color.Transparent,
+                    border = BorderStroke(.5.dp, FloatingNavigationColors.rim),
                     shadowElevation = containerElevation,
                     modifier = Modifier
                         .sharedBounds(
@@ -1158,6 +1188,7 @@ private fun VoiceAssistantButton(
                             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                         )
                         .size(buttonSize)
+                        .navigationGlass(backdrop, RoundedCornerShape(containerCorner), LocalDarkTheme.current)
                         .clip(RoundedCornerShape(containerCorner))
                 .pointerInput(
                     nudge?.id,
@@ -2183,27 +2214,31 @@ private fun NiaLandscapeLayout(
     mainViewModel: MainActivityViewModel? = null,
     deepLinkCourseId: String? = null,
 ) {
+    val navigationBackdrop = rememberLayerBackdrop()
     Box(modifier = Modifier.fillMaxSize()) {
         // Inset the content to the RIGHT of the vertical floating nav bar so the bar
         // never overlaps tile content. The bar is a 64.dp pill with 12.dp start
         // padding, itself shifted right by the safe-area start inset (camera cutout
         // sits on the left edge in landscape), so the content must reserve that same
         // inset PLUS 76.dp to clear the compact landscape pill.
-        NiaMainContent(
-            appState = appState,
-            snackbarHostState = snackbarHostState,
-            onTopAppBarActionClick = onTopAppBarActionClick,
-            modifier = modifier
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
-                .padding(start = 76.dp),
-            isLandscape = true,
-            mainViewModel = mainViewModel,
-            deepLinkCourseId = deepLinkCourseId,
-        )
+        Box(Modifier.fillMaxSize().layerBackdrop(navigationBackdrop).background(mainPageBackgroundBrush())) {
+            NiaMainContent(
+                appState = appState,
+                snackbarHostState = snackbarHostState,
+                onTopAppBarActionClick = onTopAppBarActionClick,
+                modifier = modifier
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
+                    .padding(start = 76.dp),
+                isLandscape = true,
+                mainViewModel = mainViewModel,
+                deepLinkCourseId = deepLinkCourseId,
+            )
+        }
         NiaFloatingBottomBar(
             appState = appState,
             unreadDestinations = unreadDestinations,
             currentDestination = currentDestination,
+            backdrop = navigationBackdrop,
             vertical = true,
             modifier = Modifier.align(Alignment.CenterStart),
         )

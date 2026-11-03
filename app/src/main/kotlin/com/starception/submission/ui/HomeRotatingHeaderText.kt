@@ -5,6 +5,7 @@ import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.Text
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,35 +18,39 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 
-/** A single, fixed-height line shared by the greeting/location and calendar slots. */
+/** One fixed-height metadata line; the greeting above it stays stationary. */
 @Composable
 internal fun HomeRotatingHeaderText(
-    primary: String,
-    alternate: String,
+    texts: List<String>,
     style: TextStyle,
     color: Color,
     fontWeight: FontWeight = FontWeight.Medium,
 ) {
-    var displayedText by remember(primary) { mutableStateOf(primary) }
+    val entries = remember(texts) { texts.filter(String::isNotBlank).distinct() }
+    var displayedText by remember(entries) { mutableStateOf(entries.firstOrNull().orEmpty()) }
     val rotation = remember { Animatable(0f) }
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(primary, alternate, lifecycleOwner) {
-        displayedText = primary
+    LaunchedEffect(entries, lifecycleOwner) {
+        var index = 0
+        displayedText = entries.firstOrNull().orEmpty()
         rotation.snapTo(0f)
-        if (alternate.isBlank() || alternate == primary) return@LaunchedEffect
+        if (entries.size < 2) return@LaunchedEffect
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             // A lifecycle pause can interrupt either half of the flip. Resume
             // with a readable face rather than leaving text edge-on.
             rotation.snapTo(0f)
             while (true) {
-                delay(6_000)
+                // Give a long neighborhood/address time to scroll before flipping.
+                delay(maxOf(6_000L, displayedText.length * 220L + 2_000L))
                 rotation.animateTo(90f, tween(180, easing = FastOutLinearInEasing))
-                displayedText = if (displayedText == primary) alternate else primary
+                index = (index + 1) % entries.size
+                displayedText = entries[index]
                 rotation.snapTo(-90f)
                 rotation.animateTo(0f, tween(240, easing = LinearOutSlowInEasing))
             }
@@ -61,6 +66,6 @@ internal fun HomeRotatingHeaderText(
         modifier = Modifier.graphicsLayer {
             rotationX = rotation.value
             cameraDistance = 12f * density
-        },
+        }.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1_000, velocity = 24.dp),
     )
 }
