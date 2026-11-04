@@ -193,6 +193,18 @@ private fun ColumnScope.SettingsPanel(
             selected = settings.brand == ROYAL,
             onClick = { onChangeThemeBrand(ROYAL) },
         )
+        listOf(
+            "Purple & Gold" to ThemeBrand.PURPLE_GOLD,
+            "Chocolate Truffle" to ThemeBrand.CHOCOLATE_TRUFFLE,
+            "Damson & Blue Curaçao" to ThemeBrand.DAMSON_CURACAO,
+            "Chili Spice" to ThemeBrand.CHILI_SPICE,
+        ).forEach { (label, brand) ->
+            SettingsDialogThemeChooserRow(
+                text = label,
+                selected = settings.brand == brand,
+                onClick = { onChangeThemeBrand(brand) },
+            )
+        }
     }
     AnimatedVisibility(
         visible = settings.brand == DEFAULT && supportDynamicColor,

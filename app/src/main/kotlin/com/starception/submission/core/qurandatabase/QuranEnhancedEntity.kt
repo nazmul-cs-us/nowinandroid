@@ -248,27 +248,36 @@ data class QuranAyahPage(
  * - Surah 9 (At-Tawbah): No Bismillah at all - nothing to remove
  * - All other surahs: Bismillah is recited but NOT part of ayah 1 - remove it from ayah 1
  */
-private fun removeBismillahIfNeeded(ayahText: String, surahNumber: Int, ayahNumber: Int): String {
+internal fun removeBismillahIfNeeded(ayahText: String, surahNumber: Int, ayahNumber: Int): String {
     // Only process first ayah of surahs 2-8 and 10-114
     if (ayahNumber != 1 || surahNumber == 1 || surahNumber == 9) {
         return ayahText
     }
 
-    // Bismillah text with various possible forms
-    val bismillahPatterns = listOf(
-        "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ", // With Quranic diacritics
-        "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", // Standard diacritics
-        "بسم الله الرحمن الرحيم", // Without diacritics
-    )
-
-    var cleanedText = ayahText
-    for (pattern in bismillahPatterns) {
-        // Remove Bismillah and any trailing spaces
-        cleanedText = cleanedText.replace(pattern, "").trim()
+    val opening = ayahText.trimStart()
+    val letters = "بسماللهالرحمنالرحيم"
+    var matched = 0
+    for (index in opening.indices) {
+        val char = opening[index]
+        // The Quran sources differ in tashkeel, spacing, alif spelling and
+        // tatweel. Compare letters only, but cut the original string so the
+        // first real ayah keeps its exact vocalization.
+        if (char.isWhitespace() || char == 'ـ' || char.isQuranMark()) continue
+        val letter = if (char == 'ٱ' || char == 'أ' || char == 'إ' || char == 'آ') 'ا' else char
+        if (matched >= letters.length || letter != letters[matched]) return ayahText
+        matched++
+        if (matched == letters.length) {
+            return opening.substring(index + 1)
+                .trimStart { it.isWhitespace() || it == 'ـ' || it.isQuranMark() }
+        }
     }
-
-    return cleanedText
+    return ayahText
 }
+
+private fun Char.isQuranMark(): Boolean =
+    this in '\u064B'..'\u065F' || this == '\u0670' ||
+        this in '\u06D6'..'\u06DC' || this in '\u06DF'..'\u06E4' ||
+        this in '\u06E7'..'\u06E8' || this in '\u06EA'..'\u06ED'
 
 /**
  * Convert entity to full domain model

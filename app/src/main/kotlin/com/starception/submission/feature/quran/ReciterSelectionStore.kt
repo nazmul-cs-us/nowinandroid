@@ -18,6 +18,7 @@ const val DEFAULT_RECITER_NAME = "Mishary Rashid Al-Alafasy"
 /** Observe edits made by any picker, including an already-open reader or Settings page. */
 class ReciterSelectionStore(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+    private val quranPreferences = context.applicationContext.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
 
     fun current(): ReciterSelection {
         val id = preferences.getString("selected_id", null) ?: return ReciterSelection()
@@ -40,7 +41,16 @@ class ReciterSelectionStore(context: Context) {
         awaitClose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }.distinctUntilChanged()
 
+    fun hasTranslationAudioSelection(): Boolean =
+        quranPreferences.getString("quran_translation", "ar") in setOf("bn", "en", "ur", "hi")
+
     fun select(reciter: ReciterCatalog.Reciter?) {
+        // Every entry in this picker is Arabic (including the default). Keep
+        // the language selector and playback preference in sync with the voice.
+        quranPreferences.edit()
+            .putString("quran_translation", "ar")
+            .putString("audio_language", AudioLanguage.ARABIC_ONLY.name)
+            .apply()
         preferences.edit().apply {
             if (reciter == null) {
                 remove("selected_id")

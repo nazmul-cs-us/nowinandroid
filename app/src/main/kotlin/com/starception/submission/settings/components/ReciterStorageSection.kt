@@ -1,6 +1,7 @@
 package com.starception.submission.settings.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,7 +30,9 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -60,6 +64,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -68,6 +74,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.download.AssetDownloadViewModel
 import com.starception.submission.feature.quran.ReciterCatalog
+import com.starception.submission.feature.quran.DEFAULT_RECITER_NAME
 import com.starception.submission.feature.quran.ReciterChoiceRow
 import com.starception.submission.feature.quran.ReciterPreviewButton
 import com.starception.submission.feature.quran.ReciterDownloadManager
@@ -99,6 +106,7 @@ fun ReciterStorageSection(
     val context = LocalContext.current
     val store = remember(context) { ReciterSelectionStore(context) }
     val selection by store.selections.collectAsStateWithLifecycle(initialValue = store.current())
+    val translationAudioSelected = store.hasTranslationAudioSelection()
     var showLibrary by rememberSaveable { mutableStateOf(false) }
     Surface(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -107,7 +115,8 @@ fun ReciterStorageSection(
             Icon(Icons.Filled.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(sectionTitle, style = MaterialTheme.typography.titleSmall)
-                Text(selection.name, style = MaterialTheme.typography.bodySmall,
+                Text(if (translationAudioSelected) DEFAULT_RECITER_NAME else selection.name,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
@@ -145,6 +154,7 @@ private fun ReciterBrowser(
     val manager = remember(context) { ReciterDownloadManager.get(context.applicationContext) }
     val store = remember(context) { ReciterSelectionStore(context) }
     val selection by store.selections.collectAsStateWithLifecycle(initialValue = store.current())
+    val translationAudioSelected = store.hasTranslationAudioSelection()
     var reciters by remember { mutableStateOf<List<ReciterCatalog.Reciter>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -227,7 +237,7 @@ private fun ReciterBrowser(
             if (showDefault) item(key = "default-cdn") {
                 ReciterChoiceRow(name = "Mishary Rashid Al-Alafasy",
                     description = if (manageDownloads) "Default · Downloads in Audio" else "Default recitation",
-                    selected = selection.id == null,
+                    selected = !translationAudioSelected && selection.id == null,
                     onPreview = {
                         dismissKeyboard()
                         preview.toggle("default-cdn",
@@ -257,11 +267,16 @@ private fun ReciterBrowser(
                         withContext(Dispatchers.IO) { manager.observe(reciter).collect { value = it } }
                     }
                     val expanded = expandedReciterId == reciter.id
-                    ReciterLibraryRow(reciter, status, selection.id == reciter.id, expanded,
+                    ReciterLibraryRow(reciter, status, !translationAudioSelected && selection.id == reciter.id, expanded,
                         onSelect = select,
                         onToggleDownloads = {
                             dismissKeyboard()
-                            expandedReciterId = if (expanded) null else reciter.id
+                            if (expanded) {
+                                expandedReciterId = null
+                            } else {
+                                expandedReciterId = reciter.id
+                                if (shouldStartReciterDownload(status, expanded)) manager.download(reciter)
+                            }
                         },
                         onDownload = { manager.download(reciter) },
                         onCancel = { manager.cancel(reciter.id) },
@@ -274,7 +289,7 @@ private fun ReciterBrowser(
                         previewLoading = preview.activeId == reciter.id && preview.loading)
                 } else {
                     ReciterChoiceRow(name = reciter.name, description = reciterDescription(reciter),
-                        selected = selection.id == reciter.id, onSelect = select,
+                         selected = !translationAudioSelected && selection.id == reciter.id, onSelect = select,
                         onPreview = onPreview, previewing = preview.activeId == reciter.id,
                         previewLoading = preview.activeId == reciter.id && preview.loading)
                 }
@@ -285,6 +300,12 @@ private fun ReciterBrowser(
 
 private fun reciterDescription(reciter: ReciterCatalog.Reciter) =
     reciter.riwaya.removePrefix("Rewayat ").removeSuffix(" - Murattal").ifBlank { "Arabic recitation" }
+
+internal fun shouldStartReciterDownload(
+    status: ReciterDownloadManager.DownloadStatus,
+    expanded: Boolean,
+): Boolean = !expanded && !status.downloading && status.totalSurahs > 0 &&
+    status.downloadedSurahs < status.totalSurahs
 
 @Composable
 internal fun ReciterLibraryRow(
@@ -301,25 +322,32 @@ internal fun ReciterLibraryRow(
     previewing: Boolean,
     previewLoading: Boolean,
 ) {
-    Surface(shape = RoundedCornerShape(16.dp),
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(shape = RoundedCornerShape(18.dp),
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp,
+            if (selected) MaterialTheme.colorScheme.secondary.copy(alpha = .55f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f))) {
         Column {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.weight(1f).selectable(selected, role = Role.RadioButton, onClick = onSelect)
-                    .padding(start = 12.dp, top = 12.dp, bottom = 12.dp),
+                    .padding(start = 14.dp, top = 14.dp, bottom = 14.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     RadioButton(selected, onClick = null, modifier = Modifier.size(24.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(reciter.name, style = MaterialTheme.typography.titleSmall)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(reciter.name, style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Text(reciterDescription(reciter), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                         when {
-                            status.downloading -> Text("Downloading · ${(status.progress * 100).toInt()}%",
+                            status.downloading -> Text("Saving offline · ${(status.progress * 100).toInt()}%",
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                            status.error != null -> Text("Download interrupted", style = MaterialTheme.typography.labelSmall,
+                            status.error != null -> Text("Download paused", style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error)
-                            status.downloadedSurahs > 0 -> Text("${status.downloadedSurahs}/${status.totalSurahs} offline · ${AssetDownloadViewModel.formatSize(status.downloadedBytes)}",
+                            status.downloadedSurahs > 0 -> Text("${status.downloadedSurahs} of ${status.totalSurahs} saved offline",
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            else -> Text("Available to download", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -327,15 +355,27 @@ internal fun ReciterLibraryRow(
                 IconButton(onClick = onToggleDownloads, modifier = Modifier.size(48.dp)) {
                     Icon(when {
                         expanded -> Icons.Filled.ExpandLess
-                        status.downloading || status.downloadedSurahs > 0 -> Icons.Filled.ExpandMore
+                        status.downloading || (status.totalSurahs > 0 &&
+                            status.downloadedSurahs >= status.totalSurahs) -> Icons.Filled.ExpandMore
                         else -> Icons.Filled.Download
-                    }, contentDescription = if (expanded) "Hide downloads for ${reciter.name}" else "Manage downloads for ${reciter.name}")
+                    }, contentDescription = when {
+                        expanded -> "Hide downloads for ${reciter.name}"
+                        status.downloading -> "Show download progress for ${reciter.name}"
+                        status.totalSurahs > 0 && status.downloadedSurahs >= status.totalSurahs ->
+                            "Show offline details for ${reciter.name}"
+                        else -> "Download remaining audio for ${reciter.name}"
+                    })
                 }
             }
             if (status.downloading && !expanded) {
-                LinearProgressIndicator(progress = { status.progress }, modifier = Modifier.fillMaxWidth())
+                LinearProgressIndicator(progress = { status.progress },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).height(4.dp))
             }
-            if (expanded) ReciterOfflineActions(status, onDownload, onCancel, onRemove)
+            if (expanded) {
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))
+                ReciterOfflineActions(status, onDownload, onCancel, onRemove)
+            }
         }
     }
 }
@@ -349,24 +389,29 @@ internal fun ReciterOfflineActions(
     onRemove: () -> Unit,
 ) {
     val complete = status.totalSurahs > 0 && status.downloadedSurahs >= status.totalSurahs
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(if (complete) "Available offline" else "${status.downloadedSurahs} of ${status.totalSurahs} surahs saved",
-            style = MaterialTheme.typography.labelLarge)
+            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         if (status.downloading) {
-            LinearProgressIndicator(progress = { status.progress }, modifier = Modifier.fillMaxWidth())
+            LinearProgressIndicator(progress = { status.progress },
+                modifier = Modifier.fillMaxWidth().height(5.dp))
         }
         if (status.downloadedBytes > 0) Text("${AssetDownloadViewModel.formatSize(status.downloadedBytes)} on this device",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         status.error?.let {
-            Text("Download interrupted. Saved surahs are kept; retry to download the rest.",
+            Text("Download paused. Your saved surahs are safe.",
                 color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (status.downloading) {
-                FilledTonalButton(onClick = onCancel) { Text("Cancel download") }
+                FilledTonalButton(onClick = onCancel, shape = RoundedCornerShape(12.dp)) {
+                    Text("Cancel download")
+                }
             } else if (!complete) {
-                FilledTonalButton(onClick = onDownload, enabled = status.totalSurahs > 0) {
+                FilledTonalButton(onClick = onDownload, enabled = status.totalSurahs > 0,
+                    shape = RoundedCornerShape(12.dp)) {
                     Text(when {
                         status.error != null -> "Retry download"
                         status.downloadedSurahs > 0 -> "Download remaining"
@@ -374,7 +419,9 @@ internal fun ReciterOfflineActions(
                     })
                 }
             }
-            if (status.downloadedSurahs > 0) TextButton(onClick = onRemove, enabled = !status.downloading) {
+            if (status.downloadedSurahs > 0) TextButton(onClick = onRemove,
+                enabled = !status.downloading,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
                 Text("Remove audio")
             }
         }

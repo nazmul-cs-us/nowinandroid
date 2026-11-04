@@ -59,6 +59,8 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -104,6 +106,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration.Short
@@ -113,6 +116,7 @@ import androidx.compose.material3.SnackbarResult.ActionPerformed
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.adaptive.WindowAdaptiveInfo
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
@@ -199,6 +203,9 @@ import com.starception.submission.core.designsystem.theme.LocalGradientColors
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import com.starception.submission.core.model.deenly.DeenlyNudge
 import com.starception.submission.core.model.deenly.DeenlyNudgeAction
+import com.starception.submission.download.MissingAiModelCards
+import com.starception.submission.ml.DeenlyKnowledgeModel
+import com.starception.submission.ml.DeenlyKnowledgeTask
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
@@ -433,6 +440,7 @@ internal fun NiaAppContent(
  * old navigation rail.
  */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun NiaFloatingBottomBar(
     appState: NiaAppState,
     unreadDestinations: Set<TopLevelDestination>,
@@ -444,6 +452,61 @@ private fun NiaFloatingBottomBar(
     val isSearchOpen by com.starception.submission.ui.search.SearchPrefillBus
         .isSearchOpen.collectAsStateWithLifecycle()
     if (isSearchOpen) return
+    val context = LocalContext.current
+    var showMissingAiModels by remember { mutableStateOf(false) }
+    val requiredModels = remember { setOf(DeenlyKnowledgeTask.QUESTION, DeenlyKnowledgeTask.ANSWER) }
+    val requestNudge: () -> Unit = {
+        if (requiredModels.any { task ->
+                !DeenlyKnowledgeModel.isModelDownloaded(context, task, forceRefresh = true)
+            }
+        ) {
+            showMissingAiModels = true
+        } else {
+            VoiceAssistantNudgeBus.requestSuggestion()
+        }
+    }
+    if (showMissingAiModels) {
+        ModalBottomSheet(
+            onDismissRequest = { showMissingAiModels = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(bottom = 20.dp).testTag("missing-ai-model-sheet")) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("On-device AI", style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold)
+                        Text("Choose the models to download for private questions and answers.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { showMissingAiModels = false }) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Close model downloads")
+                    }
+                }
+                val maxModelListHeight = (LocalConfiguration.current.screenHeightDp.dp * .58f)
+                    .coerceAtMost(520.dp)
+                Column(Modifier.heightIn(max = maxModelListHeight).verticalScroll(rememberScrollState())) {
+                    MissingAiModelCards(
+                        tasks = requiredModels,
+                        onDownloadComplete = {
+                            if (requiredModels.all { task ->
+                                    DeenlyKnowledgeModel.isModelDownloaded(context, task, forceRefresh = true)
+                                }
+                            ) showMissingAiModels = false
+                        },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                Text("Download once, then use these features offline.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp))
+            }
+        }
+    }
     val glassAppearance = rememberNavigationGlassAppearance(backdrop, LocalDarkTheme.current)
     val glassColors = animatedNavigationGlassColors(glassAppearance.dark)
     val latestGlassColors = rememberUpdatedState(glassColors)
@@ -700,7 +763,7 @@ private fun NiaFloatingBottomBar(
             },
             onTypedQuestion = VoiceAssistantNudgeBus::submitTypedPrompt,
             onNudgeAction = VoiceAssistantNudgeBus::requestAction,
-            onNudgeRequest = { VoiceAssistantNudgeBus.requestSuggestion() },
+            onNudgeRequest = requestNudge,
             onNudgeDismiss = VoiceAssistantNudgeBus::requestDismiss,
             onNavigationOccupationChanged = { nudgeOccupiesNavigation = it },
             modifier = voiceModifier,
@@ -1203,9 +1266,10 @@ private fun VoiceAssistantButton(
                     onClick = when {
                         showNudge -> onNudgeAction
                         isPreparingNudge -> ({})
-                        else -> ({ composerOpen = true })
+                        else -> onVoiceClick
                     },
                     onLongClick = onNudgeRequest,
+                    onDoubleClick = { composerOpen = true },
                 )
                 .semantics {
                     contentDescription = when {
@@ -1214,9 +1278,7 @@ private fun VoiceAssistantButton(
                         generatingSuggestion -> "Generating suggestion"
                         processing -> "Voice processing in progress"
                         listening -> "Finish listening"
-                        nudge != null ->
-                            "Now Nudge. Tap to type, long press or swipe down for a suggestion"
-                        else -> "Now Nudge. Tap to type or long press for a suggestion"
+                        else -> "Voice search. Long press or swipe down for a suggestion; double tap to type"
                     }
                 }
                 .graphicsLayer {

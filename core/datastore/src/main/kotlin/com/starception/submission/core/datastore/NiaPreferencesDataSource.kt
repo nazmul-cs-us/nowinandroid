@@ -86,6 +86,10 @@ class NiaPreferencesDataSource @Inject constructor(
                     ThemeBrandProto.THEME_BRAND_COASTAL -> ThemeBrand.COASTAL
                     ThemeBrandProto.THEME_BRAND_ROYAL -> ThemeBrand.ROYAL
                     ThemeBrandProto.THEME_BRAND_CUSTOM -> ThemeBrand.CUSTOM
+                    ThemeBrandProto.THEME_BRAND_PURPLE_GOLD -> ThemeBrand.PURPLE_GOLD
+                    ThemeBrandProto.THEME_BRAND_CHOCOLATE_TRUFFLE -> ThemeBrand.CHOCOLATE_TRUFFLE
+                    ThemeBrandProto.THEME_BRAND_DAMSON_CURACAO -> ThemeBrand.DAMSON_CURACAO
+                    ThemeBrandProto.THEME_BRAND_CHILI_SPICE -> ThemeBrand.CHILI_SPICE
                 },
                 darkThemeConfig = when (it.darkThemeConfig) {
                     null,
@@ -184,6 +188,10 @@ class NiaPreferencesDataSource @Inject constructor(
                         ThemeBrand.COASTAL -> ThemeBrandProto.THEME_BRAND_COASTAL
                         ThemeBrand.ROYAL -> ThemeBrandProto.THEME_BRAND_ROYAL
                         ThemeBrand.CUSTOM -> ThemeBrandProto.THEME_BRAND_CUSTOM
+                        ThemeBrand.PURPLE_GOLD -> ThemeBrandProto.THEME_BRAND_PURPLE_GOLD
+                        ThemeBrand.CHOCOLATE_TRUFFLE -> ThemeBrandProto.THEME_BRAND_CHOCOLATE_TRUFFLE
+                        ThemeBrand.DAMSON_CURACAO -> ThemeBrandProto.THEME_BRAND_DAMSON_CURACAO
+                        ThemeBrand.CHILI_SPICE -> ThemeBrandProto.THEME_BRAND_CHILI_SPICE
                     }
                 }
             }

@@ -258,12 +258,16 @@ class DeenlyKnowledgeModel(context: Context) {
          * UI uses this to offer the CDN download instead of silently falling back
          * to the deterministic content bank; inference still re-verifies the SHA.
          */
-        fun isModelDownloaded(context: Context, task: DeenlyKnowledgeTask): Boolean {
+        fun isModelDownloaded(
+            context: Context,
+            task: DeenlyKnowledgeTask,
+            forceRefresh: Boolean = false,
+        ): Boolean {
             // Called from composition on card-heavy screens; stat the ~1 GB
             // file at most once per cache window instead of every recomposition.
             val now = SystemClock.elapsedRealtime()
             val cached = cachedModelDownloaded[task]
-            if (cached != null && now - cached.first < MODEL_DOWNLOAD_CACHE_TTL_MS) {
+            if (!forceRefresh && cached != null && now - cached.first < MODEL_DOWNLOAD_CACHE_TTL_MS) {
                 return cached.second
             }
             val file = File(

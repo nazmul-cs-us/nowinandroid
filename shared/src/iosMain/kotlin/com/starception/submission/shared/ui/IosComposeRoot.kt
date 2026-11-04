@@ -37,10 +37,18 @@ import com.starception.submission.core.designsystem.theme.DarkAndroidColorScheme
 import com.starception.submission.core.designsystem.theme.DarkCoastalColorScheme
 import com.starception.submission.core.designsystem.theme.DarkDefaultColorScheme
 import com.starception.submission.core.designsystem.theme.DarkRoyalColorScheme
+import com.starception.submission.core.designsystem.theme.DarkPurpleGoldColorScheme
+import com.starception.submission.core.designsystem.theme.DarkChocolateTruffleColorScheme
+import com.starception.submission.core.designsystem.theme.DarkDamsonCuracaoColorScheme
+import com.starception.submission.core.designsystem.theme.DarkChiliSpiceColorScheme
 import com.starception.submission.core.designsystem.theme.LightAndroidColorScheme
 import com.starception.submission.core.designsystem.theme.LightCoastalColorScheme
 import com.starception.submission.core.designsystem.theme.LightDefaultColorScheme
 import com.starception.submission.core.designsystem.theme.LightRoyalColorScheme
+import com.starception.submission.core.designsystem.theme.LightPurpleGoldColorScheme
+import com.starception.submission.core.designsystem.theme.LightChocolateTruffleColorScheme
+import com.starception.submission.core.designsystem.theme.LightDamsonCuracaoColorScheme
+import com.starception.submission.core.designsystem.theme.LightChiliSpiceColorScheme
 import com.starception.submission.core.designsystem.theme.sharedTypography
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
@@ -1472,6 +1480,10 @@ private fun iosColorScheme(brand: ThemeBrand, dark: Boolean): ColorScheme = when
     ThemeBrand.ANDROID -> if (dark) DarkAndroidColorScheme else LightAndroidColorScheme
     ThemeBrand.COASTAL -> if (dark) DarkCoastalColorScheme else LightCoastalColorScheme
     ThemeBrand.ROYAL -> if (dark) DarkRoyalColorScheme else LightRoyalColorScheme
+    ThemeBrand.PURPLE_GOLD -> if (dark) DarkPurpleGoldColorScheme else LightPurpleGoldColorScheme
+    ThemeBrand.CHOCOLATE_TRUFFLE -> if (dark) DarkChocolateTruffleColorScheme else LightChocolateTruffleColorScheme
+    ThemeBrand.DAMSON_CURACAO -> if (dark) DarkDamsonCuracaoColorScheme else LightDamsonCuracaoColorScheme
+    ThemeBrand.CHILI_SPICE -> if (dark) DarkChiliSpiceColorScheme else LightChiliSpiceColorScheme
     ThemeBrand.CUSTOM -> if (dark) DarkCoastalColorScheme else LightCoastalColorScheme
 }
 

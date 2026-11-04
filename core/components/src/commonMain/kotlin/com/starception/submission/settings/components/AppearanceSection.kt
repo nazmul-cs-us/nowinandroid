@@ -169,6 +169,55 @@ fun AppearanceSection(
             }
         }
 
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ModernSectionTitle(text = "Curated themes")
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ThemePill(
+                    label = "Purple & Gold",
+                    selected = themeSettings.brand == ThemeBrand.PURPLE_GOLD,
+                    color = Color(0xFF5C237A),
+                    swatches = listOf(Color(0xFF5C237A), Color(0xFFF3C86F), Color(0xFFFCF9F3), Color(0xFF18131B)),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onChangeThemeBrand(ThemeBrand.PURPLE_GOLD)
+                    },
+                )
+                ThemePill(
+                    label = "Chocolate Truffle",
+                    selected = themeSettings.brand == ThemeBrand.CHOCOLATE_TRUFFLE,
+                    color = Color(0xFF593A2B),
+                    swatches = listOf(Color(0xFF593A2B), Color(0xFF89501C), Color(0xFFFCF5E9), Color(0xFF6F5448)),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onChangeThemeBrand(ThemeBrand.CHOCOLATE_TRUFFLE)
+                    },
+                )
+                ThemePill(
+                    label = "Damson & Blue Curaçao",
+                    selected = themeSettings.brand == ThemeBrand.DAMSON_CURACAO,
+                    color = Color(0xFF854C65),
+                    swatches = listOf(Color(0xFF854C65), Color(0xFF33BECC), Color(0xFFA47764), Color(0xFF005871)),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onChangeThemeBrand(ThemeBrand.DAMSON_CURACAO)
+                    },
+                )
+                ThemePill(
+                    label = "Chili Spice",
+                    selected = themeSettings.brand == ThemeBrand.CHILI_SPICE,
+                    color = Color(0xFFA33121),
+                    swatches = listOf(Color(0xFFA33121), Color(0xFF92511A), Color(0xFF8A4233), Color(0xFF1B120F)),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onChangeThemeBrand(ThemeBrand.CHILI_SPICE)
+                    },
+                )
+            }
+        }
+
         if (showColorPickerState.value && colorPickerDialog != null) {
             colorPickerDialog(
                 customColorOrFallback,
@@ -247,6 +296,7 @@ private fun ThemePill(
     label: String,
     selected: Boolean,
     color: Color,
+    swatches: List<Color> = listOf(color),
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -292,13 +342,15 @@ private fun ThemePill(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
-            // Color dot
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(color),
-            )
+            swatches.forEach { swatch ->
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(swatch),
+                )
+                Spacer(modifier = Modifier.size(2.dp))
+            }
 
             Spacer(modifier = Modifier.size(6.dp))
 
@@ -306,7 +358,7 @@ private fun ThemePill(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (selected) color else MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Visible,
             )

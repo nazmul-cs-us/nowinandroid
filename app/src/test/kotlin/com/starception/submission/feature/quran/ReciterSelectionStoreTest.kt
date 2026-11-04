@@ -25,10 +25,12 @@ import kotlin.test.assertNull
 class ReciterSelectionStoreTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val preferences = context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+    private val quranPreferences = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
     private val yasser = ReciterCatalog.Reciter("1-2", "Yasser Al-Dosari", "https://example.org/", setOf(1, 78), "Hafs - Murattal")
 
     @Before fun reset() {
         preferences.edit().clear().commit()
+        quranPreferences.edit().clear().commit()
     }
 
     @Test fun anOpenReaderReceivesSelectionAndResetFromAnotherPicker() = runTest {
@@ -69,5 +71,21 @@ class ReciterSelectionStoreTest {
         assertNull(preferences.getString("selected_server", null))
         assertNull(preferences.getString("selected_riwayah", null))
         assertEquals(DEFAULT_RECITER_NAME, store.current().name)
+    }
+
+    @Test fun selectingArabicReciterReplacesBengaliTranslationAudioPreference() {
+        quranPreferences.edit()
+            .putString("quran_translation", "bn")
+            .putString("audio_language", AudioLanguage.BENGALI_TRANSLATION.name)
+            .commit()
+
+        val store = ReciterSelectionStore(context)
+        assertEquals(true, store.hasTranslationAudioSelection())
+        store.select(yasser)
+
+        assertEquals("ar", quranPreferences.getString("quran_translation", null))
+        assertEquals(AudioLanguage.ARABIC_ONLY.name, quranPreferences.getString("audio_language", null))
+        assertEquals(yasser.id, ReciterSelectionStore(context).current().id)
+        assertEquals(false, store.hasTranslationAudioSelection())
     }
 }

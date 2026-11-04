@@ -266,6 +266,7 @@ import com.starception.submission.core.images.resources.home_cover_quran_portrai
 import com.starception.submission.core.images.resources.home_cover_qibla_portrait
 import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
 import com.starception.submission.core.qurandatabase.Ayah
+import com.starception.submission.core.qurandatabase.removeBismillahIfNeeded
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
 import com.starception.submission.core.qurandatabase.QuranDatabase
 import com.starception.submission.core.qurandatabase.QuranRepository
@@ -1949,6 +1950,9 @@ internal fun SwipeableBigTiles(
         var focusedActionTopInWindowPx by remember(pagerState.settledPage) {
             mutableFloatStateOf(Float.NaN)
         }
+        var focusedReaderChromeHidden by remember(pagerState.settledPage, expandedLogicalPage) {
+            mutableStateOf(false)
+        }
         BoxWithConstraints(modifier = stripModifier.onGloballyPositioned {
             stripTopInWindowPx = it.positionInWindow().y
             onReaderBoundsChange(it.boundsInWindow())
@@ -2097,6 +2101,9 @@ internal fun SwipeableBigTiles(
                     val reportActionTop: ((Float) -> Unit)? = if (isFocused) {
                         { top -> focusedActionTopInWindowPx = top }
                     } else null
+                    val reportChromeHidden: ((Boolean) -> Unit)? = if (isFocused) {
+                        { hidden -> focusedReaderChromeHidden = hidden }
+                    } else null
                     // Expanded mode is a carousel mode, not a property of only the
                     // settled page. Keeping incoming pages expanded prevents their
                     // compact artwork flashing while a swipe is still settling.
@@ -2236,6 +2243,7 @@ internal fun SwipeableBigTiles(
                             },
                             isFocused = isFocused,
                             onHeaderActionTopInWindowPx = reportActionTop,
+                            onReaderChromeHidden = reportChromeHidden,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
@@ -2339,6 +2347,9 @@ internal fun SwipeableBigTiles(
                             // Let more of the reading scene breathe around the Quran.
                             foregroundBaseScale = 0.74f,
                             foregroundOffsetFraction = Offset(0f, 0.09f),
+                            // The verse surfaces provide contrast without a
+                            // full-screen blur pass on every reading frame.
+                            disableExpandedArtworkBlur = true,
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.46f,
@@ -2354,6 +2365,7 @@ internal fun SwipeableBigTiles(
                             },
                             isFocused = isFocused,
                             onHeaderActionTopInWindowPx = reportActionTop,
+                            onReaderChromeHidden = reportChromeHidden,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
@@ -2469,6 +2481,7 @@ internal fun SwipeableBigTiles(
                             },
                             isFocused = isFocused,
                             onHeaderActionTopInWindowPx = reportActionTop,
+                            onReaderChromeHidden = reportChromeHidden,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
@@ -2548,6 +2561,7 @@ internal fun SwipeableBigTiles(
                             },
                             isFocused = isFocused,
                             onHeaderActionTopInWindowPx = reportActionTop,
+                            onReaderChromeHidden = reportChromeHidden,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
@@ -2720,7 +2734,11 @@ internal fun SwipeableBigTiles(
 
             val closeMorphProgress = insightActionSeparationProgress(expansionProgress)
             if (closeMorphProgress > 0f && (isImmersive || immersiveHome)) {
-                val controlTopInset = if (focusedActionTopInWindowPx.isFinite()) {
+                val controlTopInset = if (focusedReaderChromeHidden) {
+                    // The header row scrolls off-screen with the passage. Keep
+                    // the remaining close action inside the safe status-bar inset.
+                    immersiveInsightControlTopInset(stripTopInWindowPx)
+                } else if (focusedActionTopInWindowPx.isFinite()) {
                     with(density) {
                         calculateFocusedInsightControlTopInset(
                             (focusedActionTopInWindowPx - stripTopInWindowPx).toDp(),
@@ -2736,11 +2754,12 @@ internal fun SwipeableBigTiles(
                 }
                 AppActionSurround(
                     onDarkArtwork = true,
+                    paired = !focusedReaderChromeHidden,
                     separationFraction = closeMorphProgress,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(end = 12.dp, top = controlTopInset)
-                        .size(width = 96.dp, height = 48.dp)
+                        .size(width = if (focusedReaderChromeHidden) 48.dp else 96.dp, height = 48.dp)
                         .zIndex(4f),
                 )
                 AppActionButton(
@@ -3324,6 +3343,7 @@ internal fun InsightPreviewCard(
     fullDayEffect: Boolean = false,
     isFocused: Boolean = false,
     onHeaderActionTopInWindowPx: ((Float) -> Unit)? = null,
+    onReaderChromeHidden: ((Boolean) -> Unit)? = null,
     backgroundPageOffset: () -> Float = { 0f },
     supportingText: String? = null,
     statusText: String? = null,
@@ -3361,6 +3381,9 @@ internal fun InsightPreviewCard(
     val editorialExpanded = isExpanded && useEditorialExpandedLayout
     val readerChrome = rememberInsightReaderChrome(editorialExpanded)
     val chromeProgress = insightReaderChromeProgress(readerChrome, editorialExpanded)
+    LaunchedEffect(editorialExpanded, readerChrome.hidden, isFocused) {
+        onReaderChromeHidden?.invoke(editorialExpanded && readerChrome.hidden)
+    }
     val density = LocalDensity.current
     var cardTopInWindowPx by remember { mutableFloatStateOf(0f) }
     var suppressClickUntilMs by remember { mutableLongStateOf(0L) }
@@ -3581,43 +3604,64 @@ internal fun InsightPreviewCard(
                     ),
                 )
             }
-            val ambientMotion by rememberInfiniteTransition(label = "heroBackgroundMotion")
-                .animateFloat(
-                    initialValue = -1f,
-                    targetValue = 1f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(
-                            durationMillis = 12_000,
-                            easing = FastOutSlowInEasing,
+            // The immersive cover supplies its own artwork. Continuously drifting
+            // the full-screen cards underneath it keeps both the UI and render
+            // threads awake even when the user is simply reading the cover.
+            val animateScene = isFocused && !fluidFullBleed
+            val ambientMotion = if (animateScene) {
+                val motion by rememberInfiniteTransition(label = "heroBackgroundMotion")
+                    .animateFloat(
+                        initialValue = -1f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(
+                                durationMillis = 12_000,
+                                easing = FastOutSlowInEasing,
+                            ),
+                            repeatMode = RepeatMode.Reverse,
                         ),
-                        repeatMode = RepeatMode.Reverse,
-                    ),
-                    label = "heroBackgroundDrift",
-                )
+                        label = "heroBackgroundDrift",
+                    )
+                motion
+            } else {
+                0f
+            }
             val focusedMotionStrength by animateFloatAsState(
                 targetValue = if (isFocused) 1f else 0f,
                 animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing),
                 label = "heroBackgroundFocus",
             )
-            val sceneEffectTransition = rememberInfiniteTransition(label = "prayerSceneEffects")
-            val mosqueLightPulse by sceneEffectTransition.animateFloat(
-                initialValue = 0.12f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 3_200, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "mosqueLightPulse",
-            )
-            val waterPhase by sceneEffectTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 5_200, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart,
-                ),
-                label = "waterFlow",
-            )
+            val sceneEffectTransition = if (
+                animateScene && (backgroundOverlayBitmap != null || animateWater)
+            ) rememberInfiniteTransition(label = "prayerSceneEffects") else null
+            val mosqueLightPulse = if (sceneEffectTransition != null && backgroundOverlayBitmap != null) {
+                val pulse by sceneEffectTransition.animateFloat(
+                    initialValue = 0.12f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 3_200, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "mosqueLightPulse",
+                )
+                pulse
+            } else {
+                1f
+            }
+            val waterPhase = if (sceneEffectTransition != null && animateWater) {
+                val phase by sceneEffectTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 5_200, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart,
+                    ),
+                    label = "waterFlow",
+                )
+                phase
+            } else {
+                0f
+            }
 
             if (backgroundBitmap != null) {
                 Image(
@@ -4085,7 +4129,11 @@ internal fun InsightPreviewCard(
                 Surface(
                     onClick = onClick ?: {},
                     shape = CircleShape,
-                    color = if (editorialExpanded) Color.Transparent else Color.Black.copy(alpha = 0.34f),
+                    color = if (editorialExpanded && readingSurahIndex == null) {
+                        Color.Transparent
+                    } else {
+                        Color.Black.copy(alpha = if (editorialExpanded) 0.52f else 0.34f)
+                    },
                     shadowElevation = 0.dp,
                     // TextButton, which this replaced, applied these minimums and
                     // this content padding. Keep them so the pill holds its old
@@ -4242,7 +4290,12 @@ internal fun InsightPreviewCard(
             if (editorialExpanded) {
                 InsightReaderControlsButton(
                     readerChrome,
-                    Modifier.align(Alignment.TopEnd).padding(end = 8.dp),
+                    // Reuse the reader header's safe inset. TopEnd puts this
+                    // action over the status icons (and the fixed close button)
+                    // after the reading controls auto-hide on scroll.
+                    Modifier.align(Alignment.TopStart)
+                        .padding(start = tagInset, top = tagTopInset)
+                        .background(Color(0xFF0B1827).copy(alpha = 0.72f), CircleShape),
                 )
             }
 
@@ -5329,6 +5382,11 @@ private fun EditorialQuranReadingStage(
             val freshRepository = QuranRepository(context, assetRepository)
             ayahs = runCatching { openingAyahs(freshRepository) }.getOrDefault(emptyList())
         }
+        // Source databases may prepend the opening Bismillah to verse 1. It is
+        // recited separately except in Al-Fatihah, and is absent in At-Tawbah.
+        ayahs = ayahs.map { ayah ->
+            ayah.copy(text = removeBismillahIfNeeded(ayah.text, surah.number, ayah.numberInSurah))
+        }
         translations = if (showTranslation && translationCode != "ar") {
             runCatching {
                 val translationRepository = QuranTranslationRepository(
@@ -5474,7 +5532,7 @@ private fun EditorialQuranReadingStage(
                 state = readingScrollState,
                 overscrollEffect = null,
                 contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(
                     items = ayahs,
@@ -5485,14 +5543,16 @@ private fun EditorialQuranReadingStage(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 6.dp),
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xFF0B1827).copy(alpha = 0.68f))
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         Text(
                             text = "${ayah.numberInSurah}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = HomeReferenceGold,
+                            color = HomeReferenceGold.copy(alpha = 0.96f),
                             fontWeight = FontWeight.Bold,
                         )
                         Text(

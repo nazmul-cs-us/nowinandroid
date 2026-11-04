@@ -604,12 +604,22 @@ fun SurahDetailScreen(
         }
         viewModel.changeAudioLanguage(derived.name)
         playbackService?.let { service ->
+            val languageChanged = service.getAudioLanguage() != derived
             service.setAudioLanguage(derived)
             // If audio is already playing, restart the current surah so the new
             // language takes effect immediately rather than on the next track.
-            if (service.isPlaying()) {
+            if (languageChanged && service.isPlaying()) {
                 service.playSurah(service.getCurrentSurahIndex(), true)
             }
+        }
+    }
+
+    val playSelectedArabicReciter: () -> Unit = {
+        currentAudioLanguage = AudioLanguage.ARABIC_ONLY
+        if (currentTranslation != "ar") viewModel.changeTranslation("ar", surahNumber)
+        playbackService?.apply {
+            setAudioLanguage(AudioLanguage.ARABIC_ONLY)
+            playSurah(surahNumber - 1)
         }
     }
 
@@ -1252,7 +1262,7 @@ fun SurahDetailScreen(
                                 reciterSheetState.hide()
                                 showReciterPicker = false
                             }
-                            playbackService?.playSurah(surahNumber - 1)
+                            playSelectedArabicReciter()
                         },
                     )
                 }
@@ -1332,7 +1342,11 @@ fun SurahDetailScreen(
                 onReciterClick = {
                     showReciterPicker = true
                 },
-                selectedReciterName = reciterSelection.name,
+                selectedReciterName = if (currentAudioLanguage == AudioLanguage.ARABIC_ONLY) {
+                    reciterSelection.name
+                } else {
+                    com.starception.submission.feature.quran.DEFAULT_RECITER_NAME
+                },
                 onMoreClick = {
                     // Toggle floating toolbar visibility
                     showFloatingToolbar = !showFloatingToolbar
@@ -1800,7 +1814,7 @@ fun SurahDetailScreen(
                         },
                         onReciterSelected = {
                             showFloatingToolbar = false
-                            playbackService?.playSurah(surahNumber - 1)
+                            playSelectedArabicReciter()
                         },
                     )
 

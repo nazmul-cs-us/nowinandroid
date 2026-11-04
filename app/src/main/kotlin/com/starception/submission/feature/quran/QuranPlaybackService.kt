@@ -249,11 +249,13 @@ class QuranPlaybackService : Service() {
             Log.d("PlaybackTrace", "🎵 audioFile=${audioFile?.absolutePath} | exists=${audioFile?.exists()} | size=${audioFile?.length()}")
 
             if (audioFile == null || !audioFile.exists()) {
-                // The selected language's audio is not available locally.
-                // Fall back to the Arabic recitation — it is the primary
-                // audio and the one every reading surface should be able
-                // to play regardless of translation-language preference.
+                // Fetch the chosen translation from our CDN even when Arabic
+                // is already cached. Play Arabic in the meantime; the download
+                // completion callback switches to the requested language.
                 if (audioLanguage != AudioLanguage.ARABIC_ONLY) {
+                    audioDownloadHelper.getQuranCdnKey(index, audioLanguage)?.let { cdnKey ->
+                        onAudioNeedsDownload?.invoke(cdnKey, null)
+                    }
                     val arabicFile = resolveAudioFile(index, AudioLanguage.ARABIC_ONLY)
                     if (arabicFile != null && arabicFile.exists()) {
                         Log.i(
@@ -281,9 +283,11 @@ class QuranPlaybackService : Service() {
                 return
             }
 
-            currentReciterName = if (selectedFile != null)
-                ReciterSelectionStore(this).current().name
-            else "Mishary Rashid Al-Alafasy"
+            currentReciterName = when {
+                selectedFile != null -> ReciterSelectionStore(this).current().name
+                // CDN translation recordings are also recited by Mishary.
+                else -> DEFAULT_RECITER_NAME
+            }
 
             // Samsung's MediaPlayer can enter an unrecoverable native error
             // state after a failed prepare — reset() does not clear it, and
@@ -396,6 +400,8 @@ class QuranPlaybackService : Service() {
     fun setAudioLanguage(language: AudioLanguage) {
         audioLanguage = language
     }
+
+    fun getAudioLanguage(): AudioLanguage = audioLanguage
 
     fun isPlaying(): Boolean = mediaPlayer?.isPlaying ?: false
 

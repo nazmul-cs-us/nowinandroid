@@ -21,12 +21,16 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.animation.NiaTransitions
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
@@ -73,6 +78,7 @@ fun MissingContentCard(
     downloadManager: AssetDownloadManager,
     onDownloadComplete: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     var downloadState by remember(category) {
@@ -98,43 +104,70 @@ fun MissingContentCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = if (compact) 20.dp else 24.dp)
             .animateContentSize(animationSpec = tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing)),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(if (compact) 20.dp else 16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            containerColor = if (compact) MaterialTheme.colorScheme.surfaceContainerHigh
+                else MaterialTheme.colorScheme.surfaceContainerLow,
         ),
+        border = if (compact) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f)) else null,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(if (compact) 16.dp else 24.dp),
+            horizontalAlignment = if (compact) Alignment.Start else Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(
-                imageVector = Icons.Default.CloudDownload,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
+            if (compact) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(
+                        Modifier.size(42.dp).background(
+                            MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(13.dp),
+                        ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null,
+                            modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                    Text(resourceName.removePrefix("Now Nudge "),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Text(description, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Icon(
+                    imageVector = Icons.Default.CloudDownload,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
 
-            Text(
-                text = resourceName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-            )
+                Text(
+                    text = resourceName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                )
 
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
 
             AnimatedContent(
                 targetState = downloadState,
+                // Percent updates stay in the same screen. Only animate the
+                // transitions between prompt, progress, success and error.
+                contentKey = { it::class },
                 transitionSpec = {
                     NiaTransitions.fadeThroughEnter() togetherWith NiaTransitions.fadeThroughExit()
                 },
@@ -219,15 +252,27 @@ fun MissingContentCard(
                         }
 
                         is DownloadCardState.Downloading -> {
+                            val progress = (downloadState as? DownloadCardState.Downloading)?.progress
+                                ?: state.progress
+                            if (compact) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Downloading", style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
                             LinearProgressIndicator(
-                                progress = { state.progress },
-                                modifier = Modifier.fillMaxWidth(),
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth().then(if (compact) Modifier.height(6.dp) else Modifier),
                             )
-                            Text(
-                                text = "Downloading... ${(state.progress * 100).toInt()}%",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            if (!compact) {
+                                Text(
+                                    text = "Downloading... ${(progress * 100).toInt()}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
 
                         is DownloadCardState.Completed -> {
@@ -241,7 +286,7 @@ fun MissingContentCard(
 
                         is DownloadCardState.Failed -> {
                             Text(
-                                text = state.error,
+                                text = (downloadState as? DownloadCardState.Failed)?.error ?: state.error,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )

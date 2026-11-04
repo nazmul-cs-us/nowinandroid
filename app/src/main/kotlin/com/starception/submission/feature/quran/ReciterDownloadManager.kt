@@ -113,19 +113,23 @@ class ReciterDownloadManager private constructor(private val context: Context) {
         cancelled.remove(reciter.id)
         val token = (generation[reciter.id] ?: 0) + 1
         generation[reciter.id] = token
-        publish(reciter.id, "Downloading ${reciter.name}", 0f)
+        state.value = state.value.copy(downloading = true, error = null, currentFileProgress = 0f)
+        publish(reciter.id, "Downloading ${reciter.name}", state.value.progress)
         val job = scope.launch {
             if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(downloading = true)
             try {
-                for ((index, surah) in surahs.sorted().withIndex()) {
+                // Skip saved recordings entirely instead of stepping through
+                // every cached file and making resumed progress jump around.
+                val remaining = surahs.sorted().filter { cachedFile(reciter, it) == null }
+                for ((index, surah) in remaining.withIndex()) {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     if (reciter.id in cancelled) throw CancellationException("Cancelled")
                     ReciterCatalog.download(context, reciter, surah) { fraction ->
                         if (generation[reciter.id] == token) {
                             state.update { it.copy(currentFileProgress = fraction) }
                             publish(reciter.id,
-                                "Downloading ${reciter.name} · ${index + 1}/${surahs.size}",
-                                (index + fraction) / surahs.size)
+                                "Downloading ${reciter.name} · ${index + 1}/${remaining.size}",
+                                state.value.progress)
                         }
                     }
                     if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(downloading = true)

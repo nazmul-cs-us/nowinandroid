@@ -28,16 +28,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -66,10 +62,16 @@ internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableReso
 
 internal data class HomeCoverCopy(val eyebrow: String, val title: String, val detail: String)
 
-/** Fade through the midpoint instead of superimposing two readable headlines. */
-private fun homeCoverCopyOpacity(pageOffset: Float): Float {
+/** The cover copy fades out before the next page's copy comes into focus. */
+internal fun homeCoverCopyOpacity(pageOffset: Float): Float {
     val visible = (1f - abs(pageOffset) * 2f).coerceIn(0f, 1f)
     return visible * visible * (3f - 2f * visible)
+}
+
+/** Signed distance from a page, including the wrap between the last and first covers. */
+internal fun homeSwipePageOffset(position: Float, page: Int): Float {
+    val distance = ((position - page + 5f) % 5f)
+    return if (distance > 2.5f) distance - 5f else distance
 }
 
 internal fun homeGreetingForHour(hour: Int): String = when (hour) {
@@ -131,37 +133,6 @@ internal fun homeCoverScrim(prayerVisibility: Float): Brush = Brush.verticalGrad
     1f to Color(0xFF080B14),
 )
 
-/** A blurred copy of the same scene gives the cover copy a soft, readable backdrop. */
-@Composable
-internal fun HomeCoverArtworkBlur(
-    lowerPage: Int,
-    swipeProgress: Float,
-    useNightArtwork: Boolean,
-    prayerVisibility: Float,
-) {
-    val shiftDown = .02f * prayerVisibility
-    Box(
-        Modifier.fillMaxSize()
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        (.72f + shiftDown) to Color.Transparent,
-                        (.82f + shiftDown) to Color.White.copy(alpha = .75f),
-                        1f to Color.White.copy(alpha = .75f),
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            },
-    ) {
-        Box(Modifier.fillMaxSize().blur(20.dp)) {
-            HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
-        }
-    }
-}
-
 @Composable
 private fun HomeCoverArtworkImages(lowerPage: Int, swipeProgress: Float, useNightArtwork: Boolean) {
     val nextPage = (lowerPage + 1) % 5
@@ -213,7 +184,9 @@ internal fun HomeCoverArtworkBackdrop(
             .46f to Color.Transparent,
         )))
     }
-    if (!isExpanded) HomeCoverArtworkBlur(lowerPage, swipeProgress, useNightArtwork, prayerVisibility)
+    // The lower scrim already protects the cover copy. A second full-screen
+    // blurred scene kept Home rendering continuously even at rest (~50% of a
+    // core on Samsung); the single image and scrim settle near idle instead.
     Box(Modifier.fillMaxSize().background(
         homeCoverScrim(prayerVisibility)
     ))
@@ -275,7 +248,7 @@ internal fun ImmersiveHomeCover(
             val page = absolutePage % 5
             // Every cover keeps its copy on the same water/floor baseline as
             // Prayer Now so the eyebrow does not jump while swiping pages.
-            val copyBottom = (maxHeight * .07f).coerceAtLeast(40.dp)
+            val copyBottom = (maxHeight * .055f).coerceAtLeast(32.dp)
             val useLightText = homeCoverCopyUsesLightText(page, useNightArtwork, isDarkTheme)
             val ink = if (useLightText) Color.White else Color(0xFF211C2B)
             val secondaryInk = ink.copy(alpha = if (useLightText) .80f else .72f)
@@ -287,9 +260,8 @@ internal fun ImmersiveHomeCover(
             Box(Modifier.fillMaxSize().clickable { onOpen(page) }) {
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        // Counter the pager's full-width travel. Copy drifts only
-                        // a few pixels, fading out before the incoming copy appears.
-                        // Keep it unclipped at the page edge while counter-translating.
+                        // Counter the pager's full-width travel. Copy drifts
+                        // only a few pixels and fades before the next arrives.
                         .graphicsLayer {
                             val offset = pagerState.currentPage - absolutePage + pagerState.currentPageOffsetFraction
                             translationX = offset * (size.width - 16.dp.toPx())

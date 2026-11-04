@@ -72,6 +72,7 @@ fun MissingAiModelCards(
                 if (needsQuestion && !DeenlyKnowledgeModel.isModelDownloaded(
                         context,
                         DeenlyKnowledgeTask.KNOWLEDGE,
+                        forceRefresh = reloadTrigger > 0,
                     )
                 ) {
                     add(
@@ -86,6 +87,7 @@ fun MissingAiModelCards(
                 if (needsAnswer && !DeenlyKnowledgeModel.isModelDownloaded(
                         context,
                         DeenlyKnowledgeTask.ANSWER,
+                        forceRefresh = reloadTrigger > 0,
                     )
                 ) {
                     add(
@@ -108,7 +110,7 @@ fun MissingAiModelCards(
         modifier = modifier
             .fillMaxWidth()
             .padding(top = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         missing.forEach { spec ->
             MissingContentCard(
@@ -121,6 +123,7 @@ fun MissingAiModelCards(
                     onDownloadComplete()
                 },
                 modifier = Modifier,
+                compact = true,
             )
         }
     }

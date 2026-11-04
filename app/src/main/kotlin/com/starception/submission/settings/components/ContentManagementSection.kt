@@ -22,6 +22,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,7 +37,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -50,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.ui.FlaticonIcon
@@ -87,8 +93,6 @@ fun ContentManagementSection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-
-        Spacer(modifier = Modifier.height(4.dp))
 
         // Grouped sections
         grouped.forEach { (groupName, groupCategories) ->
@@ -135,7 +139,7 @@ private fun ContentGroupCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(role = Role.Button, onClick = onToggleExpanded)
-                    .padding(16.dp),
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Group status icon
@@ -182,12 +186,16 @@ private fun ContentGroupCard(
                             text = groupDescription,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     Text(
-                        text = "$completedCount/${categories.size} available offline · ${AssetDownloadViewModel.formatSize(downloadedSize)} saved",
+                        text = "$completedCount/${categories.size} offline · ${AssetDownloadViewModel.formatSize(downloadedSize)} saved",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
 
@@ -253,63 +261,60 @@ internal fun ContentCategoryRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column {
-            Text(
-                text = state.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = if (state.isDownloading) {
-                    "Downloading · ${(state.progress * 100).toInt()}%"
-                } else if (state.isComplete) {
-                    "Available offline · ${AssetDownloadViewModel.formatSize(state.totalSize)}"
-                } else if (state.downloadedSize > 0) {
-                    "${AssetDownloadViewModel.formatSize(state.downloadedSize)} of ${AssetDownloadViewModel.formatSize(state.totalSize)} saved"
-                } else {
-                    "Not downloaded · ${AssetDownloadViewModel.formatSize(state.totalSize)}"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (state.isDownloading) {
-                Spacer(modifier = Modifier.height(4.dp))
-                LinearProgressIndicator(
-                    progress = { state.progress.coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(1.5.dp)),
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(state.displayName, style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = when {
+                        state.isDownloading -> "Downloading · ${(state.progress * 100).toInt()}%"
+                        state.isComplete -> "Available offline · ${AssetDownloadViewModel.formatSize(state.totalSize)}"
+                        state.downloadedSize > 0 ->
+                            "${AssetDownloadViewModel.formatSize(state.downloadedSize)} of ${AssetDownloadViewModel.formatSize(state.totalSize)} saved"
+                        else -> "Not downloaded · ${AssetDownloadViewModel.formatSize(state.totalSize)}"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+            when {
+                state.isDownloading -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                !state.isComplete -> TextButton(onClick = onDownload,
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.semantics { contentDescription = "Download ${state.displayName}" }) {
+                    Text(when {
+                        state.error != null -> "Retry download"
+                        state.downloadedSize > 0 -> "Resume"
+                        else -> "Download"
+                    })
+                }
+                onDelete != null -> TextButton(onClick = onDelete,
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.semantics { contentDescription = "Remove ${state.displayName}" }) {
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                }
+            }
+            if (onDelete != null && !state.isComplete && !state.isDownloading) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(40.dp).semantics {
+                    contentDescription = "Remove ${state.displayName}"
+                }) {
+                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+        if (state.isDownloading) {
+            LinearProgressIndicator(progress = { state.progress.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)))
         }
         state.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-        // Full-sized labeled controls remain reachable at large font sizes.
-        if (state.isDownloading) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                Text("You can leave this screen while downloading.", style = MaterialTheme.typography.bodySmall)
-            }
-        } else {
-            if (!state.isComplete) TextButton(onClick = onDownload, modifier = Modifier.semantics {
-                contentDescription = "Download ${state.displayName}"
-            }) {
-                Text(when {
-                    state.error != null -> "Retry download"
-                    state.downloadedSize > 0 -> "Download remaining"
-                    else -> "Download"
-                })
-            }
-            if (onDelete != null) TextButton(onClick = onDelete, modifier = Modifier.semantics {
-                contentDescription = "Remove ${state.displayName}"
-            }) {
-                Text("Remove download", color = MaterialTheme.colorScheme.error)
-            }
-        }
     }
 }

@@ -33,4 +33,10 @@ enum class ThemeBrand {
      * from that seed.
      */
     CUSTOM,
+
+    // Append new values to preserve ordinals used by the legacy app preference.
+    PURPLE_GOLD,
+    CHOCOLATE_TRUFFLE,
+    DAMSON_CURACAO,
+    CHILI_SPICE,
 }

@@ -66,6 +66,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -114,6 +115,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -156,6 +158,52 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color as ComposeColor
 import coil.size.Size as CoilSize
 import com.google.android.material.R as MaterialR
+
+/** A shallow inset edge, rather than a floating drop shadow, over the cover photo. */
+@Composable
+internal fun HomeEngravedGreeting(
+    text: String,
+    color: ComposeColor,
+    onDarkArtwork: Boolean,
+) {
+    val style = com.starception.submission.feature.prayertimes.HomeTypography.greeting
+    val upperShadow = ComposeColor.Black.copy(alpha = if (onDarkArtwork) .32f else .22f)
+    val lowerHighlight = ComposeColor.White.copy(alpha = if (onDarkArtwork) .18f else .42f)
+    Box {
+        Text(
+            text = text,
+            style = style,
+            color = upperShadow,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.offset(y = (-.7).dp).clearAndSetSemantics { },
+        )
+        Text(
+            text = text,
+            style = style,
+            color = lowerHighlight,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.offset(y = .7.dp).clearAndSetSemantics { },
+        )
+        Text(
+            text = text,
+            style = style.copy(
+                shadow = Shadow(
+                    color = ComposeColor.Black.copy(alpha = if (onDarkArtwork) .12f else .06f),
+                    offset = Offset(0f, .8f),
+                    blurRadius = 1f,
+                ),
+            ),
+            color = color,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
 
 /** Home's scrolling content must start at the window top, beneath its overlay header. */
 internal fun configureHomeContentOverlap(contentContainer: FrameLayout, immersiveHome: Boolean) {
@@ -372,7 +420,9 @@ fun AppTopSearchBar(
     val micTapHolder = remember { mutableStateOf<(() -> Unit)?>(null) }
     LaunchedEffect(Unit) {
         com.starception.submission.ui.search.SearchPrefillBus.voiceRequests.collect {
-            micTapHolder.value?.invoke()
+            val micTap = micTapHolder.value
+            if (micTap != null) micTap()
+            else if (!whisperService.isModelAvailable()) promptVoiceModelDownload()
         }
     }
 
@@ -488,7 +538,9 @@ fun AppTopSearchBar(
                 // Mic tap: capture straight away when permission is held, otherwise
                 // fire the system permission request (capture resumes in its callback).
                 val onMicTap = {
-                    if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
+                    if (!whisperService.isInitialized.value && !whisperService.isModelAvailable()) {
+                        promptVoiceModelDownload()
+                    } else if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
                         == PackageManager.PERMISSION_GRANTED
                     ) {
                         startVoiceCapture(
@@ -862,20 +914,10 @@ fun AppTopSearchBar(
                         .semantics { contentDescription = "Open profile" },
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text(
+                    HomeEngravedGreeting(
                         text = homeGreetingText,
-                        style = com.starception.submission.feature.prayertimes.HomeTypography.greeting.copy(
-                            shadow = Shadow(
-                                color = if (homeHeaderLightText) ComposeColor.Black.copy(alpha = .55f)
-                                    else ComposeColor.White.copy(alpha = .55f),
-                                offset = Offset(0f, 1.5f),
-                                blurRadius = 4f,
-                            ),
-                        ),
                         color = greetingColor,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        onDarkArtwork = homeHeaderLightText,
                     )
                     if (homeSupportingTexts.any(String::isNotBlank)) {
                         HomeRotatingHeaderText(
@@ -887,18 +929,19 @@ fun AppTopSearchBar(
                     }
                 }
                 // Reserve the fixed actions' space while only the greeting fades.
-                Box(Modifier.width(96.dp))
+                Box(Modifier.width(92.dp))
             }
         }
         if (homeImmersiveHeader && homeHeaderActionsVisible && !isSearchViewOpen) {
             Box(
                 Modifier.align(Alignment.TopEnd)
-                    .padding(end = 24.dp, top = topInset.coerceAtLeast(24.dp) + 12.dp),
+                    .padding(end = 16.dp, top = topInset.coerceAtLeast(24.dp) + 12.dp),
             ) {
                 AppHeaderActions(
                     onDarkArtwork = homeHeaderLightText,
                     onSearchClick = { searchViewHolder.value?.show() },
                     onSettingsClick = onSettingsClick,
+                    compact = true,
                 )
             }
         }

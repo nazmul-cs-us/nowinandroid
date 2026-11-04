@@ -132,6 +132,11 @@ fun NiaTheme(
         ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidGradientColors else LightAndroidGradientColors
         ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalGradientColors else LightCoastalGradientColors
         ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalGradientColors else LightRoyalGradientColors
+        ThemeBrand.PURPLE_GOLD,
+        ThemeBrand.CHOCOLATE_TRUFFLE,
+        ThemeBrand.DAMSON_CURACAO,
+        ThemeBrand.CHILI_SPICE,
+        -> defaultGradientColors
         ThemeBrand.CUSTOM -> defaultGradientColors
     }
     // Background theme
@@ -144,6 +149,11 @@ fun NiaTheme(
         ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidBackgroundTheme else LightAndroidBackgroundTheme
         ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalBackgroundTheme else LightCoastalBackgroundTheme
         ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalBackgroundTheme else LightRoyalBackgroundTheme
+        ThemeBrand.PURPLE_GOLD,
+        ThemeBrand.CHOCOLATE_TRUFFLE,
+        ThemeBrand.DAMSON_CURACAO,
+        ThemeBrand.CHILI_SPICE,
+        -> defaultBackgroundTheme
         ThemeBrand.CUSTOM -> defaultBackgroundTheme
     }
     val tintTheme = when (themeBrand) {
@@ -154,6 +164,11 @@ fun NiaTheme(
         ThemeBrand.ANDROID -> TintTheme()
         ThemeBrand.COASTAL -> TintTheme()
         ThemeBrand.ROYAL -> TintTheme()
+        ThemeBrand.PURPLE_GOLD,
+        ThemeBrand.CHOCOLATE_TRUFFLE,
+        ThemeBrand.DAMSON_CURACAO,
+        ThemeBrand.CHILI_SPICE,
+        -> TintTheme(colorScheme.primary)
         ThemeBrand.CUSTOM -> TintTheme(colorScheme.primary)
     }
     // Composition locals
@@ -196,6 +211,10 @@ fun niaColorScheme(
     ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidColorScheme else LightAndroidColorScheme
     ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalColorScheme else LightCoastalColorScheme
     ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalColorScheme else LightRoyalColorScheme
+    ThemeBrand.PURPLE_GOLD -> if (darkTheme) DarkPurpleGoldColorScheme else LightPurpleGoldColorScheme
+    ThemeBrand.CHOCOLATE_TRUFFLE -> if (darkTheme) DarkChocolateTruffleColorScheme else LightChocolateTruffleColorScheme
+    ThemeBrand.DAMSON_CURACAO -> if (darkTheme) DarkDamsonCuracaoColorScheme else LightDamsonCuracaoColorScheme
+    ThemeBrand.CHILI_SPICE -> if (darkTheme) DarkChiliSpiceColorScheme else LightChiliSpiceColorScheme
     ThemeBrand.CUSTOM -> {
         val primary = if (customSeedColor == Color.Unspecified) Color(0xFF6750A4) else customSeedColor
         val secondary = if (customSecondaryColor == Color.Unspecified) null else customSecondaryColor

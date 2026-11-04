@@ -19,8 +19,10 @@ package com.starception.submission.settings.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +34,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -94,7 +99,7 @@ import kotlinx.coroutines.flow.drop
  * Modal bottom-sheet palette editor for the CUSTOM theme. Built around the
  * production-grade [HsvColorPicker] from `skydoves/colorpicker-compose` plus a
  * brightness rail, with a role selector for Primary/Secondary/Tertiary, a row
- * of named-theme reference palettes, and a full-screen live preview of the
+ * of named-theme and Color Hunt palettes, and a full-screen live preview of the
  * home page rendered with the candidate palette.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -155,6 +160,7 @@ fun HsvColorWheelDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 24.dp, vertical = 8.dp)
                         .padding(bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -265,6 +271,27 @@ fun HsvColorWheelDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     ReferencePaletteRow(
+                        onPalettePicked = { (p, s, t) ->
+                            primary = p
+                            secondary = s
+                            tertiary = t
+                            controller.selectByColor(
+                                when (activeRole) {
+                                    0 -> p
+                                    1 -> s
+                                    else -> t
+                                },
+                                fromUser = false,
+                            )
+                        },
+                    )
+
+                    Text(
+                        text = "Popular on Color Hunt",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ColorHuntPaletteRow(
                         onPalettePicked = { (p, s, t) ->
                             primary = p
                             secondary = s
@@ -579,6 +606,7 @@ private data class NamedPalette(
     val primary: Color,
     val secondary: Color,
     val tertiary: Color,
+    val swatches: List<Color> = listOf(primary, secondary, tertiary),
 )
 
 private val ReferencePalettes = listOf(
@@ -587,6 +615,89 @@ private val ReferencePalettes = listOf(
     NamedPalette("Coastal", Color(0xFF006874), Color(0xFF4A6267), Color(0xFF525E7C)),
     NamedPalette("Royal", Color(0xFF2D5DA8), Color(0xFFC9A227), Color(0xFF7B9F7E)),
 )
+
+/** A snapshot of monthly favorites at https://colorhunt.co/palettes/popular (November 2026).
+ * Keep the original four-color order in the swatches; the indices choose the
+ * three accents supported by the persisted Custom theme.
+ */
+private val ColorHuntPalettes = listOf(
+    colorHuntPalette("Sage", "f6e2e9fefaf3b8cfb384a282", 3, 2, 0),
+    colorHuntPalette("Sea Glass", "0862884d8dba97d7ffffefc4", 0, 1, 3),
+    colorHuntPalette("Violet", "4c23657f5d999e7eb5c4a4da", 0, 1, 3),
+    colorHuntPalette("Rosewood", "7c0e44aa5e7ad49a9af2dace", 0, 1, 2),
+    colorHuntPalette("Coral", "de7272ffca88fff6a9b4e4d6", 0, 1, 3),
+    colorHuntPalette("Citrus", "fef3e2f4ae52d4621a2a1a0e", 2, 1, 3),
+    colorHuntPalette("Olive", "15370d728e6de5cd82fff2b4", 0, 1, 2),
+    colorHuntPalette("Twilight", "20273436415ab7d894e0f8c7", 1, 2, 0),
+    colorHuntPalette("Marigold", "d98327ece8af4a943e186049", 3, 0, 2),
+    colorHuntPalette("Lagoon", "1b365d005a9c60c1e5a0e0ef", 1, 2, 0),
+)
+
+private fun colorHuntPalette(
+    name: String,
+    code: String,
+    primaryIndex: Int,
+    secondaryIndex: Int,
+    tertiaryIndex: Int,
+): NamedPalette {
+    require(code.length == 24)
+    val colors = (0..3).map { index ->
+        Color(0xFF000000L or code.substring(index * 6, index * 6 + 6).toLong(16))
+    }
+    return NamedPalette(
+        name = name,
+        primary = colors[primaryIndex],
+        secondary = colors[secondaryIndex],
+        tertiary = colors[tertiaryIndex],
+        swatches = colors,
+    )
+}
+
+@Composable
+private fun ColorHuntPaletteRow(
+    onPalettePicked: (Triple<Color, Color, Color>) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        ColorHuntPalettes.forEach { palette ->
+            Column(
+                modifier = Modifier
+                    .width(96.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable {
+                        onPalettePicked(Triple(palette.primary, palette.secondary, palette.tertiary))
+                    }
+                    .padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            RoundedCornerShape(6.dp),
+                        ),
+                ) {
+                    palette.swatches.forEach { color ->
+                        Box(modifier = Modifier.weight(1f).fillMaxSize().background(color))
+                    }
+                }
+                Text(
+                    text = palette.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun ReferencePaletteRow(

@@ -100,17 +100,17 @@ class ReciterDownloadUiTest {
             compose.onAllNodes(hasText("Abdul Rahman Al-Sudais")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Reciters & offline audio").assertIsDisplayed()
+        File("build/outputs/reciter-ui").mkdirs()
+        compose.onNode(isDialog()).captureRoboImage("build/outputs/reciter-ui/reciter-library-sheet.png")
         compose.onNodeWithContentDescription("Preview Abdul Rahman Al-Sudais")
             .assertIsDisplayed().assertHeightIsAtLeast(48.dp)
-        compose.onNodeWithContentDescription("Manage downloads for Abdul Rahman Al-Sudais")
+        compose.onNodeWithContentDescription("Download remaining audio for Abdul Rahman Al-Sudais")
             .assertHeightIsAtLeast(48.dp).performClick()
         // Opening download details must not change the selected voice.
         assertEquals(null, com.starception.submission.feature.quran.ReciterSelectionStore(context).current().id)
         compose.onNodeWithText("0 of 2 surahs saved").assertIsDisplayed()
         compose.onNodeWithContentDescription("Hide downloads for Abdul Rahman Al-Sudais").performClick()
         compose.onNodeWithText("0 of 2 surahs saved").assertDoesNotExist()
-        File("build/outputs/reciter-ui").mkdirs()
-        compose.onNode(isDialog()).captureRoboImage("build/outputs/reciter-ui/reciter-library-sheet.png")
         compose.onNodeWithContentDescription("Close reciters").performClick()
         compose.onNodeWithTag("reciter-list").assertDoesNotExist()
     }
@@ -164,11 +164,18 @@ class ReciterDownloadUiTest {
             .assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithContentDescription("Stop preview of Abdul Rahman Al-Sudais")
             .assertIsDisplayed().performClick()
-        compose.onNodeWithContentDescription("Manage downloads for Abdul Rahman Al-Sudais").performClick()
+        compose.onNodeWithContentDescription("Download remaining audio for Abdul Rahman Al-Sudais").performClick()
         assertEquals(0, selections)
         assertEquals(1, downloadDetails)
         compose.onNodeWithText("Abdul Rahman Al-Sudais").performClick()
         assertEquals(1, selections)
+    }
+
+    @Test fun downloadControlOnlyStartsIncompleteIdleReciters() {
+        assertEquals(true, shouldStartReciterDownload(DownloadStatus(2, 114), expanded = false))
+        assertEquals(false, shouldStartReciterDownload(DownloadStatus(2, 114, downloading = true), expanded = false))
+        assertEquals(false, shouldStartReciterDownload(DownloadStatus(114, 114), expanded = false))
+        assertEquals(false, shouldStartReciterDownload(DownloadStatus(2, 114), expanded = true))
     }
 
     @Test fun previewDoesNotSelectAndCompletedAudioHasNoDownloadAction() {

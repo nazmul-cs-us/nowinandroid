@@ -46,9 +46,17 @@ internal object PreparedInsightReadings {
         PrayerHadithRecommendation(PrayerHadithCandidate(fields[0], fields[1], fields[2].toInt(), fields[3]), fields[4].toBooleanStrict())
     }).also { prayerCache = it }
 
-    fun ai(context: Context): InsightReadAhead<NowNudgeKnowledgeCandidate> = aiCache ?: cache(context, "ai", { item: NowNudgeKnowledgeCandidate ->
+    fun ai(context: Context): InsightReadAhead<NowNudgeKnowledgeCandidate> = aiCache ?:
+        cache(context, "ai", ::encodeAiFields, ::decodeAiFields).also { aiCache = it }
+
+    /** The Home pager reuses the reader's versioned candidate format. */
+    fun encodeAiCandidate(item: NowNudgeKnowledgeCandidate): String = packInsightFields(encodeAiFields(item))
+
+    fun decodeAiCandidate(value: String): NowNudgeKnowledgeCandidate = decodeAiFields(unpackInsightFields(value))
+
+    private fun encodeAiFields(item: NowNudgeKnowledgeCandidate): List<String> {
         val nudge = item.nudge
-        listOf(nudge.id, nudge.action.name, nudge.label, nudge.prayerName.orEmpty(), nudge.actionId,
+        return listOf(nudge.id, nudge.action.name, nudge.label, nudge.prayerName.orEmpty(), nudge.actionId,
             nudge.supportingText.orEmpty(), nudge.sourceLabel.orEmpty(), item.sourceId, item.collection, item.topic, item.rankingScore.toString()) +
             when (val target = item.target) {
                 is NowNudgeKnowledgeTarget.QuranAyah -> listOf("quran", target.surahNumber.toString(), target.ayahNumber.toString())
@@ -59,7 +67,9 @@ internal object PreparedInsightReadings {
                         postContext.orEmpty(), description.orEmpty(), audioUrl.orEmpty())
                 }
             }
-    }, { fields ->
+    }
+
+    private fun decodeAiFields(fields: List<String>): NowNudgeKnowledgeCandidate {
         val target = when (fields[11]) {
             "quran" -> NowNudgeKnowledgeTarget.QuranAyah(fields[12].toInt(), fields[13].toInt())
             "hadith" -> NowNudgeKnowledgeTarget.Hadith(fields[12], fields[13], fields[14].toInt())
@@ -67,8 +77,8 @@ internal object PreparedInsightReadings {
                 fields[16], fields[17], fields[18], fields[19], fields[20], fields[21], fields[22], fields[23], fields[24].ifEmpty { null }))
             else -> error("Unknown insight destination")
         }
-        NowNudgeKnowledgeCandidate(DeenlyNudge(fields[0], DeenlyNudgeAction.valueOf(fields[1]), fields[2],
+        return NowNudgeKnowledgeCandidate(DeenlyNudge(fields[0], DeenlyNudgeAction.valueOf(fields[1]), fields[2],
             fields[3].ifEmpty { null }, fields[4], fields[5].ifEmpty { null }, fields[6].ifEmpty { null }),
             target, fields[7], fields[8], fields[9], fields[10].toFloat())
-    }).also { aiCache = it }
+    }
 }

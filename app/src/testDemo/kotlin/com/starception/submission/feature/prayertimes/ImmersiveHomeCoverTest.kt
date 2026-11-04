@@ -42,9 +42,12 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
+import com.starception.submission.core.model.deenly.DeenlyNudge
+import com.starception.submission.core.model.deenly.DeenlyNudgeAction
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -71,6 +74,63 @@ class ImmersiveHomeCoverTest {
         assertEquals("Live compass toward Makkah", copy(3).detail)
         assertEquals("AI SUGGESTED", copy(4).eyebrow)
         assertEquals("Quran, Hadith or dua for this moment", copy(4).detail)
+    }
+
+    @Test fun homeModelTurnsAreRetainedAcrossVisitsButResetForANewDay() {
+        val firstVisit = HomePageGenerationCache.forDay("2026-11-03")
+        firstVisit.attempted[2] = true
+        assertSame(firstVisit, HomePageGenerationCache.forDay("2026-11-03"))
+        assertTrue(HomePageGenerationCache.forDay("2026-11-03").attempted[2] == true)
+        assertFalse(HomePageGenerationCache.forDay("2026-11-04").attempted[2] == true)
+    }
+
+    @Test fun reflectionShowsGroundedExcerptInsteadOfDuplicatingGenericModelTitle() {
+        val candidate = NowNudgeKnowledgeCandidate(
+            nudge = DeenlyNudge(
+                id = "grounded-reading",
+                action = DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
+                label = "Knowledge and Wisdom in Islam",
+                supportingText = "A verified narration about prayer and intention.",
+                sourceLabel = "Sunan an-Nasa'i 620",
+            ),
+            target = NowNudgeKnowledgeTarget.QuranAyah(1, 1),
+            sourceId = "test-source",
+            collection = "Sunan an-Nasa'i",
+            topic = "Prayer",
+            rankingScore = 1f,
+        )
+        compose.setContent {
+            MaterialTheme {
+                HomeReflectionPrompt(focusedPage = 1, generatedInsights = mapOf(1 to candidate), onClick = {})
+            }
+        }
+        compose.onNodeWithText("What will you carry into your next prayer?").assertExists()
+        compose.onNodeWithText("A verified narration about prayer and intention.").assertExists()
+        compose.onNodeWithText("Sunan an-Nasa'i 620").assertExists()
+        compose.onNodeWithText("Knowledge and Wisdom in Islam").assertDoesNotExist()
+    }
+
+    @Test fun reflectionPreviewStartsWithTeachingInsteadOfNarratorIntroduction() {
+        assertEquals("If you forget a prayer, pray it when you remember it.", homeEvidencePreview(
+            "It was narrated that Abu Hurairah said: The Messenger of Allah said: " +
+                "'If you forget a prayer, pray it when you remember it.'",
+        ))
+    }
+
+    @Test fun reflectionUsesCoverFadeAcrossAdjacentAndWrappedPages() {
+        for (step in 0..10) {
+            val position = step / 10f
+            val outgoing = homeSwipePageOffset(position, 0)
+            val incoming = homeSwipePageOffset(position, 1)
+            assertEquals("Swipe position $position", 1f, outgoing - incoming, .001f)
+            assertEquals(homeCoverCopyOpacity(position), homeCoverCopyOpacity(outgoing), .001f)
+            assertEquals(homeCoverCopyOpacity(position - 1f), homeCoverCopyOpacity(incoming), .001f)
+
+            val wrapped = 4f + position
+            val last = homeSwipePageOffset(wrapped, 4)
+            val first = homeSwipePageOffset(wrapped, 0)
+            assertEquals("Wrapped swipe position $wrapped", 1f, last - first, .001f)
+        }
     }
 
     @Test fun greetingFollowsTimeOfDay() {
@@ -221,6 +281,8 @@ class ImmersiveHomeCoverTest {
 
     @Test fun swipingCoverUpdatesTheFollowupFeed() {
         val selectedPage = mutableIntStateOf(0)
+        val scrollPosition = mutableFloatStateOf(0f)
+        val dragPositions = mutableListOf<Float>()
         val exploreExpanded = mutableIntStateOf(0)
         compose.setContent {
             CompositionLocalProvider(LocalInspectionMode provides true) {
@@ -238,13 +300,18 @@ class ImmersiveHomeCoverTest {
                                 nextPrayerCountdown = "1h 41m",
                                 currentPrayerName = "Fajr",
                                 readingSurahName = "Al-Kahf",
-                                readingSurahNumber = 18,
-                                onSelectionChanged = { selectedPage.intValue = it },
-                                onOpen = {},
+                                 readingSurahNumber = 18,
+                                 onSelectionChanged = { selectedPage.intValue = it },
+                                 onScrollPositionChanged = {
+                                     scrollPosition.floatValue = it
+                                     dragPositions += it
+                                 },
+                                 onOpen = {},
                             )
                         }
-                         HomeReflectionPrompt(
-                             focusedPage = selectedPage.intValue,
+                          HomeReflectionPrompt(
+                              focusedPage = selectedPage.intValue,
+                              scrollPosition = scrollPosition.floatValue,
                              exploreExpanded = exploreExpanded.intValue != 0,
                              onExploreToggle = { exploreExpanded.intValue = 1 - exploreExpanded.intValue },
                              exploreContent = {
@@ -264,6 +331,8 @@ class ImmersiveHomeCoverTest {
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_cover_reflection.png")
         compose.onNodeWithText("Make time for Fajr").performTouchInput { swipeLeft() }
         compose.waitForIdle()
+        assertTrue("Reflection should receive the in-flight cover position",
+            dragPositions.any { it > .1f && it < .9f })
         assertEquals(1, selectedPage.intValue)
         compose.onNodeWithText("What will you carry into your next prayer?").fetchSemanticsNode()
         compose.onNodeWithContentDescription("Expand home options").performScrollTo().performClick()
@@ -286,6 +355,9 @@ class ImmersiveHomeCoverTest {
 
     @Test fun scrollingKeepsReflectionAndCardSectionsAligned() {
         compose.setContent {
+            CompositionLocalProvider(LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
             CompositionLocalProvider(LocalDarkTheme provides true) {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     val scroll = rememberScrollState()
@@ -316,10 +388,13 @@ class ImmersiveHomeCoverTest {
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Expand home options").performScrollTo().performClick()
         compose.waitForIdle()
+        // The reflection can scroll entirely off-screen when the opened rail
+        // brings its last row into view. Clipped semantics bounds report 0 for
+        // that off-screen text even though both elements are inset equally.
         val reflectionLeft = compose.onNodeWithText("PRAYER REFLECTION")
-            .fetchSemanticsNode().boundsInRoot.left
+            .getUnclippedBoundsInRoot().left.value
         val cardsLeft = compose.onNodeWithTag("homeExploreReveal")
-            .fetchSemanticsNode().boundsInRoot.left
+            .getUnclippedBoundsInRoot().left.value
         assertEquals(reflectionLeft, cardsLeft, .5f)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_scrolled.png")
     }

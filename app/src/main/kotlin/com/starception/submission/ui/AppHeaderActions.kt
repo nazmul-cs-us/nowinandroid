@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -41,13 +42,14 @@ internal fun AppHeaderActions(
     onDarkArtwork: Boolean,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    compact: Boolean = false,
 ) {
     Box(contentAlignment = Alignment.Center) {
         AppActionSurround(
             onDarkArtwork = onDarkArtwork,
             modifier = Modifier.matchParentSize(),
         )
-        Row {
+        Row(horizontalArrangement = Arrangement.spacedBy(if (compact) (-4).dp else 0.dp)) {
             AppActionButton(onSearchClick, showSurround = false) {
                 HeaderActionIcon(
                     painter = painterResource(R.drawable.ic_home_search_fine),
@@ -124,8 +126,8 @@ private fun pairedActionPath(width: Float, height: Float, separationFraction: Fl
     // joining surface some elasticity; both resting states keep their old size.
     val swell = sin(PI.toFloat() * progress) * 1.25f
     val radius = height * ((22f + progress + swell) / 48f)
-    val left = width * .25f
-    val distance = width * .5f * progress
+    val left = height / 2f
+    val distance = (width - height) * progress
     val right = left + distance
     val middle = (left + right) / 2f
     val y = height / 2f

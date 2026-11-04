@@ -124,7 +124,8 @@ class NiaAppState(
             return destination.hasRoute<SurahRoute>() ||
                 destination.hasRoute<CourseDetailRoute>() ||
                 destination.hasRoute<DuaDetailRoute>() ||
-                destination.hasRoute<HadithDetailRoute>()
+                destination.hasRoute<HadithDetailRoute>() ||
+                destination.hasRoute<SettingsRoute>()
         }
 
     val shouldHideStatusBar: Boolean

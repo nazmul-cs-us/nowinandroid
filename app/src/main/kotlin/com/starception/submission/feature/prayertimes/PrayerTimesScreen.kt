@@ -3069,6 +3069,82 @@ fun PrayerTimesScreen(
                 var coverPage by rememberSaveable { mutableIntStateOf(0) }
                 var exploreExpanded by rememberSaveable { mutableStateOf(false) }
                 val coverScrollPosition = remember { mutableFloatStateOf(coverPage.toFloat()) }
+                val homeRecommendationStore = remember(screenContext.applicationContext) {
+                    HomePageRecommendationStore(screenContext.applicationContext)
+                }
+                val homePageGeneration = remember(nudgeDay) {
+                    HomePageGenerationCache.forDay(nudgeDay).also { homeRecommendationStore.restore(nudgeDay, it) }
+                }
+                val generatedHomePages = homePageGeneration.generated
+                val homeGenerationScope = rememberCoroutineScope()
+                val homeModelAvailable = remember(nudgeDay, aiModelDownloadTick) {
+                    com.starception.submission.ml.DeenlyKnowledgeModel(screenContext)
+                        .isKnowledgeModelAvailable()
+                }
+                LaunchedEffect(homeModelAvailable) {
+                    if (!homeModelAvailable) {
+                        // Downloads may finish in the app-shell sheet while Home
+                        // remains composed. Poll only the file metadata until it
+                        // appears; never invoke inference on this timer.
+                        while (true) {
+                            delay(15_000)
+                            if (com.starception.submission.ml.DeenlyKnowledgeModel(screenContext)
+                                    .isKnowledgeModelAvailable()
+                            ) {
+                                aiModelDownloadTick++
+                                break
+                            }
+                        }
+                    }
+                }
+                val homeScrollThreshold = with(LocalDensity.current) { 96.dp.toPx() }
+                val homeScrollEngaged by remember(portraitScrollState, homeScrollThreshold) {
+                    derivedStateOf { portraitScrollState.value > homeScrollThreshold }
+                }
+                LaunchedEffect(coverPage, homeScrollEngaged, homePageGeneration.generatingPage, homeModelAvailable, expandedAiCandidate) {
+                    val page = coverPage.coerceIn(0, 4)
+                    if (!homeModelAvailable || (!homeScrollEngaged && page == 0) ||
+                        homePageGeneration.generatingPage != -1 || homePageGeneration.attempted[page] == true
+                    ) return@LaunchedEffect
+                    // Only the settled page may claim a turn. Fast swipes cancel
+                    // this delay; one active job and a per-day cache prevent
+                    // scroll frames from repeatedly invoking the on-device model.
+                    delay(500)
+                    val preparedCandidate = expandedAiCandidate
+                    if (page == 4 && preparedCandidate != null) {
+                        generatedHomePages[page] = preparedCandidate
+                        homePageGeneration.attempted[page] = true
+                        homeRecommendationStore.save(nudgeDay, page, preparedCandidate)
+                        return@LaunchedEffect
+                    }
+                    homePageGeneration.attempted[page] = true
+                    homePageGeneration.generatingPage = page
+                    homeGenerationScope.launch {
+                        try {
+                            val candidate = nowNudgeKnowledgeProvider.load(
+                                date = LocalDate.parse(nudgeDay),
+                                variation = 128 + page * 16,
+                                query = homeFeedKnowledgeQuery(page),
+                                appSituation = latestExpandedAppSituation,
+                                rankingContext = latestExpandedKnowledgeContext,
+                                task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
+                            )
+                            if (candidate != null) {
+                                generatedHomePages[page] = candidate
+                                homeRecommendationStore.save(nudgeDay, page, candidate)
+                            }
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            // Navigation can dispose Home mid-turn. An unfinished
+                            // turn must not block this page for the rest of the day.
+                            homePageGeneration.attempted.remove(page)
+                            throw cancelled
+                        } catch (error: Exception) {
+                            android.util.Log.w("HomeReflection", "Could not prepare page $page", error)
+                        } finally {
+                            homePageGeneration.generatingPage = -1
+                        }
+                    }
+                }
                 val prayerArtworkNight = prayerTimes?.let {
                     currentTime.isBefore(it.sunrise) || !currentTime.isBefore(it.maghrib)
                 } ?: (currentTime.hour < 6 || currentTime.hour >= 18)
@@ -3945,9 +4021,9 @@ fun PrayerTimesScreen(
                                                     nextPrayerName = coverNextPrayerName,
                                                     nextPrayerCountdown = PrayerTimeHelpers
                                                         .getTimeUntilNextPrayer(currentTime, prayerTimes),
-                                                    readingSurahName = coverReading.nameEnglish,
-                                                    readingSurahNumber = coverReading.number,
-                                                    onSelectionChanged = { coverPage = it },
+                                                 readingSurahName = coverReading.nameEnglish,
+                                                 readingSurahNumber = coverReading.number,
+                                                 onSelectionChanged = { coverPage = it },
                                                     onScrollPositionChanged = { coverScrollPosition.floatValue = it },
                                                     onOpen = { page ->
                                                         coverPage = page
@@ -3958,11 +4034,13 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileExpanded) {
-                                            HomeReflectionPrompt(
-                                                focusedPage = coverPage,
+                                             HomeReflectionPrompt(
+                                                 focusedPage = coverPage,
+                                                 scrollPosition = coverScrollPosition.floatValue,
                                                 onDarkCover = !darkHome,
                                                 exploreExpanded = exploreExpanded,
                                                 onExploreToggle = { exploreExpanded = !exploreExpanded },
+                                                generatedInsights = generatedHomePages,
                                                 exploreContent = {
                                                     HomeArtworkRail(
                                                         focusedPage = coverPage,
@@ -3995,7 +4073,9 @@ fun PrayerTimesScreen(
                                                     }
                                                 },
                                             ) {
-                                                feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
+                                                val generated = generatedHomePages[coverPage]
+                                                if (generated != null) openExpandedAiCandidate(generated)
+                                                else feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
                                             }
                                             Spacer(Modifier.height(28.dp))
                                         }

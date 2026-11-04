@@ -17,6 +17,7 @@
 package com.starception.submission.core.datastore
 
 import com.starception.submission.core.datastore.test.InMemoryDataStore
+import com.starception.submission.core.model.data.ThemeBrand
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -24,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class NiaPreferencesDataSourceTest {
@@ -87,5 +89,18 @@ class NiaPreferencesDataSourceTest {
     fun userShouldUseDynamicColorIsTrueWhenSet() = testScope.runTest {
         subject.setDynamicColorPreference(true)
         assertTrue(subject.userData.first().useDynamicColor)
+    }
+
+    @Test
+    fun curatedThemeBrandsRoundTripThroughPreferences() = testScope.runTest {
+        listOf(
+            ThemeBrand.PURPLE_GOLD,
+            ThemeBrand.CHOCOLATE_TRUFFLE,
+            ThemeBrand.DAMSON_CURACAO,
+            ThemeBrand.CHILI_SPICE,
+        ).forEach { brand ->
+            subject.setThemeBrand(brand)
+            assertEquals(brand, subject.userData.first().themeBrand)
+        }
     }
 }
