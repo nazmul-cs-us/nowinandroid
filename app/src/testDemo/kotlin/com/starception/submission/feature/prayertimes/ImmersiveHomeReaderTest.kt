@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -132,6 +133,23 @@ class ImmersiveHomeReaderTest {
             assertEquals(page, expandedPage)
             compose.onRoot().captureRoboImage("src/testDemo/screenshots/$image")
             assertCloseStaysClearOfStatusBar()
+            if (page == 2) {
+                val grip = compose.onNodeWithContentDescription("Resize insight from bottom right")
+                val before = grip.fetchSemanticsNode().boundsInRoot
+                val rootWidth = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
+                // Cross the old 55% presentation cutoff without fully collapsing.
+                grip.performTouchInput {
+                    swipe(center, center - Offset(0f, rootWidth * 240f / 393f), 900)
+                }
+                compose.waitForIdle()
+                val after = grip.fetchSemanticsNode().boundsInRoot
+                assertTrue("Resize handle did not reduce tile height", after.bottom < before.bottom)
+                assertEquals(2, expandedPage)
+                compose.onNodeWithText("Quran text is unavailable").assertIsDisplayed()
+                compose.onNodeWithContentDescription("Collapse insight").assertIsDisplayed().performClick()
+                compose.waitForIdle()
+                assertEquals(null, expandedPage)
+            }
             if (page == 4) {
                 compose.onRoot().performTouchInput {
                     swipe(Offset(190f, 690f), Offset(190f, 230f), 350)

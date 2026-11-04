@@ -1857,6 +1857,13 @@ internal fun SwipeableBigTiles(
     )
     // Keep interpolated layout dimensions within their measured bounds.
     val expansionProgress = animatedExpansionProgress.coerceIn(0f, 1f)
+    // Resizing changes the viewport, not the open reader's presentation. Keep
+    // its content and close action until the grip actually collapses the tile.
+    val readerPresentationProgress = if (immersiveHome && expandedLogicalPage != null) {
+        1f
+    } else {
+        expansionProgress
+    }
     LaunchedEffect(expansionProgress) {
         onExpansionProgressChange(expansionProgress)
     }
@@ -2114,7 +2121,7 @@ internal fun SwipeableBigTiles(
                     // settled page. Keeping incoming pages expanded prevents their
                     // compact artwork flashing while a swipe is still settling.
                     val isExpandedCard = expandedLogicalPage != null
-                    val presentationExpanded = if (immersiveHome) expansionProgress >= 0.55f else isExpandedCard
+                    val presentationExpanded = isExpandedCard
                     val renderExpandedPayload = presentationExpanded &&
                         (page == pagerState.settledPage || page == pagerState.currentPage)
                     val onCardLongPress: (() -> Unit)? = when {
@@ -2172,7 +2179,7 @@ internal fun SwipeableBigTiles(
                             statusMetaText = prayerWeatherInsight?.summary,
                             weatherThresholds = weatherThresholds,
                             compactProgress = compactProgress,
-                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) readerPresentationProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
@@ -2236,7 +2243,7 @@ internal fun SwipeableBigTiles(
                             skyTintStrength = livePrayerSkyPalette.strength * 0.58f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.72f,
                             compactProgress = compactProgress,
-                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) readerPresentationProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
@@ -2361,7 +2368,7 @@ internal fun SwipeableBigTiles(
                             skyTintStrength = livePrayerSkyPalette.strength * 0.46f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.64f,
                             compactProgress = compactProgress,
-                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) readerPresentationProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
@@ -2477,7 +2484,7 @@ internal fun SwipeableBigTiles(
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness *
                                 if (isExpandedCard) 0.24f else 0.68f,
                             compactProgress = compactProgress,
-                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) readerPresentationProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
@@ -2557,7 +2564,7 @@ internal fun SwipeableBigTiles(
                             skyTintStrength = livePrayerSkyPalette.strength * 0.50f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.70f,
                             compactProgress = compactProgress,
-                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) expansionProgress else 0f,
+                            expansionProgress = if (immersiveHome || expandedLogicalPage != null) readerPresentationProgress else 0f,
                             isExpanded = presentationExpanded,
                             fluidFullBleed = immersiveHome && edgeToEdgeArtwork,
                             lightHomeArtwork = immersiveHome && !LocalDarkTheme.current,
@@ -2738,7 +2745,7 @@ internal fun SwipeableBigTiles(
                 }
             }
 
-            val closeMorphProgress = insightActionSeparationProgress(expansionProgress)
+            val closeMorphProgress = insightActionSeparationProgress(readerPresentationProgress)
             if (closeMorphProgress > 0f && (isImmersive || immersiveHome)) {
                 val safeControlTopInset = immersiveInsightControlTopInset(stripTopInWindowPx)
                 val controlTopInset = if (focusedReaderChromeHidden) {
