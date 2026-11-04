@@ -1,11 +1,15 @@
 package com.starception.submission.feature.quran
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 class ReciterCatalogTest {
@@ -32,5 +36,32 @@ class ReciterCatalogTest {
         assertEquals(listOf("1-2", "1-3"), result.map { it.id })
         assertEquals(setOf(1, 2), result.first().surahs)
         assertEquals("https://example.org/audio/", result.first().server)
+    }
+
+    @Test fun completedOlderReciterRemainsAvailableWhenCatalogChanges() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val preferences = context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+        val reciter = ReciterCatalog.Reciter("87654-9876", "Saved Reciter",
+            "https://example.org/audio/", setOf(1, 2), "Hafs")
+        val directory = File(context.filesDir, "quran/reciters/${reciter.id}")
+        try {
+            directory.mkdirs()
+            File(directory, "001.mp3").writeText("audio")
+            File(directory, "002.mp3").writeText("audio")
+            preferences.edit().putString("catalog_json", """{"reciters":[{"id":87654,"name":"Saved Reciter","moshaf":[
+                {"id":9876,"name":"Hafs","server":"https://example.org/audio/","surah_list":"1,2"}
+            ]}]}""").commit()
+            assertEquals(listOf(reciter.id), ReciterCatalog.cached(context)?.map { it.id })
+            assertEquals(2, ReciterDownloadManager.get(context).snapshot(reciter).downloadedSurahs)
+            assertEquals(listOf(reciter.id), ReciterCatalog.offline(context).map { it.id })
+            preferences.edit().putString("catalog_json", """{"reciters":[]}""").commit()
+            assertEquals(listOf(reciter), ReciterCatalog.offline(context))
+            ReciterCatalog.forgetDownloaded(context, reciter.id)
+            assertEquals(listOf(reciter), ReciterCatalog.offline(context, listOf(reciter)))
+            assertEquals(listOf(reciter), ReciterCatalog.offline(context))
+        } finally {
+            ReciterDownloadManager.get(context).delete(reciter)
+            preferences.edit().remove("catalog_json").commit()
+        }
     }
 }

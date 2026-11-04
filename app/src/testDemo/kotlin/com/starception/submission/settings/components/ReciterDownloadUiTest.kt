@@ -83,6 +83,51 @@ class ReciterDownloadUiTest {
         assertEquals("1-2", com.starception.submission.feature.quran.ReciterSelectionStore(context).current().id)
     }
 
+    @Test fun completedReciterAppearsInSurahPickerAndStorageWithoutNetwork() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+        org.robolectric.Shadows.shadowOf(connectivity).setActiveNetworkInfo(null)
+        context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).edit().clear()
+            .putString("catalog_json", """{"reciters":[
+                {"id":991,"name":"Offline Voice","moshaf":[{"id":992,"name":"Hafs","server":"https://example.org/audio/","surah_list":"1,2"}]},
+                {"id":993,"name":"Online Voice","moshaf":[{"id":994,"name":"Hafs","server":"https://example.org/audio/","surah_list":"1,2"}]}
+            ]}""").commit()
+        val reciter = ReciterCatalog.Reciter("991-992", "Offline Voice", "https://example.org/audio/", setOf(1, 2), "Hafs")
+        val directory = File(context.filesDir, "quran/reciters/${reciter.id}")
+        val showPicker = mutableStateOf(false)
+        try {
+            directory.mkdirs()
+            File(directory, "001.mp3").writeText("audio")
+            File(directory, "002.mp3").writeText("audio")
+            compose.setContent { MaterialTheme { Surface {
+                if (showPicker.value) ReciterStorageSection(initiallyExpanded = true, manageDownloads = false)
+                else ReciterStorageSection()
+            } } }
+            compose.waitUntil(5_000) {
+                compose.onAllNodes(hasText("Available offline: Offline Voice"))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithText("Quran recitations").performClick()
+            compose.waitUntil(5_000) {
+                compose.onAllNodes(hasText("Downloaded reciters")).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithText("Offline Voice").assertIsDisplayed()
+            compose.onNodeWithText("Available offline · 2 surahs").assertIsDisplayed()
+            compose.onNodeWithTag("reciter-list").performScrollToNode(hasText("More reciters"))
+            compose.onNodeWithTag("reciter-list").performScrollToNode(hasText("Offline Voice"))
+            compose.onNodeWithContentDescription("Show offline details for Offline Voice").performClick()
+            compose.onNodeWithText("Available offline").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Close reciters").performClick()
+            compose.runOnIdle { showPicker.value = true }
+            compose.waitUntil(5_000) {
+                compose.onAllNodes(hasText("Available offline · Hafs")).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithText("Offline Voice").assertIsDisplayed()
+        } finally {
+            com.starception.submission.feature.quran.ReciterDownloadManager.get(context).delete(reciter)
+        }
+    }
+
     @Test fun storageOpensADedicatedSheetWithCompactIndependentDownloadControls() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)

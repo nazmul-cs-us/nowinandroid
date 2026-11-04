@@ -123,6 +123,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -211,15 +213,19 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -318,6 +324,7 @@ import com.starception.submission.core.images.resources.Res as ImageRes
 import com.starception.submission.ui.VoiceNudgeSparkles
 import com.starception.submission.ui.AppActionButton
 import com.starception.submission.ui.AppActionSurround
+import com.starception.submission.ui.HomeEngravedGreeting
 import kotlinx.datetime.LocalDate as KotlinLocalDate
 import org.jetbrains.compose.resources.painterResource as composePainterResource
 
@@ -2346,9 +2353,9 @@ internal fun SwipeableBigTiles(
                             // Let more of the reading scene breathe around the Quran.
                             foregroundBaseScale = 0.74f,
                             foregroundOffsetFraction = Offset(0f, 0.09f),
-                            // The verse surfaces provide contrast without a
-                            // full-screen blur pass on every reading frame.
-                            disableExpandedArtworkBlur = true,
+                            // Defocus the artwork behind the flowing passage;
+                            // text and controls live outside the blurred layers.
+                            expandedArtworkBlurRadius = 6.dp,
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.46f,
@@ -3333,6 +3340,7 @@ internal fun InsightPreviewCard(
     // scene sharp and clips a stronger blur to the lower reading region.
     expandedBlurStartFraction: Float? = null,
     disableExpandedArtworkBlur: Boolean = false,
+    expandedArtworkBlurRadius: Dp = 1.8.dp,
     compactProgress: Float,
     expansionProgress: Float = 0f,
     isExpanded: Boolean = false,
@@ -3380,6 +3388,7 @@ internal fun InsightPreviewCard(
     disableCardGesturesWhenExpanded: Boolean = false,
 ) {
     val editorialExpanded = isExpanded && useEditorialExpandedLayout
+    val engravedHomeHeader = isExpanded && fluidFullBleed
     val readerChrome = rememberInsightReaderChrome(editorialExpanded)
     val chromeProgress = insightReaderChromeProgress(readerChrome, editorialExpanded)
     LaunchedEffect(editorialExpanded, readerChrome.hidden, isFocused) {
@@ -3571,7 +3580,7 @@ internal fun InsightPreviewCard(
             val expandedArtworkBlur = if (
                 isExpanded && expandedBlurStartFraction == null && !disableExpandedArtworkBlur
             ) {
-                1.8.dp
+                expandedArtworkBlurRadius
             } else {
                 0.dp
             }
@@ -4130,7 +4139,9 @@ internal fun InsightPreviewCard(
                         onClick ?: {}
                     },
                     shape = CircleShape,
-                    color = if (editorialExpanded && readingSurahIndex == null && !readerChrome.hidden) {
+                    // All expanded Home headings start at the same inset. Keep
+                    // the pill only for the compact label or Show controls.
+                    color = if (engravedHomeHeader && !readerChrome.hidden) {
                         Color.Transparent
                     } else {
                         Color.Black.copy(alpha = if (editorialExpanded) 0.52f else 0.34f)
@@ -4145,16 +4156,26 @@ internal fun InsightPreviewCard(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     ) {
-                        Text(
-                            text = if (editorialExpanded && readerChrome.hidden) "Show controls" else displayLabel,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = labelFontSize,
-                                letterSpacing = 0.sp,
-                            ),
-                            color = Color.White,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                        )
+                        if (engravedHomeHeader && !readerChrome.hidden) {
+                            // Use the Home greeting's larger type and shallow engraved
+                            // edge for every expanded insight heading.
+                            HomeEngravedGreeting(
+                                text = displayLabel,
+                                color = Color.White,
+                                onDarkArtwork = true,
+                            )
+                        } else {
+                            Text(
+                                text = if (editorialExpanded && readerChrome.hidden) "Show controls" else displayLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = labelFontSize,
+                                    letterSpacing = 0.sp,
+                                ),
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
 
@@ -5323,6 +5344,8 @@ private fun EditorialQuranReadingStage(
     val translationCode = quranPrefs.getString("quran_translation", "ar") ?: "ar"
     val showTranslation = quranPrefs.getBoolean("show_translation", true)
     val showTajweed = quranPrefs.getBoolean("show_tajweed", false)
+    val selectedArabicFont = quranPrefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
+    val useIndoPakEdition = selectedArabicFont == "indopak_script" || selectedArabicFont == "pdms_saleem"
     val assetRepository = remember(context) {
         EntryPointAccessors.fromApplication(
             context.applicationContext,
@@ -5339,7 +5362,7 @@ private fun EditorialQuranReadingStage(
         )
     }
     val arabicFontFamily = remember(context, quranPreferenceVersion) {
-        when (quranPrefs.getString("arabic_font", "indopak_script")) {
+        when (selectedArabicFont) {
             "noor_e_hidayat" -> QuranFonts.NoorEHidayat
             "thabit" -> QuranFonts.Thabit
             "uthmani_script" -> QuranFonts.UthmanicScript
@@ -5347,6 +5370,7 @@ private fun EditorialQuranReadingStage(
             else -> QuranFonts.PDMSSaleem
         }
     }
+    var sourceAyahs by remember(surah.number) { mutableStateOf<List<Ayah>>(emptyList()) }
     var ayahs by remember(surah.number) { mutableStateOf<List<Ayah>>(emptyList()) }
     var isLoadingAyahs by remember(surah.number) { mutableStateOf(true) }
     var translations by remember(surah.number) { mutableStateOf<Map<Int, String>>(emptyMap()) }
@@ -5361,7 +5385,7 @@ private fun EditorialQuranReadingStage(
             emptyMap()
         }
     }
-    LaunchedEffect(surah.number, translationCode, showTranslation) {
+    LaunchedEffect(surah.number, translationCode, showTranslation, useIndoPakEdition) {
         isLoadingAyahs = true
         suspend fun openingAyahs(source: QuranRepository): List<Ayah> {
             val resolved = source.getSurahByNumber(surah.number) ?: return emptyList()
@@ -5378,8 +5402,22 @@ private fun EditorialQuranReadingStage(
         }
         // Source databases may prepend the opening Bismillah to verse 1. It is
         // recited separately except in Al-Fatihah, and is absent in At-Tawbah.
-        ayahs = ayahs.map { ayah ->
+        sourceAyahs = ayahs.map { ayah ->
             ayah.copy(text = removeBismillahIfNeeded(ayah.text, surah.number, ayah.numberInSurah))
+        }
+        val indoPakTexts = if (useIndoPakEdition) {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    com.starception.submission.core.qurandatabase.IndoPakTextRepository
+                        .getInstance(context).getSurahTexts(surah.number)
+                }.getOrDefault(emptyMap())
+            }
+        } else {
+            emptyMap()
+        }
+        ayahs = sourceAyahs.map { ayah ->
+            val matchingText = indoPakTexts[ayah.numberInSurah] ?: return@map ayah
+            ayah.copy(text = removeBismillahIfNeeded(matchingText, surah.number, ayah.numberInSurah))
         }
         translations = if (showTranslation && translationCode != "ar") {
             runCatching {
@@ -5401,30 +5439,59 @@ private fun EditorialQuranReadingStage(
         }
         isLoadingAyahs = false
     }
+    val editionTajweedAnnotations = remember(sourceAyahs, ayahs, tajweedAnnotations) {
+        if (sourceAyahs == ayahs) tajweedAnnotations else {
+            sourceAyahs.zip(ayahs).mapNotNull { (source, displayed) ->
+                val rules = tajweedAnnotations[source.numberInSurah] ?: return@mapNotNull null
+                source.numberInSurah to if (source.text == displayed.text) rules else {
+                    com.starception.submission.feature.surah.tajweed.TajweedEditionMapper.remap(
+                        sourceText = source.text,
+                        targetText = displayed.text,
+                        annotations = rules,
+                    )
+                }
+            }.toMap()
+        }
+    }
 
     val isPlaying = playback.isPlaying && playback.surahIndex == surah.number - 1
     val compression = compactProgress.coerceIn(0f, 1f)
     val readingScrollState = rememberLazyListState()
+    // Keep translations paired with their verse. Arabic-only reading flows in
+    // bounded passages so even long Surahs retain lazy text layout.
+    val passages = remember(ayahs, translations) {
+        ayahs.chunked(if (translations.values.any(String::isNotBlank)) 1 else 12)
+    }
+    val readingShadow = androidx.compose.ui.graphics.Shadow(
+        color = Color.Black.copy(alpha = 0.8f),
+        offset = Offset(0f, 2f),
+        blurRadius = 6f,
+    )
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val blocks = ayahs.flatMap { ayah ->
-            val translation = translations[ayah.numberInSurah]?.takeIf(String::isNotBlank)
+        val arabicVerseStyle = MaterialTheme.typography.bodyMedium.copy(
+            fontFamily = arabicFontFamily,
+            fontSize = (24f - 5f * compression).sp,
+            // IndoPak and Uthmani diacritics extend beyond the glyph body.
+            lineHeight = (48f - 7f * compression).sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.sp,
+            textDirection = TextDirection.Rtl,
+            shadow = readingShadow,
+        )
+        val blocks = passages.flatMap { passage ->
+            val translation = translations[passage.first().numberInSurah]?.takeIf(String::isNotBlank)
             listOfNotNull(
                 InsightTextBlock(
-                    ayah.text.trim(),
-                    MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = arabicFontFamily,
-                        fontSize = (if (translation != null) 21f - 4f * compression else 25f - 6f * compression).sp,
-                        lineHeight = (if (translation != null) 31f - 7f * compression else 37f - 9f * compression).sp,
-                        letterSpacing = 0.sp,
-                    ),
-                    48.dp,
+                    passage.joinToString("  ") { "${it.text.trim()} ${it.numberInSurah.toArabicIndic()}" },
+                    arabicVerseStyle,
+                    16.dp,
                 ),
                 translation?.let {
                     InsightTextBlock(it, insightReadingTranslationStyle(compression), 8.dp)
                 },
             )
         }
-        val naturalHeight = insightTextHeight(blocks, maxWidth) + 64.dp
+        val naturalHeight = insightTextHeight(blocks, (maxWidth - 16.dp).coerceAtLeast(100.dp)) + 64.dp
         LaunchedEffect(naturalHeight, ayahs.isEmpty()) {
             if (ayahs.isNotEmpty()) onPreferredHeightChange(naturalHeight)
         }
@@ -5525,62 +5592,81 @@ private fun EditorialQuranReadingStage(
                     .weight(1f),
                 state = readingScrollState,
                 overscrollEffect = null,
-                contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(
-                    items = ayahs,
-                    key = { ayah -> ayah.numberInSurah },
-                ) { ayah ->
-                    val translation = translations[ayah.numberInSurah]
+                    items = passages,
+                    key = { passage -> passage.first().numberInSurah },
+                ) { passage ->
+                    val translation = translations[passage.first().numberInSurah]
                         ?.takeIf(String::isNotBlank)
+                    val passageText = remember(passage, showTajweed, editionTajweedAnnotations) {
+                        buildAnnotatedString {
+                            passage.forEachIndexed { index, ayah ->
+                                if (index > 0) append("  ")
+                                append(
+                                    if (showTajweed) {
+                                        com.starception.submission.feature.surah.tajweed.TajweedTextApplier
+                                            .applyWithOverlap(
+                                                text = ayah.text.trim(),
+                                                annotations = editionTajweedAnnotations[ayah.numberInSurah].orEmpty(),
+                                            )
+                                    } else {
+                                        androidx.compose.ui.text.AnnotatedString(ayah.text.trim())
+                                    },
+                                )
+                                append("\u00A0")
+                                appendInlineContent("ayah-${ayah.numberInSurah}", "(${ayah.numberInSurah.toArabicIndic()})")
+                            }
+                        }
+                    }
+                    val verseMarkers = passage.associate { ayah ->
+                        "ayah-${ayah.numberInSurah}" to InlineTextContent(
+                            // Arabic swashes can extend beyond their advance width.
+                            // Reserve breathing room on both sides of the marker.
+                            Placeholder(1.4.em, 1.1.em, PlaceholderVerticalAlign.TextCenter),
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxHeight().aspectRatio(1f).padding(2.dp)
+                                        .border(0.8.dp, HomeReferenceGold.copy(alpha = 0.9f), CircleShape)
+                                        .semantics { contentDescription = "Ayah ${ayah.numberInSurah}" },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = ayah.numberInSurah.toArabicIndic(),
+                                        style = TextStyle(shadow = readingShadow),
+                                        fontFamily = QuranFonts.Amiri,
+                                        fontSize = arabicVerseStyle.fontSize * if (ayah.numberInSurah >= 100) 0.40f else 0.48f,
+                                        color = HomeReferenceGold,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFF0B1827).copy(alpha = 0.68f))
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(7.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
-                            text = "${ayah.numberInSurah}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = HomeReferenceGold.copy(alpha = 0.96f),
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = if (showTajweed) {
-                                com.starception.submission.feature.surah.tajweed.TajweedTextApplier
-                                    .applyWithOverlap(
-                                        text = ayah.text.trim(),
-                                        annotations = tajweedAnnotations[ayah.numberInSurah].orEmpty(),
-                                    )
-                            } else {
-                                androidx.compose.ui.text.AnnotatedString(ayah.text.trim())
-                            },
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = arabicFontFamily,
-                                fontSize = if (translation != null) {
-                                    (21f - (4f * compression)).sp
-                                } else {
-                                    (25f - (6f * compression)).sp
-                                },
-                                lineHeight = if (translation != null) {
-                                    (31f - (7f * compression)).sp
-                                } else {
-                                    (37f - (9f * compression)).sp
-                                },
-                                letterSpacing = 0.sp,
-                            ),
-                            color = Color.White.copy(alpha = 0.98f),
-                            textAlign = TextAlign.Center,
+                            text = passageText,
+                            inlineContent = verseMarkers,
+                            style = arabicVerseStyle,
+                            color = Color.White,
+                            // Android justification can displace inline placeholder
+                            // bounds; natural RTL spacing keeps markers with text.
+                            textAlign = TextAlign.Right,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         translation?.let { translatedText ->
                             Text(
                                 text = translatedText,
-                                style = insightReadingTranslationStyle(compression),
+                                style = insightReadingTranslationStyle(compression).copy(shadow = readingShadow),
                                 color = Color.White.copy(alpha = 0.88f),
                                 textAlign = TextAlign.Start,
                                 modifier = Modifier.fillMaxWidth(),

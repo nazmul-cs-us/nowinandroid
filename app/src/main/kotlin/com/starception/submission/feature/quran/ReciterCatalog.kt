@@ -13,6 +13,7 @@ import kotlin.coroutines.coroutineContext
 /** MP3Quran catalog; keeps the bundled/CDN recitation as a separate default option. */
 object ReciterCatalog {
     private val downloadLocks = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
+    private const val OFFLINE_RECITER_PREFIX = "offline_reciter_"
 
     data class Reciter(
         val id: String,
@@ -27,6 +28,60 @@ object ReciterCatalog {
         val json = context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
             .getString("catalog_json", null) ?: return@withContext null
         try { parse(json) } catch (_: org.json.JSONException) { null }
+    }
+
+    /** Preserve names and supported surahs independently of the changing online catalog. */
+    internal fun rememberDownloaded(context: Context, reciter: Reciter) {
+        if (!reciter.id.matches(Regex("[0-9]+-[0-9]+"))) return
+        val metadata = JSONObject()
+            .put("id", reciter.id)
+            .put("name", reciter.name)
+            .put("server", reciter.server)
+            .put("surahs", reciter.surahs.sorted().joinToString(","))
+            .put("riwaya", reciter.riwaya)
+        context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).edit()
+            .putString(OFFLINE_RECITER_PREFIX + reciter.id, metadata.toString()).apply()
+    }
+
+    internal fun forgetDownloaded(context: Context, reciterId: String) {
+        context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).edit()
+            .remove(OFFLINE_RECITER_PREFIX + reciterId).apply()
+    }
+
+    /** Include recordings saved before metadata was introduced, even without connectivity. */
+    suspend fun offline(context: Context, catalog: List<Reciter> = emptyList()): List<Reciter> = withContext(Dispatchers.IO) {
+        val savedIds = File(context.filesDir, "quran/reciters")
+            .listFiles()?.filter(File::isDirectory)?.map(File::getName)?.toSet().orEmpty()
+        if (savedIds.isEmpty()) return@withContext emptyList()
+        val preferences = context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+        fun fromFields(id: String, name: String, server: String, surahs: String, riwaya: String): Reciter? {
+            val offered = surahs.split(',').mapNotNull { it.trim().toIntOrNull() }
+                .filter { it in 1..114 }.toSet()
+            return if (id in savedIds && id.matches(Regex("[0-9]+-[0-9]+")) &&
+                server.startsWith("https://") && offered.isNotEmpty()
+            ) Reciter(id, name, server, offered, riwaya) else null
+        }
+        val remembered = preferences.all.mapNotNull { (key, raw) ->
+            if (!key.startsWith(OFFLINE_RECITER_PREFIX) || raw !is String) return@mapNotNull null
+            runCatching {
+                val json = JSONObject(raw)
+                fromFields(json.optString("id"), json.optString("name"), json.optString("server"),
+                    json.optString("surahs"), json.optString("riwaya"))
+            }.getOrNull()
+        }
+        val selected = preferences.getString("selected_id", null)?.let { id ->
+            fromFields(id, preferences.getString("selected_name", "").orEmpty(),
+                preferences.getString("selected_server", "").orEmpty(),
+                preferences.getString("selected_surahs", "").orEmpty(),
+                preferences.getString("selected_riwayah", "").orEmpty())
+        }
+        val manager = ReciterDownloadManager.get(context)
+        val available = (remembered + catalog + cached(context).orEmpty() + listOfNotNull(selected))
+            .distinctBy(Reciter::id)
+            .filter { it.id in savedIds && manager.snapshot(it).downloadedSurahs > 0 }
+        // Bootstrap metadata for existing files before a remote fetch replaces catalog_json.
+        available.forEach { rememberDownloaded(context, it) }
+        available
     }
 
     suspend fun fetch(context: Context? = null): List<Reciter> = withContext(Dispatchers.IO) {

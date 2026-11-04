@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -107,7 +108,23 @@ fun ReciterStorageSection(
     val store = remember(context) { ReciterSelectionStore(context) }
     val selection by store.selections.collectAsStateWithLifecycle(initialValue = store.current())
     val translationAudioSelected = store.hasTranslationAudioSelection()
+    val manager = remember(context) { ReciterDownloadManager.get(context.applicationContext) }
+    val revision by manager.changes.collectAsStateWithLifecycle()
     var showLibrary by rememberSaveable { mutableStateOf(false) }
+    val offlineReciters by produceState(emptyList<ReciterCatalog.Reciter>(), context, revision, showLibrary) {
+        value = ReciterCatalog.offline(context)
+    }
+    val completedIds by produceState(emptySet<String>(), offlineReciters, revision) {
+        value = withContext(Dispatchers.IO) {
+            val savedIds = manager.localReciterIds()
+            offlineReciters.filter { reciter ->
+                if (reciter.id !in savedIds) return@filter false
+                val status = manager.snapshot(reciter)
+                status.totalSurahs > 0 && status.downloadedSurahs == status.totalSurahs
+            }.map(ReciterCatalog.Reciter::id).toSet()
+        }
+    }
+    val completedNames = offlineReciters.filter { it.id in completedIds }.map { it.name }.distinct()
     Surface(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Row(Modifier.clickable(role = Role.Button) { showLibrary = true }.padding(16.dp),
@@ -118,6 +135,12 @@ fun ReciterStorageSection(
                 Text(if (translationAudioSelected) DEFAULT_RECITER_NAME else selection.name,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (completedNames.isNotEmpty()) {
+                    Text("Available offline: ${completedNames.joinToString()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 3, overflow = TextOverflow.Ellipsis)
+                }
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
         }
@@ -152,6 +175,10 @@ private fun ReciterBrowser(
 ) {
     val context = LocalContext.current
     val manager = remember(context) { ReciterDownloadManager.get(context.applicationContext) }
+    val revision by manager.changes.collectAsStateWithLifecycle()
+    val offlineReciters by produceState(emptyList<ReciterCatalog.Reciter>(), context, revision) {
+        value = ReciterCatalog.offline(context)
+    }
     val store = remember(context) { ReciterSelectionStore(context) }
     val selection by store.selections.collectAsStateWithLifecycle(initialValue = store.current())
     val translationAudioSelected = store.hasTranslationAudioSelection()
@@ -181,8 +208,10 @@ private fun ReciterBrowser(
         loading = true
         error = null
         try {
-            if (reciters.isEmpty()) reciters = ReciterCatalog.cached(context).orEmpty()
-            reciters = ReciterCatalog.fetch(context)
+            if (reciters.isEmpty()) reciters = (ReciterCatalog.offline(context) +
+                ReciterCatalog.cached(context).orEmpty()).distinctBy(ReciterCatalog.Reciter::id)
+            val latest = ReciterCatalog.fetch(context)
+            reciters = (latest + ReciterCatalog.offline(context, latest)).distinctBy(ReciterCatalog.Reciter::id)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -191,13 +220,29 @@ private fun ReciterBrowser(
             loading = false
         }
     }
-    val filtered = remember(reciters, surahNumber, query, group, selection.id) {
-        reciters.filter { (surahNumber == null || surahNumber in it.surahs) &&
+    val allReciters = remember(reciters, offlineReciters) {
+        (reciters + offlineReciters).distinctBy(ReciterCatalog.Reciter::id)
+    }
+    val completedIds by produceState(emptySet<String>(), allReciters, revision) {
+        value = withContext(Dispatchers.IO) {
+            val savedIds = manager.localReciterIds()
+            allReciters.filter { reciter ->
+                if (reciter.id !in savedIds) return@filter false
+                val status = manager.snapshot(reciter)
+                status.totalSurahs > 0 && status.downloadedSurahs == status.totalSurahs
+            }.map(ReciterCatalog.Reciter::id).toSet()
+        }
+    }
+    val filtered = remember(allReciters, completedIds, surahNumber, query, group, selection.id) {
+        allReciters.filter { (surahNumber == null || surahNumber in it.surahs) &&
             (group == null || reciterGroup(it.name) == group) && ReciterCatalog.matchesSearch(it, query) }
-            .sortedByDescending { it.id == selection.id }
+            .sortedWith(compareByDescending<ReciterCatalog.Reciter> { it.id in completedIds }
+                .thenByDescending { it.id == selection.id }
+                .thenBy { it.name })
     }
     val showDefault = (group == null || group == ReciterGroup.CONTEMPORARY) &&
         "Mishary Rashid Al-Alafasy default".contains(query.trim(), true)
+    val downloadedCount = filtered.count { it.id in completedIds }
 
     // Only search is fixed. Filters and rows share the remaining viewport, even
     // at large font scales or when the keyboard leaves very little height.
@@ -247,7 +292,16 @@ private fun ReciterBrowser(
                     previewLoading = preview.activeId == "default-cdn" && preview.loading,
                     onSelect = { preview.stop(); dismissKeyboard(); store.select(null); onReciterSelected() })
             }
-            items(filtered, key = { it.id }) { reciter ->
+            if (downloadedCount > 0) item(key = "offline-heading") {
+                Text("Downloaded reciters", style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+            }
+            itemsIndexed(filtered, key = { _, reciter -> reciter.id }) { index, reciter ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (index == downloadedCount && downloadedCount > 0) {
+                    Text("More reciters", style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                }
                 val onPreview = {
                     dismissKeyboard()
                     val sample = surahNumber ?: reciter.surahs.minOrNull() ?: 1
@@ -288,10 +342,13 @@ private fun ReciterBrowser(
                         previewing = preview.activeId == reciter.id,
                         previewLoading = preview.activeId == reciter.id && preview.loading)
                 } else {
-                    ReciterChoiceRow(name = reciter.name, description = reciterDescription(reciter),
+                    ReciterChoiceRow(name = reciter.name,
+                        description = if (reciter.id in completedIds) "Available offline · ${reciterDescription(reciter)}"
+                            else reciterDescription(reciter),
                          selected = !translationAudioSelected && selection.id == reciter.id, onSelect = select,
                         onPreview = onPreview, previewing = preview.activeId == reciter.id,
                         previewLoading = preview.activeId == reciter.id && preview.loading)
+                }
                 }
             }
         }
@@ -344,6 +401,9 @@ internal fun ReciterLibraryRow(
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             status.error != null -> Text("Download paused", style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error)
+                            status.totalSurahs > 0 && status.downloadedSurahs == status.totalSurahs ->
+                                Text("Available offline · ${status.totalSurahs} surahs",
+                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             status.downloadedSurahs > 0 -> Text("${status.downloadedSurahs} of ${status.totalSurahs} saved offline",
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             else -> Text("Available to download", style = MaterialTheme.typography.labelSmall,

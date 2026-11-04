@@ -25,8 +25,9 @@ class ReciterDownloadManager private constructor(private val context: Context) {
         @Volatile private var instance: ReciterDownloadManager? = null
 
         fun get(context: Context): ReciterDownloadManager =
-            instance ?: synchronized(this) {
-                instance ?: ReciterDownloadManager(context.applicationContext).also { instance = it }
+            instance?.takeIf { it.context === context.applicationContext } ?: synchronized(this) {
+                instance?.takeIf { it.context === context.applicationContext }
+                    ?: ReciterDownloadManager(context.applicationContext).also { instance = it }
             }
     }
 
@@ -43,6 +44,9 @@ class ReciterDownloadManager private constructor(private val context: Context) {
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val revisions = MutableStateFlow(0L)
+    val changes: StateFlow<Long> = revisions.asStateFlow()
+    private fun contentChanged() { revisions.update { it + 1 } }
     data class TransferProgress(val label: String, val progress: Float)
     private val transfers = MutableStateFlow<Map<String, TransferProgress>>(emptyMap())
     val activeTransfer: StateFlow<TransferProgress?> = transfers.map { active ->
@@ -69,12 +73,14 @@ class ReciterDownloadManager private constructor(private val context: Context) {
             // Single-surah playback downloads must refresh an open Storage
             // panel just like a bulk download does.
             withContext(Dispatchers.IO) {
+                ReciterCatalog.rememberDownloaded(context, reciter)
                 val saved = snapshot(reciter)
                 states[reciter.id]?.update { current -> current.copy(
                     downloadedSurahs = saved.downloadedSurahs,
                     totalSurahs = saved.totalSurahs,
                     downloadedBytes = saved.downloadedBytes,
                 ) }
+                contentChanged()
             }
             file
         } finally { clear(key) }
@@ -94,6 +100,9 @@ class ReciterDownloadManager private constructor(private val context: Context) {
         val file = File(context.filesDir, "quran/reciters/${reciter.id}/%03d.mp3".format(java.util.Locale.US, surah))
         return file.takeIf { it.isFile && it.length() > 0 }
     }
+
+    fun localReciterIds(): Set<String> = File(context.filesDir, "quran/reciters")
+        .listFiles()?.filter(File::isDirectory)?.map(File::getName)?.toSet().orEmpty()
 
     fun snapshot(reciter: ReciterCatalog.Reciter): DownloadStatus {
         val files = reciter.surahs.mapNotNull { cachedFile(reciter, it) }
@@ -132,6 +141,7 @@ class ReciterDownloadManager private constructor(private val context: Context) {
                                 state.value.progress)
                         }
                     }
+                    ReciterCatalog.rememberDownloaded(context, reciter)
                     if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(downloading = true)
                 }
                 if (generation[reciter.id] == token) state.value = snapshot(reciter)
@@ -142,6 +152,7 @@ class ReciterDownloadManager private constructor(private val context: Context) {
                 if (generation[reciter.id] == token) state.value = snapshot(reciter).copy(error = error.message ?: "Download failed")
             } finally {
                 if (generation[reciter.id] == token) clear(reciter.id)
+                contentChanged()
             }
         }
         jobs[reciter.id] = job
@@ -161,6 +172,8 @@ class ReciterDownloadManager private constructor(private val context: Context) {
         cancel(reciter.id)
         val directory = File(context.filesDir, "quran/reciters/${reciter.id}")
         directory.deleteRecursively()
+        ReciterCatalog.forgetDownloaded(context, reciter.id)
         states[reciter.id]?.value = snapshot(reciter)
+        contentChanged()
     }
 }

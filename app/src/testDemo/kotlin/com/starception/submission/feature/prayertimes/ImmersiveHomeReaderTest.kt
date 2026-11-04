@@ -121,6 +121,13 @@ class ImmersiveHomeReaderTest {
                     compose.onAllNodesWithText("Quran text is unavailable")
                         .fetchSemanticsNodes().isNotEmpty()
                 }
+            } else if (page == 1) {
+                // The local collection prompt arrives after the async Hadith
+                // lookup; capture the settled reader rather than a partial frame.
+                compose.waitUntil(15_000) {
+                    compose.onAllNodesWithText("Download more Hadith collections")
+                        .fetchSemanticsNodes().isNotEmpty()
+                }
             }
             assertEquals(page, expandedPage)
             compose.onRoot().captureRoboImage("src/testDemo/screenshots/$image")
