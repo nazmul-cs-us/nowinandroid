@@ -819,10 +819,13 @@ struct NativePrayerTabsView: View {
     @State private var selectedTab = 0
     @State private var morePath: [Int] = []
     @State private var lastSelectedTab = 0
+    @State private var destinationChrome: [Int: Bool] = [:]
     @StateObject private var bot = NowNudgeBotModel()
     @State private var insightImmersive = ProcessInfo.processInfo.arguments.contains {
         $0.hasPrefix("--expand-insight=")
     }
+
+    private var activeOwner: Int { selectedTab == 5 ? (morePath.last ?? 5) : selectedTab }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -851,7 +854,7 @@ struct NativePrayerTabsView: View {
         .scrollEdgeEffectHidden(true, for: .all)
         .tint(Color.accentColor)
         .overlay(alignment: .bottomTrailing) {
-            if !insightImmersive {
+            if !insightImmersive && destinationChrome[activeOwner] != true {
                 NowNudgeBotLayer(model: bot)
                     .padding(.trailing, 16)
                     .padding(.bottom, 0)
@@ -859,6 +862,7 @@ struct NativePrayerTabsView: View {
         }
         .onAppear {
             bot.start()
+            NativeAppearanceBridge.shared.select(activeOwner)
         }
         .onDisappear {
             bot.stop()
@@ -868,8 +872,17 @@ struct NativePrayerTabsView: View {
             selectedTab = 0
             lastSelectedTab = 0
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("sharedDestinationChromeChanged"))) { notification in
+            guard let value = notification.object as? String else { return }
+            let fields = value.split(separator: ":")
+            guard fields.count == 2, let owner = Int(fields[0]) else { return }
+            destinationChrome[owner] = fields[1] == "true"
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("insightImmersiveChanged"))) { notification in
             insightImmersive = (notification.object as? String) == "true"
+        }
+        .onChange(of: morePath) { _, _ in
+            if selectedTab == 5 { NativeAppearanceBridge.shared.select(activeOwner) }
         }
         .onChange(of: selectedTab) { _, newValue in
             if newValue == 6 {
@@ -885,6 +898,7 @@ struct NativePrayerTabsView: View {
                 }
             } else {
                 lastSelectedTab = newValue
+                NativeAppearanceBridge.shared.select(activeOwner)
             }
         }
     }
@@ -896,7 +910,7 @@ struct NativePrayerTabsView: View {
             .ignoresSafeArea(.container, edges: .all)
             .scrollEdgeEffectHidden(true, for: .all)
             .toolbarBackground(.hidden, for: .tabBar)
-            .toolbar(insightImmersive ? .hidden : .visible, for: .tabBar)
+            .toolbar((insightImmersive || destinationChrome[activeOwner] == true) ? .hidden : .visible, for: .tabBar)
     }
 
     private func selectContentTab(_ index: Int) {

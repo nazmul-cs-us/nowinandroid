@@ -29,18 +29,28 @@ class UserAppearanceSettings(private val store: KeyValueStore = platformKeyValue
     fun settings(): ThemeSettingsState = ThemeSettingsState(
         brand = store.getString(KEY_BRAND)
             ?.let { name -> ThemeBrand.entries.firstOrNull { it.name == name } }
-            ?.takeUnless { it == ThemeBrand.CUSTOM }
             ?: ThemeBrand.COASTAL,
+        customColor = store.getString("ios_custom_primary")?.toIntOrNull() ?: 0,
+        customSecondaryColor = store.getString("ios_custom_secondary")?.toIntOrNull() ?: 0,
+        customTertiaryColor = store.getString("ios_custom_tertiary")?.toIntOrNull() ?: 0,
         darkThemeConfig = store.getString(KEY_DARK_MODE)
             ?.let { name -> DarkThemeConfig.entries.firstOrNull { it.name == name } }
             ?: DarkThemeConfig.FOLLOW_SYSTEM,
     )
 
     fun saveBrand(brand: ThemeBrand) {
-        if (brand != ThemeBrand.CUSTOM) {
+        run {
             store.putString(KEY_BRAND, brand.name)
             appearanceRevision.value += 1
         }
+    }
+
+    fun saveCustomColors(primary: Int, secondary: Int, tertiary: Int) {
+        store.putString("ios_custom_primary", primary.toString())
+        store.putString("ios_custom_secondary", secondary.toString())
+        store.putString("ios_custom_tertiary", tertiary.toString())
+        store.putString(KEY_BRAND, ThemeBrand.CUSTOM.name)
+        appearanceRevision.value += 1
     }
 
     fun saveDarkTheme(config: DarkThemeConfig) {

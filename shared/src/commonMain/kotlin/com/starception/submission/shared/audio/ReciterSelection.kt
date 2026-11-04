@@ -39,6 +39,7 @@ class QuranReciterPreferences(
     }.getOrNull()
 
     fun selectSource(source: QuranReciterSource?) {
+        com.starception.submission.shared.content.SharedContentStore(store).saveQuranTranslationLanguage("ar")
         store.putString("quran_reciter_source", source?.let {
             kotlinx.serialization.json.Json.encodeToString(QuranReciterSource.serializer(), it)
         }.orEmpty())
@@ -64,3 +65,10 @@ fun selectableQuranReciters(
     else sources.filter { surah in it.availableSurahs && it.baseUrl.startsWith("https://") }
         .distinctBy { it.id }
         .sortedBy { it.displayName }
+
+/** Match familiar spelling and punctuation without changing the API identity. */
+fun matchesQuranReciterSearch(source: QuranReciterSource, query: String): Boolean {
+    val aliases = if (source.id.substringBefore('-') == "54") " Abdulrahman Alsudaes Abdur Rahman As Sudais Sudays" else ""
+    val searchable = (source.displayName + " " + source.riwaya + aliases).lowercase().filter(Char::isLetterOrDigit)
+    return query.lowercase().split(' ', '-', '\'', '’').map { it.filter(Char::isLetterOrDigit) }.all(searchable::contains)
+}

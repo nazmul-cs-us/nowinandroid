@@ -50,4 +50,19 @@ class QuranVerseRepositoryTest {
         assertEquals(true, hasLeadingBismillah(prefixed))
         assertEquals("الٓمٓ", removeLeadingBismillah(prefixed))
     }
+
+    @Test fun removesOpeningWithMixedQuranMarksAndPreservesAyahVocalization() {
+        val ayah = "الٓمٓ ذَٰلِكَ الْكِتَابُ"
+        val text = "  بِسۡـمِ أللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ  $ayah"
+        assertEquals(true, hasLeadingBismillah(text))
+        assertEquals(ayah, removeLeadingBismillah(text))
+    }
+
+    @Test fun keepsIncompleteOrNonLeadingBismillah() {
+        val incomplete = "بِسْمِ اللهِ عَبَسَ"
+        assertEquals(false, hasLeadingBismillah(incomplete))
+        assertEquals(incomplete, removeLeadingBismillah(incomplete))
+        val later = "قُلْ بسم الله الرحمن الرحيم"
+        assertEquals(later, removeLeadingBismillah(later))
+    }
 }

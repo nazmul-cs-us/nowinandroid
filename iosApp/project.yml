@@ -184,6 +184,8 @@ targets:
         # aborts the process. It lifts the 60 Hz cap so Compose can drive
         # ProMotion displays at their full refresh rate.
         CADisableMinimumFrameDurationOnPhone: true
+        # The Compose surface reports artwork contrast independently of app theme.
+        UIViewControllerBasedStatusBarAppearance: false
         NSSupportsLiveActivities: true
         # Quran and Fortress recitations keep playing with the app in the
         # background or the screen locked: the shared player runs an

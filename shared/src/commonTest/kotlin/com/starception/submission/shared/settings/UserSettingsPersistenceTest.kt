@@ -127,7 +127,7 @@ class UserSettingsPersistenceTest {
         assertEquals(DarkThemeConfig.DARK, UserAppearanceSettings(store).settings().darkThemeConfig)
 
         store.putString("ios_theme_brand", ThemeBrand.CUSTOM.name)
-        assertEquals(ThemeBrand.COASTAL, UserAppearanceSettings(store).settings().brand)
+        assertEquals(ThemeBrand.CUSTOM, UserAppearanceSettings(store).settings().brand)
     }
 
     @Test

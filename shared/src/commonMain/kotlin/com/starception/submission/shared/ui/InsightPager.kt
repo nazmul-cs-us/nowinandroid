@@ -67,6 +67,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -83,6 +87,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.unit.em
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -849,6 +858,7 @@ fun InsightPager(
                             ArtworkTile(
                                 fluidFullBleed = immersiveHome,
                                 backgroundPageOffset = { pageOffset },
+                                expandedArtworkBlurRadius = 6.dp,
                                 artwork = if (immersiveHome) homeCoverArtwork(2, false) else Res.drawable.insight_quran_background,
                                 foreground = if (immersiveHome) null else Res.drawable.insight_quran_foreground_v2,
                                 foregroundScale = 0.74f,
@@ -1155,17 +1165,10 @@ fun InsightPager(
             // Android's immersive reader keeps its close control on the artwork,
             // in the top-right control slot, instead of a separate heading row.
             if (immersiveHome && isExpanded) {
-                CupertinoSurface(
-                    onClick = { onExpansionExtentChange(0f) },
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.48f),
-                    modifier = Modifier.align(Alignment.TopEnd)
-                        .padding(top = 12.dp, end = 12.dp)
-                        .size(40.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Close, contentDescription = "Collapse insight",
-                            tint = Color.White, modifier = Modifier.size(20.dp))
+                Box(Modifier.align(Alignment.TopEnd).padding(top = maxOf(24.dp, WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()) + 12.dp, end = 12.dp), contentAlignment = Alignment.Center) {
+                    AppActionSurround(onDarkArtwork = true, paired = false, modifier = Modifier.matchParentSize())
+                    AppActionButton(onClick = { onExpansionExtentChange(0f) }, showSurround = false) {
+                        Icon(Icons.Filled.Close, contentDescription = "Collapse insight", tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -1398,7 +1401,7 @@ private fun ExpandedReadingPreview(
         val readingScrollState = rememberLazyListState()
         val hasTranslation = verses.any { it.translation.isNotBlank() }
         val readingArabicSize = (
-            maxWidth.value * if (hasTranslation) 0.058f else 0.068f
+            maxWidth.value * if (hasTranslation) 0.073f else 0.078f
             ).coerceIn(if (hasTranslation) 18f else 21f, if (hasTranslation) 26f else 31f).sp
         val readingArabicLineHeight = (readingArabicSize.value * 1.35f).sp
         val bismillahSize = (maxWidth.value * 0.048f).coerceIn(17f, 24f).sp
@@ -1429,35 +1432,14 @@ private fun ExpandedReadingPreview(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    InsightSectionLabel("SURAH $surahNumber")
-                    Text(
-                        text = surahName,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = when {
-                            loading -> "Preparing passage…"
-                            loadFailed -> "Passage unavailable"
-                            isPlaying -> "PLAYING"
-                            mushafMode -> "MUSHAF · ${verses.size} AYAT"
-                            else -> "${verses.size} AYAT"
-                        },
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp,
-                            letterSpacing = 0.8.sp,
-                        ),
-                        color = ReadingPreviewGold,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+            Row(Modifier.fillMaxWidth().insightChromeVisibility(LocalInsightReaderChromeProgress.current),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("SURAH $surahNumber · ${surahName.uppercase()}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, letterSpacing = 1.3.sp),
+                    color = Color.White.copy(alpha = .68f), fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(if (loading) "Preparing…" else if (loadFailed) "Unavailable" else if (isPlaying) "PLAYING" else "${verses.size} AYAT",
+                    style = MaterialTheme.typography.labelSmall, color = ReadingPreviewGold)
             }
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f)
@@ -1516,51 +1498,45 @@ private fun ExpandedReadingPreview(
                         }
                     }
                 }
-                items(
-                    items = verses,
-                    key = { verse -> verse.numberInSurah },
-                ) { verse ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(7.dp),
-                    ) {
-                        Text(
-                            text = verse.numberInSurah.toArabicIndic(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ReadingPreviewGold,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .background(ReadingPreviewGold.copy(alpha = 0.12f), CircleShape)
-                                .padding(horizontal = 12.dp, vertical = 5.dp),
-                        )
-                        Text(
-                            text = if (showTajweed) {
-                                tajweedAnnotatedString(
-                                    verse.arabicText.trim(),
-                                    tajweedAnnotations[verse.numberInSurah],
-                                )
-                            } else {
-                                androidx.compose.ui.text.AnnotatedString(verse.arabicText.trim())
-                            },
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = QuranArabicFonts.fontFamily(arabicFont),
-                                fontSize = readingArabicSize,
-                                lineHeight = readingArabicLineHeight,
-                                letterSpacing = 0.sp,
-                            ),
-                            color = Color.White.copy(alpha = 0.96f),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        verse.translation.takeIf(String::isNotBlank)?.let { translation ->
-                                ReadingTranslationPanel(
-                                    text = translation,
-                                    fontSize = readingTranslationSize,
-                                )
+                item(key = "flowing-passage") {
+                    val passage = androidx.compose.ui.text.buildAnnotatedString {
+                        verses.forEachIndexed { index, verse ->
+                            if (index > 0) append("  ")
+                            val arabic = if (index == 0 && surahNumber != 1 && surahNumber != 9)
+                                com.starception.submission.shared.quran.removeLeadingBismillah(verse.arabicText.trim())
+                                else verse.arabicText.trim()
+                            append(if (showTajweed) tajweedAnnotatedString(arabic, tajweedAnnotations[verse.numberInSurah])
+                                else androidx.compose.ui.text.AnnotatedString(arabic))
+                            append(" ")
+                            appendInlineContent("ayah-${verse.numberInSurah}", "(${verse.numberInSurah.toArabicIndic()})")
+                        }
+                    }
+                    val markers = verses.associate { verse ->
+                        "ayah-${verse.numberInSurah}" to InlineTextContent(
+                            Placeholder(1.4.em, 1.1.em, PlaceholderVerticalAlign.TextCenter)) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Box(Modifier.fillMaxHeight().aspectRatio(1f).padding(2.dp)
+                                    .border(0.8.dp, ReadingPreviewGold.copy(alpha = .9f), CircleShape), contentAlignment = Alignment.Center) {
+                                    val numberSize = readingArabicSize * if (verse.numberInSurah >= 100) .40f else .48f
+                                    Text(verse.numberInSurah.toArabicIndic(), color = ReadingPreviewGold,
+                                        style = androidx.compose.ui.text.TextStyle(fontSize = numberSize,
+                                            lineHeight = numberSize * 1.3f, textAlign = TextAlign.Center,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif),
+                                        maxLines = 1)
+                                }
                             }
+                        }
+                    }
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(passage, inlineContent = markers,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = QuranArabicFonts.fontFamily(arabicFont), fontSize = readingArabicSize,
+                                lineHeight = readingArabicLineHeight, letterSpacing = 0.sp,
+                                textDirection = androidx.compose.ui.text.style.TextDirection.ContentOrRtl,
+                                shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = .7f), blurRadius = 3f)),
+                            color = Color.White, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
+                        verses.mapNotNull { it.translation.takeIf(String::isNotBlank) }.joinToString("\n\n")
+                            .takeIf(String::isNotBlank)?.let { ReadingTranslationPanel(it, readingTranslationSize) }
                     }
                 }
             }
@@ -2229,10 +2205,15 @@ private fun ExpandedSuggestion(
     }
 }
 
-private sealed interface DeenlyKnowledgeTarget {
+@kotlinx.serialization.Serializable
+internal sealed interface DeenlyKnowledgeTarget {
+    @kotlinx.serialization.Serializable
     data class Surah(val number: Int) : DeenlyKnowledgeTarget
+    @kotlinx.serialization.Serializable
     data class FortressDua(val chapterId: Int) : DeenlyKnowledgeTarget
+    @kotlinx.serialization.Serializable
     data class BukhariHadith(val hadithId: Int) : DeenlyKnowledgeTarget
+    @kotlinx.serialization.Serializable
     data class ShamayelBook(val bookId: Int) : DeenlyKnowledgeTarget
 }
 
@@ -2250,7 +2231,8 @@ internal fun expandedKnowledgeSourceIndex(date: LocalDate, sourceCount: Int): In
 }
 
 /** The model-generated grounded suggestion shown by the enlarged AI tile. */
-private data class DeenlyKnowledgeCard(
+@kotlinx.serialization.Serializable
+internal data class DeenlyKnowledgeCard(
     val title: String,
     val sourceText: String,
     val reference: String,
@@ -2289,7 +2271,7 @@ private object PreparedKnowledgeReadings {
     }
 }
 
-private suspend fun generateInsightKnowledgeCard(
+internal suspend fun generateInsightKnowledgeCard(
     date: LocalDate,
     appSituation: String?,
     fortressInvocations: Map<Int, List<com.starception.submission.shared.content.FortressInvocation>>,
@@ -2649,6 +2631,7 @@ private fun MissingModelDownloadCard(
 private fun ArtworkTile(
     artwork: DrawableResource,
     fluidFullBleed: Boolean = false,
+    expandedArtworkBlurRadius: Dp = 1.8.dp,
     foreground: DrawableResource? = null,
     foregroundScale: Float = 1f,
     foregroundOffsetXFraction: Float = 0f,
@@ -2669,6 +2652,7 @@ private fun ArtworkTile(
     onCompactContentHeightChange: (Dp) -> Unit = {},
     content: @Composable (() -> Unit)? = null,
 ) {
+    val readerSafeTop = if (fluidFullBleed && isExpanded) WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding() else 0.dp
     val readerChrome = rememberInsightReaderChrome(isExpanded)
     val chromeProgress = insightReaderChromeProgress(readerChrome, isExpanded)
     val density = LocalDensity.current
@@ -2728,7 +2712,7 @@ private fun ArtworkTile(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(if (isExpanded) 1.8.dp else 0.dp)
+                    .blur(if (isExpanded) expandedArtworkBlurRadius else 0.dp)
                     .graphicsLayer {
                         // Android's InsightPreviewCard parallax: the artwork
                         // counter-scrolls 18dp per page-fraction, scaled up and
@@ -2753,7 +2737,7 @@ private fun ArtworkTile(
                     alignment = Alignment.BottomCenter,
                     modifier = Modifier
                         .fillMaxSize()
-                        .blur(if (isExpanded) 1.8.dp else 0.dp)
+                        .blur(if (isExpanded) expandedArtworkBlurRadius else 0.dp)
                         .graphicsLayer {
                             // Match Android's slight foreground overscan so the
                             // subject remains covered while it counter-scrolls.
@@ -2797,7 +2781,7 @@ private fun ArtworkTile(
                             alpha = 1f - chromeProgress
                             translationY = -12.dp.toPx() * chromeProgress
                         }
-                        .padding(start = 22.dp, end = 70.dp, top = 20.dp)
+                        .padding(start = 22.dp, end = 70.dp, top = readerSafeTop + 20.dp)
                         .onSizeChanged { expandedLabelHeight = with(density) { it.height.toDp() } }
                         .semantics { heading() },
                 )
@@ -2833,7 +2817,7 @@ private fun ArtworkTile(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .graphicsLayer { alpha = 1f - chromeProgress }
-                        .padding(top = 11.dp, end = if (fluidFullBleed && isExpanded) 64.dp else 11.dp),
+                        .padding(top = readerSafeTop + 12.dp, end = if (fluidFullBleed && isExpanded) 64.dp else 11.dp),
                 ) {
                     trailing()
                 }
@@ -2845,7 +2829,7 @@ private fun ArtworkTile(
                         .fillMaxSize()
                         .padding(
                             start = 22.dp, end = 22.dp,
-                            top = maxOf(64.dp, expandedLabelHeight + 40.dp) * (1f - chromeProgress) +
+                            top = readerSafeTop + maxOf(64.dp, expandedLabelHeight + 40.dp) * (1f - chromeProgress) +
                                 48.dp * chromeProgress,
                             bottom = (24f - 16f * chromeProgress).dp,
                         ),

@@ -384,6 +384,11 @@ fun RequestComposerSuggestions(onReady: (List<String>) -> Unit) {
 }
 
 @Suppress("FunctionName")
+fun DeenlyStartupViewController(onFinished: () -> Unit): UIViewController = ComposeUIViewController {
+    DeenlySparkSplash(onFinished)
+}
+
+@Suppress("FunctionName")
 fun PrayerTimesViewController(
     sherpaService: IosSherpaService? = null,
     nowPlayingService: IosNowPlayingService? = null,
@@ -967,7 +972,7 @@ private fun createPrayerTimesViewController(
             target = io.github.alexzhirkevich.cupertino.adaptive.Theme.Cupertino,
             material = {
                 MaterialTheme(
-                    colorScheme = iosColorScheme(themeSettings.brand, useDarkTheme),
+                    colorScheme = iosColorScheme(themeSettings.brand, useDarkTheme, themeSettings.customColor, themeSettings.customSecondaryColor, themeSettings.customTertiaryColor),
                     typography = sharedTypography(),
                 ) { it() }
             },
@@ -982,6 +987,12 @@ private fun createPrayerTimesViewController(
                 androidx.compose.material3.LocalRippleConfiguration provides null,
                 androidx.compose.foundation.LocalIndication provides
                     com.starception.submission.shared.ui.CirclePressIndication,
+                LocalNativeBarAppearance provides remember(startBottomIndex) {
+                    { lightIcons: Boolean? ->
+                        platform.Foundation.NSNotificationCenter.defaultCenter.postNotificationName(
+                            aName = "sharedBarAppearanceChanged", `object` = "$startBottomIndex:${lightIcons?.toString() ?: "system"}")
+                    }
+                },
                 LocalShowBottomNavigation provides (onSelectBottom == null),
                 LocalContentDownloadState provides contentStorageState,
                 LocalContentDownloadActions provides ContentStorageActions(
@@ -992,6 +1003,10 @@ private fun createPrayerTimesViewController(
                 ),
             ) {
             SharedNavHost(
+                onFullScreenDestinationChanged = { fullScreen ->
+                    platform.Foundation.NSNotificationCenter.defaultCenter.postNotificationName(
+                        aName = "sharedDestinationChromeChanged", `object` = "$startBottomIndex:$fullScreen")
+                },
                 startInSettings = startInSettings,
                 startInQibla = startInQibla,
                 startInSurah = startInSurah,
@@ -1133,6 +1148,10 @@ private fun createPrayerTimesViewController(
                             settingsStore.saveLiveActivitiesEnabled(enabled)
                         },
                         themeSettings = themeSettings,
+                        onCustomColorsChange = { primary, secondary, tertiary ->
+                            appearanceStore.saveCustomColors(primary, secondary, tertiary)
+                            themeSettings = appearanceStore.settings()
+                        },
                         onThemeBrandChange = { brand ->
                             appearanceStore.saveBrand(brand)
                             themeSettings = themeSettings.copy(brand = brand)
@@ -1475,7 +1494,7 @@ private class BundledTravelDuaPlayer {
 private fun hasBundledTravelDuaClip(): Boolean =
     platform.Foundation.NSBundle.mainBundle.pathForResource("travel_dua", ofType = "caf") != null
 
-private fun iosColorScheme(brand: ThemeBrand, dark: Boolean): ColorScheme = when (brand) {
+private fun iosColorScheme(brand: ThemeBrand, dark: Boolean, primary: Int = 0, secondary: Int = 0, tertiary: Int = 0): ColorScheme = when (brand) {
     ThemeBrand.DEFAULT -> if (dark) DarkDefaultColorScheme else LightDefaultColorScheme
     ThemeBrand.ANDROID -> if (dark) DarkAndroidColorScheme else LightAndroidColorScheme
     ThemeBrand.COASTAL -> if (dark) DarkCoastalColorScheme else LightCoastalColorScheme
@@ -1484,7 +1503,10 @@ private fun iosColorScheme(brand: ThemeBrand, dark: Boolean): ColorScheme = when
     ThemeBrand.CHOCOLATE_TRUFFLE -> if (dark) DarkChocolateTruffleColorScheme else LightChocolateTruffleColorScheme
     ThemeBrand.DAMSON_CURACAO -> if (dark) DarkDamsonCuracaoColorScheme else LightDamsonCuracaoColorScheme
     ThemeBrand.CHILI_SPICE -> if (dark) DarkChiliSpiceColorScheme else LightChiliSpiceColorScheme
-    ThemeBrand.CUSTOM -> if (dark) DarkCoastalColorScheme else LightCoastalColorScheme
+    ThemeBrand.CUSTOM -> com.starception.submission.core.designsystem.theme.seedColorScheme(
+        androidx.compose.ui.graphics.Color(if (primary != 0) primary else 0xFF6750A4.toInt()),
+        secondary.takeIf { it != 0 }?.let { androidx.compose.ui.graphics.Color(it) },
+        tertiary.takeIf { it != 0 }?.let { androidx.compose.ui.graphics.Color(it) }, dark)
 }
 
 /**

@@ -27,7 +27,7 @@ object IosReciterCatalog {
                 if (surahs.isEmpty()) return@mapNotNull null
                 QuranReciterSource(
                     id = "$reciterId-$variantId",
-                    displayName = name,
+                    displayName = if (reciterId == "54") "Abdul Rahman Al-Sudais" else name,
                     baseUrl = server,
                     availableSurahs = surahs,
                     riwaya = moshaf["name"]?.jsonPrimitive?.content.orEmpty(),

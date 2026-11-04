@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 struct iOSApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
+    @State private var showingStartup = !ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("--start-") }
     @AppStorage("ios_dark_theme_config") private var savedDarkTheme = "FOLLOW_SYSTEM"
 
     private var appPreferredColorScheme: ColorScheme? {
@@ -66,6 +67,7 @@ struct iOSApp: App {
 
     var body: some Scene {
         WindowGroup {
+            ZStack {
             Group {
                 if #available(iOS 26.0, *) {
                     NativePrayerTabsView()
@@ -74,7 +76,22 @@ struct iOSApp: App {
                         .ignoresSafeArea(.container)
                 }
             }
+                if showingStartup {
+                    StartupSparkView {
+                        withAnimation(.easeOut(duration: 0.25)) { showingStartup = false }
+                    }
+                    .ignoresSafeArea(.container)
+                    .transition(.opacity)
+                    .zIndex(10)
+                }
+            }
                 .preferredColorScheme(appPreferredColorScheme)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("sharedBarAppearanceChanged"))) { notification in
+            guard let value = notification.object as? String else { return }
+            let fields = value.split(separator: ":")
+            guard fields.count == 2, let owner = Int(fields[0]) else { return }
+            NativeAppearanceBridge.shared.update(owner: owner, lightIcons: fields[1] == "system" ? nil : fields[1] == "true")
+        }
                 .onOpenURL { url in
                     guard url.scheme == "deenly", url.host == "prayer-times" else { return }
                     IosComposeRootKt.OpenPrayerTimesFromLiveActivity()
@@ -87,4 +104,12 @@ struct iOSApp: App {
                 }
         }
     }
+}
+
+private struct StartupSparkView: UIViewControllerRepresentable {
+    let onFinished: () -> Void
+    func makeUIViewController(context: Context) -> UIViewController {
+        IosComposeRootKt.DeenlyStartupViewController(onFinished: onFinished)
+    }
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) { }
 }

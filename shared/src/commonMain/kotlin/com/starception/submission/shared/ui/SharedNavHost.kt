@@ -18,6 +18,8 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -182,6 +184,7 @@ fun SharedNavHost(
     notifications: com.starception.submission.prayer.model.PrayerNotificationPreferences? = null,
     globalRefreshing: Boolean = false,
     globalSyncResultText: String? = null,
+    onFullScreenDestinationChanged: (Boolean) -> Unit = {},
 ) {
     // The prayer-time alert (go-to-mosue countdown when prayer approaches)
     // shows in the sync strip of EVERY top page, like Android's app-level
@@ -286,7 +289,18 @@ fun SharedNavHost(
             ?.let { navController.navigate(BukhariHadithRoute(it)) }
     }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val updateNativeBars = LocalNativeBarAppearance.current
+    val nativeBarsDarkBackground = MaterialTheme.colorScheme.background.luminance() < .5f
     val currentRoute = currentBackStackEntry?.destination?.route
+    LaunchedEffect(currentRoute) {
+        onFullScreenDestinationChanged(currentRoute != null && currentRoute !in tabRouteNames)
+    }
+    LaunchedEffect(currentRoute, nativeBarsDarkBackground) {
+        if (currentRoute != PrayerTimesRoute::class.qualifiedName) {
+            updateNativeBars(if (currentRoute == PrayerSettingsRoute::class.qualifiedName || currentRoute in tabRouteNames)
+                nativeBarsDarkBackground else true)
+        }
+    }
     val ownsSyncContainer = currentRoute in tabRouteNames ||
         currentRoute == PrayerSettingsRoute::class.qualifiedName
     val detailMediaBar = if (ownsSyncContainer) {
@@ -370,6 +384,7 @@ fun SharedNavHost(
             },
         ) {
             composable<PrayerTimesRoute> {
+                MaterialTheme(typography = homeTypography(MaterialTheme.typography)) {
                 CompositionLocalProvider(LocalQuranAudioPlayer provides quranPlayer) {
                     home(
                         SharedHomeActions(
@@ -396,6 +411,8 @@ fun SharedNavHost(
                             onSelectBottom = selectBottom,
                         ),
                     )
+                }
+
                 }
             }
             composable<PrayerSettingsRoute> {

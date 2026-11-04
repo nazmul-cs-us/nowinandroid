@@ -25,6 +25,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -107,6 +110,7 @@ fun PrayerNowTile(
     expandedContent: (@Composable () -> Unit)? = null,
     backgroundPageOffset: () -> Float = { 0f },
 ) {
+    val readerSafeTop = if (fluidFullBleed && isExpanded) WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding() else 0.dp
     val density = androidx.compose.ui.platform.LocalDensity.current
     val isNight = !forceSunForTesting && (
         forceMoonForTesting || nowMinute < sunriseMinute || nowMinute >= maghribMinute ||
@@ -215,7 +219,7 @@ fun PrayerNowTile(
 
         Row(
             modifier = Modifier.fillMaxWidth().padding(
-                start = 11.dp, top = 11.dp, bottom = 11.dp,
+                start = 11.dp, top = readerSafeTop + 12.dp, bottom = 11.dp,
                 end = if (fluidFullBleed && isExpanded) 64.dp else 11.dp,
             ),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -259,7 +263,7 @@ fun PrayerNowTile(
             modifier = if (isExpanded) {
                 Modifier
                     .fillMaxSize()
-                    .padding(start = 18.dp, top = 68.dp, end = 18.dp, bottom = 20.dp)
+                    .padding(start = 18.dp, top = readerSafeTop + 68.dp, end = 18.dp, bottom = 20.dp)
             } else {
                 Modifier
                     .align(Alignment.BottomStart)

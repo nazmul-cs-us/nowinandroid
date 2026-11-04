@@ -16,6 +16,19 @@ import platform.Foundation.NSURL
  */
 object IosReciterAudioStore {
     private val transferMutex = Mutex()
+    private val metadataLock = platform.Foundation.NSLock()
+    internal fun rememberSource(source: QuranReciterSource) {
+        metadataLock.lock()
+        try {
+            val store = com.starception.submission.shared.storage.platformKeyValueStore()
+            val previous = runCatching {
+                kotlinx.serialization.json.Json.decodeFromString<List<QuranReciterSource>>(store.getString("quran_offline_reciters").orEmpty())
+            }.getOrDefault(emptyList())
+            val sources = (listOf(source) + previous).distinctBy { it.id }
+            store.putString("quran_offline_reciters", kotlinx.serialization.json.Json.encodeToString(
+                kotlinx.serialization.builtins.ListSerializer(QuranReciterSource.serializer()), sources))
+        } finally { metadataLock.unlock() }
+    }
     private fun key(reciterId: String, surah: Int): String {
         require(reciterId.matches(Regex("[0-9]+-[0-9]+")))
         require(surah in 1..114)
@@ -31,6 +44,7 @@ object IosReciterAudioStore {
         surah: Int,
         onProgress: (Long, Long) -> Unit = { _, _ -> },
     ): String? {
+        rememberSource(source)
         cachedUrl(source.id, surah)?.let { return it }
         val bannerKey = "track:${source.id}:$surah:${platform.Foundation.NSUUID.UUID().UUIDString}"
         ContentDownloadBus.publishReciter(bannerKey, ContentDownloadStatus("Downloading ${source.displayName}", 0.001f))
@@ -69,6 +83,7 @@ object IosReciterAudioStore {
         source: QuranReciterSource,
         onCompleted: (Int, Int) -> Unit = { _, _ -> },
     ): Int {
+        rememberSource(source)
         val ordered = source.availableSurahs.filter { it in 1..114 }.sorted()
         val pending = ordered.filter { cachedUrl(source.id, it) == null }
         var completed = ordered.size - pending.size

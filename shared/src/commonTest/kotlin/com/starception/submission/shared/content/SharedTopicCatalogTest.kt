@@ -24,7 +24,8 @@ class SharedTopicCatalogTest {
     @Test
     fun catalogMatchesAndroidTopicIds() {
         assertEquals(
-            setOf(7, 8, 11) + (21..37),
+            // Include Shama'il (9) and the additional downloadable Hadith collections (38–45).
+            setOf(7, 8, 9, 11) + (21..45),
             SharedTopics.mapTo(mutableSetOf()) { it.id },
         )
     }

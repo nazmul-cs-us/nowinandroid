@@ -84,15 +84,34 @@ internal fun cleanQuranText(text: String): String = text.trim().removePrefix("\u
 
 internal const val QURAN_BISMILLAH = "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ"
 
-private val BismillahPrefix = Regex(
-    "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*[اٱ]لل[َّ]*ه[ِ]*\\s*[اٱ]لر[َّ]*ح[ْۡ]*م[َٰـ]*ن[ِ]*\\s*[اٱ]لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
-)
+/** Compare opening letters only, preserving the remaining ayah's vocalization. */
+private fun leadingBismillahEnd(text: String): Int? {
+    val opening = text.trimStart()
+    val leadingSpace = text.length - opening.length
+    val letters = "بسماللهالرحمنالرحيم"
+    var matched = 0
+    fun mark(char: Char): Boolean = char in '\u064B'..'\u065F' || char == '\u0670' ||
+        char in '\u06D6'..'\u06DC' || char in '\u06DF'..'\u06E4' || char in '\u06E7'..'\u06E8' || char in '\u06EA'..'\u06ED'
+    for (index in opening.indices) {
+        val char = opening[index]
+        if (char.isWhitespace() || char == 'ـ' || mark(char)) continue
+        val letter = if (char in "ٱأإآ") 'ا' else char
+        if (letter != letters[matched]) return null
+        matched++
+        if (matched == letters.length) {
+            var end = index + 1
+            while (end < opening.length && (opening[end].isWhitespace() || opening[end] == 'ـ' || mark(opening[end]))) end++
+            return leadingSpace + end
+        }
+    }
+    return null
+}
 
-internal fun hasLeadingBismillah(text: String): Boolean =
-    BismillahPrefix.containsMatchIn(cleanQuranText(text))
+internal fun hasLeadingBismillah(text: String): Boolean = leadingBismillahEnd(cleanQuranText(text)) != null
 
-internal fun removeLeadingBismillah(text: String): String =
-    BismillahPrefix.replaceFirst(cleanQuranText(text), "").trim()
+internal fun removeLeadingBismillah(text: String): String = cleanQuranText(text).let { clean ->
+    leadingBismillahEnd(clean)?.let { clean.substring(it) } ?: clean
+}
 
 internal fun filterQuranVerses(
     verses: List<QuranVerse>,

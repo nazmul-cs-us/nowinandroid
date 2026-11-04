@@ -32,8 +32,15 @@ private val audioPreparationMutex = kotlinx.coroutines.sync.Mutex()
 actual suspend fun resolveQuranAudioUrl(
     surahNumber: Int,
     translationCode: String,
+): String? = resolveIosQuranAudioUrl(surahNumber, translationCode, true)
+
+@OptIn(ExperimentalForeignApi::class)
+internal suspend fun resolveIosQuranAudioUrl(
+    surahNumber: Int,
+    translationCode: String,
+    useSelectedReciter: Boolean,
 ): String? {
-    if (quranAudioLanguage(translationCode) == "arabic") {
+    if (useSelectedReciter && quranAudioLanguage(translationCode) == "arabic") {
         val preferences = QuranReciterPreferences()
         preferences.selectedReciterId()?.takeIf { it.matches(Regex("[0-9]+-[0-9]+")) }?.let { id ->
             IosReciterAudioStore.cachedUrl(id, surahNumber)?.let { return it }

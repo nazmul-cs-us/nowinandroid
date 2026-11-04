@@ -95,6 +95,7 @@ fun PrayerSettingsScreen(
     onLiveActivitiesEnabledChange: (Boolean) -> Unit = {},
     themeSettings: ThemeSettingsState = ThemeSettingsState(),
     onThemeBrandChange: (ThemeBrand) -> Unit = {},
+    onCustomColorsChange: (Int, Int, Int) -> Unit = { _, _, _ -> },
     onDarkThemeConfigChange: (DarkThemeConfig) -> Unit = {},
     appVersion: String = "Unknown",
     audioState: AudioSettingsState = AudioSettingsState(),
@@ -171,8 +172,11 @@ fun PrayerSettingsScreen(
                             onChangeDynamicColorPreference = {},
                             onChangeDarkThemeConfig = onDarkThemeConfigChange,
                             supportDynamicColor = false,
-                            showCustomTheme = false,
-                            colorPickerDialog = null,
+                            showCustomTheme = true,
+                            onChangeCustomColors = onCustomColorsChange,
+                            colorPickerDialog = { primary, secondary, tertiary, confirm, dismiss ->
+                                SharedAccentColorDialog(primary, secondary, tertiary, confirm, dismiss)
+                            },
                         )
                     }
 

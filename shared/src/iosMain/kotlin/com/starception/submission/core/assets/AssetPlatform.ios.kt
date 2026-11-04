@@ -172,6 +172,10 @@ object AssetPlatform {
     }
 
     suspend fun fetchText(url: String): String? = suspendCancellableCoroutine { continuation ->
+        if (!com.starception.submission.shared.connectivity.appConnectivity.isOnline.value) {
+            continuation.resume(null)
+            return@suspendCancellableCoroutine
+        }
         val source = NSURL.URLWithString(url)
         if (source == null) {
             continuation.resume(null)

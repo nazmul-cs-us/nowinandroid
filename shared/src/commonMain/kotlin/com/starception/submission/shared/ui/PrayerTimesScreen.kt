@@ -31,6 +31,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -266,7 +267,21 @@ fun PrayerTimesScreen(
     // The immersive home cover, ported from the Android home page. Tapping a
     // cover page reveals the matching insight tile in the pager below it.
     var coverPage by remember { mutableStateOf(initialExpandedInsight ?: 0) }
+    val homeReflectionEvidence = HomePageReflections.evidence
+    val reflectionModelRevision by com.starception.submission.shared.ml.DeenlyKnowledgeRuntime.downloadCompleted.collectAsState()
+    LaunchedEffect(today, coverPage, reflectionModelRevision) {
+        HomePageReflections.prepare(today, coverPage)
+    }
+    var exploreExpanded by remember { mutableStateOf(false) }
     var coverExpandRequest by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    LaunchedEffect(initialExpandedInsight) {
+        if (initialExpandedInsight != null) {
+            showAllPrayers = false
+            coverPage = initialExpandedInsight
+            insightExpansionExtent = 1f
+            coverExpandRequest = initialExpandedInsight to 1
+        }
+    }
     val coverReadingSurah = remember(today) {
         com.starception.submission.feature.quran.dailyReading(today)
     }
@@ -540,8 +555,17 @@ fun PrayerTimesScreen(
                 val homeIsDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
                 val homeSafeTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
                 val homePortraitScroll = rememberScrollState()
-                val coverScrollPosition = remember { mutableFloatStateOf(coverPage.toFloat()) }
                 val homeCoverHeightPx = remember { mutableIntStateOf(0) }
+                if (isPhoneHome) {
+                    val artworkIcons = homeStatusBarUsesLightIcons(
+                        homeCoverHeaderUsesLightText(coverPage, coverNightArtwork),
+                        with(LocalDensity.current) { homePortraitScroll.value.toDp().value },
+                        with(LocalDensity.current) { homeCoverHeightPx.intValue.toDp().value },
+                        homeIsDark, Color(0xFF080B14), isPagerRevealed)
+                    NativeBarAppearance(
+                        lightIcons = homeBannerUsesLightIcons(syncState.wobbleIntensity, MaterialTheme.colorScheme.tertiaryContainer) ?: artworkIcons)
+                }
+                val coverScrollPosition = remember { mutableFloatStateOf(coverPage.toFloat()) }
                 val coverEpochSeconds = remember {
                     kotlin.time.Clock.System.now().epochSeconds.toDouble()
                 }
@@ -552,7 +576,7 @@ fun PrayerTimesScreen(
                     targetValue = if (showPhoneHomeCover) {
                         homeSafeTop + 4.dp
                     } else {
-                        8.dp
+                        if (isPhoneHome && isPagerRevealed) 0.dp else 8.dp
                     },
                     animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
                     label = "homeCoverTopGap",
@@ -563,6 +587,7 @@ fun PrayerTimesScreen(
                     if (isPagerRevealed) homePortraitScroll.animateScrollTo(0)
                 }
                 fun openHomeInsight(page: Int) {
+                    showAllPrayers = false
                     coverPage = page
                     // Reveal the insight reader for this page; the pager
                     // refines its own extent after measuring.
@@ -648,7 +673,7 @@ fun PrayerTimesScreen(
                             .then(
                                 if (useTwoPaneLayout) Modifier else syncState.directPullModifier,
                             )
-                            .safeDrawingPadding()
+                            .then(if (isPhoneHome && isPagerRevealed) Modifier else Modifier.safeDrawingPadding())
                             .padding(
                                 bottom = if (LocalShowBottomNavigation.current && !useSideNavigation && !isInsightImmersive) {
                                     72.dp
@@ -852,7 +877,16 @@ fun PrayerTimesScreen(
                                   val phoneViewportWidth = maxWidth
                                   Column(
                                       modifier = Modifier.fillMaxSize()
-                                          .verticalScroll(homePortraitScroll),
+                                          .verticalScroll(homePortraitScroll)
+                                          .drawBehind {
+                                              if (isPhoneHome && !isPagerRevealed && homeCoverHeightPx.intValue > 0) {
+                                                  val coverBottom = homeCoverHeightPx.intValue + homeTopGap.toPx()
+                                                  val start = (coverBottom - 150.dp.toPx()).coerceAtLeast(0f)
+                                                  drawRect(homeReflectionScrim(start, start + 450.dp.toPx(), Color(0xFF080B14)),
+                                                      topLeft = androidx.compose.ui.geometry.Offset(0f, start),
+                                                      size = androidx.compose.ui.geometry.Size(size.width, (size.height - start).coerceAtLeast(0f)))
+                                              }
+                                          },
                                       verticalArrangement = Arrangement.spacedBy(sectionGap),
                                   ) {
                                       // The insight reader slot, Android home order: it
@@ -909,6 +943,7 @@ fun PrayerTimesScreen(
                                       ) {
                                           ImmersiveHomeCover(
                                               selectedPage = coverPage,
+                                              isDarkTheme = homeIsDark,
                                               useNightArtwork = coverNightArtwork,
                                               nextPrayerName = day.nextPrayer.orEmpty(),
                                               nextPrayerCountdown = day.countdown,
@@ -925,13 +960,27 @@ fun PrayerTimesScreen(
                                       if (!isPagerRevealed) {
                                           HomeReflectionPrompt(
                                               focusedPage = coverPage,
+                                              scrollPosition = coverScrollPosition.floatValue,
+                                              generatedInsights = homeReflectionEvidence,
+                                              exploreExpanded = exploreExpanded,
+                                              onExploreToggle = { exploreExpanded = !exploreExpanded },
+                                              exploreContent = {
+                                                  HomeArtworkRail(focusedPage = coverPage, useNightArtwork = coverNightArtwork,
+                                                      bottomClearance = 96.dp, expanded = exploreExpanded,
+                                                      onExpandedChange = { exploreExpanded = it }) { card, _ -> openHomeInsight(card.page) }
+                                              },
                                               onDarkCover = !homeIsDark,
-                                              onClick = { openHomeInsight(coverPage) },
+                                              onClick = {
+                                                  when (val target = HomePageReflections.cards[coverPage]?.target) {
+                                                      is DeenlyKnowledgeTarget.Surah -> onOpenQuran(target.number)
+                                                      is DeenlyKnowledgeTarget.FortressDua -> onOpenFortressChapter(target.chapterId)
+                                                      is DeenlyKnowledgeTarget.BukhariHadith -> onOpenBukhariHadith(target.hadithId)
+                                                      is DeenlyKnowledgeTarget.ShamayelBook -> onOpenShamayelBook(target.bookId)
+                                                      null -> openHomeInsight(coverPage)
+                                                  }
+                                              },
                                           )
-                                          HomeArtworkRail(
-                                              focusedPage = coverPage,
-                                              useNightArtwork = coverNightArtwork,
-                                          ) { card, _ -> openHomeInsight(card.page) }
+
                                       }
                                     if (!isInsightImmersive) {
                                         val scheduleLayout = homePrayerScheduleLayout(
@@ -942,6 +991,7 @@ fun PrayerTimesScreen(
                                             prayerContentHeights.values.maxOrNull()?.value ?: 0f,
                                         )
                                         PrayerScheduleSection(
+                                            onDarkFeed = isPhoneHome,
                                             modifier = Modifier.fillMaxWidth(),
                                             day = day,
                                             offsets = offsets,
@@ -1031,6 +1081,10 @@ fun PrayerTimesScreen(
                                 .padding(start = 24.dp, end = 24.dp, top = 12.dp),
                         ) {
                             PrayerHomeHeader(
+                                lightHeaderInk = homeCoverHeaderUsesLightText(coverPage, coverNightArtwork),
+                                greeting = homeGreetingForHour(day.nowMinute / 60),
+                                supportingTexts = listOfNotNull(placeName.takeIf { it.isNotBlank() },
+                                    day.temperatureCelsius?.let { "${it.toInt()}°C · ${day.currentPrayer.orEmpty()}" }),
                                 onOpenSettings = onOpenSettings,
                                 onOpenProfile = onOpenProfile,
                                 onOpenSearch = { searchController?.open() ?: onOpenSearch() },
@@ -1201,7 +1255,22 @@ private fun PrayerHomeHeader(
     onShowProfile: () -> Unit = {},
     searchController: SharedSearchController? = null,
     onArtwork: Boolean = false,
+    lightHeaderInk: Boolean = true,
+    greeting: String = "Peace be upon you",
+    supportingTexts: List<String> = emptyList(),
 ) {
+    if (onArtwork) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                val ink = if (lightHeaderInk) Color.White else Color(0xFF101827)
+                Text(greeting, style = HomeTypography.greeting, color = ink, maxLines = 1)
+                HomeRotatingHeaderText(supportingTexts, style = HomeTypography.caption, color = ink.copy(alpha = .82f))
+            }
+            AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings)
+        }
+        return
+    }
     // In-place voice capture: the mic keeps the user on this page — the pill
     // hosts the listening wave, and the search page only opens when a final
     // transcript arrives.
@@ -1480,6 +1549,7 @@ internal fun SearchSuggestionsOverlayContent(
             .verticalScroll(rememberScrollState())
             .padding(vertical = 6.dp),
     ) {
+        ReciterSearchResults(trimmed)
         if (trimmed.isEmpty()) {
             if (recents.isNotEmpty()) {
                 SuggestionHeader("RECENT")
@@ -1911,6 +1981,7 @@ private fun PrayerScheduleSection(
     showFooterLocationPin: Boolean = false,
     onFooterLocationClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onDarkFeed: Boolean = false,
 ) {
     var revealedCard by remember { mutableStateOf<RevealedPrayerCard?>(null) }
 
@@ -1929,12 +2000,12 @@ private fun PrayerScheduleSection(
                     text = "Prayer times",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = if (onDarkFeed) Color.White else MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
                     text = "Today's schedule",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (onDarkFeed) Color.White.copy(alpha = .7f) else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
                 // The button shrinks with the morph: "Done" is a short
