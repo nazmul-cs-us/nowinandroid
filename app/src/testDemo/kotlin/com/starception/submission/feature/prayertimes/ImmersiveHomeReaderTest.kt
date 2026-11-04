@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -16,7 +17,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
@@ -28,6 +32,7 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import java.time.LocalTime
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +52,7 @@ class ImmersiveHomeReaderTest {
         hilt.inject()
         var expandedPage: Int? = null
         val requestedPage = mutableStateOf(0 to 1)
+        val tilePull = mutableStateOf(0.dp)
         compose.setContent {
             CompositionLocalProvider(LocalInspectionMode provides true) {
                 org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
@@ -56,32 +62,34 @@ class ImmersiveHomeReaderTest {
                     val context = LocalContext.current
                     val locationService = remember(context) { EnhancedLocationService(context) }
                     Box(Modifier.fillMaxWidth().height(852.dp).background(Color(0xFF080B14))) {
-                        SwipeableBigTiles(
-                            prayerTimes = null,
-                            currentTime = LocalTime.of(17, 0),
-                            locationService = locationService,
-                            getNextPrayer = { null },
-                            getCurrentPrayer = { null },
-                            getPrayerStatus = { "" },
-                            getPrayerTimeDisplay = { "" },
-                            getTimeUntilNextPrayer = { "" },
-                            getCurrentDate = { "" },
-                            getSmartTitle = { "" },
-                            getSmartContent = { "" },
-                            getSmartFooter = { "" },
-                            getTimeSinceCurrentPrayer = { "" },
-                            getPrayerProgress = { 0 to 5 },
-                            getDailyStatsTitle = { "" },
-                            getDailyStatsMessage = { "" },
-                            getCurrentActivity = { "UNKNOWN" },
-                            onCompassClick = {},
-                            portraitStripHeight = 550.dp,
-                            portraitExpandedStripHeight = 852.dp,
-                            immersiveHome = true,
-                            edgeToEdgeArtwork = true,
-                            pageRequest = requestedPage.value,
-                            onExpandedPageChange = { expandedPage = it },
-                        )
+                        Box(Modifier.fillMaxWidth().height(852.dp).offset(y = tilePull.value)) {
+                            SwipeableBigTiles(
+                                prayerTimes = null,
+                                currentTime = LocalTime.of(17, 0),
+                                locationService = locationService,
+                                getNextPrayer = { null },
+                                getCurrentPrayer = { null },
+                                getPrayerStatus = { "" },
+                                getPrayerTimeDisplay = { "" },
+                                getTimeUntilNextPrayer = { "" },
+                                getCurrentDate = { "" },
+                                getSmartTitle = { "" },
+                                getSmartContent = { "" },
+                                getSmartFooter = { "" },
+                                getTimeSinceCurrentPrayer = { "" },
+                                getPrayerProgress = { 0 to 5 },
+                                getDailyStatsTitle = { "" },
+                                getDailyStatsMessage = { "" },
+                                getCurrentActivity = { "UNKNOWN" },
+                                onCompassClick = {},
+                                portraitStripHeight = 550.dp,
+                                portraitExpandedStripHeight = 852.dp,
+                                immersiveHome = true,
+                                edgeToEdgeArtwork = true,
+                                pageRequest = requestedPage.value,
+                                onExpandedPageChange = { expandedPage = it },
+                            )
+                        }
                     }
                 }
             }
@@ -89,6 +97,17 @@ class ImmersiveHomeReaderTest {
         compose.waitForIdle()
         assertEquals(0, expandedPage)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_prayer_reader.png")
+        fun assertCloseStaysClearOfStatusBar() {
+            compose.runOnIdle { tilePull.value = (-120).dp }
+            compose.waitForIdle()
+            val rootWidth = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
+            val closeTop = compose.onNodeWithContentDescription("Collapse insight")
+                .fetchSemanticsNode().boundsInRoot.top
+            assertTrue("Close control scrolled into status bar: $closeTop", closeTop >= rootWidth * 24f / 393f)
+            compose.runOnIdle { tilePull.value = 0.dp }
+            compose.waitForIdle()
+        }
+        assertCloseStaysClearOfStatusBar()
         for ((page, image) in listOf(
             2 to "immersive_home_quran_reader.png",
             1 to "immersive_home_salah_reader.png",
@@ -105,12 +124,19 @@ class ImmersiveHomeReaderTest {
             }
             assertEquals(page, expandedPage)
             compose.onRoot().captureRoboImage("src/testDemo/screenshots/$image")
+            assertCloseStaysClearOfStatusBar()
             if (page == 4) {
                 compose.onRoot().performTouchInput {
                     swipe(Offset(190f, 690f), Offset(190f, 230f), 350)
                 }
                 compose.waitForIdle()
                 compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_ai_scrolled.png")
+                val controlsTag = compose.onNodeWithText("Show controls").fetchSemanticsNode().boundsInRoot
+                val rootWidth = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
+                assertTrue("Reader tag grew beyond its compact height", controlsTag.height <= rootWidth * 48f / 393f)
+                compose.onNodeWithText("Show controls").performClick()
+                compose.waitForIdle()
+                assertTrue(compose.onAllNodesWithText("Show controls").fetchSemanticsNodes().isEmpty())
             }
         }
     }

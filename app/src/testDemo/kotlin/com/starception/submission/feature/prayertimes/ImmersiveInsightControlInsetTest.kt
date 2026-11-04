@@ -14,12 +14,15 @@ class ImmersiveInsightControlInsetTest {
         assertEquals(48.dp, calculateImmersiveInsightControlInset(36.dp, 0.dp))
     }
 
-    @Test fun focusedActionAboveStripNeverProducesNegativePadding() {
-        assertEquals(12.dp, calculateFocusedInsightControlTopInset((-40).dp))
-        assertEquals(12.dp, calculateFocusedInsightControlTopInset(0.dp))
+    @Test fun scrollingTheWholeTilePastTheTopPinsControlsBelowStatusBar() {
+        val safeInset = calculateImmersiveInsightControlInset(24.dp, (-120).dp)
+        assertEquals(156.dp, safeInset)
+        assertEquals(156.dp, calculateFocusedInsightControlTopInset(48.dp, safeInset))
     }
 
-    @Test fun focusedActionBelowStripPreservesMeasuredOffset() {
-        assertEquals(28.dp, calculateFocusedInsightControlTopInset(28.dp))
+    @Test fun focusedActionFollowsHeaderUntilItReachesSafeArea() {
+        val safeInset = calculateImmersiveInsightControlInset(24.dp, (-40).dp)
+        assertEquals(100.dp, calculateFocusedInsightControlTopInset(100.dp, safeInset))
+        assertEquals(76.dp, calculateFocusedInsightControlTopInset(20.dp, safeInset))
     }
 }

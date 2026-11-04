@@ -48,7 +48,6 @@ import com.starception.submission.core.designsystem.component.LocalInsightReader
 import com.starception.submission.core.designsystem.component.insightChromeVisibility
 import com.starception.submission.core.designsystem.component.rememberInsightReaderChrome
 import com.starception.submission.core.designsystem.component.insightReaderChromeProgress
-import com.starception.submission.core.designsystem.component.InsightReaderControlsButton
 import com.starception.submission.prayer.model.prayerHadithContext
 import com.starception.submission.core.designsystem.component.rememberSmoothCompassHeading
 import com.starception.submission.core.designsystem.component.InsightMotion
@@ -2734,18 +2733,20 @@ internal fun SwipeableBigTiles(
 
             val closeMorphProgress = insightActionSeparationProgress(expansionProgress)
             if (closeMorphProgress > 0f && (isImmersive || immersiveHome)) {
+                val safeControlTopInset = immersiveInsightControlTopInset(stripTopInWindowPx)
                 val controlTopInset = if (focusedReaderChromeHidden) {
                     // The header row scrolls off-screen with the passage. Keep
                     // the remaining close action inside the safe status-bar inset.
-                    immersiveInsightControlTopInset(stripTopInWindowPx)
+                    safeControlTopInset
                 } else if (focusedActionTopInWindowPx.isFinite()) {
                     with(density) {
                         calculateFocusedInsightControlTopInset(
                             (focusedActionTopInWindowPx - stripTopInWindowPx).toDp(),
+                            safeControlTopInset,
                         )
                     }
                 } else {
-                    immersiveInsightControlTopInset(stripTopInWindowPx)
+                    safeControlTopInset
                 }
                 val sourceIcon = when (pagerState.currentPage % insightPageCount) {
                     0, 3 -> Icons.Default.Navigation
@@ -3285,15 +3286,15 @@ private fun PrayerPosterInsightCard(
 @Composable
 private fun immersiveInsightControlTopInset(topInWindowPx: Float): Dp {
     val safeTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
-    val occupiedTop = with(LocalDensity.current) { topInWindowPx.coerceAtLeast(0f).toDp() }
-    return calculateImmersiveInsightControlInset(safeTop, occupiedTop)
+    val stripTop = with(LocalDensity.current) { topInWindowPx.toDp() }
+    return calculateImmersiveInsightControlInset(safeTop, stripTop)
 }
 
-internal fun calculateImmersiveInsightControlInset(safeTop: Dp, occupiedTop: Dp): Dp =
-    (maxOf(24.dp, safeTop) - occupiedTop + 12.dp).coerceAtLeast(12.dp)
+internal fun calculateImmersiveInsightControlInset(safeTop: Dp, stripTop: Dp): Dp =
+    (maxOf(24.dp, safeTop) - stripTop + 12.dp).coerceAtLeast(12.dp)
 
-internal fun calculateFocusedInsightControlTopInset(focusedDelta: Dp): Dp =
-    focusedDelta.coerceAtLeast(12.dp)
+internal fun calculateFocusedInsightControlTopInset(focusedDelta: Dp, safeControlInset: Dp): Dp =
+    maxOf(focusedDelta, safeControlInset)
 
 // Use the tile's existing animated progress in both layers. A second animation
 // would lag behind drag resizing and leave the engraved wells off-center.
@@ -4101,12 +4102,8 @@ internal fun InsightPreviewCard(
             val showHeaderActions = compactProgress < 0.5f &&
                 (onClick != null || onReadingPlayPause != null || directionalHintBearing != null || onPrayerUndo != null)
 
-            if (chromeProgress < 0.999f) Row(
+            Row(
                 modifier = Modifier
-                    .graphicsLayer {
-                        alpha = 1f - chromeProgress
-                        translationY = -12.dp.toPx() * chromeProgress
-                    }
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
                     .padding(
@@ -4127,9 +4124,13 @@ internal fun InsightPreviewCard(
                 // have no surface to sit on there; match the header actions to
                 // the right instead — dark scrim pill, white label.
                 Surface(
-                    onClick = onClick ?: {},
+                    onClick = if (editorialExpanded && readerChrome.hidden) {
+                        readerChrome::showControls
+                    } else {
+                        onClick ?: {}
+                    },
                     shape = CircleShape,
-                    color = if (editorialExpanded && readingSurahIndex == null) {
+                    color = if (editorialExpanded && readingSurahIndex == null && !readerChrome.hidden) {
                         Color.Transparent
                     } else {
                         Color.Black.copy(alpha = if (editorialExpanded) 0.52f else 0.34f)
@@ -4145,7 +4146,7 @@ internal fun InsightPreviewCard(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     ) {
                         Text(
-                            text = displayLabel,
+                            text = if (editorialExpanded && readerChrome.hidden) "Show controls" else displayLabel,
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = labelFontSize,
                                 letterSpacing = 0.sp,
@@ -4160,9 +4161,14 @@ internal fun InsightPreviewCard(
                 if (showHeaderActions) {
                     Spacer(modifier = Modifier.weight(1f))
                     Row(
-                        modifier = Modifier.onGloballyPositioned { coordinates ->
-                            onHeaderActionTopInWindowPx?.invoke(coordinates.positionInWindow().y)
-                        },
+                        modifier = Modifier
+                            .graphicsLayer {
+                                alpha = 1f - chromeProgress
+                                translationY = -12.dp.toPx() * chromeProgress
+                            }
+                            .onGloballyPositioned { coordinates ->
+                                onHeaderActionTopInWindowPx?.invoke(coordinates.positionInWindow().y)
+                            },
                         horizontalArrangement = Arrangement.spacedBy(if (isReadingHeader) 4.dp else 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -4285,18 +4291,6 @@ internal fun InsightPreviewCard(
                         }
                     }
                 }
-            }
-
-            if (editorialExpanded) {
-                InsightReaderControlsButton(
-                    readerChrome,
-                    // Reuse the reader header's safe inset. TopEnd puts this
-                    // action over the status icons (and the fixed close button)
-                    // after the reading controls auto-hide on scroll.
-                    Modifier.align(Alignment.TopStart)
-                        .padding(start = tagInset, top = tagTopInset)
-                        .background(Color(0xFF0B1827).copy(alpha = 0.72f), CircleShape),
-                )
             }
 
             val stageContent: @Composable () -> Unit = {
