@@ -134,7 +134,7 @@ class ImmersiveHomeReaderTest {
             compose.onRoot().captureRoboImage("src/testDemo/screenshots/$image")
             assertCloseStaysClearOfStatusBar()
             if (page == 2) {
-                val grip = compose.onNodeWithContentDescription("Resize insight from bottom right")
+                val grip = compose.onNodeWithContentDescription("Resize insight height")
                 val before = grip.fetchSemanticsNode().boundsInRoot
                 val rootWidth = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
                 // Cross the old 55% presentation cutoff without fully collapsing.

@@ -161,7 +161,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.starception.submission.core.designsystem.component.formatInsightHadithText
 import com.starception.submission.core.designsystem.component.InsightContentLayout
-import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
+import com.starception.submission.core.designsystem.component.InsightResizeHandle
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
@@ -2657,10 +2657,7 @@ internal fun SwipeableBigTiles(
             }
 
             if (!isLandscape && !pagerState.isScrollInProgress) {
-                // Mirrors InsightPreviewCard's own ContinuousCornerShape radius
-                // calculation so the corner handle's fold matches whichever
-                // card is currently focused, in whatever compact/expanded
-                // state it is in.
+                // Keep the handle overlay within the focused card's bounds.
                 val focusedCardCornerExtent = (
                     26f -
                         (8f * compactProgress) +
@@ -2674,39 +2671,28 @@ internal fun SwipeableBigTiles(
                         .clip(ContinuousCornerShape(focusedCardCornerExtent))
                         .zIndex(3f),
                 ) {
-                    listOf(Alignment.BottomStart to true, Alignment.BottomEnd to false).forEach { (alignment, start) ->
-                        InsightResizeCornerHandle(
-                            isStart = start,
-                            expansionExtent = expansionExtent,
-                            isResizing = isResizeDragging,
-                            onDragStart = {
-                                isResizeDragging = true
-                                isAutomaticallySized = false
-                                interactionEpoch++
-                            },
-                            // The grip controls the card's bottom edge: pulling
-                            // outward and down increases height; inward and up
-                            // decreases it.
-                            onDrag = { deltaY -> resizeFromPointerDelta(-deltaY) },
-                            onDragEnd = {
-                                isResizeDragging = false
-                                interactionEpoch++
-                            },
-                            onExpand = {
-                                expandInsightToPreferred(focusedLogicalPage)
-                            },
-                            onCollapse = {
-                                isAutomaticallySized = true
-                                setExpansionExtent(0f)
-                            },
-                            modifier = Modifier
-                                 .align(alignment)
-                                 .offset(
-                                     x = 0.dp,
-                                     y = 0.dp,
-                                 ),
-                        )
-                    }
+                    InsightResizeHandle(
+                        expansionExtent = expansionExtent,
+                        onDragStart = {
+                            isResizeDragging = true
+                            isAutomaticallySized = false
+                            interactionEpoch++
+                        },
+                        // Move the bottom edge with the finger, in either direction.
+                        onDrag = { deltaY -> resizeFromPointerDelta(-deltaY) },
+                        onDragEnd = {
+                            isResizeDragging = false
+                            interactionEpoch++
+                        },
+                        onExpand = {
+                            expandInsightToPreferred(focusedLogicalPage)
+                        },
+                        onCollapse = {
+                            isAutomaticallySized = true
+                            setExpansionExtent(0f)
+                        },
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
                 }
             }
 

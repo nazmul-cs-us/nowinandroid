@@ -117,7 +117,7 @@ import androidx.compose.ui.Modifier
 import com.starception.submission.core.designsystem.component.formatInsightHadithText
 import com.starception.submission.core.designsystem.component.formatGroundedSuggestionTitle
 import com.starception.submission.core.designsystem.component.InsightContentLayout
-import com.starception.submission.core.designsystem.component.InsightResizeCornerHandle
+import com.starception.submission.core.designsystem.component.InsightResizeHandle
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -1124,43 +1124,32 @@ fun InsightPager(
                         .height(effectiveTileHeight)
                         .clip(RoundedCornerShape(focusedCornerRadius)),
                 ) {
-                    listOf(Alignment.BottomStart to true, Alignment.BottomEnd to false).forEach { (alignment, start) ->
-                        InsightResizeCornerHandle(
-                            isStart = start,
-                            expansionExtent = normalizedExtent,
-                            isResizing = isResizeDragging,
-                            onDragStart = {
-                                isResizeDragging = true
-                                isAutomaticallySized = false
-                            },
-                            // The grip controls the card's bottom edge: pulling
-                            // outward and down increases height; inward and up
-                            // decreases it.
-                            onDrag = { deltaY -> consumeResizeDelta(-deltaY) },
-                            onDragEnd = { isResizeDragging = false },
-                            onExpand = {
-                                isAutomaticallySized = true
-                                onExpansionExtentChange(
-                                    preferredInsightExpansionExtent(
-                                        settledLogicalPage,
-                                        contentAwareRestingHeight,
-                                        boundedMaxTileHeight,
-                                        expandedHeightHints[settledLogicalPage],
-                                    ),
-                                )
-                            },
-                            onCollapse = {
-                                isAutomaticallySized = true
-                                onExpansionExtentChange(0f)
-                            },
-                            modifier = Modifier
-                                 .align(alignment)
-                                 .offset(
-                                     x = 0.dp,
-                                     y = 0.dp,
-                                 ),
-                        )
-                    }
+                    InsightResizeHandle(
+                        expansionExtent = normalizedExtent,
+                        onDragStart = {
+                            isResizeDragging = true
+                            isAutomaticallySized = false
+                        },
+                        // Move the bottom edge with the finger, in either direction.
+                        onDrag = { deltaY -> consumeResizeDelta(-deltaY) },
+                        onDragEnd = { isResizeDragging = false },
+                        onExpand = {
+                            isAutomaticallySized = true
+                            onExpansionExtentChange(
+                                preferredInsightExpansionExtent(
+                                    settledLogicalPage,
+                                    contentAwareRestingHeight,
+                                    boundedMaxTileHeight,
+                                    expandedHeightHints[settledLogicalPage],
+                                ),
+                            )
+                        },
+                        onCollapse = {
+                            isAutomaticallySized = true
+                            onExpansionExtentChange(0f)
+                        },
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
                 }
             }
             // Android's immersive reader keeps its close control on the artwork,

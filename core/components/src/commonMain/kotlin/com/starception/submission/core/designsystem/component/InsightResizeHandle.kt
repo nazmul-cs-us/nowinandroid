@@ -16,17 +16,11 @@
 
 package com.starception.submission.core.designsystem.component
 
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,7 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -47,10 +41,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
-/** Transparent corner grip; only the two diagonal strokes are painted. */
+/** Quiet bottom-edge grab bar with a larger, invisible drag target. */
 @Composable
-fun InsightResizeCornerHandle(
-    isStart: Boolean,
+fun InsightResizeHandle(
     expansionExtent: Float,
     onDragStart: () -> Unit,
     onDrag: (Float) -> Unit,
@@ -58,7 +51,6 @@ fun InsightResizeCornerHandle(
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
-    isResizing: Boolean = false,
 ) {
     var isActive by remember { mutableStateOf(false) }
     // Keep the pointer coroutine alive across layout changes, while using the
@@ -69,39 +61,12 @@ fun InsightResizeCornerHandle(
     val activeProgress by animateFloatAsState(
         targetValue = if (isActive) 1f else 0f,
         animationSpec = tween(140),
-        label = "insightCornerGripPress",
+        label = "insightGripPress",
     )
-    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val strokeColor = if (dark) Color(0xFFBDD0AE) else Color(0xFF61785B)
-    // Two gentle outward/downward nudges, then a long rest. The hint pauses
-    // during either corner's drag and when there is no more room to expand.
-    val hintProgress = if (!isActive && !isResizing && expansionExtent > 0f && expansionExtent < 0.98f) {
-        val transition = rememberInfiniteTransition(label = "insightResizeHint")
-        val progress by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 0f,
-            animationSpec = infiniteRepeatable(
-                animation = keyframes {
-                    durationMillis = 8_000
-                    0f at 0
-                    0f at 5_000 using FastOutSlowInEasing
-                    1f at 5_600 using FastOutSlowInEasing
-                    0f at 6_200 using FastOutSlowInEasing
-                    1f at 6_800 using FastOutSlowInEasing
-                    0f at 7_400
-                    0f at 8_000
-                },
-            ),
-            label = "insightResizeHintOffset",
-        )
-        progress
-    } else {
-        0f
-    }
     Canvas(
         modifier = modifier
-            .size(56.dp)
-            .pointerInput(isStart) {
+            .size(width = 80.dp, height = 48.dp)
+            .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = {
                         isActive = true
@@ -117,16 +82,11 @@ fun InsightResizeCornerHandle(
                     },
                 ) { change, delta ->
                     change.consume()
-                    val outwardX = if (isStart) -delta.x else delta.x
-                    currentOnDrag((delta.y + outwardX) * 0.70710677f)
+                    currentOnDrag(delta.y)
                 }
             }
             .semantics {
-                contentDescription = if (isStart) {
-                    "Resize insight from bottom left"
-                } else {
-                    "Resize insight from bottom right"
-                }
+                contentDescription = "Resize insight height"
                 stateDescription = "${(expansionExtent * 100).roundToInt()} percent expanded"
                 customActions = listOf(
                     CustomAccessibilityAction("Expand insight") { onExpand(); true },
@@ -134,17 +94,18 @@ fun InsightResizeCornerHandle(
                 )
             },
     ) {
-        // A compact, graduated corner grip: the shorter outer stroke nests
-        // against the longer inner one, with aligned ends and a fine gap.
-        val nudge = hintProgress * 1.25f
-        fun point(x: Float, y: Float) = Offset(
-            if (isStart) (x - nudge).dp.toPx() else size.width - (x - nudge).dp.toPx(),
-            size.height - (y - nudge).dp.toPx(),
+        val halfWidth = (16f + 4f * activeProgress).dp.toPx()
+        val y = size.height - 12.dp.toPx()
+        val start = Offset(size.width / 2f - halfWidth, y)
+        val end = Offset(size.width / 2f + halfWidth, y)
+        drawLine(Color.Black.copy(alpha = .24f), start, end, 6.dp.toPx(), StrokeCap.Round)
+        drawLine(
+            color = lerp(Color.White.copy(alpha = .65f), Color.White, activeProgress),
+            start = start,
+            end = end,
+            strokeWidth = 3.dp.toPx(),
+            cap = StrokeCap.Round,
         )
-        val stroke = (1.35f + activeProgress * 0.15f).dp.toPx()
-        val ink = strokeColor.copy(alpha = 0.8f + activeProgress * 0.2f)
-        drawLine(ink, point(16f, 17f), point(21f, 12f), stroke, StrokeCap.Round)
-        drawLine(ink, point(16f, 21f), point(25f, 12f), stroke, StrokeCap.Round)
     }
 }
 
