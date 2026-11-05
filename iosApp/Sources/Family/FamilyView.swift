@@ -202,8 +202,14 @@ struct FamilyView: View {
                         FamilyContactAvatar(jid: member.jid, size: 50)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(familyName(member.jid)).font(.system(size: 16, weight: .medium)).foregroundStyle(colors.ink).lineLimit(1)
-                            Text(member.status == "incoming" ? "Invited you to join" : member.status == "outgoing" ? "Waiting for acceptance" : "Voice & video calls")
-                                .font(.system(size: 12)).foregroundStyle(colors.muted).lineLimit(1)
+                            let presence = store.connected && store.serviceReady ? member.presence : "unknown"
+                            HStack(spacing: 6) {
+                                if member.status == "accepted" && presence == "online" {
+                                    Circle().fill(Color(red: 46 / 255, green: 157 / 255, blue: 101 / 255)).frame(width: 6, height: 6).accessibilityHidden(true)
+                                }
+                                Text(member.status == "incoming" ? "Invited you to join" : member.status == "outgoing" ? "Waiting for acceptance" : presence == "online" ? "Online" : presence == "offline" ? "Offline" : "Status unavailable")
+                                    .font(.system(size: 12)).foregroundStyle(colors.muted).lineLimit(1)
+                            }
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain)

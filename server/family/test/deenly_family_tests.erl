@@ -17,15 +17,22 @@ family_test_() -> {setup, fun setup/0, fun cleanup/1, [
     ?_test(restart_preserves_family()), ?_test(push_requires_family()),
     ?_test(push_registration_ownership()), ?_test(push_logout_is_scoped()),
     ?_test(push_is_durable_and_idempotent()), ?_test(push_cancelled_is_pruned()),
-    ?_test(push_invalid_device_rejected()), ?_test(call_id_requires_uuid())]}.
+    ?_test(push_invalid_device_rejected()), ?_test(call_id_requires_uuid()),
+    ?_test(presence_is_family_private()), ?_test(presence_combines_devices()),
+    ?_test(stale_activity_cannot_restore_online()), ?_test(presence_disconnect_and_expiry()),
+    ?_test(presence_removal_revokes_updates()), ?_test(presence_heartbeats_are_coalesced()),
+    ?_test(raw_peer_presence_is_rejected())]}.
 setup() ->
     Dir = "/tmp/deenly-family-eunit-" ++ integer_to_list(erlang:unique_integer([positive])),
     application:set_env(mnesia, dir, Dir),
     mnesia:create_schema([node()]), application:start(mnesia),
     {atomic, ok} = mnesia:create_table(deenly_family, [{attributes, [key, value]}, {disc_copies, [node()]}]),
-    ok = mnesia:wait_for_tables([deenly_family], 10000), Dir.
+    ok = mnesia:wait_for_tables([deenly_family], 10000),
+    ok = mod_deenly_family_presence:init(), Dir.
 cleanup(Dir) -> application:stop(mnesia), file:del_dir_r(Dir).
-reset() -> {atomic, ok} = mnesia:clear_table(deenly_family).
+reset() -> {atomic, ok} = mnesia:clear_table(deenly_family),
+    {atomic, ok} = mnesia:clear_table(deenly_family_presence),
+    ok = mod_deenly_family_presence:init().
 run(U, F, Req) -> mnesia:transaction(fun() ->
     mnesia:read(deenly_family, {lock, ?D}, write),
     mod_deenly_family:expire(?D), mod_deenly_family:execute(?D, U, F, Req)
@@ -87,9 +94,15 @@ simultaneous_answers() -> reset(), family(), {atomic, _} = call(), Parent = self
     ?assertEqual(1, length([ok || {atomic, _} <- Results])),
     ?assertEqual(1, length([ok || {aborted, {denied, <<"answered_elsewhere">>}} <- Results])).
 restart_preserves_family() -> reset(), family(),
+    {atomic, {#{<<"presenceEpoch">> := Epoch}, [_]}} = presence(?A, ?AF, true, 1),
     stopped = mnesia:stop(), ok = mnesia:start(), ok = mnesia:wait_for_tables([deenly_family], 10000),
-    {atomic, {#{<<"members">> := [Member]}, _}} = act(?A, ?AF, <<"snapshot">>, #{}),
-    ?assertEqual(<<"accepted">>, maps:get(<<"status">>, Member)).
+    ok = mod_deenly_family_presence:init(),
+    {atomic, {#{<<"members">> := [Member], <<"presenceEpoch">> := NewEpoch}, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    ?assertEqual(<<"accepted">>, maps:get(<<"status">>, Member)),
+    ?assertEqual(<<"unknown">>, maps:get(<<"presence">>, Member)),
+    ?assertNotEqual(Epoch, NewEpoch),
+    %% The RAM subscription index is rebuilt from durable accepted relationships.
+    {atomic, {_, [{?B, _}]}} = presence(?A, ?AF, true, 1).
 
 register(U, F, Device, Token) -> act(U, F, <<"register_device">>, #{<<"deviceId">> => Device,
     <<"platform">> => <<"android">>, <<"token">> => Token}).
@@ -121,3 +134,63 @@ push_invalid_device_rejected() -> reset(),
 call_id_requires_uuid() -> reset(), family(),
     ?assertEqual({aborted, {denied, <<"invalid_call">>}}, act(?A, ?AF, <<"invite_call">>,
         #{<<"peer">> => ?B, <<"callId">> => <<"not-a-native-call-uuid">>, <<"kind">> => <<"voice">>})).
+
+
+presence(U, F, Active, Sequence) -> act(U, F, <<"presence">>, #{<<"active">> => Active, <<"activityVersion">> => Sequence}).
+presence_state(U) -> {atomic, S} = mnesia:transaction(fun() -> mod_deenly_family_presence:state(?D, U) end), S.
+presence_is_family_private() ->
+    reset(), invite(),
+    {atomic, {_, []}} = presence(?A, ?AF, true, 1),
+    {atomic, {#{<<"members">> := [Pending]}, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    ?assertNot(maps:is_key(<<"presence">>, Pending)),
+    {atomic, _} = act(?B, ?BF, <<"accept_member">>, #{<<"peer">> => ?A}),
+    {atomic, {#{<<"members">> := [Member]}, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    ?assertEqual(<<"online">>, maps:get(<<"presence">>, Member)),
+    {atomic, {_, [{?B, Event}]}} = presence(?A, ?AF, false, 2),
+    ?assertEqual(<<"offline">>, maps:get(<<"presence">>, Event)),
+    ?assertEqual(?A, maps:get(<<"jid">>, Event)),
+    ?assert(is_binary(maps:get(<<"presenceEpoch">>, Event))),
+    {atomic, {#{<<"members">> := []}, _}} = act(<<"eve@xmpp.test">>, <<"eve@xmpp.test/web">>, <<"snapshot">>, #{}),
+    %% Availability must never restrict an authorized call.
+    ?assertMatch({atomic, _}, call()).
+presence_combines_devices() ->
+    reset(), family(), Other = <<"alice@xmpp.test/second">>,
+    {atomic, {_, [_]}} = presence(?A, ?AF, true, 1),
+    {atomic, {_, []}} = presence(?A, Other, true, 1),
+    {atomic, {_, []}} = presence(?A, ?AF, false, 2),
+    ?assertEqual(<<"online">>, maps:get(<<"presence">>, presence_state(?A))),
+    {atomic, {_, [_]}} = presence(?A, Other, false, 2),
+    ?assertEqual(<<"offline">>, maps:get(<<"presence">>, presence_state(?A))).
+stale_activity_cannot_restore_online() ->
+    reset(), family(),
+    {atomic, _} = presence(?A, ?AF, true, 1),
+    {atomic, _} = presence(?A, ?AF, false, 3),
+    {atomic, {_, []}} = presence(?A, ?AF, true, 2),
+    {atomic, _} = act(?A, ?AF, <<"snapshot">>, #{<<"active">> => true, <<"activityVersion">> => 1}),
+    ?assertEqual(<<"offline">>, maps:get(<<"presence">>, presence_state(?A))).
+presence_disconnect_and_expiry() ->
+    reset(), family(), {atomic, _} = presence(?A, ?AF, true, 1),
+    {atomic, [_]} = mnesia:transaction(fun() -> mod_deenly_family_presence:remove(?D, ?A, ?AF) end),
+    ?assertEqual(<<"offline">>, maps:get(<<"presence">>, presence_state(?A))),
+    {atomic, _} = presence(?A, ?AF, true, 2),
+    {atomic, ok} = mnesia:transaction(fun() ->
+        K = {session, ?D, ?AF}, [{T, K, U, Value}] = mnesia:read(deenly_family_presence, K, write),
+        mnesia:write({T, K, U, Value#{until => 0}})
+    end),
+    [{?D, [_]}] = mod_deenly_family_presence:sweep(),
+    ?assertEqual(<<"offline">>, maps:get(<<"presence">>, presence_state(?A))).
+presence_removal_revokes_updates() ->
+    reset(), family(), {atomic, _} = presence(?A, ?AF, true, 1),
+    {atomic, _} = act(?B, ?BF, <<"remove_member">>, #{<<"peer">> => ?A}),
+    {atomic, {_, []}} = presence(?A, ?AF, false, 2),
+    {atomic, {#{<<"members">> := []}, _}} = act(?B, ?BF, <<"snapshot">>, #{}).
+presence_heartbeats_are_coalesced() ->
+    reset(), family(), {atomic, _} = presence(?A, ?AF, true, 1),
+    Before = mnesia:table_info(deenly_family_presence, size),
+    State = presence_state(?A),
+    [{atomic, {_, []}} = presence(?A, ?AF, true, 1) || _ <- lists:seq(1, 100)],
+    ?assertEqual(Before, mnesia:table_info(deenly_family_presence, size)),
+    ?assertEqual(State, presence_state(?A)).
+raw_peer_presence_is_rejected() ->
+    ?assertEqual({stop, drop}, mod_deenly_family:filter_packet(
+        {jid:from_binary(?A), jid:from_binary(?B), #{}, {xmlel, <<"presence">>, #{<<"type">> => <<"probe">>}, []}}, #{}, #{})).

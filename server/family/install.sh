@@ -53,6 +53,7 @@ beam="$release/lib/mongooseim-6.10.0/ebin/mod_deenly_family.beam"
 if [ -f "$beam" ]; then cp -p "$beam" "$beam.before-family-$(date -u +%Y%m%dT%H%M%S%N)"; fi
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family.beam" "$beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_push.beam" "$(dirname "$beam")/mod_deenly_family_push.beam"
+install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_presence.beam" "$(dirname "$beam")/mod_deenly_family_presence.beam"
 systemctl restart mongooseim
 for attempt in {1..20}; do
   if /usr/local/bin/mongooseimctl status >/dev/null 2>&1; then

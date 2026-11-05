@@ -257,8 +257,15 @@ internal fun FamilyScreenContent(
                                 ContactAvatar(member.jid, 50)
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(callDisplayName(member.jid), color = colors.ink, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(when (member.status) { "incoming" -> "Invited you to join"; "outgoing" -> "Waiting for acceptance"; else -> "Voice & video calls" },
-                                        color = colors.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    val presence = if (state.connected && state.serviceReady) member.presence else "unknown"
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        if (member.status == "accepted" && presence == "online") {
+                                            Box(Modifier.size(6.dp).background(Color(0xFF2E9D65), CircleShape))
+                                        }
+                                        Text(when (member.status) { "incoming" -> "Invited you to join"; "outgoing" -> "Waiting for acceptance"
+                                            else -> when (presence) { "online" -> "Online"; "offline" -> "Offline"; else -> "Status unavailable" } },
+                                            color = colors.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
                                 }
                                 if (member.status == "accepted") FilledTonalIconButton(onClick = { actions.voice(member.jid) }, enabled = canCall,
                                     modifier = Modifier.size(44.dp), colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = colors.field, contentColor = colors.accent)) {

@@ -3,7 +3,7 @@
 -behaviour(gen_mod).
 -compile({no_auto_import, [put/2]}).
 -export([start/2, stop/1, supported_features/0, config_spec/0, process_iq/5,
-         hooks/1, filter_packet/3, sweep/1]).
+         hooks/1, filter_packet/3, sweep/1, presence_removed/3]).
 -include("jlib.hrl").
 -include("mongoose_logger.hrl").
 -ifdef(TEST).
@@ -22,6 +22,7 @@ start(Host, _) ->
         Error -> error({family_storage_unavailable, Error})
     end,
     ok = mnesia:wait_for_tables([?TABLE], 10000),
+    ok = mod_deenly_family_presence:init(),
     {ok, Timer} = timer:apply_interval(5000, ?MODULE, sweep, [Host]),
     persistent_term:put({?MODULE, Host}, Timer),
     gen_iq_handler:add_iq_handler_for_domain(Host, ?NS, ejabberd_local,
@@ -30,12 +31,21 @@ stop(Host) ->
     timer:cancel(persistent_term:get({?MODULE, Host})),
     persistent_term:erase({?MODULE, Host}),
     gen_iq_handler:remove_iq_handler_for_domain(Host, ?NS, ejabberd_local).
-hooks(Host) -> [{filter_local_packet, Host, fun ?MODULE:filter_packet/3, #{}, 5}].
+hooks(Host) -> [{filter_local_packet, Host, fun ?MODULE:filter_packet/3, #{}, 5},
+                {unset_presence, Host, fun ?MODULE:presence_removed/3, #{}, 60},
+                {sm_remove_connection, Host, fun ?MODULE:presence_removed/3, #{}, 60}].
+presence_removed(Acc, #{jid := #jid{lserver = D} = J}, _) ->
+    F = jid:to_binary(J), U = bare(F),
+    case mnesia:transaction(fun() ->
+        mnesia:read(?TABLE, {lock, D}, write),
+        mod_deenly_family_presence:remove(D, U, F)
+    end) of {atomic, Events} -> deliver(D, Events); _ -> ok end,
+    {ok, Acc}.
 
 %% Clients must use authenticated server IQs. Never route peer-authored call messages.
 filter_packet(drop, _, _) -> {ok, drop};
 filter_packet({#jid{luser = U}, #jid{luser = V}, _, #xmlel{name = Name}}, _, _)
-  when U =/= <<>>, V =/= <<>>, (Name =:= <<"message">> orelse Name =:= <<"iq">>) -> {stop, drop};
+  when U =/= <<>>, V =/= <<>>, (Name =:= <<"message">> orelse Name =:= <<"iq">> orelse Name =:= <<"presence">>) -> {stop, drop};
 filter_packet(Packet, _, _) -> {ok, Packet}.
 
 process_iq(Acc, From, #jid{lserver = Domain}, #iq{type = set, sub_el = El} = IQ, _) ->
@@ -66,7 +76,15 @@ execute(D, U, F, #{<<"action">> := <<"register_device">>} = R) ->
     mod_deenly_family_push:register(D, U, F, R);
 execute(D, U, _, #{<<"action">> := <<"unregister_device">>, <<"deviceId">> := Device}) ->
     mod_deenly_family_push:unregister(D, U, Device);
-execute(D, U, F, #{<<"action">> := <<"snapshot">>}) ->
+execute(D, U, F, #{<<"action">> := <<"presence">>, <<"active">> := Active} = Req) when is_boolean(Active) ->
+    {#{<<"presenceEpoch">> => mod_deenly_family_presence:epoch()},
+     mod_deenly_family_presence:update(D, U, F, Active, presence_sequence(Req))};
+execute(D, U, F, #{<<"action">> := <<"snapshot">>} = Req) ->
+    PresenceEvents = case maps:find(<<"active">>, Req) of
+        {ok, Active} when is_boolean(Active) -> mod_deenly_family_presence:update(D, U, F, Active, presence_sequence(Req));
+        error -> [];
+        _ -> denied(<<"invalid_request">>)
+    end,
     lists:foreach(fun(C) ->
         case maps:get(<<"stage">>, C) =:= <<"active">> andalso selected(C, F) of
             true ->
@@ -77,7 +95,8 @@ execute(D, U, F, #{<<"action">> := <<"snapshot">>}) ->
     end, calls(D)),
     Calls = [view(C, F) || C <- calls(D), participant(C, U),
                           maps:get(<<"stage">>, C) =/= <<"ended">>],
-    {#{<<"members">> => members(D, U), <<"calls">> => Calls}, []};
+    {#{<<"members">> => members(D, U), <<"calls">> => Calls,
+       <<"presenceEpoch">> => mod_deenly_family_presence:epoch()}, PresenceEvents};
 execute(D, U, _, #{<<"action">> := Action, <<"peer">> := Peer})
   when Action =:= <<"invite">>; Action =:= <<"accept_member">>;
        Action =:= <<"remove_member">> ->
@@ -94,12 +113,13 @@ execute(D, U, _, #{<<"action">> := Action, <<"peer">> := Peer})
             end;
         <<"accept_member">> ->
             case Old of
-                #{by := Peer, status := <<"pending">>} -> put(K, Old#{status => <<"accepted">>});
+                #{by := Peer, status := <<"pending">>} -> put(K, Old#{status => <<"accepted">>}),
+                    mod_deenly_family_presence:accept(D, U, Peer);
                 #{status := <<"accepted">>} -> ok;
                 _ -> denied(<<"invitation_not_found">>)
             end;
         <<"remove_member">> ->
-            mnesia:delete({?TABLE, K})
+            mnesia:delete({?TABLE, K}), mod_deenly_family_presence:revoke(D, U, Peer)
     end,
     EndEvents = case Action of
         <<"remove_member">> -> lists:flatmap(fun(C) ->
@@ -109,9 +129,9 @@ execute(D, U, _, #{<<"action">> := Action, <<"peer">> := Peer})
             end end, calls(D));
         _ -> []
     end,
-    Events = [{U, #{<<"event">> => <<"family">>, <<"members">> => members(D, U)}},
-              {Peer, #{<<"event">> => <<"family">>, <<"members">> => members(D, Peer)}}],
-    {#{<<"members">> => members(D, U)}, Events ++ EndEvents};
+    Events = [{U, #{<<"event">> => <<"family">>, <<"presenceEpoch">> => mod_deenly_family_presence:epoch(), <<"members">> => members(D, U)}},
+              {Peer, #{<<"event">> => <<"family">>, <<"presenceEpoch">> => mod_deenly_family_presence:epoch(), <<"members">> => members(D, Peer)}}],
+    {#{<<"members">> => members(D, U), <<"presenceEpoch">> => mod_deenly_family_presence:epoch()}, Events ++ EndEvents};
 execute(D, U, F, #{<<"action">> := <<"invite_call">>, <<"peer">> := Peer,
                    <<"callId">> := Id, <<"kind">> := Kind}) ->
     valid_peer(D, U, Peer), family(D, U, Peer),
@@ -171,6 +191,10 @@ execute(D, U, F, #{<<"action">> := Action, <<"callId">> := Id} = Req) ->
     end;
 execute(_, _, _, _) -> denied(<<"unknown_action">>).
 
+presence_sequence(Req) ->
+    Sequence = maps:get(<<"activityVersion">>, Req, 0),
+    true_or_deny(is_integer(Sequence) andalso Sequence >= 0 andalso Sequence < 9007199254740991, <<"invalid_request">>),
+    Sequence.
 family(D, A, B) ->
     case read(family_key(D, A, B)) of #{status := <<"accepted">>} -> ok; _ -> denied(<<"not_family">>) end.
 valid_peer(D, U, Peer) ->
@@ -185,8 +209,9 @@ read(K) -> case mnesia:read(?TABLE, K, write) of [{?TABLE, K, V}] -> V; [] -> un
 put(K, V) -> mnesia:write({?TABLE, K, V}).
 rows() -> mnesia:foldl(fun({?TABLE, K, V}, A) -> [{K, V} | A] end, [], ?TABLE).
 members(D, U) ->
-    [#{<<"jid">> => case U =:= A of true -> B; false -> A end,
-       <<"status">> => case S of <<"accepted">> -> S; _ when By =:= U -> <<"outgoing">>; _ -> <<"incoming">> end}
+    [maps:merge(#{<<"jid">> => case U =:= A of true -> B; false -> A end,
+       <<"status">> => case S of <<"accepted">> -> S; _ when By =:= U -> <<"outgoing">>; _ -> <<"incoming">> end},
+       case S of <<"accepted">> -> mod_deenly_family_presence:state(D, case U =:= A of true -> B; false -> A end); _ -> #{} end)
      || {{family, Domain, _}, #{a := A, b := B, by := By, status := S}} <- rows(),
         Domain =:= D, (A =:= U orelse B =:= U)].
 calls(D) -> [C || {{call, Domain, _}, C} <- rows(), Domain =:= D].
@@ -231,6 +256,7 @@ sweep(_Host) ->
             (_) -> []
         end, rows())
     end) of {atomic, Events} -> [deliver(D, E) || {D, E} <- Events]; _ -> ok end,
+    [deliver(D, E) || {D, E} <- mod_deenly_family_presence:sweep()],
     mod_deenly_family_push:drain().
 turn(U, Id) ->
     Path = case os:getenv("FAMILY_TURN_SECRET_FILE") of false -> "/etc/mongooseim/turn-secret"; P -> P end,
@@ -245,8 +271,15 @@ turn(U, Id) ->
 deliver(D, Events) ->
     From = jid:from_binary(D),
     lists:foreach(fun({Target, Body}) ->
-        Packet = #xmlel{name = <<"message">>, attrs = #{<<"type">> => <<"normal">>, <<"from">> => D, <<"to">> => Target},
-                        children = [element(<<"body">>, <<"jabber:client">>, Body#{<<"v">> => 1})]},
+        IsPresence = maps:get(<<"event">>, Body, <<>>) =:= <<"presence">>,
+        Type = case IsPresence of true -> <<"headline">>; false -> <<"normal">> end,
+        Hints = case IsPresence of
+            true -> [#xmlel{name = <<"no-store">>, attrs = #{<<"xmlns">> => <<"urn:xmpp:hints">>}},
+                     #xmlel{name = <<"no-copy">>, attrs = #{<<"xmlns">> => <<"urn:xmpp:hints">>}}];
+            false -> []
+        end,
+        Packet = #xmlel{name = <<"message">>, attrs = #{<<"type">> => Type, <<"from">> => D, <<"to">> => Target},
+                        children = [element(<<"body">>, <<"jabber:client">>, Body#{<<"v">> => 1}) | Hints]},
         mongoose_router:route(mongoose_acc:new(From, jid:from_binary(Target), Packet, ?LOCATION))
     end, Events).
 element(Name, NS, Body) -> #xmlel{name = Name, attrs = #{<<"xmlns">> => NS},
