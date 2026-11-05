@@ -88,6 +88,9 @@ struct FamilyView: View {
                     else { FamilyLandingIllustration().frame(height: 148) }
                     VStack(alignment: .leading, spacing: 0) {
                         if store.connected { contactList } else { loginFields }
+                        if store.connected, let message = store.pushRegistrationMessage {
+                            Text(message).font(.system(size: 12)).foregroundStyle(colors.muted).padding(.horizontal, 24).padding(.vertical, 12)
+                        }
                         if let message = store.message {
                             HStack(spacing: 10) {
                                 Image(systemName: "info.circle").foregroundStyle(colors.accent)
@@ -393,6 +396,7 @@ private struct FamilyCallView: View {
     @ObservedObject private var media = FamilyStore.shared.media
     @ObservedObject private var appearance = FamilyAppearance.shared
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
     private var video: Bool { store.call?.kind == "video" && store.call?.stage == "active" }
     private var preview: Bool { store.call?.kind == "video" && store.call?.stage == "ringing" && store.call?.caller == store.me && media.localVideo != nil }
@@ -424,7 +428,7 @@ private struct FamilyCallView: View {
                                 }
                             }
                         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: preview ? .top : .center)
-                        if let message = store.message {
+                        if let message = store.callMessage {
                             Text(message).font(.system(size: 12)).foregroundStyle(colors.error).multilineTextAlignment(.center).padding(.bottom, 12)
                         }
                         if call.stage == "ringing" && call.kind == "video" && call.caller == store.me {
@@ -450,6 +454,7 @@ private struct FamilyCallView: View {
                 }
             }
             .task(id: call.id) { await store.previewCamera() }
+            .task(id: scenePhase) { if scenePhase == .active { await store.previewCamera() } }
             .onAppear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: immersive || colorScheme == .dark) }
             .onChange(of: immersive) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: immersive || colorScheme == .dark) }
             .onChange(of: colorScheme) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: immersive || colorScheme == .dark) }

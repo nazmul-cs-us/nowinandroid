@@ -45,6 +45,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -273,6 +274,9 @@ internal fun FamilyScreenContent(
                         }
                     }
                 }
+                if (state.connected) state.pushRegistrationError?.let { message -> item {
+                    Text(message, Modifier.padding(horizontal = 28.dp, vertical = 12.dp), fontSize = 12.sp, color = colors.muted)
+                } }
                 state.error?.let { message -> item {
                     Row(Modifier.padding(horizontal = 24.dp, vertical = 16.dp).fillMaxWidth().background(colors.field, RoundedCornerShape(16.dp)).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Info, null, Modifier.size(18.dp), tint = colors.accent)
@@ -382,6 +386,20 @@ internal data class FamilyCallActions(
     val speaker: () -> Unit = {}, val camera: () -> Unit = {}, val flip: () -> Unit = {},
 )
 
+/** Handles an already-resumed screen as well as every subsequent resume/stop. */
+@Composable
+internal fun FamilyCameraPreviewEffect(callId: String, lifecycle: androidx.lifecycle.Lifecycle,
+    onStart: () -> Unit, onStop: () -> Unit) {
+    val start by rememberUpdatedState(onStart)
+    val stop by rememberUpdatedState(onStop)
+    LaunchedEffect(callId, lifecycle) {
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            start()
+            try { kotlinx.coroutines.awaitCancellation() } finally { stop() }
+        }
+    }
+}
+
 @Composable
 fun FamilyCallOverlay(client: FamilyClient) {
     val state by client.state.collectAsStateWithLifecycle()
@@ -390,15 +408,8 @@ fun FamilyCallOverlay(client: FamilyClient) {
     val remote by client.media.remoteVideo.collectAsStateWithLifecycle()
     val local by client.media.localVideo.collectAsStateWithLifecycle()
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(call.id) { client.previewCamera() }
-    DisposableEffect(lifecycle, call.id) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) client.previewCamera()
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) client.stopPreview()
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer); client.stopPreview() }
-    }
+    FamilyCameraPreviewEffect(call.id, lifecycle,
+        onStart = { client.previewCamera(call.id) }, onStop = { client.stopPreview(call.id) })
     var elapsed by remember(call.id) { mutableLongStateOf(0L) }
     LaunchedEffect(call.id, state.connectedAtElapsed) {
         val start = state.connectedAtElapsed ?: return@LaunchedEffect
@@ -492,7 +503,7 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
                         fontFamily = if (state.mediaConnected) FontFamily.Monospace else FontFamily.Default, modifier = Modifier.padding(top = 8.dp))
                 }
             }
-            state.error?.let { Text(it, color = colors.error, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(bottom = 12.dp)) }
+            state.callError?.let { Text(it, color = colors.error, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(bottom = 12.dp)) }
             if (call.kind == "video" && call.stage == "ringing" && !incoming) {
                 Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                     CallControl(Icons.Default.Cameraswitch, "Flip", enabled = state.camera, onVideo = preview, action = actions.flip)

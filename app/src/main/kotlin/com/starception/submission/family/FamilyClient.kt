@@ -34,6 +34,7 @@ data class FamilyCall(
 data class FamilyUiState(
     val me: String = "", val connected: Boolean = false, val busy: Boolean = false,
     val serviceReady: Boolean = false,
+    val callError: String? = null, val pushRegistrationError: String? = null,
     val members: List<FamilyMember> = emptyList(), val call: FamilyCall? = null,
     val error: String? = null, val muted: Boolean = false, val camera: Boolean = true,
     val speaker: Boolean = false, val mediaConnected: Boolean = false,
@@ -66,21 +67,23 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private val queuedSignals = mutableListOf<Pair<String, JSONObject>>()
     private var ringingJob: Job? = null
     private var heartbeat: Job? = null
-    private var visibleActivities = 0
-    internal val hasForegroundActivity: Boolean get() = visibleActivities > 0
+    private val visibleActivities = mutableSetOf<android.app.Activity>()
+    internal val hasForegroundActivity: Boolean get() = visibleActivities.isNotEmpty()
     init {
         (context.applicationContext as android.app.Application).registerActivityLifecycleCallbacks(
             object : android.app.Application.ActivityLifecycleCallbacks {
-                override fun onActivityStarted(activity: android.app.Activity) { visibleActivities++ }
+                override fun onActivityStarted(activity: android.app.Activity) { visibleActivities.add(activity) }
                 override fun onActivityStopped(activity: android.app.Activity) {
-                    visibleActivities--
+                    // An activity (notably the splash) may have started before this
+                    // singleton existed. Its stop must not hide the new activity.
+                    visibleActivities.remove(activity)
                     // Telecom and the call foreground service now own background calls.
                 }
                 override fun onActivityCreated(a: android.app.Activity, b: android.os.Bundle?) = Unit
                 override fun onActivityResumed(a: android.app.Activity) = Unit
                 override fun onActivityPaused(a: android.app.Activity) = Unit
                 override fun onActivitySaveInstanceState(a: android.app.Activity, b: android.os.Bundle) = Unit
-                override fun onActivityDestroyed(a: android.app.Activity) = Unit
+                override fun onActivityDestroyed(a: android.app.Activity) { visibleActivities.remove(a) }
             })
     }
     private var mediaInstance: AndroidFamilyMedia? = null
@@ -190,8 +193,16 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     fun dismissError() { mutable.value = mutable.value.copy(error = null) }
     fun registerPushToken() {
         com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            if (mutable.value.connected) perform {
-                registerDevice(token)
+            if (mutable.value.connected) scope.launch {
+                val session = generation
+                try {
+                    registerDevice(token)
+                    if (session == generation) mutable.value = mutable.value.copy(pushRegistrationError = null)
+                } catch (error: CancellationException) { throw error }
+                catch (_: Exception) {
+                    if (session == generation) mutable.value = mutable.value.copy(pushRegistrationError =
+                        "Background call registration is unavailable. Calls can still work while both apps are open.")
+                }
             }
         }
     }
@@ -222,13 +233,14 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     }
     fun acceptMember(peer: String) = perform { apply(request("accept_member", "peer" to peer)) }
     fun removeMember(peer: String) = perform { apply(request("remove_member", "peer" to peer)) }
-    fun call(peer: String, video: Boolean) = perform {
+    fun call(peer: String, video: Boolean) = perform(callAction = true) {
+        mutable.value = mutable.value.copy(error = null, callError = null)
         check(mutable.value.call == null)
         check(mutable.value.members.any { it.jid == peer && FamilyPolicy().canCall(it.status) })
         apply(request("invite_call", "peer" to peer, "kind" to if (video) "video" else "voice",
             "callId" to UUID.randomUUID().toString()))
     }
-    fun acceptCall() = perform {
+    fun acceptCall() = perform(callAction = true) {
         mutable.value.call?.let { apply(request("accept_call", "callId" to it.id)) }
     }
     fun hangup() = scope.launch {
@@ -236,25 +248,33 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         finish(call.id)
         runCatching { request("end_call", "callId" to call.id) }
     }
-    fun previewCamera() {
+    fun previewCamera(callId: String? = null) {
         val call = mutable.value.call ?: return
-        if (call.stage != "ringing" || call.kind != "video" || call.caller != mutable.value.me || !hasForegroundActivity) return
+        if (call.stage != "ringing" || call.kind != "video" || call.caller != mutable.value.me || (callId != null && call.id != callId)) return
         if (!mutable.value.camera) { mediaInstance?.close(); return }
-        runCatching { media.preview() }.onFailure {
+        runCatching { media.preview() }.onSuccess {
+            mutable.value = mutable.value.copy(callError = null)
+        }.onFailure {
             mediaInstance?.close()
-            mutable.value = mutable.value.copy(error = "Camera preview unavailable. You can still continue the call.")
+            android.util.Log.w("FamilyCalls", "Camera preview failed: ${it.javaClass.simpleName}")
+            mutable.value = mutable.value.copy(callError = "Camera preview could not start. Cancel and retry the video call.")
         }
     }
-    fun stopPreview() { if (mutable.value.call?.stage == "ringing") mediaInstance?.close() }
+    fun stopPreview(callId: String) {
+        if (mutable.value.call?.let { it.id == callId && it.stage == "ringing" } == true) mediaInstance?.close()
+    }
     fun mute() { val mute = !mutable.value.muted; media.mute(mute); mutable.value = mutable.value.copy(muted = mute) }
     fun toggleCamera() { val enabled = !mutable.value.camera; media.camera(enabled); mutable.value = mutable.value.copy(camera = enabled) }
     fun switchCamera() { media.switchCamera() }
     fun speaker() { val enabled = !mutable.value.speaker; media.speaker(enabled); mutable.value = mutable.value.copy(speaker = enabled) }
 
-    private fun perform(action: suspend () -> Unit) = scope.launch {
+    private fun perform(callAction: Boolean = false, action: suspend () -> Unit) = scope.launch {
         val token = generation
         try { action() } catch (e: CancellationException) { throw e }
-        catch (e: Exception) { if (token == generation) mutable.value = mutable.value.copy(error = friendly(e.message)) }
+        catch (e: Exception) {
+            if (token == generation) mutable.value = if (callAction && mutable.value.call != null)
+                mutable.value.copy(callError = friendly(e.message)) else mutable.value.copy(error = friendly(e.message))
+        }
     }
     private suspend fun request(action: String, vararg values: Pair<String, Any>): JSONObject = withContext(Dispatchers.IO) {
         val socket = connection ?: error("not_connected")
@@ -335,7 +355,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         callReducer.finishCall(id)
         terminal.add(id); while (terminal.size > 256) terminal.remove(terminal.first())
         if (mutable.value.call?.id == id) {
-            mutable.value = mutable.value.copy(call = null, muted = false, camera = true, speaker = false, mediaConnected = false, connectedAtElapsed = null)
+            mutable.value = mutable.value.copy(call = null, muted = false, camera = true, speaker = false, mediaConnected = false, connectedAtElapsed = null, callError = null)
             ringingJob?.cancel(); mediaInstance?.close(); rtcCallId = null; queuedSignals.clear()
         }
     }

@@ -46,6 +46,46 @@ class FamilyScreenScreenshotTest {
     @Test fun landingDark() { render(true, false); capture("landing-dark") }
     @Test fun contactsLight() { render(false, true); capture("contacts-light") }
     @Test fun contactsDark() { render(true, true); capture("contacts-dark") }
+    @Test fun previewStartsWhenAlreadyResumedAndRestartsAfterPause() {
+        var starts = 0
+        var stops = 0
+        compose.setContent {
+            FamilyCameraPreviewEffect("call-preview", compose.activity.lifecycle,
+                onStart = { starts++ }, onStop = { stops++ })
+            androidx.compose.material3.Text("Preview lifecycle fixture")
+        }
+        compose.runOnIdle { kotlin.test.assertEquals(1, starts) }
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.STARTED)
+        compose.runOnIdle { kotlin.test.assertEquals(1, stops) }
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        compose.runOnIdle { kotlin.test.assertEquals(2, starts) }
+    }
+    @Test fun stoppingUntrackedSplashDoesNotHideCurrentActivity() {
+        compose.setContent { androidx.compose.material3.Text("Visibility fixture") }
+        compose.runOnIdle {
+            val splash = org.robolectric.Robolectric.buildActivity(ComponentActivity::class.java).setup()
+            val client = FamilyClient(compose.activity.applicationContext)
+            val main = org.robolectric.Robolectric.buildActivity(ComponentActivity::class.java).setup()
+            try {
+                splash.pause().stop().destroy()
+                kotlin.test.assertTrue(client.hasForegroundActivity)
+            } finally { main.pause().stop().destroy() }
+            kotlin.test.assertFalse(client.hasForegroundActivity)
+        }
+    }
+    @Test fun callScreenShowsOnlyCallErrors() {
+        compose.setContent {
+            NiaTheme {
+                FamilyCallContent(FamilyUiState(me = "omar@xmpp.starception.com",
+                    error = "General family action failed", pushRegistrationError = "Background registration failed",
+                    callError = "Camera access required",
+                    call = FamilyCall("call-preview", "omar@xmpp.starception.com", "amina@xmpp.starception.com", "video", "ringing", 1, Long.MAX_VALUE, true)))
+            }
+        }
+        compose.onNodeWithText("General family action failed").assertDoesNotExist()
+        compose.onNodeWithText("Background registration failed").assertDoesNotExist()
+        compose.onNodeWithText("Camera access required").assertExists()
+    }
     @Test fun contactsRoyalTheme() { render(false, true, ThemeBrand.ROYAL); capture("contacts-royal") }
     @Test fun incomingCall() {
         compose.setContent {

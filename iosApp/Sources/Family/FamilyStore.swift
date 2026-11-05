@@ -44,6 +44,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     @Published private(set) var members: [FamilyMemberRow] = []
     @Published private(set) var call: FamilyCallInfo?
     @Published var message: String?
+    @Published private(set) var callMessage: String?
+    @Published private(set) var pushRegistrationMessage: String?
     @Published private(set) var muted = false
     @Published private(set) var cameraEnabled = true
     @Published private(set) var speakerEnabled = false
@@ -95,6 +97,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     func disconnect(clearSaved: Bool = true) {
         if clearSaved { unregisterPushToken(); FamilyCredentials.clear() }
+        callMessage = nil; pushRegistrationMessage = nil
         if let id = call?.id { FamilySystemCalls.shared.end(id) }
         let socket = stream
         if let current = call, let socket, socket.isAuthenticated,
@@ -112,6 +115,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     private func lost(_ text: String) {
         if let id = call?.id { FamilySystemCalls.shared.end(id, reason: .failed) }
         pendingCredential = nil
+        callMessage = nil
         connectedAt = nil
         password = nil; connected = false; serviceReady = false; busy = false; media.close(); mediaCall = nil
         call = nil; queuedSignals.removeAll(); ringingTask?.cancel(); heartbeat?.cancel()
@@ -140,6 +144,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     func acceptMember(_ peer: String) { perform { try await self.apply(self.request("accept_member", ["peer": peer])) } }
     func removeMember(_ peer: String) { perform { try await self.apply(self.request("remove_member", ["peer": peer])) } }
     func startCall(_ peer: String, video: Bool) {
+        message = nil; callMessage = nil
         guard call == nil, members.contains(where: { $0.jid == peer && FamilyPolicy().canCall(relationship: $0.status) }) else { return }
         perform {
             guard await FamilyWebRTC.permissions(video: video) else {
@@ -170,8 +175,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         guard let current = call, current.stage == "ringing", current.kind == "video", current.caller == me,
               UIApplication.shared.applicationState == .active else { return }
         if !cameraEnabled { media.close(); return }
-        do { try await media.preview() }
-        catch { if call?.id == current.id && call?.stage == "ringing" { media.close(); message = "Camera preview unavailable. You can still continue the call." } }
+        do { try await media.preview(); callMessage = nil }
+        catch { if call?.id == current.id && call?.stage == "ringing" { media.close(); callMessage = "Camera preview could not start. Cancel and retry the video call." } }
     }
     func mute() { muted.toggle(); media.mute(muted) }
     func camera() { cameraEnabled.toggle(); media.camera(cameraEnabled) }
@@ -185,8 +190,16 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     func registerPushToken() {
         guard connected, let token = FamilySystemCalls.shared.token else { return }
         let environment = Bundle.main.object(forInfoDictionaryKey: "FamilyAPNSEnvironment") as? String == "development" ? "sandbox" : "production"
-        perform { _ = try await self.request("register_device", ["deviceId": FamilyCredentials.deviceID,
-            "platform": "ios", "token": token, "environment": environment]) }
+        let activeStream = stream
+        Task {
+            do {
+                _ = try await self.request("register_device", ["deviceId": FamilyCredentials.deviceID,
+                    "platform": "ios", "token": token, "environment": environment])
+                if activeStream === stream { pushRegistrationMessage = nil }
+            } catch {
+                if activeStream === stream { pushRegistrationMessage = "Background call registration is unavailable. Calls can still work while both apps are open." }
+            }
+        }
     }
     func unregisterPushToken() {
         guard let socket = stream, socket.isAuthenticated,
@@ -263,6 +276,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         guard callReducer.apply(id: next.id, revision: next.version, next: next.stage, expiresAt: next.expires, now: now) else { return }
         if callReducer.stage == "ended" || (next.stage == "active" && !next.selected) { finish(next.id); return }
         if next.stage == "ringing" && next.expires <= now { finish(next.id); return }
+        if call?.id != next.id { callMessage = nil }
         call = next
         FamilySystemCalls.shared.update(next, me: me)
         if next.stage == "active" && mediaCall != next.id { speakerEnabled = next.kind == "video" }
@@ -293,7 +307,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         guard let current = call, current.id == id else { return }
         FamilySystemCalls.shared.end(id)
         call = nil; ringingTask?.cancel(); media.close(); mediaCall = nil; queuedSignals.removeAll()
-        muted = false; cameraEnabled = true; speakerEnabled = false; mediaConnected = false; connectedAt = nil
+        muted = false; cameraEnabled = true; speakerEnabled = false; mediaConnected = false; connectedAt = nil; callMessage = nil
     }
     private func failCall(_ text: String) async {
         if let current = call { finish(current.id); _ = try? await request("end_call", ["callId": current.id]) }
