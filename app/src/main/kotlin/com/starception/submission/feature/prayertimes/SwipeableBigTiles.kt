@@ -52,6 +52,9 @@ import com.starception.submission.prayer.model.prayerHadithContext
 import com.starception.submission.core.designsystem.component.rememberSmoothCompassHeading
 import com.starception.submission.core.designsystem.component.InsightMotion
 import com.starception.submission.core.designsystem.component.insightReadingEdges
+import com.starception.submission.core.designsystem.component.InsightReadingHeader
+import com.starception.submission.core.designsystem.component.InsightReadingContrastBackground
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -1398,6 +1401,7 @@ internal fun SwipeableBigTiles(
     onExpandedPageChange: ((Int?) -> Unit)? = null,
     onExpansionProgressChange: (Float) -> Unit = {},
     onImmersiveModeChange: (Boolean) -> Unit = {},
+    onReaderChromeHiddenChange: (Boolean) -> Unit = {},
     onHeaderHeightChange: (Dp) -> Unit = {},
     collapseExpandedTileRequest: Int = 0,
     immersiveHome: Boolean = false,
@@ -1965,6 +1969,9 @@ internal fun SwipeableBigTiles(
         }
         var focusedReaderChromeHidden by remember(pagerState.settledPage, expandedLogicalPage) {
             mutableStateOf(false)
+        }
+        LaunchedEffect(focusedReaderChromeHidden, expandedLogicalPage) {
+            onReaderChromeHiddenChange(expandedLogicalPage != null && focusedReaderChromeHidden)
         }
         BoxWithConstraints(modifier = stripModifier.onGloballyPositioned {
             stripTopInWindowPx = it.positionInWindow().y
@@ -3389,6 +3396,7 @@ internal fun InsightPreviewCard(
     }
     val density = LocalDensity.current
     var cardTopInWindowPx by remember { mutableFloatStateOf(0f) }
+    var headerRowHeight by remember { mutableStateOf(0.dp) }
     var suppressClickUntilMs by remember { mutableLongStateOf(0L) }
     val cardInteractionSource = remember { MutableInteractionSource() }
     val cardIndication = LocalIndication.current
@@ -4108,11 +4116,12 @@ internal fun InsightPreviewCard(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
+                    .onSizeChanged { headerRowHeight = with(density) { it.height.toDp() } }
                     .padding(
                         start = tagInset,
                         end = if (fluidFullBleed) lerp(tagInset.value, 12f, actionPlacement).dp else tagInset,
                         top = tagTopInset,
-                        bottom = tagInset,
+                        bottom = if (editorialExpanded && isReadingHeader) 0.dp else tagInset,
                     )
                     .padding(end = when {
                         fluidFullBleed -> (48f * actionPlacement).dp // Make room before the close action splits off.
@@ -4778,10 +4787,14 @@ internal fun InsightPreviewCard(
                             // The label/action row follows the status-bar inset.
                             // Anchor the reader below that actual row as well as
                             // its normal editorial offset on every screen size.
-                            top = (maxOf(
-                                if (isReadingHeader) 104.dp else if (prayerRecap.isNotEmpty()) 88.dp else 64.dp,
-                                tagTopInset + 56.dp,
-                            ) - 16.dp * chromeProgress),
+                            top = if (isReadingHeader) {
+                                val controlsBottom = maxOf(headerRowHeight, tagTopInset + 40.dp)
+                                lerp((controlsBottom + 12.dp).value,
+                                    (tagTopInset + 48.dp).value, chromeProgress).dp
+                            } else {
+                                maxOf(if (prayerRecap.isNotEmpty()) 88.dp else 64.dp,
+                                    tagTopInset + 56.dp) - 16.dp * chromeProgress
+                            },
                             bottom = (24f - 16f * chromeProgress).dp,
                         ),
                     spacing = 12.dp,
@@ -5496,44 +5509,16 @@ private fun EditorialQuranReadingStage(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "SURAH ${surah.number} · ${surah.nameEnglish.uppercase()}",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp,
-                            letterSpacing = 1.3.sp,
-                        ),
-                        color = Color.White.copy(alpha = 0.68f),
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = when {
-                            isPlaying -> "PLAYING"
-                            isLoadingAyahs -> "LOADING"
-                            ayahs.isEmpty() -> "TEXT UNAVAILABLE"
-                            else -> "${ayahs.size} AYAT"
-                        },
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp,
-                            letterSpacing = 0.8.sp,
-                        ),
-                        color = HomeReferenceGold.copy(alpha = 0.94f),
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                }
+                InsightReadingHeader(
+                    title = "SURAH ${surah.number} · ${surah.nameEnglish.uppercase()}",
+                    status = when {
+                        isPlaying -> "PLAYING"
+                        isLoadingAyahs -> "LOADING"
+                        ayahs.isEmpty() -> "TEXT UNAVAILABLE"
+                        else -> "${ayahs.size} AYAT"
+                    },
+                    accent = HomeReferenceGold,
+                )
             }
             if (ayahs.isEmpty()) {
                 Column(
@@ -5626,6 +5611,7 @@ private fun EditorialQuranReadingStage(
                             ) {
                                 Box(
                                     modifier = Modifier.fillMaxHeight().aspectRatio(1f).padding(2.dp)
+                                        .background(InsightReadingContrastBackground, CircleShape)
                                         .border(0.8.dp, HomeReferenceGold.copy(alpha = 0.9f), CircleShape)
                                         .semantics { contentDescription = "Ayah ${ayah.numberInSurah}" },
                                     contentAlignment = Alignment.Center,

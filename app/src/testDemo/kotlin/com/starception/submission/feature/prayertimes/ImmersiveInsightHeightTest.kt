@@ -1,6 +1,8 @@
 package com.starception.submission.feature.prayertimes
 
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -36,6 +38,21 @@ class ImmersiveInsightHeightTest {
         assertFalse(shouldHideHomeNavigationForInsight(true, true, 0, 24f))
         assertTrue(shouldHideHomeNavigationForInsight(true, true, 25, 24f))
         assertFalse(shouldHideHomeNavigationForInsight(false, true, 100, 24f))
+    }
+
+    @Test fun passageScrollHidesNavigationWithoutMovingTheHomeFeed() {
+        assertTrue(shouldHideHomeNavigationForInsight(true, false, 0, 24f, readerChromeHidden = true))
+        assertFalse(shouldHideHomeNavigationForInsight(true, false, 0, 24f, readerChromeHidden = false))
+        assertFalse(shouldHideHomeNavigationForInsight(false, false, 0, 24f, readerChromeHidden = true))
+    }
+
+    @Test fun readingLabelsHaveEnoughContrastEvenOverWhiteArtwork() {
+        val backing = com.starception.submission.core.designsystem.component.InsightReadingContrastBackground
+            .compositeOver(androidx.compose.ui.graphics.Color.White)
+        for (gold in listOf(androidx.compose.ui.graphics.Color(0xFFD8AB59), androidx.compose.ui.graphics.Color(0xFFE8C681))) {
+            val contrast = (gold.luminance() + .05f) / (backing.luminance() + .05f)
+            assertTrue("Gold reading labels need at least 4.5:1 contrast over the brightest artwork", contrast >= 4.5f)
+        }
     }
 
     @Test fun longPassagesStayInsideTheirReaderViewport() {

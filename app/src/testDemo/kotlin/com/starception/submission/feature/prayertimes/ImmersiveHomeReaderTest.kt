@@ -32,6 +32,7 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import java.time.LocalTime
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -52,6 +53,7 @@ class ImmersiveHomeReaderTest {
     @Test fun coverRequestsOpenEachExpandedInsight() {
         hilt.inject()
         var expandedPage: Int? = null
+        var readerChromeHidden = false
         val requestedPage = mutableStateOf(0 to 1)
         val tilePull = mutableStateOf(0.dp)
         compose.setContent {
@@ -89,6 +91,7 @@ class ImmersiveHomeReaderTest {
                                 edgeToEdgeArtwork = true,
                                 pageRequest = requestedPage.value,
                                 onExpandedPageChange = { expandedPage = it },
+                                onReaderChromeHiddenChange = { readerChromeHidden = it },
                             )
                         }
                     }
@@ -156,12 +159,14 @@ class ImmersiveHomeReaderTest {
                 }
                 compose.waitForIdle()
                 compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_ai_scrolled.png")
+                assertTrue("Reader scrolling must reach the Home navigation callback", readerChromeHidden)
                 val controlsTag = compose.onNodeWithText("Show controls").fetchSemanticsNode().boundsInRoot
                 val rootWidth = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
                 assertTrue("Reader tag grew beyond its compact height", controlsTag.height <= rootWidth * 48f / 393f)
                 compose.onNodeWithText("Show controls").performClick()
                 compose.waitForIdle()
                 assertTrue(compose.onAllNodesWithText("Show controls").fetchSemanticsNodes().isEmpty())
+                assertFalse("Showing controls must restore navigation", readerChromeHidden)
             }
         }
     }

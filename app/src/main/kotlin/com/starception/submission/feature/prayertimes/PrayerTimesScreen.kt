@@ -332,7 +332,8 @@ internal fun shouldHideHomeNavigationForInsight(
     scrollArmed: Boolean,
     scrollOffsetPx: Int,
     thresholdPx: Float,
-): Boolean = readerOpen && scrollArmed && scrollOffsetPx > thresholdPx
+    readerChromeHidden: Boolean = false,
+): Boolean = readerOpen && (readerChromeHidden || (scrollArmed && scrollOffsetPx > thresholdPx))
 
 internal fun shouldReplacePrayerBellWithWeather(
     prayerStatus: String,
@@ -3016,11 +3017,13 @@ fun PrayerTimesScreen(
                 // resize gestures may reveal one, two, or three readable rows.
                 var insightTileExpanded by remember { mutableStateOf(false) }
                 var insightReaderOpen by remember { mutableStateOf(false) }
+                var insightReaderChromeHidden by remember { mutableStateOf(false) }
                 var immersiveScrollArmed by remember { mutableStateOf(false) }
                 val portraitScrollState = rememberScrollState()
                 val immersiveScrollThresholdPx = with(LocalDensity.current) { 24.dp.toPx() }
                 val insightTileImmersive = shouldHideHomeNavigationForInsight(
-                    readerOpen = insightReaderOpen,
+                    readerOpen = insightTileExpanded,
+                    readerChromeHidden = insightReaderChromeHidden,
                     scrollArmed = immersiveScrollArmed,
                     scrollOffsetPx = portraitScrollState.value,
                     thresholdPx = immersiveScrollThresholdPx,
@@ -3945,6 +3948,9 @@ fun PrayerTimesScreen(
                                                 },
                                                 onImmersiveModeChange = { immersive ->
                                                     insightReaderOpen = immersive
+                                                },
+                                                onReaderChromeHiddenChange = { hidden ->
+                                                    insightReaderChromeHidden = hidden
                                                 },
                                                 collapseExpandedTileRequest = collapseTileRequest,
                                                 onSurahClick = onSurahClick,

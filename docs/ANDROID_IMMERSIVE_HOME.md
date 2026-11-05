@@ -37,3 +37,16 @@ three destinations and the overlay presence.
 
 Physical-device review is still required for frame pacing, the search bar,
 bottom navigation, and Back during card expansion.
+
+Today's Reading positions its Surah heading below the measured header controls,
+including larger accessibility text, instead of reserving a fixed 104dp gap.
+Scrolling inside an expanded passage now forwards the reader's existing chrome
+visibility to Home, so the navigation capsule can hide without scrolling the
+outer feed. “Show controls” restores the capsule; closing the reader clears the
+hidden state. The existing outer-feed scroll behavior remains available.
+
+Android and iOS share a dark-backed Surah/status header and dark-backed gold ayah
+markers so bright artwork cannot wash out the labels. iOS already hides its
+navigation when the reader opens. `ExpandedReadingLayoutTest` checks header
+spacing, larger text and nested passage scrolling; `ImmersiveHomeReaderTest`
+checks that the carousel forwards hide/show changes to Home.

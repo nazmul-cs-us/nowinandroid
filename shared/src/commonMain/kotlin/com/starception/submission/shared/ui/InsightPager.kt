@@ -18,6 +18,9 @@ package com.starception.submission.shared.ui
 
 import com.starception.submission.core.components.InsightSearchStatus
 import com.starception.submission.core.model.deenly.InsightSearchProgress
+import com.starception.submission.core.designsystem.component.InsightReadingHeader
+import com.starception.submission.core.designsystem.component.InsightReadingContrastBackground
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -1432,15 +1435,13 @@ private fun ExpandedReadingPreview(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(Modifier.fillMaxWidth().insightChromeVisibility(LocalInsightReaderChromeProgress.current),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("SURAH $surahNumber · ${surahName.uppercase()}",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, letterSpacing = 1.3.sp),
-                    color = Color.White.copy(alpha = .68f), fontWeight = FontWeight.Bold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Text(if (loading) "Preparing…" else if (loadFailed) "Unavailable" else if (isPlaying) "PLAYING" else "${verses.size} AYAT",
-                    style = MaterialTheme.typography.labelSmall, color = ReadingPreviewGold)
-            }
+            InsightReadingHeader(
+                title = "SURAH $surahNumber · ${surahName.uppercase()}",
+                status = if (loading) "Preparing…" else if (loadFailed) "Unavailable"
+                    else if (isPlaying) "PLAYING" else "${verses.size} AYAT",
+                accent = ReadingPreviewGold,
+                modifier = Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current),
+            )
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f)
                     .insightReadingEdges(
@@ -1516,6 +1517,7 @@ private fun ExpandedReadingPreview(
                             Placeholder(1.4.em, 1.1.em, PlaceholderVerticalAlign.TextCenter)) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Box(Modifier.fillMaxHeight().aspectRatio(1f).padding(2.dp)
+                                    .background(InsightReadingContrastBackground, CircleShape)
                                     .border(0.8.dp, ReadingPreviewGold.copy(alpha = .9f), CircleShape), contentAlignment = Alignment.Center) {
                                     val numberSize = readingArabicSize * if (verse.numberInSurah >= 100) .40f else .48f
                                     Text(verse.numberInSurah.toArabicIndic(), color = ReadingPreviewGold,
