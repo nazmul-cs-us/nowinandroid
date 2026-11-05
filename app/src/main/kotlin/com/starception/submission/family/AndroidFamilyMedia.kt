@@ -52,7 +52,7 @@ class AndroidFamilyMedia(
     val ready: Boolean get() = peer != null
 
     suspend fun start(servers: JSONArray, video: Boolean, caller: Boolean) {
-        close()
+        close(preservePreview = video && caller && peer == null && localVideo.value != null)
         val token = epoch
         FamilyAudioSession.setActive(true)
         previousMode = audio.mode; previousSpeaker = audio.isSpeakerphoneOn
@@ -106,15 +106,8 @@ class AndroidFamilyMedia(
         microphone = factory.createAudioTrack("family-audio", audioSource)
         peer!!.addTrack(microphone, listOf("family"))
         if (video) {
-            val enumerator: CameraEnumerator = if (Camera2Enumerator.isSupported(context)) Camera2Enumerator(context) else Camera1Enumerator(false)
-            val name = enumerator.deviceNames.firstOrNull { enumerator.isFrontFacing(it) } ?: enumerator.deviceNames.first()
-            capturer = enumerator.createCapturer(name, null) ?: error("Camera unavailable")
-            cameraSource = factory.createVideoSource(false)
-            texture = SurfaceTextureHelper.create("FamilyCamera", egl.eglBaseContext)
-            capturer!!.initialize(texture, context, cameraSource!!.capturerObserver)
-            localVideo.value = factory.createVideoTrack("family-video", cameraSource)
+            preview()
             peer!!.addTrack(localVideo.value, listOf("family"))
-            capturer!!.startCapture(640, 480, 24)
         }
         if (caller) {
             val offer = create(true)
@@ -122,6 +115,18 @@ class AndroidFamilyMedia(
             set(offer, true)
             if (token == epoch) signal(JSONObject().put("type", "offer").put("sdp", offer.description))
         }
+    }
+    /** Local-only camera. No peer, microphone or signalling is created. */
+    fun preview() {
+        if (localVideo.value != null) return
+        val enumerator: CameraEnumerator = if (Camera2Enumerator.isSupported(context)) Camera2Enumerator(context) else Camera1Enumerator(false)
+        val name = enumerator.deviceNames.firstOrNull { enumerator.isFrontFacing(it) } ?: enumerator.deviceNames.first()
+        capturer = enumerator.createCapturer(name, null) ?: error("Camera unavailable")
+        cameraSource = factory.createVideoSource(false)
+        texture = SurfaceTextureHelper.create("FamilyCamera", egl.eglBaseContext)
+        capturer!!.initialize(texture, context, cameraSource!!.capturerObserver)
+        localVideo.value = factory.createVideoTrack("family-video", cameraSource)
+        capturer!!.startCapture(640, 480, 24)
     }
     suspend fun receive(payload: JSONObject) {
         val token = epoch
@@ -173,14 +178,18 @@ class AndroidFamilyMedia(
     fun camera(enabled: Boolean) { localVideo.value?.setEnabled(enabled) }
     fun switchCamera() { capturer?.switchCamera(null) }
     @Suppress("DEPRECATION") fun speaker(enabled: Boolean) { audio.isSpeakerphoneOn = enabled }
-    fun close() {
+    fun close(preservePreview: Boolean = false) {
         epoch++; remoteDescription = false; candidates.clear()
-        runCatching { capturer?.stopCapture() }; capturer?.dispose(); capturer = null
-        texture?.dispose(); texture = null
+        if (!preservePreview) {
+            runCatching { capturer?.stopCapture() }; capturer?.dispose(); capturer = null
+            texture?.dispose(); texture = null
+            localVideo.value?.dispose(); localVideo.value = null
+            cameraSource?.dispose(); cameraSource = null
+        }
         peer?.close(); peer?.dispose(); peer = null
-        localVideo.value?.dispose(); localVideo.value = null; remoteVideo.value = null
+        remoteVideo.value = null
         microphone?.dispose(); microphone = null
-        cameraSource?.dispose(); cameraSource = null; audioSource?.dispose(); audioSource = null
+        audioSource?.dispose(); audioSource = null
         if (ownsAudio) {
             audio.mode = previousMode; speaker(previousSpeaker)
             focus?.let { audio.abandonAudioFocusRequest(it) }; focus = null; ownsAudio = false

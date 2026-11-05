@@ -1,5 +1,7 @@
 package com.starception.submission.family
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
@@ -55,6 +57,25 @@ class FamilyScreenScreenshotTest {
         compose.onNodeWithText("Accept").assertExists()
         compose.onNodeWithText("Decline").assertExists()
         capture("incoming-call")
+    }
+    @Test fun outgoingVideoShowsLocalPreviewBeforeAnswer() {
+        compose.setContent {
+            NiaTheme {
+                FamilyCallContent(FamilyUiState(me = "omar@xmpp.starception.com",
+                    call = FamilyCall("call-preview", "omar@xmpp.starception.com", "amina.khan@xmpp.starception.com", "video", "ringing", 1, Long.MAX_VALUE, true)),
+                    localReady = true, localVideo = {
+                        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()
+                            .background(androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer)) {
+                            androidx.compose.material3.Text("Local preview fixture")
+                        }
+                    })
+            }
+        }
+        compose.onNodeWithText("Local preview fixture").assertExists()
+        compose.onNodeWithText("Calling…").assertExists()
+        compose.onNodeWithText("Flip").assertExists()
+        compose.onNodeWithText("Cancel").assertExists()
+        compose.onNodeWithText("Mute").assertDoesNotExist()
     }
     @Test fun activeVoiceCallDark() {
         compose.setContent {

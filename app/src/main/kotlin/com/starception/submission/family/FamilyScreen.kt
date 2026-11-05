@@ -387,6 +387,17 @@ fun FamilyCallOverlay(client: FamilyClient) {
     val call = state.call ?: return
     val permission = permissionRequest()
     val remote by client.media.remoteVideo.collectAsStateWithLifecycle()
+    val local by client.media.localVideo.collectAsStateWithLifecycle()
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(call.id) { client.previewCamera() }
+    DisposableEffect(lifecycle, call.id) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) client.previewCamera()
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) client.stopPreview()
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer); client.stopPreview() }
+    }
     var elapsed by remember(call.id) { mutableLongStateOf(0L) }
     LaunchedEffect(call.id, state.connectedAtElapsed) {
         val start = state.connectedAtElapsed ?: return@LaunchedEffect
@@ -395,7 +406,7 @@ fun FamilyCallOverlay(client: FamilyClient) {
     Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false,
         dismissOnBackPress = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
         val view = androidx.compose.ui.platform.LocalView.current
-        val video = call.kind == "video" && call.stage == "active"
+        val video = call.kind == "video" && (call.stage == "active" || (call.caller == state.me && local != null && state.camera))
         val lightStatusBar = !video && MaterialTheme.colorScheme.primaryContainer.luminance() > 0.5f
         val lightNavigationBar = !video && MaterialTheme.colorScheme.surface.luminance() > 0.5f
         DisposableEffect(view, lightStatusBar, lightNavigationBar) {
@@ -409,8 +420,8 @@ fun FamilyCallOverlay(client: FamilyClient) {
         }
         FamilyCallContent(state, elapsed, FamilyCallActions(
             answer = { permission(call.kind == "video") { client.acceptCall() } }, hangup = { client.hangup() },
-            mute = { client.mute() }, speaker = { client.speaker() }, camera = { client.toggleCamera() }, flip = { client.switchCamera() }),
-            remoteReady = remote != null,
+            mute = { client.mute() }, speaker = { client.speaker() }, camera = { client.toggleCamera(); client.previewCamera() }, flip = { client.switchCamera() }),
+            remoteReady = remote != null, localReady = local != null,
             remoteVideo = { VideoSurface(client.media, false, Modifier.fillMaxSize()) },
             localVideo = { VideoSurface(client.media, true, Modifier.fillMaxSize()) })
     }
@@ -418,14 +429,16 @@ fun FamilyCallOverlay(client: FamilyClient) {
 
 @Composable
 internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions: FamilyCallActions = FamilyCallActions(),
-    remoteReady: Boolean = false, remoteVideo: @Composable () -> Unit = {}, localVideo: @Composable () -> Unit = {}) {
+    remoteReady: Boolean = false, localReady: Boolean = false, remoteVideo: @Composable () -> Unit = {}, localVideo: @Composable () -> Unit = {}) {
     val colors = MaterialTheme.colorScheme
     val call = state.call ?: return
     val incoming = call.callee == state.me && call.stage == "ringing"
     val video = call.kind == "video" && call.stage == "active"
+    val preview = call.kind == "video" && call.stage == "ringing" && !incoming && localReady && state.camera
+    val immersive = video || preview
     val name = callDisplayName(call.peer(state.me))
-    val ink = if (video) Color.White else colors.onSurface
-    val muted = if (video) Color.White.copy(alpha = 0.75f) else colors.onSurfaceVariant
+    val ink = if (immersive) Color.White else colors.onSurface
+    val muted = if (immersive) Color.White.copy(alpha = 0.75f) else colors.onSurfaceVariant
     val status = when {
         incoming -> "Incoming ${call.kind} call"
         call.stage == "ringing" -> "Calling…"
@@ -435,6 +448,7 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(colors.surface)) {
         val compact = maxHeight < 500.dp
+        if (preview) Box(Modifier.fillMaxSize()) { localVideo() }
         if (video) Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxWidth().background(colors.surfaceContainerHigh), contentAlignment = Alignment.Center) {
                 remoteVideo()
@@ -454,7 +468,7 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
                     color = Color.White, fontSize = 11.sp)
             }
         }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(if (video)
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(if (immersive)
             listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent, Color.Black.copy(alpha = 0.78f))
             else listOf(colors.primaryContainer, colors.surface, colors.surface))))
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp),
@@ -466,19 +480,25 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
                 if (video) Text(status, Modifier.background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(18.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
                     color = Color.White, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
-            Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = if (preview) Arrangement.Top else Arrangement.Center) {
                 if (!video) {
-                    ContactAvatar(call.peer(state.me), if (compact) 48 else 128)
+                    if (preview) Spacer(Modifier.height(28.dp))
+                    ContactAvatar(call.peer(state.me), if (preview) 64 else if (compact) 48 else 128)
                     Spacer(Modifier.height(if (compact) 8.dp else 24.dp))
-                    Text(name, color = ink, fontSize = if (compact) 20.sp else 30.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
+                    Text(name, color = ink, fontSize = if (preview) 20.sp else if (compact) 20.sp else 30.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(status, color = muted, fontSize = 14.sp,
                         fontFamily = if (state.mediaConnected) FontFamily.Monospace else FontFamily.Default, modifier = Modifier.padding(top = 8.dp))
                 }
             }
             state.error?.let { Text(it, color = colors.error, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(bottom = 12.dp)) }
+            if (call.kind == "video" && call.stage == "ringing" && !incoming) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    CallControl(Icons.Default.Cameraswitch, "Flip", enabled = state.camera, onVideo = preview, action = actions.flip)
+                }
+            }
             if (call.stage == "active") {
-                Row(Modifier.fillMaxWidth().background((if (video) Color.White else colors.primary).copy(alpha = if (video) 0.13f else 0.055f), RoundedCornerShape(28.dp)).padding(vertical = 16.dp, horizontal = 4.dp),
+                Row(Modifier.fillMaxWidth().background((if (immersive) Color.White else colors.primary).copy(alpha = if (video) 0.13f else 0.055f), RoundedCornerShape(28.dp)).padding(vertical = 16.dp, horizontal = 4.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly) {
                     CallControl(if (state.muted) Icons.Default.MicOff else Icons.Default.Mic, if (state.muted) "Unmute" else "Mute", state.muted, onVideo = video, action = actions.mute)
                     CallControl(if (state.speaker) Icons.Default.VolumeUp else Icons.Default.Hearing, "Speaker", state.speaker, onVideo = video, action = actions.speaker)
@@ -486,14 +506,14 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
                         CallControl(if (state.camera) Icons.Default.Videocam else Icons.Default.VideocamOff, "Camera", !state.camera, onVideo = video, action = actions.camera)
                         CallControl(Icons.Default.Cameraswitch, "Flip", enabled = state.camera, onVideo = video, action = actions.flip)
                     }
-                    if (compact) CallControl(Icons.Default.CallEnd, "End call", color = colors.error, onVideo = video, action = actions.hangup)
+                    if (compact) CallControl(Icons.Default.CallEnd, "End call", color = colors.error, onVideo = immersive, action = actions.hangup)
                 }
                 if (!compact) Spacer(Modifier.height(24.dp))
             }
             if (!compact || call.stage != "active") Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 if (incoming) CallControl(if (call.kind == "video") Icons.Default.Videocam else Icons.Default.Call, "Accept", color = colors.primary, large = true, onVideo = video, action = actions.answer)
                 CallControl(Icons.Default.CallEnd, if (incoming) "Decline" else if (call.stage == "ringing") "Cancel" else "End call",
-                    color = colors.error, large = incoming, onVideo = video, action = actions.hangup)
+                    color = colors.error, large = incoming, onVideo = immersive, action = actions.hangup)
             }
         }
     }
@@ -526,6 +546,8 @@ private fun VideoSurface(media: AndroidFamilyMedia, local: Boolean, modifier: Mo
     val context = LocalContext.current
     val renderer = remember { SurfaceViewRenderer(context).apply {
         init(media.egl.eglBaseContext, null); setMirror(local); setZOrderMediaOverlay(local)
+        setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+        setEnableHardwareScaler(true)
     } }
     DisposableEffect(track, renderer) {
         runCatching { track?.addSink(renderer) }

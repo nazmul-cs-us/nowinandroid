@@ -38,7 +38,7 @@ import Shared
         return true
     }
     func start(_ servers: [[String: Any]], video: Bool, caller: Bool) async throws {
-        close()
+        close(preservePreview: video && caller && peer == nil && localVideo != nil)
         let token = epoch
         FamilyAudioSession.shared.setActive(active: true)
         QuranPlaybackBus.shared.stop()
@@ -69,13 +69,9 @@ import Shared
         microphone = Self.factory.audioTrack(with: audioSource, trackId: "family-audio")
         if let track = microphone { connection.add(track, streamIds: ["family"]) }
         if video {
-            let source = Self.factory.videoSource()
-            let capture = RTCCameraVideoCapturer(delegate: source)
-            capturer = capture
-            localVideo = Self.factory.videoTrack(with: source, trackId: "family-video")
+            if UIApplication.shared.applicationState == .active { try await preview() }
+            else if localVideo == nil { makeCamera(); localVideo?.isEnabled = false }
             if let track = localVideo { connection.add(track, streamIds: ["family"]) }
-            if UIApplication.shared.applicationState == .active { try await startCamera(front: true) }
-            else { localVideo?.isEnabled = false }
         }
         if caller {
             let offer = try await create(offer: true, connection: connection)
@@ -83,6 +79,22 @@ import Shared
             try await set(offer, local: true, connection: connection)
             guard epoch == token else { return }
             onSignal?(["type": "offer", "sdp": offer.sdp])
+        }
+    }
+    private func makeCamera() {
+        let source = Self.factory.videoSource()
+        capturer = RTCCameraVideoCapturer(delegate: source)
+        localVideo = Self.factory.videoTrack(with: source, trackId: "family-video")
+    }
+    /// Local video only: no peer connection, microphone or audio activation.
+    func preview() async throws {
+        guard localVideo == nil else { return }
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else { throw MediaError.camera }
+        makeCamera()
+        do { try await startCamera(front: true) }
+        catch {
+            if peer == nil { close() } else { onFailure?("Could not start camera.") }
+            throw error
         }
     }
     func receive(_ payload: [String: Any]) async {
@@ -163,10 +175,10 @@ import Shared
         }
     }
     func speaker(_ enabled: Bool) { try? AVAudioSession.sharedInstance().overrideOutputAudioPort(enabled ? .speaker : .none) }
-    func close() {
+    func close(preservePreview: Bool = false) {
         epoch += 1
-        capturer?.stopCapture(); capturer = nil; cameraDevice = nil; cameraStarted = false
-        peer?.close(); peer = nil; microphone = nil; localVideo = nil; remoteVideo = nil
+        if !preservePreview { capturer?.stopCapture(); capturer = nil; cameraDevice = nil; cameraStarted = false; localVideo = nil }
+        peer?.close(); peer = nil; microphone = nil; remoteVideo = nil
         pendingCandidates.removeAll(); hasRemoteDescription = false
         if ownsAudio {
             let session = AVAudioSession.sharedInstance()

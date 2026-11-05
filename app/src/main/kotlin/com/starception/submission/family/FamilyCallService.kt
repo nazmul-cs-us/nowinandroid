@@ -50,6 +50,10 @@ class FamilyCallService : Service() {
                 lockscreenVisibility = Notification.VISIBILITY_PRIVATE
                 setSound(null, null)
             })
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel(ONGOING_CHANNEL, "Ongoing Family calls", NotificationManager.IMPORTANCE_LOW).apply {
+                setSound(null, null); lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            })
         FamilyTelecom.register(this)
         wakeLock = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
             "Deenly:FamilyCall").apply { setReferenceCounted(false); acquire(60000) }
@@ -107,10 +111,10 @@ class FamilyCallService : Service() {
         val view = activity(10, false)
         val decline = PendingIntent.getService(this, 12, Intent(this, FamilyCallService::class.java).setAction(DECLINE).putExtra("callId", call?.id),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val builder = NotificationCompat.Builder(this, CHANNEL)
+        val builder = NotificationCompat.Builder(this, if (incoming) CHANNEL else ONGOING_CHANNEL)
             .setSmallIcon(R.drawable.ic_notification_logo).setContentTitle(call?.peer(state.me)?.substringBefore('@') ?: "Family call")
-            .setContentText(if (incoming) "Incoming ${call?.kind} call" else if (call == null) "Checking incoming call…" else "Family call in progress")
-            .setCategory(NotificationCompat.CATEGORY_CALL).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentText(if (incoming) "Incoming ${call?.kind} call" else if (call == null) "Checking incoming call…" else if (call.stage == "ringing") "Calling…" else if (!state.mediaConnected) "Connecting…" else "Family call in progress")
+            .setCategory(NotificationCompat.CATEGORY_CALL).setPriority(if (incoming) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setOngoing(true).setOnlyAlertOnce(true).setContentIntent(view)
         if (call != null) {
             val person = androidx.core.app.Person.Builder().setName(call.peer(state.me).substringBefore('@')).setImportant(true).build()
@@ -126,6 +130,7 @@ class FamilyCallService : Service() {
     }
     companion object {
         private const val CHANNEL = "family_calls"
+        private const val ONGOING_CHANNEL = "family_calls_ongoing"
         private const val NOTIFICATION_ID = 7801
         private const val DECLINE = "family.decline"
         fun ensure(context: Context, microphone: Boolean = false, camera: Boolean = false) {

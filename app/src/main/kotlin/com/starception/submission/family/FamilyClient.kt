@@ -236,6 +236,16 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         finish(call.id)
         runCatching { request("end_call", "callId" to call.id) }
     }
+    fun previewCamera() {
+        val call = mutable.value.call ?: return
+        if (call.stage != "ringing" || call.kind != "video" || call.caller != mutable.value.me || !hasForegroundActivity) return
+        if (!mutable.value.camera) { mediaInstance?.close(); return }
+        runCatching { media.preview() }.onFailure {
+            mediaInstance?.close()
+            mutable.value = mutable.value.copy(error = "Camera preview unavailable. You can still continue the call.")
+        }
+    }
+    fun stopPreview() { if (mutable.value.call?.stage == "ringing") mediaInstance?.close() }
     fun mute() { val mute = !mutable.value.muted; media.mute(mute); mutable.value = mutable.value.copy(muted = mute) }
     fun toggleCamera() { val enabled = !mutable.value.camera; media.camera(enabled); mutable.value = mutable.value.copy(camera = enabled) }
     fun switchCamera() { media.switchCamera() }

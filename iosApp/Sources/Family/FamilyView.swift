@@ -377,7 +377,10 @@ struct FamilyCallPresentation: ViewModifier {
         content.fullScreenCover(item: Binding(get: { enabled ? store.call : nil }, set: { _ in })) { _ in
             FamilyCallView().interactiveDismissDisabled()
         }
-        .onChange(of: scenePhase) { phase in if phase == .background { store.backgrounded() } }
+        .onChange(of: scenePhase) { phase in
+            if phase == .background { store.backgrounded() }
+            if phase == .active { Task { await store.previewCamera() } }
+        }
     }
 }
 
@@ -388,8 +391,10 @@ private struct FamilyCallView: View {
     @Environment(\.colorScheme) private var colorScheme
     private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
     private var video: Bool { store.call?.kind == "video" && store.call?.stage == "active" }
-    private var ink: Color { video ? .white : colors.ink }
-    private var muted: Color { video ? .white.opacity(0.75) : colors.muted }
+    private var preview: Bool { store.call?.kind == "video" && store.call?.stage == "ringing" && store.call?.caller == store.me && media.localVideo != nil }
+    private var immersive: Bool { video || preview }
+    private var ink: Color { immersive ? .white : colors.ink }
+    private var muted: Color { immersive ? .white.opacity(0.75) : colors.muted }
     var body: some View {
         if let call = store.call {
             let incoming = call.stage == "ringing" && call.callee == store.me
@@ -405,17 +410,22 @@ private struct FamilyCallView: View {
                             if video { callStatus(incoming: incoming, stage: call.stage).padding(.horizontal, 12).padding(.vertical, 6).background(.black.opacity(0.25), in: Capsule()) }
                         }.frame(height: 40)
                         VStack(spacing: compact ? 8 : 24) {
+                            if preview { Spacer().frame(height: 28) }
                             if !video {
-                                FamilyContactAvatar(jid: call.peer(store.me), size: compact ? 48 : 128)
+                                FamilyContactAvatar(jid: call.peer(store.me), size: preview ? 64 : compact ? 48 : 128)
                                 VStack(spacing: 8) {
-                                    Text(familyName(call.peer(store.me))).font(.system(size: compact ? 20 : 30, weight: .medium))
+                                    Text(familyName(call.peer(store.me))).font(.system(size: preview ? 20 : compact ? 20 : 30, weight: .medium))
                                         .foregroundStyle(ink).multilineTextAlignment(.center).lineLimit(2)
                                     callStatus(incoming: incoming, stage: call.stage)
                                 }
                             }
-                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: preview ? .top : .center)
                         if let message = store.message {
                             Text(message).font(.system(size: 12)).foregroundStyle(colors.error).multilineTextAlignment(.center).padding(.bottom, 12)
+                        }
+                        if call.stage == "ringing" && call.kind == "video" && call.caller == store.me {
+                            FamilyCallControl(symbol: "arrow.triangle.2.circlepath.camera", title: "Flip", onVideo: preview) { store.switchCamera() }
+                                .disabled(!preview).padding(.bottom, 24)
                         }
                         if call.stage == "active" {
                             controls(call, compact: compact).padding(.vertical, 16).padding(.horizontal, 4)
@@ -429,16 +439,20 @@ private struct FamilyCallView: View {
                                                       color: colors.accent, large: true, onVideo: video) { store.answer() }
                                 }
                                 FamilyCallControl(symbol: "phone.down.fill", title: incoming ? "Decline" : call.stage == "ringing" ? "Cancel" : "End call",
-                                                  color: colors.error, large: incoming, onVideo: video) { store.hangup() }
+                                                  color: colors.error, large: incoming, onVideo: immersive) { store.hangup() }
                             }
                         }
                     }.padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 24)
                 }
             }
-            .onAppear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: video || colorScheme == .dark) }
-            .onChange(of: video) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: video || colorScheme == .dark) }
-            .onChange(of: colorScheme) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: video || colorScheme == .dark) }
-            .onDisappear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: nil) }
+            .task(id: call.id) { await store.previewCamera() }
+            .onAppear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: immersive || colorScheme == .dark) }
+            .onChange(of: immersive) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: immersive || colorScheme == .dark) }
+            .onChange(of: colorScheme) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: immersive || colorScheme == .dark) }
+            .onDisappear {
+                if store.call?.id == call.id && store.call?.stage == "ringing" { media.close() }
+                NativeAppearanceBridge.shared.setCallAppearance(lightIcons: nil)
+            }
         }
     }
     private func callStatus(incoming: Bool, stage: String) -> some View {
@@ -459,7 +473,10 @@ private struct FamilyCallView: View {
         }
     }
     @ViewBuilder private func backdrop(_ call: FamilyCallInfo) -> some View {
-        if video {
+        if preview {
+            FamilyVideoRenderer(track: media.localVideo, mirror: true).ignoresSafeArea()
+            LinearGradient(colors: [.black.opacity(0.5), .clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+        } else if video {
             GeometryReader { geometry in
                 VStack(spacing: 1) {
                     ZStack {

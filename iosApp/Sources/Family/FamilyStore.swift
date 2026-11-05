@@ -166,13 +166,21 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         finish(current.id)
         Task { _ = try? await request("end_call", ["callId": current.id]) }
     }
+    func previewCamera() async {
+        guard let current = call, current.stage == "ringing", current.kind == "video", current.caller == me,
+              UIApplication.shared.applicationState == .active else { return }
+        if !cameraEnabled { media.close(); return }
+        do { try await media.preview() }
+        catch { if call?.id == current.id && call?.stage == "ringing" { media.close(); message = "Camera preview unavailable. You can still continue the call." } }
+    }
     func mute() { muted.toggle(); media.mute(muted) }
     func camera() { cameraEnabled.toggle(); media.camera(cameraEnabled) }
     func switchCamera() { media.switchCamera() }
     func speaker() { speakerEnabled.toggle(); media.speaker(speakerEnabled) }
     func backgrounded() {
         // iOS suspends camera capture in the background; voice stays owned by CallKit.
-        if call?.kind == "video", cameraEnabled { camera() }
+        if call?.stage == "ringing" { media.close() }
+        else if call?.kind == "video", cameraEnabled { camera() }
     }
     func registerPushToken() {
         guard connected, let token = FamilySystemCalls.shared.token else { return }
