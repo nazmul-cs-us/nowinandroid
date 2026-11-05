@@ -177,6 +177,20 @@ or use `--remote`.
 
 ## Troubleshooting generated-project build errors
 
+After pulling new Swift files or package changes, close Xcode and run
+`cd iosApp && xcodegen generate`, then reopen `iosApp.xcodeproj`. Resolve packages
+with `xcodebuild -resolvePackageDependencies -project iosApp.xcodeproj -scheme iosApp`.
+The spec pins CocoaLumberjack to 3.8.5 because newer releases can require a higher
+iOS deployment target than XMPPFramework declares. Keep this constraint when
+resolving packages; changing only the app's deployment target does not fix the
+dependency's own platform mismatch.
+
+For device signing, set `DEVELOPMENT_TEAM = YOUR_TEAM_ID` in the uncommitted
+`iosApp/Config/Local.xcconfig` (create the file if needed). All three app/extension
+targets inherit this setting. Alternatively select the same Team for `iosApp`,
+`PrayerLiveActivityExtension`, and `PrayerWidgetExtension` in Xcode's Signing &
+Capabilities editor after generating the project.
+
 If Xcode tries to copy `iosApp/AppIcon-1024.png` into
 `PrayerLiveActivityExtension`, its generated project contains an obsolete or
 locally edited resource reference. The current `project.yml` doesn't bundle an

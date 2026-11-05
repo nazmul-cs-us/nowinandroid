@@ -22,6 +22,11 @@ packages:
   FamilyXMPP:
     url: https://github.com/robbiehanson/XMPPFramework
     revision: 7d4dd1f215f18e9db5bbf1739403583c78afb4e7
+  # XMPPFramework permits newer 3.x releases whose deployment target can exceed
+  # its own. Keep its logging dependency compatible with the pinned framework.
+  CocoaLumberjack:
+    url: https://github.com/CocoaLumberjack/CocoaLumberjack.git
+    exactVersion: 3.8.5
   SherpaOnnx:
     url: https://github.com/k2-fsa/sherpa-onnx
     exactVersion: 1.13.7
@@ -274,6 +279,8 @@ targets:
         product: WebRTC
       - package: FamilyXMPP
         product: XMPPFramework
+      - package: CocoaLumberjack
+        product: CocoaLumberjack
       - package: SherpaOnnx
         product: sherpa-onnx
       - package: Swift3D
@@ -336,6 +343,9 @@ targets:
   PrayerWidgetExtension:
     type: app-extension
     platform: iOS
+    configFiles:
+      Debug: Config/Build.xcconfig
+      Release: Config/Build.xcconfig
     sources:
       - path: PrayerWidget
     info:
