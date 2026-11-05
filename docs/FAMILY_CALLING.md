@@ -1,14 +1,16 @@
 # Family calling
 
-This change implements foreground, one-to-one voice/video calls on Android and iOS. It includes Family pages, invitation acceptance/removal, native WebRTC capture/rendering, and a MongooseIM authorization module. This is a private versioned XMPP protocol, not Jingle interoperability. Deployment and real-device acceptance are separate from code/build validation.
+This implements one-to-one voice/video calls on Android and iOS, with Family pages, invitation acceptance/removal, native WebRTC, and MongooseIM authorization. The call UI uses full-screen, stacked video feeds, caller initials, a timer, and circular controls inspired by the supplied incoming-call reference. Background call delivery adds Android FCM/Telecom and optional iOS PushKit/CallKit; see [background deployment and testing](BACKGROUND_CALLING.md). This is a private versioned XMPP protocol, not Jingle interoperability. Deployment and real-device acceptance are separate from code/build validation.
 
 ## App workflow
 
 Android has a **Family** navigation destination. iOS 26+ has **More → Family**; earlier supported versions have a Family button opening the page.
 
+The contact screen uses a dark green header, circular family shortcuts, a rounded light/dark list panel, account search, Family/Invitations filters, and voice/video actions. Names are derived from account IDs until profile integration is available; circles show initials, not presence or unread-message state. Invitations are composed in a sheet, and removal requires confirmation.
+
 For debug device testing, Android prefills `android@xmpp.starception.com` and iOS prefills `ios@xmpp.starception.com`, along with the shared test password. Tap **Sign in** to connect; the password field clears after each attempt. Android keeps the test password in debug-only resources, and iOS includes it only under `#if DEBUG`. After sign-in, the opposite test account is suggested in the invitation field. Release builds keep the sign-in and invitation fields blank. Both apps use the shared `FamilyEndpoint` settings for `xmpp.starception.com:5222`, require STARTTLS and server certificate verification, and allow a short username (`android`/`ios`) or a full account ID. The Family service readiness message appears only after its authenticated snapshot succeeds.
 
-Sign in using a provisioned Family/XMPP account, such as the two pilot accounts requested for device testing. Passwords are entered locally and retained only for the connection; they are not bundled or saved in preferences. Send an invitation to another full Family account ID. Only its recipient can accept. Voice/Video controls appear for accepted members. Either party can remove a relationship, ending calling access.
+Sign in using a provisioned Family/XMPP account, such as the two pilot accounts. For reconnecting after a call push, credentials are saved in Android Keystore-encrypted, backup-excluded preferences or iOS Keychain with AfterFirstUnlockThisDeviceOnly accessibility. Signing out clears them and unregisters that installation. Debug builds prefill the requested pilot credentials; release builds do not embed them. Send an invitation to another Family account ID. Only its recipient can accept. Voice/Video controls appear for accepted members. Either party can remove a relationship, ending calling access.
 
 Incoming calls appear over other screens while signed in with the app open. Capture starts only after acceptance and permissions. Mute, speaker/earpiece, camera on/off, camera switching, decline/cancel and hang-up are supported. Other app audio yields; playback is not automatically resumed afterward.
 
@@ -31,6 +33,8 @@ Authenticated IQ `set` requests go to `xmpp.starception.com`, with JSON inside a
 | `end_call` | `callId` | Participant/selected installation |
 | `turn` | `callId` | Active, selected, still-family participant |
 | `signal` | `callId`, `payload` | Active selected participant; bounded SDP/ICE goes to the other installation |
+| `register_device` | `deviceId`, `platform`, `token`, `environment` | Authenticated owner; bounded to eight installations; token ownership moves on account changes |
+| `unregister_device` | `deviceId` | Removes only the current account's installation |
 
 Relationships and authoritative calls live in the Mnesia **disk** table `deenly_family`. Eligibility and transitions are transactional and serialized by domain. Back up Mnesia consistently along with PostgreSQL; copying live files is not a consistent backup.
 
@@ -44,7 +48,7 @@ The issuer reads `/etc/mongooseim/turn-secret`, never sends that static secret t
 
 ## Deploy on the VM
 
-Use a checkout containing this change, or transfer `server/family`. Workspace changes are not automatically on GitHub.
+Pull the latest `main` checkout on the VM before installing.
 
 ```bash
 # From that checkout on the VM; validate locally first.
@@ -108,6 +112,6 @@ The EUnit tests use real Mnesia with small external-directory test doubles. `smo
 
 ## Remaining production gates
 
-This is a **foreground** implementation. Backgrounding ends a call; closed/force-stopped apps do not ring. FCM/PushKit, CallKit/Android Telecom integration, and a durable push outbox remain separate work requiring platform/provider configuration. Production Firebase bootstrap is also pending.
+Background support requires deploying the push bridge, granting its FCM provider access, and rebuilding the apps. iOS incoming wake requires paid Apple Developer/APNs configuration and the optional push-enabled project spec; the regular project remains usable without those credentials. The new paths require locked/background/terminated-device acceptance tests before treating them as working in production. Explicit Android force stop prevents push delivery until the app is reopened. Production Firebase identity bootstrap is also pending.
 
 Before production, validate backups/restore, monitoring, abuse/load limits, certificate renewal deployment to MongooseIM, restrictive-network TURN/TLS on 443, and the signed-device acceptance matrix. A successful build is not a production-readiness claim.

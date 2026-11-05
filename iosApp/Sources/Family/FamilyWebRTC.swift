@@ -2,6 +2,7 @@ import AVFoundation
 import Combine
 import Foundation
 import WebRTC
+import UIKit
 import Shared
 
 @MainActor final class FamilyWebRTC: NSObject, ObservableObject {
@@ -18,6 +19,7 @@ import Shared
     private var microphone: RTCAudioTrack?
     private var capturer: RTCCameraVideoCapturer?
     private var cameraDevice: AVCaptureDevice?
+    private var cameraStarted = false
     private var pendingCandidates: [RTCIceCandidate] = []
     private var hasRemoteDescription = false
     private var epoch = 0
@@ -47,7 +49,7 @@ import Shared
         SherpaSpeechService.shared.stopRecognition()
         SherpaSpeechService.shared.stopSpeaking()
         try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
-        try session.setActive(true)
+        // CallKit activates/deactivates the audio session through its provider.
         ownsAudio = true
         speaker(video)
         let configuration = RTCConfiguration()
@@ -72,7 +74,8 @@ import Shared
             capturer = capture
             localVideo = Self.factory.videoTrack(with: source, trackId: "family-video")
             if let track = localVideo { connection.add(track, streamIds: ["family"]) }
-            try await startCamera(front: true)
+            if UIApplication.shared.applicationState == .active { try await startCamera(front: true) }
+            else { localVideo?.isEnabled = false }
         }
         if caller {
             let offer = try await create(offer: true, connection: connection)
@@ -146,23 +149,29 @@ import Shared
                 if let error { continuation.resume(throwing: error) } else { continuation.resume() }
             }
         }
+        cameraStarted = true
     }
     func switchCamera() {
         let front = cameraDevice?.position != .front
         Task { do { try await startCamera(front: front) } catch { onFailure?("Could not switch camera.") } }
     }
     func mute(_ muted: Bool) { microphone?.isEnabled = !muted }
-    func camera(_ enabled: Bool) { localVideo?.isEnabled = enabled }
+    func camera(_ enabled: Bool) {
+        localVideo?.isEnabled = enabled
+        if enabled && !cameraStarted && UIApplication.shared.applicationState == .active {
+            Task { do { try await startCamera(front: true) } catch { onFailure?("Could not start camera.") } }
+        }
+    }
     func speaker(_ enabled: Bool) { try? AVAudioSession.sharedInstance().overrideOutputAudioPort(enabled ? .speaker : .none) }
     func close() {
         epoch += 1
-        capturer?.stopCapture(); capturer = nil; cameraDevice = nil
+        capturer?.stopCapture(); capturer = nil; cameraDevice = nil; cameraStarted = false
         peer?.close(); peer = nil; microphone = nil; localVideo = nil; remoteVideo = nil
         pendingCandidates.removeAll(); hasRemoteDescription = false
         if ownsAudio {
             let session = AVAudioSession.sharedInstance()
             try? session.overrideOutputAudioPort(.none)
-            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            // CallKit releases activation after the call is reported ended.
             if let category = previousCategory, let mode = previousMode {
                 try? session.setCategory(category, mode: mode, options: previousOptions)
             }

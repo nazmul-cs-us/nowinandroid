@@ -18,10 +18,12 @@
     <cloud-backup>
         <!-- Back up shared preferences only (prayer settings, app preferences) -->
         <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="family_call_private.xml" />
     </cloud-backup>
     <device-transfer>
         <!-- Allow all data during device-to-device transfer -->
         <include domain="sharedpref" path="." />
         <include domain="database" path="." />
+        <exclude domain="sharedpref" path="family_call_private.xml" />
     </device-transfer>
 </data-extraction-rules>

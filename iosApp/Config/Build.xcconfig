@@ -2,5 +2,7 @@
 // uncommitted Config/Local.xcconfig file.
 APNS_ENVIRONMENT = development
 PRAYER_PUSH_BACKEND_URL =
+// Enable using project-push.yml after paid Apple/APNs provisioning is available.
+FAMILY_BACKGROUND_CALLS = NO
 
 #include? "Local.xcconfig"

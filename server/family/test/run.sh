@@ -5,6 +5,6 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 build=$(mktemp -d)
 trap 'rm -rf "$build"' EXIT
-erlc -DTEST -I "$MONGOOSE_SOURCE/include" -o "$build" "$root/mod_deenly_family.erl"
+erlc -DTEST -I "$MONGOOSE_SOURCE/include" -o "$build" "$root/mod_deenly_family"*.erl
 erlc -o "$build" "$root/test/"*.erl
 erl +S 2:2 -noshell -pa "$build" -eval 'case eunit:test(deenly_family_tests, [verbose]) of ok -> halt(0); _ -> halt(1) end.'

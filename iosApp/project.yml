@@ -206,6 +206,8 @@ targets:
         # Empty by default. Set PRAYER_PUSH_BACKEND_URL externally to enable the
         # credential-free token snapshot uploader.
         PrayerPushBackendURL: $(PRAYER_PUSH_BACKEND_URL)
+        FamilyBackgroundCalls: $(FAMILY_BACKGROUND_CALLS)
+        FamilyAPNSEnvironment: $(APNS_ENVIRONMENT)
         # Core Location refuses to prompt without this string, and the refusal is
         # silent — no fix ever arrives and the app just shows the fallback city.
         NSLocationWhenInUseUsageDescription: >-

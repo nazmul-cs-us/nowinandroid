@@ -3,6 +3,7 @@ import Combine
 import XMPPFramework
 import KissXML
 import Shared
+import UIKit
 
 struct FamilyMemberRow: Identifiable {
     let jid: String
@@ -47,6 +48,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     @Published private(set) var cameraEnabled = true
     @Published private(set) var speakerEnabled = false
     @Published private(set) var mediaConnected = false
+    @Published private(set) var connectedAt: Date?
     let media = FamilyWebRTC()
     private var stream: XMPPStream?
     private var password: String?
@@ -57,6 +59,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     private var queuedSignals: [(String, [String: Any])] = []
     private var ringingTask: Task<Void, Never>?
     private var heartbeat: Task<Void, Never>?
+    private var pendingCredential: (String, String)?
 
     override private init() {
         super.init()
@@ -65,7 +68,11 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             Task { do { _ = try await self.request("signal", ["callId": id, "payload": payload]) }
                 catch { await self.failCall("Call signalling was interrupted.") } }
         }
-        media.onConnected = { [weak self] in self?.mediaConnected = $0 }
+        media.onConnected = { [weak self] connected in
+            self?.mediaConnected = connected
+            if connected && self?.connectedAt == nil { self?.connectedAt = Date() }
+            if connected, let id = self?.call?.id { FamilySystemCalls.shared.connected(id) }
+        }
         media.onFailure = { [weak self] message in Task { await self?.failCall(message) } }
     }
     func login(_ input: String, password: String) {
@@ -74,10 +81,11 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
               jid.hasSuffix("@" + Self.domain), !password.isEmpty else {
             message = "Enter your family account and password."; return
         }
-        disconnect()
+        disconnect(clearSaved: false)
         me = jid; busy = true; self.password = password
+        pendingCredential = (jid, password)
         let socket = XMPPStream()
-        socket.myJID = XMPPJID(string: jid + "/ios-" + UUID().uuidString)
+        socket.myJID = XMPPJID(string: jid + "/ios-" + FamilyCredentials.deviceID)
         socket.hostName = Self.domain; socket.hostPort = UInt16(FamilyEndpoint().port)
         socket.startTLSPolicy = .required
         socket.addDelegate(self, delegateQueue: .main)
@@ -85,7 +93,9 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         do { try socket.connect(withTimeout: 15) }
         catch { lost("Could not reach the family server. Check that this device’s network is allowed through the server firewall on TCP 5222.") }
     }
-    func disconnect() {
+    func disconnect(clearSaved: Bool = true) {
+        if clearSaved { unregisterPushToken(); FamilyCredentials.clear() }
+        if let id = call?.id { FamilySystemCalls.shared.end(id) }
         let socket = stream
         if let current = call, let socket, socket.isAuthenticated,
            let data = try? JSONSerialization.data(withJSONObject: ["v": 1, "action": "end_call", "callId": current.id]) {
@@ -94,12 +104,15 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             socket.send(XMPPIQ(type: "set", to: XMPPJID(string: Self.domain), elementID: UUID().uuidString, child: child))
         }
         stream = nil; socket?.removeDelegate(self); socket?.disconnectAfterSending()
-        password = nil; connected = false; serviceReady = false; busy = false; me = ""; members = []
+        password = nil; pendingCredential = nil; connected = false; serviceReady = false; busy = false; me = ""; members = []; connectedAt = nil
         media.close(); mediaCall = nil; call = nil; terminal.removeAll(); queuedSignals.removeAll(); callReducer.clear()
         ringingTask?.cancel(); heartbeat?.cancel(); heartbeat = nil
         rejectPending()
     }
     private func lost(_ text: String) {
+        if let id = call?.id { FamilySystemCalls.shared.end(id, reason: .failed) }
+        pendingCredential = nil
+        connectedAt = nil
         password = nil; connected = false; serviceReady = false; busy = false; media.close(); mediaCall = nil
         call = nil; queuedSignals.removeAll(); ringingTask?.cancel(); heartbeat?.cancel()
         rejectPending(); message = text
@@ -136,14 +149,17 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         }
     }
     func answer() {
-        guard let incoming = call else { return }
-        perform {
-            guard await FamilyWebRTC.permissions(video: incoming.kind == "video") else {
-                self.message = "Allow microphone access, and camera access for video calls, in Settings."; return
-            }
-            guard self.call?.id == incoming.id else { return }
-            try await self.apply(self.request("accept_call", ["callId": incoming.id]))
+        if let id = call?.id { FamilySystemCalls.shared.answer(id) }
+    }
+    func answerFromSystem(_ id: String) async -> Bool {
+        guard await resumeForPush(id), let incoming = call else { return false }
+        guard await FamilyWebRTC.permissions(video: incoming.kind == "video") else {
+            message = "Allow microphone and camera access in Settings before answering."; return false
         }
+        do {
+            try await apply(request("accept_call", ["callId": incoming.id]))
+            return call?.id == incoming.id && call?.stage == "active"
+        } catch { return false }
     }
     func hangup() { if let current = call { endCall(current) } }
     private func endCall(_ current: FamilyCallInfo) {
@@ -154,7 +170,38 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     func camera() { cameraEnabled.toggle(); media.camera(cameraEnabled) }
     func switchCamera() { media.switchCamera() }
     func speaker() { speakerEnabled.toggle(); media.speaker(speakerEnabled) }
-    func backgrounded() { hangup() }
+    func backgrounded() {
+        // iOS suspends camera capture in the background; voice stays owned by CallKit.
+        if call?.kind == "video", cameraEnabled { camera() }
+    }
+    func registerPushToken() {
+        guard connected, let token = FamilySystemCalls.shared.token else { return }
+        let environment = Bundle.main.object(forInfoDictionaryKey: "FamilyAPNSEnvironment") as? String == "development" ? "sandbox" : "production"
+        perform { _ = try await self.request("register_device", ["deviceId": FamilyCredentials.deviceID,
+            "platform": "ios", "token": token, "environment": environment]) }
+    }
+    func unregisterPushToken() {
+        guard let socket = stream, socket.isAuthenticated,
+              let data = try? JSONSerialization.data(withJSONObject: ["v": 1, "action": "unregister_device", "deviceId": FamilyCredentials.deviceID]) else { return }
+        let child = DDXMLElement(name: "family", xmlns: Self.namespace)
+        child.stringValue = String(decoding: data, as: UTF8.self)
+        socket.send(XMPPIQ(type: "set", to: XMPPJID(string: Self.domain), elementID: UUID().uuidString, child: child))
+    }
+    func resumeForPush(_ id: String) async -> Bool {
+        if !connected {
+            guard let saved = FamilyCredentials.load() else { return false }
+            if !busy { login(saved.0, password: saved.1) }
+            for _ in 0..<150 {
+                if connected || !busy { break }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+        }
+        guard connected else { return false }
+        do {
+            try await apply(request("snapshot"))
+            return call?.id.lowercased() == id.lowercased() && call?.callee == me && call?.stage == "ringing"
+        } catch { return false }
+    }
 
     private func perform(_ action: @escaping @MainActor () async throws -> Void) {
         Task { do { try await action() }
@@ -209,7 +256,9 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         if callReducer.stage == "ended" || (next.stage == "active" && !next.selected) { finish(next.id); return }
         if next.stage == "ringing" && next.expires <= now { finish(next.id); return }
         call = next
+        FamilySystemCalls.shared.update(next, me: me)
         if next.stage == "active" && mediaCall != next.id { speakerEnabled = next.kind == "video" }
+        if next.stage == "active" && next.kind == "video" && UIApplication.shared.applicationState != .active { cameraEnabled = false }
         if next.stage == "ringing" {
             ringingTask?.cancel()
             ringingTask = Task { [weak self] in
@@ -234,8 +283,9 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         terminal.insert(id)
         // The server expires/prunes calls; retain all terminal IDs for this signed-in session.
         guard let current = call, current.id == id else { return }
+        FamilySystemCalls.shared.end(id)
         call = nil; ringingTask?.cancel(); media.close(); mediaCall = nil; queuedSignals.removeAll()
-        muted = false; cameraEnabled = true; speakerEnabled = false; mediaConnected = false
+        muted = false; cameraEnabled = true; speakerEnabled = false; mediaConnected = false; connectedAt = nil
     }
     private func failCall(_ text: String) async {
         if let current = call { finish(current.id); _ = try? await request("end_call", ["callId": current.id]) }
@@ -265,6 +315,9 @@ extension FamilyStore: XMPPStreamDelegate {
         Task { @MainActor in
             guard sender === stream else { return }
             password = nil; connected = true; busy = false
+            if let saved = pendingCredential { FamilyCredentials.save(jid: saved.0, password: saved.1) }
+            pendingCredential = nil
+            registerPushToken()
             sender.send(XMPPPresence())
             refresh()
             heartbeat?.cancel()

@@ -12,7 +12,7 @@ root=$(cd "$(dirname "$0")" && pwd)
 [ -f "$release/etc/vm.args" ] && [ -f /etc/mongooseim/mongooseim.toml ]
 build=$(mktemp -d)
 trap 'rm -rf "$build"' EXIT
-ERL_LIBS="$source_dir/_build/default/lib" erlc -I "$source_dir/include" -o "$build" "$root/mod_deenly_family.erl"
+ERL_LIBS="$source_dir/_build/default/lib" erlc -I "$source_dir/include" -o "$build" "$root/mod_deenly_family"*.erl
 python3 - "$listener_ip" <<'PY'
 import datetime,grp,ipaddress,os,pathlib,re,shutil,sys,tempfile,tomllib
 address=ipaddress.ip_address(sys.argv[1])
@@ -52,6 +52,7 @@ PY
 beam="$release/lib/mongooseim-6.10.0/ebin/mod_deenly_family.beam"
 if [ -f "$beam" ]; then cp -p "$beam" "$beam.before-family-$(date -u +%Y%m%dT%H%M%S%N)"; fi
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family.beam" "$beam"
+install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_push.beam" "$(dirname "$beam")/mod_deenly_family_push.beam"
 systemctl restart mongooseim
 for attempt in {1..20}; do
   if /usr/local/bin/mongooseimctl status >/dev/null 2>&1; then

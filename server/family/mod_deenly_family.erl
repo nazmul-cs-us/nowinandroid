@@ -62,6 +62,10 @@ process_iq(Acc, From, #jid{lserver = Domain}, #iq{type = set, sub_el = El} = IQ,
 process_iq(Acc, _, _, IQ, _) ->
     {Acc, IQ#iq{type = error, sub_el = [mongoose_xmpp_errors:not_allowed()]}}.
 
+execute(D, U, F, #{<<"action">> := <<"register_device">>} = R) ->
+    mod_deenly_family_push:register(D, U, F, R);
+execute(D, U, _, #{<<"action">> := <<"unregister_device">>, <<"deviceId">> := Device}) ->
+    mod_deenly_family_push:unregister(D, U, Device);
 execute(D, U, F, #{<<"action">> := <<"snapshot">>}) ->
     lists:foreach(fun(C) ->
         case maps:get(<<"stage">>, C) =:= <<"active">> andalso selected(C, F) of
@@ -111,7 +115,9 @@ execute(D, U, _, #{<<"action">> := Action, <<"peer">> := Peer})
 execute(D, U, F, #{<<"action">> := <<"invite_call">>, <<"peer">> := Peer,
                    <<"callId">> := Id, <<"kind">> := Kind}) ->
     valid_peer(D, U, Peer), family(D, U, Peer),
-    true_or_deny(byte_size(Id) >= 16 andalso byte_size(Id) =< 80, <<"invalid_call">>),
+    true_or_deny(is_binary(Id) andalso byte_size(Id) =:= 36 andalso
+        re:run(Id, <<"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$">>,
+               [{capture, none}]) =:= match, <<"invalid_call">>),
     true_or_deny(lists:member(Kind, [<<"voice">>, <<"video">>]), <<"invalid_kind">>),
     C = case read({call, D, Id}) of
         undefined ->
@@ -122,7 +128,7 @@ execute(D, U, F, #{<<"action">> := <<"invite_call">>, <<"peer">> := Peer,
                     <<"kind">> => Kind, <<"stage">> => <<"ringing">>,
                     <<"version">> => 1, <<"expires">> => now_ms() + 45000,
                     <<"reason">> => <<>>},
-            save_call(D, New), New;
+            save_call(D, New), mod_deenly_family_push:enqueue(D, New), New;
         Existing ->
             true_or_deny(maps:get(<<"callerFull">>, Existing) =:= F andalso
                          maps:get(<<"callee">>, Existing) =:= Peer, <<"invalid_call">>), Existing
@@ -224,7 +230,8 @@ sweep(_Host) ->
                 end;
             (_) -> []
         end, rows())
-    end) of {atomic, Events} -> [deliver(D, E) || {D, E} <- Events]; _ -> ok end.
+    end) of {atomic, Events} -> [deliver(D, E) || {D, E} <- Events]; _ -> ok end,
+    mod_deenly_family_push:drain().
 turn(U, Id) ->
     Path = case os:getenv("FAMILY_TURN_SECRET_FILE") of false -> "/etc/mongooseim/turn-secret"; P -> P end,
     {ok, Data} = file:read_file(Path), Secret = string:trim(Data),

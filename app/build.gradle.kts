@@ -261,6 +261,7 @@ dependencies {
     // Social sign-in via Firebase Authentication (Google/Microsoft/Facebook/Apple).
     // Google uses Credential Manager; the rest use Firebase's OAuthProvider web flow.
     implementation(libs.firebase.auth)
+    implementation(libs.firebase.cloud.messaging)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)

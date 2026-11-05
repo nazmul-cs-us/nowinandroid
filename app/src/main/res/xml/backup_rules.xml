@@ -17,4 +17,5 @@
 <full-backup-content>
     <!-- Back up shared preferences only (prayer settings, app preferences) -->
     <include domain="sharedpref" path="." />
+    <exclude domain="sharedpref" path="family_call_private.xml" />
 </full-backup-content>

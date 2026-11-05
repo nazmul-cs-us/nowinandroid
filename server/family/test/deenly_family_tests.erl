@@ -14,7 +14,10 @@ family_test_() -> {setup, fun setup/0, fun cleanup/1, [
     ?_test(nonparticipant_cannot_signal()), ?_test(expiry_prevents_late_answer()),
     ?_test(relay_credentials_scoped()), ?_test(disconnected_call_lease_expires()),
     ?_test(raw_peer_messages_are_rejected()), ?_test(simultaneous_answers()),
-    ?_test(restart_preserves_family())]}.
+    ?_test(restart_preserves_family()), ?_test(push_requires_family()),
+    ?_test(push_registration_ownership()), ?_test(push_logout_is_scoped()),
+    ?_test(push_is_durable_and_idempotent()), ?_test(push_cancelled_is_pruned()),
+    ?_test(push_invalid_device_rejected()), ?_test(call_id_requires_uuid())]}.
 setup() ->
     Dir = "/tmp/deenly-family-eunit-" ++ integer_to_list(erlang:unique_integer([positive])),
     application:set_env(mnesia, dir, Dir),
@@ -87,3 +90,34 @@ restart_preserves_family() -> reset(), family(),
     stopped = mnesia:stop(), ok = mnesia:start(), ok = mnesia:wait_for_tables([deenly_family], 10000),
     {atomic, {#{<<"members">> := [Member]}, _}} = act(?A, ?AF, <<"snapshot">>, #{}),
     ?assertEqual(<<"accepted">>, maps:get(<<"status">>, Member)).
+
+register(U, F, Device, Token) -> act(U, F, <<"register_device">>, #{<<"deviceId">> => Device,
+    <<"platform">> => <<"android">>, <<"token">> => Token}).
+device() -> <<"00000000-1111-2222-3333-444444444444">>.
+token() -> <<"synthetic-fcm-token-012345678901234567890">>.
+push_rows() -> {atomic, Rows} = mnesia:transaction(fun() ->
+    mnesia:foldl(fun({deenly_family, K = {push, _, _, _}, V}, A) -> [{K,V}|A]; (_, A) -> A end, [], deenly_family)
+end), Rows.
+push_requires_family() -> reset(), {atomic, _} = register(?B, ?BF, device(), token()),
+    ?assertMatch({aborted, _}, call()), ?assertEqual([], push_rows()).
+push_registration_ownership() -> reset(), {atomic, _} = register(?A, ?AF, device(), token()),
+    {atomic, _} = register(?B, ?BF, device(), token()),
+    {atomic, Old} = mnesia:transaction(fun() -> mnesia:read(deenly_family, {device, ?D, ?A, device()}) end),
+    ?assertEqual([], Old).
+push_logout_is_scoped() -> reset(), {atomic, _} = register(?B, ?BF, device(), token()),
+    {atomic, _} = act(?A, ?AF, <<"unregister_device">>, #{<<"deviceId">> => device()}),
+    family(), {atomic, _} = call(), ?assertEqual(1, length(push_rows())).
+push_is_durable_and_idempotent() -> reset(), family(), {atomic, _} = register(?B, ?BF, device(), token()),
+    {atomic, _} = call(), {atomic, _} = call(),
+    ?assertEqual(1, length(push_rows())),
+    mnesia:dump_log(), application:stop(mnesia), application:start(mnesia),
+    ok = mnesia:wait_for_tables([deenly_family], 10000),
+    ?assertEqual(1, length(push_rows())).
+push_cancelled_is_pruned() -> reset(), family(), {atomic, _} = register(?B, ?BF, device(), token()),
+    {atomic, _} = call(), {atomic, _} = act(?A, ?AF, <<"end_call">>, #{<<"callId">> => ?ID}),
+    mod_deenly_family_push:drain(), ?assertEqual([], push_rows()).
+push_invalid_device_rejected() -> reset(),
+    ?assertEqual({aborted, {denied, <<"invalid_device">>}}, register(?B, ?BF, <<"short">>, token())).
+call_id_requires_uuid() -> reset(), family(),
+    ?assertEqual({aborted, {denied, <<"invalid_call">>}}, act(?A, ?AF, <<"invite_call">>,
+        #{<<"peer">> => ?B, <<"callId">> => <<"not-a-native-call-uuid">>, <<"kind">> => <<"voice">>})).

@@ -5,6 +5,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import org.jivesoftware.smack.ConnectionListener
 import org.jivesoftware.smack.XMPPConnection
 import org.jivesoftware.smack.packet.IQ
@@ -36,6 +37,7 @@ data class FamilyUiState(
     val members: List<FamilyMember> = emptyList(), val call: FamilyCall? = null,
     val error: String? = null, val muted: Boolean = false, val camera: Boolean = true,
     val speaker: Boolean = false, val mediaConnected: Boolean = false,
+    val connectedAtElapsed: Long? = null,
 )
 
 private class FamilyIq(val body: String) : IQ("family", FAMILY_NS) {
@@ -52,6 +54,7 @@ private class FamilyIqProvider : IQProvider<FamilyIq>() {
 /** One process-level socket and media owner; screens never own the connection. */
 @Singleton
 class FamilyClient @Inject constructor(@ApplicationContext private val context: Context) {
+    internal val credentials = FamilyCredentials(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutable = MutableStateFlow(FamilyUiState())
     val state = mutable.asStateFlow()
@@ -64,13 +67,14 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private var ringingJob: Job? = null
     private var heartbeat: Job? = null
     private var visibleActivities = 0
+    internal val hasForegroundActivity: Boolean get() = visibleActivities > 0
     init {
         (context.applicationContext as android.app.Application).registerActivityLifecycleCallbacks(
             object : android.app.Application.ActivityLifecycleCallbacks {
                 override fun onActivityStarted(activity: android.app.Activity) { visibleActivities++ }
                 override fun onActivityStopped(activity: android.app.Activity) {
                     visibleActivities--
-                    if (visibleActivities <= 0 && !activity.isChangingConfigurations) hangup()
+                    // Telecom and the call foreground service now own background calls.
                 }
                 override fun onActivityCreated(a: android.app.Activity, b: android.os.Bundle?) = Unit
                 override fun onActivityResumed(a: android.app.Activity) = Unit
@@ -86,7 +90,8 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             scope.launch { runCatching { request("signal", "callId" to call.id, "payload" to payload) }
                 .onFailure { endWithError("Call signalling was interrupted.") } }
         } },
-        connected = { connected -> mutable.value = mutable.value.copy(mediaConnected = connected) },
+        connected = { connected -> mutable.value = mutable.value.copy(mediaConnected = connected,
+            connectedAtElapsed = mutable.value.connectedAtElapsed ?: if (connected) android.os.SystemClock.elapsedRealtime() else null) },
         failed = { message -> scope.launch { endWithError(message) } },
     )
 
@@ -96,7 +101,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         if (jid == null || !jid.endsWith("@$FAMILY_DOMAIN") || password.isBlank()) {
             mutable.value = mutable.value.copy(error = "Enter your family account and password."); return@launch
         }
-        disconnect()
+        disconnect(clearSaved = false)
         val token = generation
         mutable.value = FamilyUiState(me = jid, busy = true)
         var attemptedSocket: XMPPTCPConnection? = null
@@ -106,7 +111,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                 XMPPTCPConnection(XMPPTCPConnectionConfiguration.builder()
                     .setXmppDomain(FAMILY_DOMAIN).setHost(FAMILY_DOMAIN).setPort(FamilyEndpoint().port)
                     .setUsernameAndPassword(jid.substringBefore('@'), password)
-                    .setResource("android-${UUID.randomUUID()}")
+                    .setResource("android-${credentials.deviceId}")
                     .setSecurityMode(org.jivesoftware.smack.ConnectionConfiguration.SecurityMode.required)
                     .setHostnameVerifier(HttpsURLConnection.getDefaultHostnameVerifier())
                     .build()).also { socket ->
@@ -130,6 +135,10 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             if (token != generation) { withContext(Dispatchers.IO) { socket.disconnect() }; return@launch }
             connection = socket
             mutable.value = mutable.value.copy(connected = true, busy = false)
+            runCatching { credentials.save(jid, password) }.onFailure {
+                mutable.value = mutable.value.copy(error = "Could not securely save sign-in. Background calling is unavailable.")
+            }
+            registerPushToken()
             refresh()
             heartbeat = scope.launch {
                 while (isActive) { delay(20000); runCatching { apply(request("snapshot")) } }
@@ -145,13 +154,20 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
     }
 
-    fun disconnect() {
+    fun disconnect(clearSaved: Boolean = true) {
+        if (clearSaved) credentials.clear()
         generation++
         heartbeat?.cancel(); heartbeat = null
         val oldCall = mutable.value.call
         val old = connection
-        if (oldCall != null && old != null) scope.launch(Dispatchers.IO) {
-            runCatching {
+        if (old != null) scope.launch(Dispatchers.IO) {
+            if (clearSaved) runCatching {
+                val iq = FamilyIq(JSONObject().put("v", 1).put("action", "unregister_device")
+                    .put("deviceId", credentials.deviceId).toString())
+                iq.to = org.jxmpp.jid.impl.JidCreate.domainBareFrom(FAMILY_DOMAIN)
+                old.createStanzaCollectorAndSend(iq).nextResultOrThrow<FamilyIq>()
+            }
+            if (oldCall != null) runCatching {
                 val iq = FamilyIq(JSONObject().put("v", 1).put("action", "end_call").put("callId", oldCall.id).toString())
                 iq.to = org.jxmpp.jid.impl.JidCreate.domainBareFrom(FAMILY_DOMAIN)
                 old.createStanzaCollectorAndSend(iq).nextResultOrThrow<FamilyIq>()
@@ -161,7 +177,6 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         connection = null
         ringingJob?.cancel(); mediaInstance?.close(); rtcCallId = null; queuedSignals.clear(); terminal.clear(); callReducer.clear()
         mutable.value = FamilyUiState()
-        if (oldCall == null) scope.launch(Dispatchers.IO) { runCatching { old?.disconnect() } }
     }
     private fun lost(token: Int) {
         if (token != generation) return
@@ -169,9 +184,37 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         heartbeat?.cancel(); heartbeat = null
         mediaInstance?.close(); rtcCallId = null; queuedSignals.clear(); ringingJob?.cancel()
         mutable.value = mutable.value.copy(connected = false, serviceReady = false, busy = false, call = null,
+            connectedAtElapsed = null,
             error = "Connection lost. Sign in again before calling.")
     }
     fun dismissError() { mutable.value = mutable.value.copy(error = null) }
+    fun registerPushToken() {
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            if (mutable.value.connected) perform {
+                registerDevice(token)
+            }
+        }
+    }
+    internal suspend fun registerDevice(token: String) {
+        request("register_device", "deviceId" to credentials.deviceId, "platform" to "android",
+            "token" to token, "environment" to "production")
+    }
+    internal suspend fun ensureSession(): Boolean {
+        if (!mutable.value.connected) {
+            val saved = credentials.load() ?: return false
+            if (mutable.value.busy) {
+                withTimeoutOrNull(16000) { state.first { !it.busy } }
+            } else login(saved.first, saved.second).join()
+        }
+        return mutable.value.connected
+    }
+    internal suspend fun resumeForPush(callId: String): Boolean {
+        if (!ensureSession()) return false
+        return runCatching {
+            apply(request("snapshot"))
+            mutable.value.call?.let { it.id == callId && it.callee == mutable.value.me && it.stage == "ringing" } == true
+        }.getOrDefault(false)
+    }
     fun refresh() = perform { apply(request("snapshot")) }
     fun invite(input: String) = perform {
         val peer = FamilyEndpoint().account(input) ?: error("invalid_member")
@@ -260,6 +303,8 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         if (callReducer.stage == "ended" || (call.stage == "active" && !call.selected)) { finish(call.id); return }
         if (call.stage == "ringing" && call.expires <= System.currentTimeMillis()) { finish(call.id); return }
         mutable.value = mutable.value.copy(call = call, speaker = if (call.stage == "active") call.kind == "video" else mutable.value.speaker)
+        FamilyCallService.ensure(context, microphone = call.stage == "active" && hasForegroundActivity,
+            camera = call.stage == "active" && call.kind == "video" && hasForegroundActivity)
         if (call.stage == "ringing") {
             ringingJob?.cancel()
             ringingJob = scope.launch { delay((call.expires - System.currentTimeMillis()).coerceAtLeast(0));
@@ -280,7 +325,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         callReducer.finishCall(id)
         terminal.add(id); while (terminal.size > 256) terminal.remove(terminal.first())
         if (mutable.value.call?.id == id) {
-            mutable.value = mutable.value.copy(call = null, muted = false, camera = true, speaker = false, mediaConnected = false)
+            mutable.value = mutable.value.copy(call = null, muted = false, camera = true, speaker = false, mediaConnected = false, connectedAtElapsed = null)
             ringingJob?.cancel(); mediaInstance?.close(); rtcCallId = null; queuedSignals.clear()
         }
     }

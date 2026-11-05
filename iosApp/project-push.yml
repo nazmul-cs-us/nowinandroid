@@ -1,0 +1,14 @@
+# Optional paid Apple Developer/APNs configuration; normal builds stay unchanged.
+include:
+  - project.yml
+targets:
+  iosApp:
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: Config/iosApp-push.entitlements
+        FAMILY_BACKGROUND_CALLS: YES
+    info:
+      properties:
+        UIBackgroundModes:
+          - audio
+          - voip

@@ -1,6 +1,6 @@
 # Private calling design — reviewed baseline
 
-Status: reviewed production design. A foreground Family calling implementation is now in the repository; see [Family calling](FAMILY_CALLING.md) for its exact scope, server module, native clients and deployment/validation steps. Deployment and real-device acceptance are separate. Production identity/bootstrap and background push integration remain planned. This document replaces the earlier Go/LiveKit group-first proposal.
+Status: reviewed production design. Family calling, native call screens, a durable push outbox, Android FCM/Telecom and optional iOS PushKit/CallKit are in the repository; see [Family calling](FAMILY_CALLING.md) and [background deployment](BACKGROUND_CALLING.md) for implementation scope and validation. Foreground cross-platform calling was confirmed on devices. Background provider configuration and signed-device acceptance remain necessary; production identity/bootstrap is still planned. This document replaces the earlier Go/LiveKit group-first proposal.
 
 ## Scope and selection
 
