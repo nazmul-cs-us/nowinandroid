@@ -1,0 +1,4 @@
+<resources>
+    <!-- Test accounts only; this value is excluded from release resources. -->
+    <string name="family_test_password" translatable="false">1234567812345678</string>
+</resources>

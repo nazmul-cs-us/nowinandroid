@@ -3,6 +3,7 @@ package com.starception.submission.family
 import android.Manifest
 import android.content.pm.PackageManager
 import android.media.RingtoneManager
+import com.starception.submission.R
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -61,9 +62,10 @@ private fun permissionRequest(): (Boolean, () -> Unit) -> Unit {
 fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
     val client = viewModel.client
     val state by client.state.collectAsStateWithLifecycle()
-    val isDebugBuild = LocalContext.current.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+    val context = LocalContext.current
+    val isDebugBuild = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
     var account by remember { mutableStateOf(if (isDebugBuild) FamilyEndpoint().androidTestAccount else "") }
-    var password by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf(if (isDebugBuild) context.getString(R.string.family_test_password) else "") }
     var invitation by remember { mutableStateOf("") }
     val permissions = permissionRequest()
     LaunchedEffect(state.me) {
@@ -79,7 +81,7 @@ fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
                 Text("Invite someone to your family. Voice and video calls become available after they accept.",
                     style = MaterialTheme.typography.bodyMedium) }
             if (!state.connected) {
-                if (isDebugBuild && account == FamilyEndpoint().androidTestAccount) item { Text("Android test account selected. Enter its password below.",
+                if (isDebugBuild && account == FamilyEndpoint().androidTestAccount) item { Text("Android test credentials prefilled. Tap Sign in to connect.",
                     style = MaterialTheme.typography.bodySmall) }
                 item { OutlinedTextField(account, { account = it }, label = { Text("Family account") },
                     placeholder = { Text("name@xmpp.starception.com") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }

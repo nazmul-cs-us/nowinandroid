@@ -7,10 +7,11 @@ struct FamilyView: View {
     @ObservedObject private var store = FamilyStore.shared
     #if DEBUG
     @State private var account = FamilyEndpoint().iosTestAccount
+    @State private var password = "1234567812345678"
     #else
     @State private var account = ""
-    #endif
     @State private var password = ""
+    #endif
     @State private var invitation = ""
     @State private var removing: FamilyMemberRow?
 
@@ -25,7 +26,7 @@ struct FamilyView: View {
                 Section("Family account") {
                     #if DEBUG
                     if account == FamilyEndpoint().iosTestAccount {
-                        Text("iOS test account selected. Enter its password below.").font(.caption).foregroundStyle(.secondary)
+                        Text("iOS test credentials prefilled. Tap Sign in to connect.").font(.caption).foregroundStyle(.secondary)
                     }
                     #endif
                     TextField("name@xmpp.starception.com", text: $account)
