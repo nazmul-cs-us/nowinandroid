@@ -28,6 +28,8 @@ These fixtures show empty release-style fields and a disabled sign-in button. De
 
 The contact page, illustration, avatar containers, fields and actions resolve theme roles. Native iOS reads the same shared palette and saved seed values. Mute/camera states have visible selected treatment and accessible labels. System-bar contrast changes for light voice surfaces versus video. Compact-height calls place hang-up beside the other controls.
 
+Appearance settings now offer [curated themes](APPEARANCE_THEMES.md) with System/Light/Dark modes. Existing saved palettes, including those used in these snapshots, continue to render until another theme is selected.
+
 ## Reproduce
 
 ```bash

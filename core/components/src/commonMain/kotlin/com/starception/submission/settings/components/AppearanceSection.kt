@@ -16,7 +16,6 @@
 
 package com.starception.submission.settings.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -39,8 +38,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -50,9 +47,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,105 +70,14 @@ import io.github.alexzhirkevich.cupertino.adaptive.ExperimentalAdaptiveApi
 fun AppearanceSection(
     themeSettings: ThemeSettingsState,
     onChangeThemeBrand: (ThemeBrand) -> Unit,
-    onChangeDynamicColorPreference: (Boolean) -> Unit,
     onChangeDarkThemeConfig: (DarkThemeConfig) -> Unit,
-    onChangeCustomColors: (primary: Int, secondary: Int, tertiary: Int) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
-    /**
-     * Whether the platform offers dynamic colour. On Android this is a
-     * Build.VERSION check for Material You; on iOS there is no such thing, so it
-     * passes false and the option is not offered.
-     */
-    supportDynamicColor: Boolean = false,
-    showCustomTheme: Boolean = true,
-    /**
-     * The custom-accent picker. Android's draws its wheel with Bitmap, Canvas and
-     * Paint, which do not cross, so the dialog comes from the caller. When null
-     * the custom colours option simply does not open one.
-     */
-    colorPickerDialog: (
-        @Composable (
-            initialPrimary: Color,
-            initialSecondary: Color,
-            initialTertiary: Color,
-            onConfirm: (Color, Color, Color) -> Unit,
-            onDismiss: () -> Unit,
-        ) -> Unit
-    )? = null,
 ) {
     val haptic = LocalHapticFeedback.current
-    val showColorPickerState = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val customColorOrFallback = if (themeSettings.customColor != 0) Color(themeSettings.customColor) else Color(0xFF6750A4)
-    val customSecondaryOrFallback = if (themeSettings.customSecondaryColor != 0) Color(themeSettings.customSecondaryColor) else Color(0xFF625B71)
-    val customTertiaryOrFallback = if (themeSettings.customTertiaryColor != 0) Color(themeSettings.customTertiaryColor) else Color(0xFF7D5260)
-
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Theme Brand Section
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ModernSectionTitle(text = "Color Theme")
-
-            // Theme pills: content-sized in a scrollable row so labels never
-            // get clipped — equal weights used to trim "Default"/"Android"/
-            // "Coastal"/"Custom" down to whatever fit.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ThemePill(
-                    label = "Default",
-                    selected = themeSettings.brand == ThemeBrand.DEFAULT,
-                    color = Color(0xFF6750A4),
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onChangeThemeBrand(ThemeBrand.DEFAULT)
-                    },
-                )
-                ThemePill(
-                    label = "Android",
-                    selected = themeSettings.brand == ThemeBrand.ANDROID,
-                    color = Color(0xFF3DDC84),
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onChangeThemeBrand(ThemeBrand.ANDROID)
-                    },
-                )
-                ThemePill(
-                    label = "Coastal",
-                    selected = themeSettings.brand == ThemeBrand.COASTAL,
-                    color = Color(0xFF0097A7),
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onChangeThemeBrand(ThemeBrand.COASTAL)
-                    },
-                )
-                ThemePill(
-                    label = "Royal",
-                    selected = themeSettings.brand == ThemeBrand.ROYAL,
-                    color = Color(0xFF2D5DA8), // Lapis
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onChangeThemeBrand(ThemeBrand.ROYAL)
-                    },
-                )
-                if (showCustomTheme) {
-                    ThemePill(
-                        label = "Custom",
-                        selected = themeSettings.brand == ThemeBrand.CUSTOM,
-                        color = customColorOrFallback,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            showColorPickerState.value = true
-                        },
-                    )
-                }
-            }
-        }
-
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ModernSectionTitle(text = "Curated themes")
             Row(
@@ -216,34 +125,6 @@ fun AppearanceSection(
                     },
                 )
             }
-        }
-
-        if (showColorPickerState.value && colorPickerDialog != null) {
-            colorPickerDialog(
-                customColorOrFallback,
-                customSecondaryOrFallback,
-                customTertiaryOrFallback,
-                { primary, secondary, tertiary ->
-                    onChangeCustomColors(primary.toArgb(), secondary.toArgb(), tertiary.toArgb())
-                    showColorPickerState.value = false
-                },
-                { showColorPickerState.value = false },
-            )
-        }
-
-        // Dynamic Color Section (only visible when Default theme and Android 12+)
-        AnimatedVisibility(
-            visible = themeSettings.brand == ThemeBrand.DEFAULT && supportDynamicColor,
-        ) {
-            ModernSwitchRow(
-                title = "Dynamic Colors",
-                subtitle = "Use colors from your wallpaper",
-                checked = themeSettings.useDynamicColor,
-                onCheckedChange = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onChangeDynamicColorPreference(it)
-                },
-            )
         }
 
         // Dark Mode Section with modern segmented button
@@ -319,9 +200,11 @@ private fun ThemePill(
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "pillBorder",
     )
+    val isSelected = selected
 
     Surface(
         modifier = modifier
+            .semantics { this.selected = isSelected; role = Role.RadioButton }
             .height(56.dp)
             .clip(RoundedCornerShape(16.dp))
             .border(

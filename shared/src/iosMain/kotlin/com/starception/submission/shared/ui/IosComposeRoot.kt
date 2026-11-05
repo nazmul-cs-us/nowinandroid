@@ -1162,10 +1162,6 @@ private fun createPrayerTimesViewController(
                             settingsStore.saveLiveActivitiesEnabled(enabled)
                         },
                         themeSettings = themeSettings,
-                        onCustomColorsChange = { primary, secondary, tertiary ->
-                            appearanceStore.saveCustomColors(primary, secondary, tertiary)
-                            themeSettings = appearanceStore.settings()
-                        },
                         onThemeBrandChange = { brand ->
                             appearanceStore.saveBrand(brand)
                             themeSettings = themeSettings.copy(brand = brand)

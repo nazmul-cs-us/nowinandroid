@@ -75,7 +75,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
-import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
@@ -86,7 +85,6 @@ import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.ContentManagementSection
 import com.starception.submission.settings.components.ReciterStorageSection
 import com.starception.submission.settings.components.DeveloperSettingsSection
-import com.starception.submission.settings.components.HsvColorWheelDialog
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
@@ -285,7 +283,7 @@ fun UnifiedSettingsScreen(
                     item {
                         SettingsSection(
                             title = "Appearance",
-                            subtitle = "Theme, colors & display mode",
+                            subtitle = "Curated themes & display mode",
                             iconGlyph = FlaticonIcons.APPEARANCE,
                             isExpanded = expandedSections.contains("appearance"),
                             onToggleExpanded = { viewModel.toggleSection("appearance") },
@@ -293,23 +291,7 @@ fun UnifiedSettingsScreen(
                             AppearanceSection(
                                 themeSettings = themeSettings,
                                 onChangeThemeBrand = viewModel::updateThemeBrand,
-                                onChangeDynamicColorPreference = viewModel::updateDynamicColorPreference,
                                 onChangeDarkThemeConfig = viewModel::updateDarkThemeConfig,
-                                onChangeCustomColors = viewModel::updateCustomThemeColors,
-                                // Both of these are Android-only and are supplied
-                                // here so the section itself can be shared: Material
-                                // You is a Build.VERSION check, and the colour wheel
-                                // is drawn with Bitmap, Canvas and Paint.
-                                supportDynamicColor = supportsDynamicTheming(),
-                                colorPickerDialog = { primary, secondary, tertiary, onConfirm, onDismiss ->
-                                    HsvColorWheelDialog(
-                                        initialPrimary = primary,
-                                        initialSecondary = secondary,
-                                        initialTertiary = tertiary,
-                                        onConfirm = onConfirm,
-                                        onDismiss = onDismiss,
-                                    )
-                                },
                             )
                             AppIconSection(modifier = Modifier.padding(top = 20.dp))
                         }

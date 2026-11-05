@@ -95,7 +95,6 @@ fun PrayerSettingsScreen(
     onLiveActivitiesEnabledChange: (Boolean) -> Unit = {},
     themeSettings: ThemeSettingsState = ThemeSettingsState(),
     onThemeBrandChange: (ThemeBrand) -> Unit = {},
-    onCustomColorsChange: (Int, Int, Int) -> Unit = { _, _, _ -> },
     onDarkThemeConfigChange: (DarkThemeConfig) -> Unit = {},
     appVersion: String = "Unknown",
     audioState: AudioSettingsState = AudioSettingsState(),
@@ -159,7 +158,7 @@ fun PrayerSettingsScreen(
 
                     SettingsSection(
                         title = "Appearance",
-                        subtitle = "Theme, colors & display mode",
+                        subtitle = "Curated themes & display mode",
                         iconGlyph = FlaticonIcons.APPEARANCE,
                         isExpanded = expanded == SECTION_APPEARANCE,
                         onToggleExpanded = {
@@ -169,14 +168,7 @@ fun PrayerSettingsScreen(
                         AppearanceSection(
                             themeSettings = themeSettings,
                             onChangeThemeBrand = onThemeBrandChange,
-                            onChangeDynamicColorPreference = {},
                             onChangeDarkThemeConfig = onDarkThemeConfigChange,
-                            supportDynamicColor = false,
-                            showCustomTheme = true,
-                            onChangeCustomColors = onCustomColorsChange,
-                            colorPickerDialog = { primary, secondary, tertiary, confirm, dismiss ->
-                                SharedAccentColorDialog(primary, secondary, tertiary, confirm, dismiss)
-                            },
                         )
                     }
 
