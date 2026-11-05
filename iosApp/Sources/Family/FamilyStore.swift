@@ -34,10 +34,11 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
 /** The socket and media session belong to the process, never a SwiftUI screen. */
 @MainActor final class FamilyStore: NSObject, ObservableObject {
     static let shared = FamilyStore()
-    static let domain = "xmpp.starception.com"
+    static let domain = FamilyEndpoint().domain
     static let namespace = "urn:starception:family:1"
     @Published private(set) var connected = false
     @Published private(set) var busy = false
+    @Published private(set) var serviceReady = false
     @Published private(set) var me = ""
     @Published private(set) var members: [FamilyMemberRow] = []
     @Published private(set) var call: FamilyCallInfo?
@@ -69,7 +70,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     func login(_ input: String, password: String) {
         guard !busy else { return }
-        guard let jid = FamilyPolicy().normalizeJid(input: input),
+        guard let jid = FamilyEndpoint().account(input: input),
               jid.hasSuffix("@" + Self.domain), !password.isEmpty else {
             message = "Enter your family account and password."; return
         }
@@ -77,12 +78,12 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         me = jid; busy = true; self.password = password
         let socket = XMPPStream()
         socket.myJID = XMPPJID(string: jid + "/ios-" + UUID().uuidString)
-        socket.hostName = Self.domain; socket.hostPort = 5222
+        socket.hostName = Self.domain; socket.hostPort = UInt16(FamilyEndpoint().port)
         socket.startTLSPolicy = .required
         socket.addDelegate(self, delegateQueue: .main)
         stream = socket
         do { try socket.connect(withTimeout: 15) }
-        catch { lost("Could not connect to the family server.") }
+        catch { lost("Could not reach the family server. Check that this device’s network is allowed through the server firewall on TCP 5222.") }
     }
     func disconnect() {
         let socket = stream
@@ -93,13 +94,13 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             socket.send(XMPPIQ(type: "set", to: XMPPJID(string: Self.domain), elementID: UUID().uuidString, child: child))
         }
         stream = nil; socket?.removeDelegate(self); socket?.disconnectAfterSending()
-        password = nil; connected = false; busy = false; me = ""; members = []
+        password = nil; connected = false; serviceReady = false; busy = false; me = ""; members = []
         media.close(); mediaCall = nil; call = nil; terminal.removeAll(); queuedSignals.removeAll(); callReducer.clear()
         ringingTask?.cancel(); heartbeat?.cancel(); heartbeat = nil
         rejectPending()
     }
     private func lost(_ text: String) {
-        password = nil; connected = false; busy = false; media.close(); mediaCall = nil
+        password = nil; connected = false; serviceReady = false; busy = false; media.close(); mediaCall = nil
         call = nil; queuedSignals.removeAll(); ringingTask?.cancel(); heartbeat?.cancel()
         rejectPending(); message = text
     }
@@ -107,9 +108,20 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         let waiting = Array(pending.values); pending.removeAll()
         waiting.forEach { $0.resume(throwing: FamilyError.disconnected) }
     }
-    func refresh() { perform { try await self.apply(self.request("snapshot")) } }
+    func refresh() {
+        let activeStream = stream
+        Task {
+            do { try await self.apply(self.request("snapshot")) }
+            catch {
+                if connected && activeStream === stream {
+                    serviceReady = false
+                    message = "Signed in, but the Family service did not respond. Tap Refresh to retry."
+                }
+            }
+        }
+    }
     func invite(_ input: String) {
-        guard let peer = FamilyPolicy().normalizeJid(input: input) else { message = "Enter a valid family account."; return }
+        guard let peer = FamilyEndpoint().account(input: input) else { message = "Enter a valid family account."; return }
         perform { try await self.apply(self.request("invite", ["peer": peer])) }
     }
     func acceptMember(_ peer: String) { perform { try await self.apply(self.request("accept_member", ["peer": peer])) } }
@@ -168,6 +180,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     private func apply(_ body: [String: Any]) async {
         if let rows = body["members"] as? [[String: String]] {
+            serviceReady = true
             members = rows.compactMap { row in
                 guard let jid = row["jid"], let status = row["status"] else { return nil }
                 return FamilyMemberRow(jid: jid, status: status)
@@ -268,7 +281,7 @@ extension FamilyStore: XMPPStreamDelegate {
         Task { @MainActor in if sender === stream { lost("Could not sign in. Check your family account and password.") } }
     }
     nonisolated func xmppStreamDidDisconnect(_ sender: XMPPStream, withError error: Error?) {
-        Task { @MainActor in if sender === stream { lost("Family connection closed. Sign in again before calling.") } }
+        Task { @MainActor in if sender === stream { lost(connected ? "Family connection closed. Sign in again before calling." : "Could not connect securely to the family server. Check the device clock, certificate and firewall access on TCP 5222.") } }
     }
     nonisolated func xmppStream(_ sender: XMPPStream, didReceive iq: XMPPIQ) -> Bool {
         guard iq.type == "result" || iq.type == "error" else { return false }

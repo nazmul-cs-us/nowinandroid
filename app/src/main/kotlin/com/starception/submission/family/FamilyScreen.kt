@@ -61,10 +61,14 @@ private fun permissionRequest(): (Boolean, () -> Unit) -> Unit {
 fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
     val client = viewModel.client
     val state by client.state.collectAsStateWithLifecycle()
-    var account by remember { mutableStateOf("") }
+    val isDebugBuild = LocalContext.current.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+    var account by remember { mutableStateOf(if (isDebugBuild) FamilyEndpoint().androidTestAccount else "") }
     var password by remember { mutableStateOf("") }
     var invitation by remember { mutableStateOf("") }
     val permissions = permissionRequest()
+    LaunchedEffect(state.me) {
+        if (isDebugBuild && state.me.isNotBlank()) invitation = FamilyEndpoint().testPeer(state.me)
+    }
     Scaffold(topBar = { TopAppBar(title = { Text("Family") }, actions = {
         if (state.connected) TextButton(onClick = { client.disconnect() }) { Text("Sign out") }
     }) }) { padding ->
@@ -75,19 +79,23 @@ fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
                 Text("Invite someone to your family. Voice and video calls become available after they accept.",
                     style = MaterialTheme.typography.bodyMedium) }
             if (!state.connected) {
+                if (isDebugBuild && account == FamilyEndpoint().androidTestAccount) item { Text("Android test account selected. Enter its password below.",
+                    style = MaterialTheme.typography.bodySmall) }
                 item { OutlinedTextField(account, { account = it }, label = { Text("Family account") },
                     placeholder = { Text("name@xmpp.starception.com") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
                 item { OutlinedTextField(password, { password = it }, label = { Text("Password") },
                     visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                item { Button(onClick = { client.login(account, password); password = "" }, enabled = !state.busy,
+                item { Button(onClick = { client.login(account, password); password = "" }, enabled = !state.busy && account.isNotBlank() && password.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()) { Text(if (state.busy) "Signing in…" else "Sign in") } }
             } else {
                 item { Text(state.me, style = MaterialTheme.typography.labelMedium)
+                    Text(if (state.serviceReady) "Family service connected" else "Checking Family service…",
+                        style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(invitation, { invitation = it }, label = { Text("Family member’s account") },
                         singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Row { Button(onClick = { client.invite(invitation); invitation = "" }, enabled = invitation.isNotBlank()) { Text("Send invitation") }
+                    Row { Button(onClick = { client.invite(invitation); invitation = "" }, enabled = state.serviceReady && invitation.isNotBlank()) { Text("Send invitation") }
                         TextButton(onClick = { client.refresh() }) { Text("Refresh") } } }
-                if (state.members.isEmpty()) item { Text("Your family list is empty. Send an invitation to get started.") }
+                if (state.serviceReady && state.members.isEmpty()) item { Text("Your family list is empty. Send an invitation to get started.") }
                 items(state.members, key = { it.jid }) { member ->
                     ElevatedCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -96,8 +104,8 @@ fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
                                 "outgoing" -> "Waiting for acceptance"; else -> "Family member" })
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (FamilyPolicy().canCall(member.status)) {
-                                    Button(onClick = { permissions(false) { client.call(member.jid, false) } }, enabled = state.call == null) { Text("Voice") }
-                                    Button(onClick = { permissions(true) { client.call(member.jid, true) } }, enabled = state.call == null) { Text("Video") }
+                                    Button(onClick = { permissions(false) { client.call(member.jid, false) } }, enabled = state.serviceReady && state.call == null) { Text("Voice") }
+                                    Button(onClick = { permissions(true) { client.call(member.jid, true) } }, enabled = state.serviceReady && state.call == null) { Text("Video") }
                                 }
                                 if (member.status == "incoming") Button(onClick = { client.acceptMember(member.jid) }) { Text("Accept") }
                                 TextButton(onClick = { client.removeMember(member.jid) }) {

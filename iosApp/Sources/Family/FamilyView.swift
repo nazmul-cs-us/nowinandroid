@@ -5,7 +5,11 @@ import WebRTC
 
 struct FamilyView: View {
     @ObservedObject private var store = FamilyStore.shared
+    #if DEBUG
+    @State private var account = FamilyEndpoint().iosTestAccount
+    #else
     @State private var account = ""
+    #endif
     @State private var password = ""
     @State private var invitation = ""
     @State private var removing: FamilyMemberRow?
@@ -19,6 +23,11 @@ struct FamilyView: View {
             }
             if !store.connected {
                 Section("Family account") {
+                    #if DEBUG
+                    if account == FamilyEndpoint().iosTestAccount {
+                        Text("iOS test account selected. Enter its password below.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    #endif
                     TextField("name@xmpp.starception.com", text: $account)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
                         .keyboardType(.emailAddress)
@@ -26,19 +35,21 @@ struct FamilyView: View {
                     Button(store.busy ? "Signing in…" : "Sign in") {
                         store.login(account, password: password)
                         password = ""
-                    }.disabled(store.busy)
+                    }.disabled(store.busy || account.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty)
                 }
             } else {
                 Section {
                     Text(store.me).font(.caption).foregroundStyle(.secondary)
+                    Text(store.serviceReady ? "Family service connected" : "Checking Family service…")
+                        .font(.caption).foregroundStyle(.secondary)
                     TextField("Family member’s account", text: $invitation)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
                         .keyboardType(.emailAddress)
                     Button("Send invitation") { store.invite(invitation); invitation = "" }
-                        .disabled(invitation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(!store.serviceReady || invitation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 Section("Your family") {
-                    if store.members.isEmpty { Text("Your family list is empty. Send an invitation to get started.").foregroundStyle(.secondary) }
+                    if store.serviceReady && store.members.isEmpty { Text("Your family list is empty. Send an invitation to get started.").foregroundStyle(.secondary) }
                     ForEach(store.members) { member in
                         VStack(alignment: .leading, spacing: 10) {
                             Text(member.jid).font(.headline)
@@ -46,9 +57,9 @@ struct FamilyView: View {
                             HStack(spacing: 18) {
                                 if FamilyPolicy().canCall(relationship: member.status) {
                                     Button { store.startCall(member.jid, video: false) } label: { Label("Voice", systemImage: "phone.fill") }
-                                        .disabled(store.call != nil)
+                                        .disabled(!store.serviceReady || store.call != nil)
                                     Button { store.startCall(member.jid, video: true) } label: { Label("Video", systemImage: "video.fill") }
-                                        .disabled(store.call != nil)
+                                        .disabled(!store.serviceReady || store.call != nil)
                                 }
                                 if member.status == "incoming" { Button("Accept") { store.acceptMember(member.jid) } }
                                 Button(member.status == "incoming" ? "Decline" : member.status == "outgoing" ? "Cancel" : "Remove", role: .destructive) {
@@ -65,6 +76,16 @@ struct FamilyView: View {
             }
         }
         .navigationTitle("Family")
+        .onAppear {
+            #if DEBUG
+            if invitation.isEmpty { invitation = FamilyEndpoint().testPeer(input: store.me) }
+            #endif
+        }
+        .onChange(of: store.me) { me in
+            #if DEBUG
+            invitation = FamilyEndpoint().testPeer(input: me)
+            #endif
+        }
         .toolbar { if store.connected { Button { store.refresh() } label: { Image(systemName: "arrow.clockwise") }.accessibilityLabel("Refresh family") } }
         .refreshable { store.refresh() }
         .confirmationDialog("Remove this family relationship?", isPresented: Binding(

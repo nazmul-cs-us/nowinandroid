@@ -22,7 +22,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import javax.net.ssl.HttpsURLConnection
 
-internal const val FAMILY_DOMAIN = "xmpp.starception.com"
+internal val FAMILY_DOMAIN = FamilyEndpoint().domain
 internal const val FAMILY_NS = "urn:starception:family:1"
 
 data class FamilyMember(val jid: String, val status: String)
@@ -32,6 +32,7 @@ data class FamilyCall(
 ) { fun peer(me: String) = if (caller == me) callee else caller }
 data class FamilyUiState(
     val me: String = "", val connected: Boolean = false, val busy: Boolean = false,
+    val serviceReady: Boolean = false,
     val members: List<FamilyMember> = emptyList(), val call: FamilyCall? = null,
     val error: String? = null, val muted: Boolean = false, val camera: Boolean = true,
     val speaker: Boolean = false, val mediaConnected: Boolean = false,
@@ -91,23 +92,25 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
 
     fun login(jidInput: String, password: String) = scope.launch {
         if (mutable.value.busy) return@launch
-        val jid = FamilyPolicy().normalizeJid(jidInput)
+        val jid = FamilyEndpoint().account(jidInput)
         if (jid == null || !jid.endsWith("@$FAMILY_DOMAIN") || password.isBlank()) {
             mutable.value = mutable.value.copy(error = "Enter your family account and password."); return@launch
         }
         disconnect()
         val token = generation
         mutable.value = FamilyUiState(me = jid, busy = true)
+        var attemptedSocket: XMPPTCPConnection? = null
         try {
             ProviderManager.addIQProvider("family", FAMILY_NS, FamilyIqProvider())
             val socket = withContext(Dispatchers.IO) {
                 XMPPTCPConnection(XMPPTCPConnectionConfiguration.builder()
-                    .setXmppDomain(FAMILY_DOMAIN).setHost(FAMILY_DOMAIN).setPort(5222)
+                    .setXmppDomain(FAMILY_DOMAIN).setHost(FAMILY_DOMAIN).setPort(FamilyEndpoint().port)
                     .setUsernameAndPassword(jid.substringBefore('@'), password)
                     .setResource("android-${UUID.randomUUID()}")
                     .setSecurityMode(org.jivesoftware.smack.ConnectionConfiguration.SecurityMode.required)
                     .setHostnameVerifier(HttpsURLConnection.getDefaultHostnameVerifier())
                     .build()).also { socket ->
+                    attemptedSocket = socket
                     socket.replyTimeout = 15000
                     socket.addAsyncStanzaListener({ stanza ->
                         val message = stanza as? Message
@@ -118,8 +121,8 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                         }
                     }, org.jivesoftware.smack.filter.StanzaTypeFilter.MESSAGE)
                     socket.addConnectionListener(object : ConnectionListener {
-                        override fun connectionClosed() { scope.launch { lost(token) } }
-                        override fun connectionClosedOnError(e: Exception) { scope.launch { lost(token) } }
+                        override fun connectionClosed() { scope.launch { if (mutable.value.connected) lost(token) } }
+                        override fun connectionClosedOnError(e: Exception) { scope.launch { if (mutable.value.connected) lost(token) } }
                     })
                     socket.connect().login()
                 }
@@ -131,9 +134,14 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             heartbeat = scope.launch {
                 while (isActive) { delay(20000); runCatching { apply(request("snapshot")) } }
             }
-        } catch (_: Exception) {
-            if (token == generation) mutable.value = mutable.value.copy(busy = false,
-                error = "Could not sign in. Check your account and the family server connection.")
+        } catch (e: Exception) {
+            if (token == generation) {
+                generation++
+                mutable.value = mutable.value.copy(busy = false, connected = false,
+                    serviceReady = false, error = signInError(e))
+            }
+            withContext(Dispatchers.IO) { runCatching { attemptedSocket?.disconnect() } }
+            if (e is CancellationException) throw e
         }
     }
 
@@ -160,13 +168,13 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         generation++
         heartbeat?.cancel(); heartbeat = null
         mediaInstance?.close(); rtcCallId = null; queuedSignals.clear(); ringingJob?.cancel()
-        mutable.value = mutable.value.copy(connected = false, busy = false, call = null,
+        mutable.value = mutable.value.copy(connected = false, serviceReady = false, busy = false, call = null,
             error = "Connection lost. Sign in again before calling.")
     }
     fun dismissError() { mutable.value = mutable.value.copy(error = null) }
     fun refresh() = perform { apply(request("snapshot")) }
     fun invite(input: String) = perform {
-        val peer = FamilyPolicy().normalizeJid(input) ?: error("invalid_member")
+        val peer = FamilyEndpoint().account(input) ?: error("invalid_member")
         apply(request("invite", "peer" to peer))
     }
     fun acceptMember(peer: String) = perform { apply(request("accept_member", "peer" to peer)) }
@@ -191,8 +199,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     fun speaker() { val enabled = !mutable.value.speaker; media.speaker(enabled); mutable.value = mutable.value.copy(speaker = enabled) }
 
     private fun perform(action: suspend () -> Unit) = scope.launch {
+        val token = generation
         try { action() } catch (e: CancellationException) { throw e }
-        catch (e: Exception) { mutable.value = mutable.value.copy(error = friendly(e.message)) }
+        catch (e: Exception) { if (token == generation) mutable.value = mutable.value.copy(error = friendly(e.message)) }
     }
     private suspend fun request(action: String, vararg values: Pair<String, Any>): JSONObject = withContext(Dispatchers.IO) {
         val socket = connection ?: error("not_connected")
@@ -200,14 +209,25 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         val body = JSONObject().put("v", 1).put("action", action)
         values.forEach { body.put(it.first, it.second) }
         val iq = FamilyIq(body.toString()).also { it.to = org.jxmpp.jid.impl.JidCreate.domainBareFrom(FAMILY_DOMAIN) }
-        val response = socket.createStanzaCollectorAndSend(iq).nextResultOrThrow<FamilyIq>()
+        val response = try {
+            socket.createStanzaCollectorAndSend(iq).nextResultOrThrow<FamilyIq>()
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            if (action == "snapshot") {
+                withContext(Dispatchers.Main.immediate) {
+                    if (token == generation) mutable.value = mutable.value.copy(serviceReady = false)
+                }
+                error("family_unavailable")
+            }
+            throw e
+        }
         check(token == generation && mutable.value.connected) { "not_connected" }
         JSONObject(response.body).also { if (!it.optBoolean("ok")) error(it.optString("error", "unavailable")) }
     }
     private suspend fun apply(body: JSONObject) {
         if (body.has("members")) {
             val members = body.getJSONArray("members")
-            mutable.value = mutable.value.copy(members = (0 until members.length()).map { i ->
+            mutable.value = mutable.value.copy(serviceReady = true, members = (0 until members.length()).map { i ->
                 members.getJSONObject(i).let { FamilyMember(it.getString("jid"), it.getString("status")) }
             })
         }
@@ -269,7 +289,19 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         call?.let { finish(it.id); runCatching { request("end_call", "callId" to it.id) } }
         mutable.value = mutable.value.copy(error = message)
     }
+    private fun signInError(error: Exception): String {
+        val causes = generateSequence<Throwable>(error) { it.cause }.take(8).toList()
+        return when {
+            causes.any { it is org.jivesoftware.smack.sasl.SASLErrorException } ->
+                "The family account or password was rejected. Use the password created on your server."
+            causes.any { it is javax.net.ssl.SSLException } ->
+                "The server certificate could not be verified. Check the device clock and server certificate."
+            else -> "Could not reach the family server. Check that this device’s network is allowed through the server firewall on TCP 5222."
+        }
+    }
     private fun friendly(code: String?) = when (code) {
+        "family_unavailable" -> "Signed in, but the Family service did not respond. Tap Refresh to retry."
+
         "not_family" -> "Only accepted family members can call each other."
         "busy" -> "One of you is already in a call."
         "member_not_found", "invalid_member" -> "Enter a valid family account on this server."

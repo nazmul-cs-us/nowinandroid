@@ -6,6 +6,8 @@ This change implements foreground, one-to-one voice/video calls on Android and i
 
 Android has a **Family** navigation destination. iOS 26+ has **More → Family**; earlier supported versions have a Family button opening the page.
 
+For debug device testing, Android prefills `android@xmpp.starception.com` and iOS prefills `ios@xmpp.starception.com`. Enter the passwords created on the VM; neither platform stores or embeds them. After sign-in, the opposite test account is suggested in the invitation field. Release builds keep both fields blank. Both apps use the shared `FamilyEndpoint` settings for `xmpp.starception.com:5222`, require STARTTLS and server certificate verification, and allow a short username (`android`/`ios`) or a full account ID. The Family service readiness message appears only after its authenticated snapshot succeeds.
+
 Sign in using a provisioned Family/XMPP account, such as the two pilot accounts requested for device testing. Passwords are entered locally and retained only for the connection; they are not bundled or saved in preferences. Send an invitation to another full Family account ID. Only its recipient can accept. Voice/Video controls appear for accepted members. Either party can remove a relationship, ending calling access.
 
 Incoming calls appear over other screens while signed in with the app open. Capture starts only after acceptance and permissions. Mute, speaker/earpiece, camera on/off, camera switching, decline/cancel and hang-up are supported. Other app audio yields; playback is not automatically resumed afterward.
