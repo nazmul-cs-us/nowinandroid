@@ -288,7 +288,7 @@ extension FamilyStore: XMPPStreamDelegate {
         Task { @MainActor in
             guard sender === stream, iq.from == nil || iq.from?.full == Self.domain,
                   let id = iq.elementID, let continuation = pending.removeValue(forKey: id) else { return }
-            guard iq.type == "result", let text = iq.element(forName: "family", xmlns: Self.namespace)?.stringValue,
+            guard iq.type == "result", let text = iq.elements(forLocalName: "family", uri: Self.namespace).first?.stringValue,
                   let data = text.data(using: .utf8),
                   let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 continuation.resume(throwing: FamilyError.invalidResponse); return
