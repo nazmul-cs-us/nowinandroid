@@ -1,5 +1,7 @@
 # Family calling
 
+For the actual completed VM/app setup, commands and reported live results, start with [Calling setup record](CALLING_SETUP_RECORD.md). Background push deployment is tracked separately below.
+
 This implements one-to-one voice/video calls on Android and iOS, with Family pages, invitation acceptance/removal, native WebRTC, and MongooseIM authorization. The call UI uses full-screen, stacked video feeds, caller initials, a timer, and circular controls inspired by the supplied incoming-call reference. Background call delivery adds Android FCM/Telecom and optional iOS PushKit/CallKit; see [background deployment and testing](BACKGROUND_CALLING.md). This is a private versioned XMPP protocol, not Jingle interoperability. Deployment and real-device acceptance are separate from code/build validation.
 
 ## App workflow

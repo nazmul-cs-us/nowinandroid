@@ -1,5 +1,7 @@
 # Background Family calls
 
+Status as of 5 November 2026: code committed; provider/VM deployment and closed-app acceptance tests are pending. For the already completed TURN/XMPP/foreground-call setup, see [Calling setup record](CALLING_SETUP_RECORD.md).
+
 The foreground Android-to-iOS call was confirmed on real devices before this change. The new native UI and background paths require a fresh signed-device test. A local build or provider mock test does not prove delivery to a locked/terminated phone.
 
 ## Delivery flow

@@ -83,10 +83,10 @@
 <!-- issuer -->
 <g id="node7" class="node">
 <title>issuer</title>
-<path fill="#17283e" stroke="#607590" d="M922,-461C922,-461 616,-461 616,-461 610,-461 604,-455 604,-449 604,-449 604,-393 604,-393 604,-387 610,-381 616,-381 616,-381 922,-381 922,-381 928,-381 934,-387 934,-393 934,-393 934,-449 934,-449 934,-455 928,-461 922,-461"/>
+<path fill="#17283e" stroke="#607590" d="M934.5,-461C934.5,-461 603.5,-461 603.5,-461 597.5,-461 591.5,-455 591.5,-449 591.5,-449 591.5,-393 591.5,-393 591.5,-387 597.5,-381 603.5,-381 603.5,-381 934.5,-381 934.5,-381 940.5,-381 946.5,-387 946.5,-393 946.5,-393 946.5,-449 946.5,-449 946.5,-455 940.5,-461 934.5,-461"/>
 <text text-anchor="middle" x="769" y="-435.2" font-family="DejaVu Sans" font-size="16.00" fill="#f1f5f9">Authorized credential issuer</text>
-<text text-anchor="middle" x="769" y="-417.2" font-family="DejaVu Sans" font-size="16.00" fill="#f1f5f9">Now: local Python diagnostic script</text>
-<text text-anchor="middle" x="769" y="-399.2" font-family="DejaVu Sans" font-size="16.00" fill="#f1f5f9">Later: authenticated app integration</text>
+<text text-anchor="middle" x="769" y="-417.2" font-family="DejaVu Sans" font-size="16.00" fill="#f1f5f9">Active, selected Family call participants</text>
+<text text-anchor="middle" x="769" y="-399.2" font-family="DejaVu Sans" font-size="16.00" fill="#f1f5f9">Local script for diagnostics only</text>
 </g>
 <!-- secret&#45;&gt;issuer -->
 <g id="edge5" class="edge">
@@ -100,7 +100,7 @@
 <path fill="#17283e" stroke="#607590" d="M975,-334C975,-334 563,-334 563,-334 557,-334 551,-328 551,-322 551,-322 551,-266 551,-266 551,-260 557,-254 563,-254 563,-254 975,-254 975,-254 981,-254 987,-260 987,-266 987,-266 987,-322 987,-322 987,-328 981,-334 975,-334"/>
 <text text-anchor="middle" x="769" y="-308.2" font-family="DejaVu Sans" font-size="16.00" fill="#f1f5f9">Temporary username: expiry + user suffix</text>
 <text text-anchor="middle" x="769" y="-290.2" font-family="DejaVu Sans" font-size="16.00" fill="#f1f5f9">Password: Base64 HMAC&#45;SHA1(secret, username)</text>
-<text text-anchor="middle" x="769" y="-272.2" font-family="DejaVu Sans" font-size="16.00" fill="#f1f5f9">Diagnostic lifetime:15 minutes</text>
+<text text-anchor="middle" x="769" y="-272.2" font-family="DejaVu Sans" font-size="16.00" fill="#f1f5f9">App lifetime:1 hour · diagnostic:15 minutes</text>
 </g>
 <!-- issuer&#45;&gt;temp -->
 <g id="edge6" class="edge">

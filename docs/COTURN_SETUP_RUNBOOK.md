@@ -6,14 +6,16 @@ This document explains the actual setup performed with the VM owner. It is an an
 
 ## 1. Deployment inventory and current evidence
 
+Updated 5 November 2026. See the [completed setup record](CALLING_SETUP_RECORD.md) for the subsequent MongooseIM, firewall and mobile-call steps, and [background calling](BACKGROUND_CALLING.md) for the push setup still to be deployed. Historical diagnostic failures below are retained as evidence, not the current overall status.
+
 | Item | Value |
 |---|---|
 | Project | `webrtc-512816` |
-| VM and zone | `webrtc`, `asia-southeast 1-a` |
+| VM and zone | `webrtc`, `asia-southeast1-a` |
 | OS and machine | Debian 13, e2-medium, shared CPU,4 GB RAM |
 | Public/private IPv4 | `34.143.204.245` / `10.148.0.2` |
 | TURN name | `turn.starception.com` |
-| Future XMPP name | `xmpp.starception.com` |
+| Active XMPP name | `xmpp.starception.com` |
 | Installed package | coturn 4.6.1-2; executable reports 4.6.1 |
 | Configuration | `/etc/turnserver.conf` |
 | Service identity | `turnserver:turnserver` |
@@ -32,11 +34,13 @@ The public IP should be reserved so a stop/start does not break DNS. That reserv
 | TCP 3478 relay |20 sent,20 received, zero reported loss |
 | TLS 5349 short relay test |20 sent,12 received |
 | TLS 5349 larger relay test |200 sent,119 received;40.5% reported loss |
-| Independent browser test | Prepared, not yet executed |
+| Independent browser relay-only TLS test | PASS: 200 sent, 200 received, 200 echoed; both candidates relay, transport TLS, address `34.143.204.245` |
 | Renewal dry run | Not yet confirmed |
-| MongooseIM/mobile calls/push bridge | Planned, not installed by this procedure |
+| MongooseIM and Family policy | 6.10.0 deployed; authenticated policy smoke test passed |
+| Native Android-to-iOS call | User confirmed a successful real-device call |
+| Background push bridge | Code committed; VM/Firebase deployment and device delivery test pending |
 
-TLS packet delivery remains unresolved. Server peer counters in the short test showed ten packets received/sent per media allocation, conflicting with the client's final loss count. That does not establish where the discrepancy occurred. Successful authentication is not proof of reliable media delivery.
+Reliable bidirectional TURN/TLS data delivery was subsequently confirmed by the independent browser test. The earlier utility's loss discrepancy is still unexplained: server peer counters conflicted with its final count. Reliable SCTP can retransmit, so the browser pass is not a raw packet-loss measurement. The successful native call does not establish which ICE path it selected; native forced-relay media quality still needs a specific device test.
 
 ## 2. Full architecture
 
@@ -583,7 +587,7 @@ turns:turn.starception.com:5349?transport=tcp
 
 The page creates two peers with relay-only ICE, opens a data channel, sends 200 numbered messages and echoes them. It reports selected candidate type and relay protocol where browser statistics expose them. Expected:200 sent,200 received,200 echoed, relay candidates and TLS transport.
 
-Reliable SCTP can retransmit. Passing proves reliable bidirectional data delivery through the chosen path, not zero raw loss, media quality, two-phone interoperability or incoming-call behavior. The page passed JavaScript syntax checks; live results remain pending.
+Reliable SCTP can retransmit. Passing proves reliable bidirectional data delivery through the chosen path, not zero raw loss, media quality, two-phone interoperability or incoming-call behavior. The live test passed: `Sent=200; received=200; echoed back=200`; both peers reported relay candidates, TLS transport, and `34.143.204.245`. Native Android-to-iOS calling was separately confirmed, without evidence of its selected relay protocol.
 
 ## 20. Costs, limits and maintenance
 
@@ -611,13 +615,14 @@ The 10 GB disk makes bounded journal retention/backups important. Agree a host-w
 - [x] GCP TURN firewall rule created.
 - [x] External TLS chain/hostname verification passed.
 - [x] External UDP/TCP sample relay tests passed.
-- [ ] Explain/resolve TLS relay discrepancy with independent evidence.
-- [ ] Browser and real Android/iOS relay tests passed.
+- [x] Independent browser relay-only TLS data test passed.
+- [x] Real Android-to-iOS call confirmed by the user.
+- [ ] Explain the old utility's loss discrepancy and measure native forced-relay media quality.
 - [ ] Negative tests for invalid/expired credentials and quotas.
 - [ ] Static external-IP reservation confirmed.
 - [ ] Renewal dry run, hook and served-certificate checks confirmed.
 - [ ] Verbose logging removed after investigation; retention established.
-- [ ] Authenticated application TURN credential issuer implemented.
+- [x] Authenticated Family-module TURN credential issuer deployed and participant-scoped issuance tested.
 - [ ] TURN 443 needs evaluated for restrictive networks.
 - [ ] Measured load limits, cost monitoring and backup/maintenance procedure established.
 

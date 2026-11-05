@@ -8,7 +8,7 @@ digraph Network {
  dns -> client [style=dashed,label="DNS answer only\nDNS does not forward media", color="#B7A1F5"];
  ip [label="2  PUBLIC ENDPOINT\n34.143.204.245\nStatic reservation: still to confirm", color="#6EBBFF", fillcolor="#183852"];
  client -> ip [dir=both,label="Actual network connection"];
- fw [label="3  GCP FIREWALL  /  default VPC\nVM target tag: webrtc\nwebrtc-acme-http: TCP80\nwebrtc-turn: UDP3478 · TCP3478/5349\nand UDP49160–49259", fillcolor="#23352C", color="#65CEA2"];
+ fw [label="3  GCP FIREWALL  /  default VPC\nVM target tag: webrtc\nwebrtc-acme-http: TCP80\nwebrtc-turn: UDP3478 · TCP3478/5349\nand UDP49160–49259\nwebrtc-family-xmpp: restricted TCP5222", fillcolor="#23352C", color="#65CEA2"];
  ip -> fw [dir=both];
  nat [label="4  GCP NAT MAPPING\nPublic:34.143.204.245 ↔ private:10.148.0.2\nOS firewall must also permit required traffic"];
  fw -> nat [dir=both];
@@ -17,6 +17,7 @@ digraph Network {
  listeners [label="coturn client listeners\nUDP3478: TURN/STUN\nTCP3478: TURN over TCP\nTCP5349: TURN over TLS", color="#70B9FF", fillcolor="#183450"];
  relay [label="Peer-facing relay sockets\nUDP49160–49259\nAllocated only as needed", color="#70B9FF", fillcolor="#183450"];
  acme [label="Certbot standalone\nTemporary HTTP80 listener\nOnly during validation", color="#D9AB54", fillcolor="#342C20"];
+ xmpp [label="MongooseIM 6.10 + Family policy\n10.148.0.2:5222 · mandatory STARTTLS\nExternal TLS1.3 hostname check passed", color="#D9AB54", fillcolor="#342C20"];
  {rank=same;listeners;relay;acme;}
  listeners -> relay [dir=both,label="Relay packets",constraint=false];
  config [label="/etc/turnserver.conf\nBind / relay:10.148.0.2\nexternal-ip=34.143.204.245/10.148.0.2\nSecret auth · quotas · peer restrictions\nroot:turnserver ·0640", color="#D9AB54", fillcolor="#342C20"];
@@ -27,6 +28,7 @@ digraph Network {
  nat -> listeners [dir=both,label="Client traffic"];
  nat -> relay [dir=both,label="Peer media"];
  nat -> acme [label="ACME validation"];
- note [label="BOUNDARIES\nTURN/TLS5349 is not TURN/TLS443\nFuture XMPP listener/firewall not configured yet\nSSH access is separate from these application rules",shape=note,color="#D9AB54",fillcolor="#342C20"];
+ nat -> xmpp [dir=both,label="XMPP signalling"];
+ note [label="BOUNDARIES\nTURN/TLS5349 is not TURN/TLS443\nXMPP firewall restricted to pilot network egress\nSSH access is separate from these application rules",shape=note,color="#D9AB54",fillcolor="#342C20"];
  relay -> note [style=invis];
 }

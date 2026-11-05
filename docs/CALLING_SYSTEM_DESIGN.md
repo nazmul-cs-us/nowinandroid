@@ -101,7 +101,7 @@ Central audio ownership is essential in this app: Quran playback, driving audio,
 
 ## VM deployment requirements
 
-VM access is pending. Record hostname/IP, SSH identity, OS, existing services, available disk, domain and firewall settings before installation. The known shared-core4GB Singapore VM is a pilot target, not a verified call-capacity figure.
+The VM owner completed coturn, MongooseIM 6.10.0, PostgreSQL and Family-policy deployment on the Debian 13 Singapore VM, and confirmed a native Android-to-iOS call. See the [setup record](CALLING_SETUP_RECORD.md) for inventory, commands and evidence. Administration was performed by the owner through VM/Cloud Shell consoles; this repository workspace has no direct VM access. The shared-core 4 GB host remains a pilot target, not a verified call-capacity figure.
 
 Pin MongooseIM/coturn/integration-service releases and exact configuration. Verify required modules/auth/storage against that release. Keep configuration/secrets outside source control, persistent stores separate, logs bounded, service restart policies enabled and time synchronized.
 
