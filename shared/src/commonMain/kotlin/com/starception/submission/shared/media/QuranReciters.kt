@@ -3,6 +3,9 @@ package com.starception.submission.shared.audio
 /** Platform storage operations; Android's native reader uses its own download manager. */
 interface ReciterLibrary {
     suspend fun previewUrl(source: QuranReciterSource?): String? = source?.let { it.urlForSurah(if (1 in it.availableSurahs) 1 else it.availableSurahs.minOrNull() ?: 1) }
+    suspend fun previewUrl(source: QuranReciterSource?, surahNumber: Int?): String? =
+        if (surahNumber == null) previewUrl(source)
+        else source?.urlForSurah(surahNumber) ?: previewUrl(null)
     fun createPreviewPlayer(): ReciterPreviewPlayback? = null
     suspend fun catalog(): List<QuranReciterSource>
     suspend fun download(source: QuranReciterSource, onCompleted: (Int, Int) -> Unit)

@@ -342,7 +342,7 @@ fun PrayerSettingsScreen(
                             expanded = if (expanded == SECTION_CONTENT) null else SECTION_CONTENT
                         },
                     ) {
-                        ReciterSettingsSection(manageDownloads = true, initiallyExpanded = initialReciterStorageExpanded)
+                        ReciterSettingsSection(manageDownloads = true, initiallyShowLibrary = initialReciterStorageExpanded)
                         ContentStorageSettingsSection(
                             state = contentStorageState,
                             actions = contentStorageActions,

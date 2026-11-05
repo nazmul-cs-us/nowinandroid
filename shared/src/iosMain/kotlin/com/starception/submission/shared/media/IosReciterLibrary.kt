@@ -4,9 +4,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object IosReciterLibrary : ReciterLibrary {
-    override suspend fun previewUrl(source: QuranReciterSource?): String? =
-        if (source == null) resolveIosQuranAudioUrl(1, "ar", false)
-        else source.urlForSurah(if (1 in source.availableSurahs) 1 else source.availableSurahs.minOrNull() ?: 1)
+    override suspend fun previewUrl(source: QuranReciterSource?): String? = previewUrl(source, null)
+    override suspend fun previewUrl(source: QuranReciterSource?, surahNumber: Int?): String? {
+        val sample = surahNumber ?: source?.availableSurahs?.minOrNull() ?: 1
+        return if (source == null) resolveIosQuranAudioUrl(sample, "ar", false)
+        else IosReciterAudioStore.cachedUrl(source.id, sample) ?: source.urlForSurah(sample)
+    }
     override fun createPreviewPlayer(): ReciterPreviewPlayback = IosReciterPreviewPlayback()
     override suspend fun catalog(): List<QuranReciterSource> = IosReciterCatalog.fetch()
     override suspend fun download(source: QuranReciterSource, onCompleted: (Int, Int) -> Unit) {

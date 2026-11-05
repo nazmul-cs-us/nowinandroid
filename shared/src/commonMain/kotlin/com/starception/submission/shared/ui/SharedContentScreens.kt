@@ -472,6 +472,7 @@ internal fun QuranLibraryScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun QuranDetailScreen(
     number: Int,
@@ -508,8 +509,7 @@ internal fun QuranDetailScreen(
     var audioJob by remember(number) { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var audioError by remember(number) { mutableStateOf<String?>(null) }
 
-    fun startSelectedAudio() {
-        val requestedLanguage = translationLanguage.code
+    fun startSelectedAudio(requestedLanguage: String = store.quranTranslationLanguage()) {
         audioJob?.cancel()
         player.pause()
         playing = false
@@ -1227,18 +1227,30 @@ internal fun QuranDetailScreen(
         }
     }
         if (showReciterPicker) {
-            ReadingSettingsModal(onDismiss = {
+            val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            LaunchedEffect(reciterSelectionMade) {
+                if (reciterSelectionMade) {
+                    sheetState.hide()
+                    showReciterPicker = false
+                    reciterSelectionMade = false
+                }
+            }
+            androidx.compose.material3.ModalBottomSheet(onDismissRequest = {
                 showReciterPicker = false
                 reciterSelectionMade = false
-            }, title = "Choose reciter", dismissRequested = reciterSelectionMade) {
-                ReciterSettingsSection(initiallyExpanded = true, surahNumber = number, onSelected = {
-                    audioJob?.cancel()
-                    audioLoading = false
-                    playing = false
-                    reciterSelectionMade = true
-                })
+            }, sheetState = sheetState) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+                    Text("Choose reciter", style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(bottom = 12.dp))
+                    ReciterSettingsSection(initiallyExpanded = true, surahNumber = number,
+                        modifier = Modifier.weight(1f, fill = false), onSelected = {
+                            reciterSelectionMade = true
+                            startSelectedAudio("ar")
+                        })
+                }
             }
         }
+
         if (showReadingSettings) {
             SurahReadingSettingsSheet(
                 surahNumber = number,
@@ -1290,6 +1302,10 @@ internal fun QuranDetailScreen(
                         store.saveQuranTranslationLanguage(language.code)
                         if (resume) startSelectedAudio() else showAudioPlayer = false
                     }
+                },
+                onReciterSelected = {
+                    showReadingSettings = false
+                    startSelectedAudio("ar")
                 },
                 onDismiss = { showReadingSettings = false },
             )
@@ -1884,12 +1900,13 @@ private fun SurahReadingSettingsSheet(
     onTranslationChange: (Boolean) -> Unit,
     onTajweedChange: (Boolean) -> Unit,
     onTranslationLanguageChange: (com.starception.submission.shared.quran.QuranTranslationLanguage) -> Unit,
+    onReciterSelected: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     var expandedSection by remember { mutableStateOf<String?>(null) }
     ReadingSettingsModal(onDismiss = onDismiss) {
-        ReciterSettingsSection(surahNumber = surahNumber)
+        ReciterSettingsSection(surahNumber = surahNumber, onSelected = onReciterSelected)
         // Food Truck's grouped-form layout: titled sections on cards.
         SettingsSection(title = "Preview") {
             Text(

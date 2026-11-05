@@ -46,6 +46,17 @@ class ReciterPreviewPlayerTest {
         } finally { preview.stop() }
     }
 
+    @Test fun readerPreviewUsesTheOpenSurah() = runBlocking<Unit> {
+        val source = QuranReciterSource("3-3", "Reader voice", "https://example.org/reader", setOf(1, 36))
+        val library = TestLibrary()
+        val preview = ReciterPreviewPlayer(this, library)
+        try {
+            preview.toggle(source, 36)
+            withTimeout(2000) { while (preview.loading) delay(10) }
+            assertEquals(listOf(source.urlForSurah(36)), library.player.urls)
+        } finally { preview.stop() }
+    }
+
     private class TestLibrary(
         private val resolve: suspend (QuranReciterSource?) -> String? = { it?.urlForSurah(1) },
     ) : ReciterLibrary {

@@ -17,7 +17,7 @@ internal class ReciterPreviewPlayer(private val scope: CoroutineScope, private v
     private var job: Job? = null
     private var generation = 0
 
-    fun toggle(source: QuranReciterSource?) {
+    fun toggle(source: QuranReciterSource?, surahNumber: Int? = null) {
         val id = source?.id ?: "default-cdn"
         if (activeId == id) { stop(); return }
         stop()
@@ -28,7 +28,7 @@ internal class ReciterPreviewPlayer(private val scope: CoroutineScope, private v
         job = scope.launch {
             try {
                 val playback = player ?: kotlin.error("Preview unavailable")
-                val url = withTimeout(15_000) { withContext(Dispatchers.Default) { library.previewUrl(source) } }
+                val url = withTimeout(15_000) { withContext(Dispatchers.Default) { library.previewUrl(source, surahNumber) } }
                     ?: error("Preview unavailable")
                 com.starception.submission.shared.media.QuranPlaybackBus.stop()
                 check(playback.play(url)) { "Preview unavailable" }
@@ -66,6 +66,16 @@ internal class ReciterPreviewPlayer(private val scope: CoroutineScope, private v
 internal fun rememberReciterPreview(library: ReciterLibrary): ReciterPreviewPlayer {
     val scope = rememberCoroutineScope()
     val preview = remember(library, scope) { ReciterPreviewPlayer(scope, library) }
-    DisposableEffect(preview) { onDispose { preview.stop() } }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(preview, lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) preview.stop()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            preview.stop()
+        }
+    }
     return preview
 }
