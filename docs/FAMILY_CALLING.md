@@ -8,7 +8,7 @@ This implements one-to-one voice/video calls on Android and iOS, with Family pag
 
 Android has a **Family** navigation destination. iOS 26+ has **More → Family**; earlier supported versions have a Family button opening the page.
 
-The contact screen uses the app's active theme containers, circular family shortcuts, a rounded full-height list panel, expandable account search and a compact Family/Invites control. Contact rows have one voice-call shortcut; tapping a row opens a sheet with both voice/video actions and full account details. The landing screen has a themed illustration and sign-in form. Names are derived from account IDs until profile integration is available; circles show initials, not presence or unread-message state. Invitations are composed in a sheet, and removal requires confirmation. See [rendered UI review](FAMILY_UI_REVIEW.md).
+The contact screen uses the app's active theme containers, circular family shortcuts, a rounded full-height list panel, expandable account search and a compact Family/Invites control. Contact rows have one voice-call shortcut; tapping a row opens a sheet with both voice/video actions and full account details. The landing screen has a themed illustration and sign-in form. Names are derived from account IDs until profile integration is available; circles show initials; accepted contact rows now show live presence with a green Online dot. See [Family presence](FAMILY_PRESENCE.md) for privacy, lease behavior and deployment. Invitations are composed in a sheet, and removal requires confirmation. See [rendered UI review](FAMILY_UI_REVIEW.md).
 
 Android takes its colors directly from `MaterialTheme.colorScheme`. Native iOS consumes `FamilyThemePalette` from the same `iosColorScheme` used by the shared app, including saved custom seeds and light/dark settings; theme values are not duplicated in Swift. Theme changes invalidate the native views. Voice-call surfaces use these roles, video overlays retain readable scrims, and answer/end controls use primary/error roles with their matching foregrounds. Call controls adapt to compact landscape height.
 
@@ -68,6 +68,8 @@ sudo bash server/family/install.sh "$HOME/mongooseim-6.10.0"
 sudo install -m 0644 server/family/smoke.py /tmp/deenly-family-smoke.py
 sudo -u mongooseim python3 /tmp/deenly-family-smoke.py
 ```
+
+The smoke script reads the configured local C2s listener; `--host` and `--port` override detection. TLS always verifies `xmpp.starception.com`.
 
 The installer validates the source commit, compiles against release dependencies, backs up XMPP configuration, enables the module, and copies the existing coturn secret into a protected service-readable file. It restarts **MongooseIM**, interrupting its sessions. It does not restart/change coturn.
 

@@ -5,9 +5,10 @@ import KissXML
 import Shared
 import UIKit
 
-struct FamilyMemberRow: Identifiable {
+struct FamilyMemberRow: Identifiable, Equatable {
     let jid: String
     let status: String
+    var presence: String = "unknown"
     var id: String { jid }
 }
 struct FamilyCallInfo: Identifiable {
@@ -57,6 +58,10 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     private var pending: [String: CheckedContinuation<[String: Any], Error>] = [:]
     private var terminal: Set<String> = []
     private let callReducer = FamilyCallReducer()
+    private let presenceCache = FamilyPresenceCache()
+    private var presenceObservers: [NSObjectProtocol] = []
+    private var foreground = false
+    private var activityVersion: Int64 = 0
     private var mediaCall: String?
     private var queuedSignals: [(String, [String: Any])] = []
     private var ringingTask: Task<Void, Never>?
@@ -65,6 +70,15 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
 
     override private init() {
         super.init()
+        foreground = UIApplication.shared.applicationState == .active
+        presenceObservers = [
+            NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.activityChanged(true) }
+            },
+            NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.activityChanged(false) }
+            },
+        ]
         media.onSignal = { [weak self] payload in
             guard let self, let id = self.call?.id else { return }
             Task { do { _ = try await self.request("signal", ["callId": id, "payload": payload]) }
@@ -77,6 +91,12 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         }
         media.onFailure = { [weak self] message in Task { await self?.failCall(message) } }
     }
+    private func activityChanged(_ active: Bool) {
+        guard foreground != active else { return }
+        foreground = active; activityVersion += 1
+        guard connected else { return }
+        Task { _ = try? await request("presence") }
+    }
     func login(_ input: String, password: String) {
         guard !busy else { return }
         guard let jid = FamilyEndpoint().account(input: input),
@@ -87,7 +107,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         me = jid; busy = true; self.password = password
         pendingCredential = (jid, password)
         let socket = XMPPStream()
-        socket.myJID = XMPPJID(string: jid + "/ios-" + FamilyCredentials.deviceID)
+        socket.myJID = XMPPJID(string: jid + "/ios-" + FamilyCredentials.deviceID + "-" + String(UUID().uuidString.prefix(8)))
         socket.hostName = Self.domain; socket.hostPort = UInt16(FamilyEndpoint().port)
         socket.startTLSPolicy = .required
         socket.addDelegate(self, delegateQueue: .main)
@@ -97,6 +117,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     func disconnect(clearSaved: Bool = true) {
         if clearSaved { unregisterPushToken(); FamilyCredentials.clear() }
+        presenceCache.clear()
         callMessage = nil; pushRegistrationMessage = nil
         if let id = call?.id { FamilySystemCalls.shared.end(id) }
         let socket = stream
@@ -113,6 +134,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         rejectPending()
     }
     private func lost(_ text: String) {
+        presenceCache.clear()
         if let id = call?.id { FamilySystemCalls.shared.end(id, reason: .failed) }
         pendingCredential = nil
         callMessage = nil
@@ -232,6 +254,9 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     private func request(_ action: String, _ fields: [String: Any] = [:]) async throws -> [String: Any] {
         guard let socket = stream, socket.isAuthenticated else { throw FamilyError.disconnected }
         var object = fields; object["v"] = 1; object["action"] = action
+        if action == "snapshot" || action == "presence" {
+            object["active"] = foreground; object["activityVersion"] = activityVersion
+        }
         let data = try JSONSerialization.data(withJSONObject: object)
         let child = DDXMLElement(name: "family", xmlns: Self.namespace)
         child.stringValue = String(decoding: data, as: UTF8.self)
@@ -247,18 +272,37 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         }
     }
     private func apply(_ body: [String: Any]) async {
-        if let rows = body["members"] as? [[String: String]] {
+        presenceCache.beginEpoch(next: body["presenceEpoch"] as? String ?? "")
+        if let rows = body["members"] as? [[String: Any]] {
             serviceReady = true
-            members = rows.compactMap { row in
-                guard let jid = row["jid"], let status = row["status"] else { return nil }
+            let next = rows.compactMap { row -> FamilyMemberRow? in
+                guard let jid = row["jid"] as? String, let status = row["status"] as? String else { return nil }
+                if status == "accepted" {
+                    _ = presenceCache.apply(jid: jid, status: row["presence"] as? String ?? "unknown",
+                        revision: (row["presenceVersion"] as? NSNumber)?.int64Value ?? 0)
+                }
                 return FamilyMemberRow(jid: jid, status: status)
             }
+            presenceCache.retain(accepted: next.filter { $0.status == "accepted" }.map(\.jid))
+            publishMembers(next)
+        } else if body["event"] as? String == "presence" {
+            if let jid = body["jid"] as? String, members.contains(where: { $0.jid == jid && $0.status == "accepted" }) {
+                _ = presenceCache.apply(jid: jid, status: body["presence"] as? String ?? "unknown",
+                    revision: (body["presenceVersion"] as? NSNumber)?.int64Value ?? 0)
+            }
+            publishMembers(members)
         }
         if let current = body["call"] as? [String: Any] { await updateCall(current) }
         if let calls = body["calls"] as? [[String: Any]] {
             if let first = calls.first { await updateCall(first) }
             else if let current = call { finish(current.id) }
         }
+    }
+    private func publishMembers(_ rows: [FamilyMemberRow]) {
+        let next = rows.map { row -> FamilyMemberRow in
+            var member = row; member.presence = presenceCache.status(jid: row.jid); return member
+        }
+        if next != members { members = next }
     }
     private func event(_ body: [String: Any]) async {
         guard connected, body["v"] as? Int == 1 else { return }

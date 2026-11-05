@@ -26,7 +26,7 @@ import javax.net.ssl.HttpsURLConnection
 internal val FAMILY_DOMAIN = FamilyEndpoint().domain
 internal const val FAMILY_NS = "urn:starception:family:1"
 
-data class FamilyMember(val jid: String, val status: String)
+data class FamilyMember(val jid: String, val status: String, val presence: String = "unknown")
 data class FamilyCall(
     val id: String, val caller: String, val callee: String, val kind: String,
     val stage: String, val version: Long, val expires: Long, val selected: Boolean,
@@ -63,6 +63,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private var generation = 0
     private var rtcCallId: String? = null
     private val callReducer = FamilyCallReducer()
+    private val presenceCache = FamilyPresenceCache()
+    private var foreground = false
+    private var activityVersion = 0L
     private val terminal = LinkedHashSet<String>()
     private val queuedSignals = mutableListOf<Pair<String, JSONObject>>()
     private var ringingJob: Job? = null
@@ -70,6 +73,10 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private val visibleActivities = mutableSetOf<android.app.Activity>()
     internal val hasForegroundActivity: Boolean get() = visibleActivities.isNotEmpty()
     init {
+        androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onStart(owner: androidx.lifecycle.LifecycleOwner) { activityChanged(true) }
+            override fun onStop(owner: androidx.lifecycle.LifecycleOwner) { activityChanged(false) }
+        })
         (context.applicationContext as android.app.Application).registerActivityLifecycleCallbacks(
             object : android.app.Application.ActivityLifecycleCallbacks {
                 override fun onActivityStarted(activity: android.app.Activity) { visibleActivities.add(activity) }
@@ -85,6 +92,11 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                 override fun onActivitySaveInstanceState(a: android.app.Activity, b: android.os.Bundle) = Unit
                 override fun onActivityDestroyed(a: android.app.Activity) { visibleActivities.remove(a) }
             })
+    }
+    private fun activityChanged(active: Boolean) {
+        if (foreground == active) return
+        foreground = active; activityVersion++
+        if (mutable.value.connected) scope.launch { runCatching { request("presence") } }
     }
     private var mediaInstance: AndroidFamilyMedia? = null
     val media: AndroidFamilyMedia get() = mediaInstance ?: createMedia().also { mediaInstance = it }
@@ -114,7 +126,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                 XMPPTCPConnection(XMPPTCPConnectionConfiguration.builder()
                     .setXmppDomain(FAMILY_DOMAIN).setHost(FAMILY_DOMAIN).setPort(FamilyEndpoint().port)
                     .setUsernameAndPassword(jid.substringBefore('@'), password)
-                    .setResource("android-${credentials.deviceId}")
+                    .setResource("android-${credentials.deviceId}-${UUID.randomUUID().toString().take(8)}")
                     .setSecurityMode(org.jivesoftware.smack.ConnectionConfiguration.SecurityMode.required)
                     .setHostnameVerifier(HttpsURLConnection.getDefaultHostnameVerifier())
                     .build()).also { socket ->
@@ -160,6 +172,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     fun disconnect(clearSaved: Boolean = true) {
         if (clearSaved) credentials.clear()
         generation++
+        presenceCache.clear()
         heartbeat?.cancel(); heartbeat = null
         val oldCall = mutable.value.call
         val old = connection
@@ -184,6 +197,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private fun lost(token: Int) {
         if (token != generation) return
         generation++
+        presenceCache.clear()
         heartbeat?.cancel(); heartbeat = null
         mediaInstance?.close(); rtcCallId = null; queuedSignals.clear(); ringingJob?.cancel()
         mutable.value = mutable.value.copy(connected = false, serviceReady = false, busy = false, call = null,
@@ -276,33 +290,49 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                 mutable.value.copy(callError = friendly(e.message)) else mutable.value.copy(error = friendly(e.message))
         }
     }
-    private suspend fun request(action: String, vararg values: Pair<String, Any>): JSONObject = withContext(Dispatchers.IO) {
-        val socket = connection ?: error("not_connected")
-        val token = generation
-        val body = JSONObject().put("v", 1).put("action", action)
-        values.forEach { body.put(it.first, it.second) }
-        val iq = FamilyIq(body.toString()).also { it.to = org.jxmpp.jid.impl.JidCreate.domainBareFrom(FAMILY_DOMAIN) }
-        val response = try {
-            socket.createStanzaCollectorAndSend(iq).nextResultOrThrow<FamilyIq>()
-        } catch (e: Exception) {
-            if (e is CancellationException) throw e
-            if (action == "snapshot") {
-                withContext(Dispatchers.Main.immediate) {
-                    if (token == generation) mutable.value = mutable.value.copy(serviceReady = false)
+    private suspend fun request(action: String, vararg values: Pair<String, Any>): JSONObject {
+        val activity = withContext(Dispatchers.Main.immediate) { foreground to activityVersion }
+        return withContext(Dispatchers.IO) {
+            val socket = connection ?: error("not_connected")
+            val token = generation
+            val body = JSONObject().put("v", 1).put("action", action)
+            if (action == "snapshot" || action == "presence") body.put("active", activity.first).put("activityVersion", activity.second)
+            values.forEach { body.put(it.first, it.second) }
+            val iq = FamilyIq(body.toString()).also { it.to = org.jxmpp.jid.impl.JidCreate.domainBareFrom(FAMILY_DOMAIN) }
+            val response = try {
+                socket.createStanzaCollectorAndSend(iq).nextResultOrThrow<FamilyIq>()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                if (action == "snapshot") {
+                    withContext(Dispatchers.Main.immediate) {
+                        if (token == generation) mutable.value = mutable.value.copy(serviceReady = false)
+                    }
+                    error("family_unavailable")
                 }
-                error("family_unavailable")
+                throw e
             }
-            throw e
+            check(token == generation && mutable.value.connected) { "not_connected" }
+            JSONObject(response.body).also { if (!it.optBoolean("ok")) error(it.optString("error", "unavailable")) }
         }
-        check(token == generation && mutable.value.connected) { "not_connected" }
-        JSONObject(response.body).also { if (!it.optBoolean("ok")) error(it.optString("error", "unavailable")) }
     }
     private suspend fun apply(body: JSONObject) {
+        presenceCache.beginEpoch(body.optString("presenceEpoch"))
         if (body.has("members")) {
-            val members = body.getJSONArray("members")
-            mutable.value = mutable.value.copy(serviceReady = true, members = (0 until members.length()).map { i ->
-                members.getJSONObject(i).let { FamilyMember(it.getString("jid"), it.getString("status")) }
-            })
+            val rows = body.getJSONArray("members")
+            val members = (0 until rows.length()).map { i ->
+                val row = rows.getJSONObject(i)
+                val jid = row.getString("jid"); val status = row.getString("status")
+                if (status == "accepted") presenceCache.apply(jid, row.optString("presence"), row.optLong("presenceVersion"))
+                FamilyMember(jid, status)
+            }
+            presenceCache.retain(members.filter { it.status == "accepted" }.map { it.jid })
+            mutable.value = mutable.value.copy(serviceReady = true, members = members.map { it.copy(presence = presenceCache.status(it.jid)) })
+        } else if (body.optString("event") == "presence") {
+            val jid = body.optString("jid")
+            if (mutable.value.members.any { it.jid == jid && it.status == "accepted" }) {
+                presenceCache.apply(jid, body.optString("presence"), body.optLong("presenceVersion"))
+            }
+            mutable.value = mutable.value.copy(members = mutable.value.members.map { it.copy(presence = presenceCache.status(it.jid)) })
         }
         body.optJSONObject("call")?.let { updateCall(it) }
         body.optJSONArray("calls")?.let { calls ->

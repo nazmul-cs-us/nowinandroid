@@ -4,7 +4,10 @@
 Creates temporary accounts, exercises authenticated IQ commands, never prints
 credentials, and removes its accounts. Does not capture microphone/camera media.
 """
+import argparse
 import base64
+from pathlib import Path
+import tomllib
 import json
 import secrets
 import socket
@@ -34,9 +37,34 @@ def account(action, **fields):
     return body["data"]["account"][action]
 
 
+def connection_target(args=None, config_path="/etc/mongooseim/mongooseim.toml"):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", help="C2s listener IP/host; defaults to the local MongooseIM configuration")
+    parser.add_argument("--port", type=int, help="C2s port; defaults to the configured port, or 5222 with --host")
+    options = parser.parse_args(args)
+    host, port = options.host, options.port
+    if host is None:
+        try:
+            config = tomllib.loads(Path(config_path).read_text())
+            listeners = config["listen"]["c2s"]
+            if len(listeners) != 1:
+                raise ValueError("ambiguous listener")
+            listener = listeners[0]
+            host = listener["ip_address"]
+            port = port if port is not None else listener.get("port", 5222)
+        except (OSError, ValueError, KeyError, TypeError):
+            parser.error("Cannot determine the local C2s listener. Pass --host and optionally --port.")
+    port = 5222 if port is None else port
+    if not isinstance(host, str) or not host.strip() or not isinstance(port, int) or not 1 <= port <= 65535:
+        parser.error("Specify a valid C2s host and TCP port.")
+    # Wildcard bind addresses describe listeners, not connection destinations.
+    host = {"0.0.0.0": "127.0.0.1", "::": "::1"}.get(host.strip(), host.strip())
+    return host, port
+
+
 class Client:
-    def __init__(self, username, password):
-        self.sock = socket.create_connection(("127.0.0.1", 5222), timeout=15)
+    def __init__(self, username, password, endpoint):
+        self.sock = socket.create_connection(endpoint, timeout=15)
         self.jid = username + "@" + DOMAIN
         try:
             self.open_stream()
@@ -120,6 +148,8 @@ def require(value, message):
 
 
 def main():
+    endpoint = connection_target()
+    print(f"Testing C2s listener {endpoint[0]}:{endpoint[1]} with verified TLS identity {DOMAIN}.", flush=True)
     users, clients = [], []
     try:
         credentials = []
@@ -129,7 +159,7 @@ def main():
             account("registerUser", username=name, domain=DOMAIN, password=password)
             users.append(name + "@" + DOMAIN)
             credentials.append((name, password))
-            clients.append(Client(name, password))
+            clients.append(Client(name, password, endpoint))
         a, b, outsider = clients
         print("PASS: three real XMPP logins over verified TLS.", flush=True)
         call_id = str(uuid.uuid4())
@@ -141,6 +171,17 @@ def main():
         require(any(x["jid"] == a.jid and x["status"] == "incoming" for x in incoming), "Invitation missing.")
         b.request("accept_member", peer=a.jid)
         print("PASS: only the invited member can accept; non-family calls denied.", flush=True)
+        a.request("presence", active=True, activityVersion=1)
+        update = b.event("presence")
+        require(update.get("jid") == a.jid and update.get("presence") == "online", "Live family presence was not delivered.")
+        require(update.get("presenceVersion", 0) > 0 and update.get("presenceEpoch"), "Presence revision missing.")
+        a.request("presence", active=False, activityVersion=2)
+        require(b.event("presence").get("presence") == "offline", "Background presence was not delivered.")
+        a.request("presence", active=True, activityVersion=1)
+        member = next(x for x in b.request("snapshot")["members"] if x["jid"] == a.jid)
+        require(member.get("presence") == "offline", "An old foreground update restored online status.")
+        require(outsider.request("snapshot")["members"] == [], "Presence exposed non-family data.")
+        print("PASS: live accepted-family presence, background updates and stale-update protection.", flush=True)
         a.request("invite_call", peer=b.jid, callId=call_id, kind="voice")
         b.event("call", call_id, "ringing")
         outsider.request("accept_call", "call_not_found", callId=call_id)
@@ -150,7 +191,7 @@ def main():
             relay = client.request("turn", callId=call_id)["iceServers"]
             require(relay and relay[0].get("credential") and relay[0].get("username"), "Relay credentials missing.")
         print("PASS: accepted family call and participant-scoped TURN issuance.", flush=True)
-        other_device = Client(*credentials[1]); clients.append(other_device)
+        other_device = Client(*credentials[1], endpoint=endpoint); clients.append(other_device)
         other_device.request("accept_call", "answered_elsewhere", callId=call_id)
         other_device.request("turn", "not_active", callId=call_id)
         print("PASS: a second device cannot take over an answered call.", flush=True)

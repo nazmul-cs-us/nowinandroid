@@ -29,7 +29,8 @@ import java.io.File
 class FamilyScreenScreenshotTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val members = listOf("Amina Khan", "Omar Hassan", "Maryam Ali", "Yusuf Ahmed", "Sara Malik")
-        .map { FamilyMember(it.lowercase().replace(' ', '.') + "@xmpp.starception.com", "accepted") }
+        .mapIndexed { index, name -> FamilyMember(name.lowercase().replace(' ', '.') + "@xmpp.starception.com", "accepted",
+            when (index) { 0 -> "online"; 1 -> "offline"; else -> "unknown" }) }
     private fun render(dark: Boolean, connected: Boolean, brand: ThemeBrand = ThemeBrand.COASTAL) {
         compose.setContent {
             NiaTheme(darkTheme = dark, themeBrand = brand, disableDynamicTheming = true) {
@@ -44,7 +45,22 @@ class FamilyScreenScreenshotTest {
     }
     @Test fun landingLight() { render(false, false); capture("landing-light") }
     @Test fun landingDark() { render(true, false); capture("landing-dark") }
-    @Test fun contactsLight() { render(false, true); capture("contacts-light") }
+    @Test fun contactsLight() {
+        render(false, true)
+        compose.onNodeWithText("Online").assertExists()
+        compose.onNodeWithText("Offline").assertExists()
+        capture("contacts-light")
+    }
+    @Test fun disconnectedPresenceCannotShowAStaleOnlineIndicator() {
+        compose.setContent {
+            NiaTheme {
+                FamilyScreenContent(FamilyUiState(connected = true, serviceReady = false,
+                    members = listOf(FamilyMember("amina@xmpp.starception.com", "accepted", "online"))))
+            }
+        }
+        compose.onNodeWithText("Online").assertDoesNotExist()
+        compose.onNodeWithText("Status unavailable").assertExists()
+    }
     @Test fun contactsDark() { render(true, true); capture("contacts-dark") }
     @Test fun previewStartsWhenAlreadyResumedAndRestartsAfterPause() {
         var starts = 0
