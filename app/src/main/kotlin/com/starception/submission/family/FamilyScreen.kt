@@ -8,6 +8,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -74,248 +80,421 @@ internal fun permissionRequest(): (Boolean, () -> Unit) -> Unit {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+internal data class FamilyActions(
+    val signIn: (String, String) -> Unit = { _, _ -> },
+    val refresh: () -> Unit = {}, val signOut: () -> Unit = {},
+    val invite: (String) -> Unit = {}, val accept: (String) -> Unit = {},
+    val remove: (String) -> Unit = {}, val voice: (String) -> Unit = {},
+    val video: (String) -> Unit = {}, val dismissError: () -> Unit = {},
+)
+
 @Composable
 fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
     val client = viewModel.client
     val state by client.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val debug = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
-    var account by remember { mutableStateOf(if (debug) FamilyEndpoint().androidTestAccount else "") }
-    var password by remember { mutableStateOf(if (debug) context.getString(R.string.family_test_password) else "") }
-    var invitation by remember { mutableStateOf("") }
+    val permission = permissionRequest()
+    val notification = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    FamilyScreenContent(state, FamilyActions(
+        signIn = { account, password ->
+            if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+                notification.launch(Manifest.permission.POST_NOTIFICATIONS)
+            client.login(account, password)
+        }, refresh = { client.refresh() }, signOut = { client.disconnect() },
+        invite = { client.invite(it) }, accept = { client.acceptMember(it) }, remove = { client.removeMember(it) },
+        voice = { peer -> permission(false) { client.call(peer, false) } },
+        video = { peer -> permission(true) { client.call(peer, true) } }, dismissError = { client.dismissError() }),
+        initialAccount = if (debug) FamilyEndpoint().androidTestAccount else "",
+        initialPassword = if (debug) context.getString(R.string.family_test_password) else "",
+        suggestedPeer = if (debug) FamilyEndpoint().testPeer(state.me) else "")
+}
+
+private data class FamilyPalette(val panel: Color, val field: Color, val ink: Color, val muted: Color, val line: Color,
+    val accent: Color, val header: Color, val onHeader: Color, val button: Color, val onButton: Color)
+@Composable
+private fun familyPalette(): FamilyPalette {
+    val scheme = MaterialTheme.colorScheme
+    return FamilyPalette(scheme.surface, scheme.surfaceContainerLow, scheme.onSurface, scheme.onSurfaceVariant, scheme.outlineVariant,
+        scheme.primary, scheme.primaryContainer, scheme.onPrimaryContainer, scheme.primary, scheme.onPrimary)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun FamilyScreenContent(
+    state: FamilyUiState,
+    actions: FamilyActions = FamilyActions(),
+    initialAccount: String = "", initialPassword: String = "", suggestedPeer: String = "",
+) {
+    val colors = familyPalette()
+    var account by remember { mutableStateOf(initialAccount) }
+    var password by remember { mutableStateOf(initialPassword) }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var invitation by remember { mutableStateOf(suggestedPeer) }
     var search by remember { mutableStateOf("") }
+    var searching by remember { mutableStateOf(false) }
     var invitations by remember { mutableStateOf(false) }
     var inviting by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<FamilyMember?>(null) }
     var removing by remember { mutableStateOf<FamilyMember?>(null) }
-    var quickCall by remember { mutableStateOf<FamilyMember?>(null) }
-    val permissions = permissionRequest()
-    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    val family = state.members.filter { FamilyPolicy().canCall(it.status) }
-    val requests = state.members.filterNot { FamilyPolicy().canCall(it.status) }
-    val shown = (if (invitations) requests else family).filter { it.jid.contains(search, ignoreCase = true) || callDisplayName(it.jid).contains(search, ignoreCase = true) }
-    val green = Color(0xFF173F3B)
-    LaunchedEffect(state.me) { if (debug && state.me.isNotBlank()) invitation = FamilyEndpoint().testPeer(state.me) }
-    Scaffold(containerColor = green, topBar = {
-        TopAppBar(title = { Text("Family", fontWeight = FontWeight.SemiBold) },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = green, titleContentColor = Color.White, actionIconContentColor = Color.White),
-            actions = { if (state.connected) {
-                IconButton(onClick = { inviting = true }, enabled = state.serviceReady) { Icon(Icons.Default.PersonAdd, "Invite family member") }
-                IconButton(onClick = { client.refresh() }) { Icon(Icons.Default.Refresh, "Refresh family") }
-                var menu by remember { mutableStateOf(false) }
-                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Account options") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Sign out") }, onClick = { menu = false; client.disconnect() })
-                }
-            } })
-    }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+    var menu by remember { mutableStateOf(false) }
+    val family = state.members.filter { it.status == "accepted" }
+    val requests = state.members.filter { it.status != "accepted" }
+    val shown = (if (invitations) requests else family).filter { callDisplayName(it.jid).contains(search, true) || it.jid.contains(search, true) }
+    val canCall = state.serviceReady && state.call == null
+    LaunchedEffect(suggestedPeer) { if (invitation.isBlank()) invitation = suggestedPeer }
+    LaunchedEffect(state.connected) { if (!state.connected) { selected = null; inviting = false } }
+    Column(Modifier.fillMaxSize().background(colors.header).statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp).height(64.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(34.dp).background(colors.onHeader.copy(alpha = 0.10f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.FavoriteBorder, null, Modifier.size(19.dp), tint = colors.onHeader)
+            }
+            Text("Family", Modifier.padding(start = 10.dp).weight(1f), color = colors.onHeader, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             if (state.connected) {
-                LazyRow(Modifier.fillMaxWidth().padding(bottom = 20.dp), horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(horizontal = 24.dp)) {
+                IconButton(onClick = { searching = !searching; if (!searching) search = "" }) { Icon(Icons.Default.Search, "Search family", tint = colors.onHeader) }
+                Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreHoriz, "Family settings", tint = colors.onHeader) }
+                    DropdownMenu(menu, { menu = false }) {
+                        DropdownMenuItem(text = { Text("Refresh family") }, onClick = { menu = false; actions.refresh() })
+                        DropdownMenuItem(text = { Text("Sign out") }, onClick = { menu = false; actions.signOut() })
+                    }
+                }
+            }
+        }
+        if (state.connected) {
+            LazyRow(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                item {
+                    Column(Modifier.width(60.dp).clickable(enabled = state.serviceReady, role = androidx.compose.ui.semantics.Role.Button) { inviting = true }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.size(60.dp).border(1.dp, colors.onHeader.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Add, "Invite a member", tint = colors.onHeader, modifier = Modifier.size(24.dp))
+                        }
+                        Text("Invite", fontSize = 11.sp, color = colors.onHeader, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+                items(family, key = { it.jid }) { member ->
+                    Column(Modifier.width(60.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { selected = member }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        ContactAvatar(member.jid, 60, ring = true)
+                        Text(callDisplayName(member.jid).substringBefore(' '), fontSize = 11.sp, color = colors.onHeader,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+            }
+        } else {
+            LandingIllustration(Modifier.fillMaxWidth().height(148.dp))
+        }
+        Surface(Modifier.weight(1f).fillMaxWidth(), color = colors.panel, shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)) {
+            LazyColumn(contentPadding = PaddingValues(top = 24.dp, bottom = 104.dp)) {
+                if (!state.connected) {
                     item {
-                        Column(Modifier.clickable(enabled = state.serviceReady) { inviting = true }, horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(Modifier.size(58.dp).background(Color.White.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Add, "Invite", tint = Color.White)
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Your people.\nAlways closer.", fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold, color = colors.ink)
+                                Text("A little space for the people who matter most. Connect through voice and video.", fontSize = 14.sp, lineHeight = 21.sp, color = colors.muted)
                             }
-                            Text("Invite", color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                FamilyField(account, { account = it }, "Family account", colors, leading = Icons.Default.PersonOutline)
+                                FamilyField(password, { password = it }, "Password", colors, leading = Icons.Default.Lock,
+                                    password = !passwordVisible, trailing = {
+                                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                            Icon(if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                if (passwordVisible) "Hide password" else "Show password", tint = colors.muted, modifier = Modifier.size(20.dp))
+                                        }
+                                    })
+                                Button(onClick = { actions.signIn(account, password); password = "" },
+                                    enabled = !state.busy && account.isNotBlank() && password.isNotBlank(),
+                                    modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(18.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.button, contentColor = colors.onButton)) {
+                                    if (state.busy) CircularProgressIndicator(Modifier.size(20.dp), color = colors.onButton, strokeWidth = 2.dp)
+                                    else Text("Connect with family", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.FavoriteBorder, null, Modifier.size(14.dp), tint = colors.muted)
+                                Text("Only people you invite and accept", Modifier.padding(start = 6.dp), fontSize = 11.sp, color = colors.muted)
+                            }
                         }
                     }
-                    items(family, key = { it.jid }) { member ->
-                        Column(Modifier.width(64.dp).clickable { quickCall = member }, horizontalAlignment = Alignment.CenterHorizontally) {
-                            ContactAvatar(member.jid, 58)
-                            Text(callDisplayName(member.jid), color = Color.White, style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                } else {
+                    item {
+                        Row(Modifier.padding(horizontal = 24.dp).fillMaxWidth().height(44.dp).background(colors.field, RoundedCornerShape(24.dp)).padding(4.dp)) {
+                            FamilySegment("Family", !invitations, colors, Modifier.weight(1f)) { invitations = false }
+                            FamilySegment("Invites", invitations, colors, Modifier.weight(1f), requests.size) { invitations = true }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+                    if (searching) item {
+                        Box(Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp)) {
+                            FamilyField(search, { search = it }, "Search your family", colors, leading = Icons.Default.Search,
+                                trailing = { IconButton(onClick = { search = ""; searching = false }) { Icon(Icons.Default.Close, "Close search", tint = colors.muted) } })
+                        }
+                    }
+                    if (!state.serviceReady) item {
+                        Row(Modifier.padding(horizontal = 28.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = colors.accent)
+                            Text("Connecting your family…", fontSize = 13.sp, color = colors.muted)
+                        }
+                    }
+                    if (state.serviceReady && shown.isEmpty()) item {
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Box(Modifier.size(72.dp).background(colors.field, CircleShape), contentAlignment = Alignment.Center) {
+                                Icon(if (invitations) Icons.Default.MailOutline else Icons.Default.PeopleOutline, null, Modifier.size(30.dp), tint = colors.accent)
+                            }
+                            Text(if (search.isNotBlank()) "No matches yet" else if (invitations) "All caught up" else "Make room for your people", color = colors.ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                            Text(if (search.isNotBlank()) "Try another name or account." else if (invitations) "New family invitations will appear here." else "Invite someone close. Once they accept, you can call each other anytime.",
+                                color = colors.muted, fontSize = 13.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)
+                            if (!invitations && search.isBlank()) Button(onClick = { inviting = true }, colors = ButtonDefaults.buttonColors(containerColor = colors.button, contentColor = colors.onButton), shape = RoundedCornerShape(16.dp)) {
+                                Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Text("Invite family", Modifier.padding(start = 6.dp))
+                            }
+                        }
+                    }
+                    items(shown, key = { it.jid }) { member ->
+                        Column {
+                            Row(Modifier.fillMaxWidth().clickable(role = androidx.compose.ui.semantics.Role.Button) { selected = member }
+                                .padding(start = 24.dp, end = 20.dp, top = 14.dp, bottom = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                ContactAvatar(member.jid, 50)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(callDisplayName(member.jid), color = colors.ink, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(when (member.status) { "incoming" -> "Invited you to join"; "outgoing" -> "Waiting for acceptance"; else -> "Voice & video calls" },
+                                        color = colors.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                if (member.status == "accepted") FilledTonalIconButton(onClick = { actions.voice(member.jid) }, enabled = canCall,
+                                    modifier = Modifier.size(44.dp), colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = colors.field, contentColor = colors.accent)) {
+                                    Icon(Icons.Default.Call, "Call ${callDisplayName(member.jid)}", Modifier.size(20.dp))
+                                } else Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "View invitation", Modifier.size(20.dp), tint = colors.muted)
+                            }
+                            if (member.status == "incoming") Row(Modifier.padding(start = 88.dp, bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(onClick = { actions.accept(member.jid) }, enabled = state.serviceReady, shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.button, contentColor = colors.onButton)) { Text("Accept", fontSize = 12.sp) }
+                                TextButton(onClick = { removing = member }) { Text("Decline", fontSize = 12.sp, color = colors.muted) }
+                            }
+                            HorizontalDivider(Modifier.padding(start = 88.dp, end = 24.dp), color = colors.line.copy(alpha = 0.35f))
                         }
                     }
                 }
-            }
-            Surface(Modifier.weight(1f).fillMaxWidth(), shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), color = MaterialTheme.colorScheme.surface) {
-                LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 110.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (!state.connected) {
-                        item { Text("Your people, closer", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                            Text("Sign in to connect with your family through voice and video.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp)) }
-                        item { OutlinedTextField(account, { account = it }, label = { Text("Family account") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                        item { OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth()) }
-                        item { Button(onClick = {
-                            if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
-                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            client.login(account, password); password = ""
-                        }, enabled = !state.busy && account.isNotBlank() && password.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-                            Text(if (state.busy) "Signing in…" else "Sign in")
-                        } }
-                        if (debug) item { Text("Test credentials are prefilled in this debug build.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    } else {
-                        item { Text(if (state.serviceReady) "Ready to connect" else "Connecting to your family…", style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        item { OutlinedTextField(search, { search = it }, placeholder = { Text("Search family") },
-                            leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) }
-                        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            FilterChip(!invitations, { invitations = false }, label = { Text("Family · ${family.size}") })
-                            FilterChip(invitations, { invitations = true }, label = { Text("Invitations · ${requests.size}") })
-                        } }
-                        if (state.serviceReady && shown.isEmpty()) item {
-                            Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(if (invitations) Icons.Default.MailOutline else Icons.Default.PeopleOutline, null, Modifier.size(44.dp), tint = MaterialTheme.colorScheme.primary)
-                                Text(if (search.isNotBlank()) "No matches" else if (invitations) "No pending invitations" else "Start your family circle",
-                                    style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
-                                if (search.isBlank() && !invitations) TextButton(onClick = { inviting = true }) { Text("Invite a family member") }
-                            }
-                        }
-                        items(shown, key = { it.jid }) { member ->
-                            Column {
-                                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    ContactAvatar(member.jid, 50)
-                                    Column(Modifier.weight(1f)) {
-                                        Text(callDisplayName(member.jid), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(when (member.status) { "incoming" -> "Wants to join your family"; "outgoing" -> "Invitation sent"; else -> member.jid },
-                                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                    if (member.status == "accepted") {
-                                        IconButton(onClick = { permissions(false) { client.call(member.jid, false) } }, enabled = state.serviceReady && state.call == null) {
-                                            Icon(Icons.Default.Call, "Voice call ${callDisplayName(member.jid)}", tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                        IconButton(onClick = { permissions(true) { client.call(member.jid, true) } }, enabled = state.serviceReady && state.call == null) {
-                                            Icon(Icons.Default.Videocam, "Video call ${callDisplayName(member.jid)}", tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                    }
-                                    var menu by remember { mutableStateOf(false) }
-                                    Box {
-                                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Options for ${callDisplayName(member.jid)}") }
-                                        DropdownMenu(menu, { menu = false }) {
-                                            DropdownMenuItem(text = { Text(if (member.status == "accepted") "Remove member" else if (member.status == "incoming") "Decline invitation" else "Cancel invitation") },
-                                                onClick = { menu = false; removing = member })
-                                        }
-                                    }
-                                }
-                                if (member.status == "incoming") Row(Modifier.padding(start = 62.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(onClick = { client.acceptMember(member.jid) }, enabled = state.serviceReady) { Text("Accept") }
-                                    TextButton(onClick = { removing = member }) { Text("Decline") }
-                                }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                            }
-                        }
+                state.error?.let { message -> item {
+                    Row(Modifier.padding(horizontal = 24.dp, vertical = 16.dp).fillMaxWidth().background(colors.field, RoundedCornerShape(16.dp)).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Info, null, Modifier.size(18.dp), tint = colors.accent)
+                        Text(message, Modifier.weight(1f).padding(10.dp), color = colors.ink, fontSize = 12.sp, lineHeight = 18.sp)
+                        IconButton(onClick = actions.dismissError) { Icon(Icons.Default.Close, "Dismiss message", tint = colors.muted, modifier = Modifier.size(18.dp)) }
                     }
-                    state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = { client.dismissError() }) { Text("Dismiss") } } }
-                }
+                } }
             }
         }
     }
-    if (inviting) ModalBottomSheet(onDismissRequest = { inviting = false }) {
-        Column(Modifier.fillMaxWidth().padding(24.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Invite to your family", style = MaterialTheme.typography.headlineSmall)
-            Text("They’ll need to accept before you can call each other.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(invitation, { invitation = it }, label = { Text("Family account") }, placeholder = { Text("name@xmpp.starception.com") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Button(onClick = { client.invite(invitation); invitation = ""; inviting = false }, enabled = state.serviceReady && invitation.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Send invitation") }
+    if (inviting) ModalBottomSheet(onDismissRequest = { inviting = false }, containerColor = colors.panel) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp).padding(bottom = 28.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Box(Modifier.size(48.dp).background(colors.field, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.PersonAdd, null, tint = colors.accent) }
+            Text("Bring your people closer", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = colors.ink)
+            Text("Send an invitation. Calls become available when they accept.", fontSize = 14.sp, lineHeight = 21.sp, color = colors.muted)
+            FamilyField(invitation, { invitation = it }, "Family account", colors, leading = Icons.Default.PersonOutline)
+            Button(onClick = { actions.invite(invitation); invitation = ""; inviting = false; invitations = true }, enabled = state.serviceReady && invitation.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = colors.button, contentColor = colors.onButton)) { Text("Send invitation") }
         }
     }
-    removing?.let { member -> AlertDialog(onDismissRequest = { removing = null }, title = { Text(if (member.status == "accepted") "Remove family member?" else "Remove invitation?") },
-        text = { Text("Calling access requires an accepted family relationship.") },
-        confirmButton = { TextButton(onClick = { client.removeMember(member.jid); removing = null }) { Text("Remove") } },
+    selected?.let { member -> ModalBottomSheet(onDismissRequest = { selected = null }, containerColor = colors.panel) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp).padding(bottom = 28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ContactAvatar(member.jid, 80)
+            Text(callDisplayName(member.jid), fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = colors.ink)
+            Text(member.jid, fontSize = 12.sp, color = colors.muted, textAlign = TextAlign.Center)
+            if (member.status == "accepted") Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ContactAction("Voice call", Icons.Default.Call, canCall, colors, Modifier.weight(1f)) { selected = null; actions.voice(member.jid) }
+                ContactAction("Video call", Icons.Default.Videocam, canCall, colors, Modifier.weight(1f)) { selected = null; actions.video(member.jid) }
+            } else Text(if (member.status == "incoming") "Accept this invitation to start calling." else "Your invitation is waiting for acceptance.", fontSize = 14.sp, color = colors.muted, textAlign = TextAlign.Center)
+            if (member.status == "incoming") Button(onClick = { actions.accept(member.jid); selected = null }, enabled = state.serviceReady,
+                colors = ButtonDefaults.buttonColors(containerColor = colors.button, contentColor = colors.onButton)) { Text("Accept invitation") }
+            TextButton(onClick = { selected = null; removing = member }) { Text(if (member.status == "accepted") "Remove from family" else if (member.status == "incoming") "Decline invitation" else "Cancel invitation", color = colors.muted, fontSize = 13.sp) }
+        }
+    } }
+    removing?.let { member -> AlertDialog(onDismissRequest = { removing = null }, title = { Text(if (member.status == "accepted") "Remove ${callDisplayName(member.jid)}?" else "Remove invitation?") },
+        text = { Text("You’ll need a new accepted invitation to call each other again.") },
+        confirmButton = { TextButton(onClick = { actions.remove(member.jid); removing = null }) { Text("Remove") } },
         dismissButton = { TextButton(onClick = { removing = null }) { Text("Keep") } }) }
-    quickCall?.let { member -> AlertDialog(onDismissRequest = { quickCall = null }, title = { Text(callDisplayName(member.jid)) }, text = { Text(member.jid) },
-        confirmButton = { TextButton(enabled = state.serviceReady && state.call == null, onClick = { quickCall = null; permissions(false) { client.call(member.jid, false) } }) { Text("Voice call") } },
-        dismissButton = { TextButton(enabled = state.serviceReady && state.call == null, onClick = { quickCall = null; permissions(true) { client.call(member.jid, true) } }) { Text("Video call") } }) }
 }
 
 @Composable
-private fun ContactAvatar(jid: String, size: Int) {
-    val initials = callDisplayName(jid).split(' ').take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
-    Box(Modifier.size(size.dp).background(Color(0xFFE0EFE9), CircleShape).padding(3.dp)
-        .background(Color(0xFF315A60), CircleShape), contentAlignment = Alignment.Center) {
-        Text(initials, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+private fun ContactAction(label: String, icon: ImageVector, enabled: Boolean, colors: FamilyPalette, modifier: Modifier, action: () -> Unit) {
+    Surface(onClick = action, enabled = enabled, modifier = modifier, shape = RoundedCornerShape(20.dp), color = colors.field) {
+        Column(Modifier.padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, null, tint = colors.accent); Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.ink)
+        }
     }
 }
+
+@Composable
+private fun FamilySegment(label: String, active: Boolean, colors: FamilyPalette, modifier: Modifier, count: Int = 0, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = modifier.fillMaxHeight().semantics { selected = active }, shape = RoundedCornerShape(20.dp),
+        color = if (active) colors.panel else Color.Transparent, shadowElevation = if (active) 1.dp else 0.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            Text(label, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, color = if (active) colors.ink else colors.muted)
+            if (count > 0) Text(count.toString(), Modifier.padding(start = 7.dp).background(colors.accent.copy(alpha = 0.12f), CircleShape).padding(horizontal = 6.dp, vertical = 2.dp),
+                fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = colors.accent)
+        }
+    }
+}
+
+@Composable
+private fun FamilyField(value: String, changed: (String) -> Unit, placeholder: String, colors: FamilyPalette, leading: ImageVector,
+    password: Boolean = false, trailing: (@Composable () -> Unit)? = null) {
+    TextField(value, changed, modifier = Modifier.fillMaxWidth().semantics { contentDescription = placeholder }, placeholder = { Text(placeholder, fontSize = 14.sp, color = colors.muted) },
+        singleLine = true, shape = RoundedCornerShape(16.dp), textStyle = MaterialTheme.typography.bodyMedium.copy(color = colors.ink),
+        leadingIcon = { Icon(leading, null, Modifier.size(20.dp), tint = colors.muted) }, trailingIcon = trailing,
+        visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(autoCorrectEnabled = false,
+            keyboardType = if (placeholder == "Password") androidx.compose.ui.text.input.KeyboardType.Password else androidx.compose.ui.text.input.KeyboardType.Email),
+        colors = TextFieldDefaults.colors(focusedContainerColor = colors.field, unfocusedContainerColor = colors.field,
+            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, cursorColor = colors.accent))
+}
+
+@Composable
+private fun LandingIllustration(modifier: Modifier = Modifier) {
+    val colors = familyPalette()
+    val scheme = MaterialTheme.colorScheme
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Box(Modifier.size(160.dp).background(colors.onHeader.copy(alpha = 0.05f), CircleShape))
+        Box(Modifier.offset(x = (-43).dp, y = 7.dp).size(76.dp).background(scheme.secondaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Person, null, Modifier.size(42.dp), tint = scheme.onSecondaryContainer)
+        }
+        Box(Modifier.offset(x = 32.dp, y = (-8).dp).size(92.dp).border(5.dp, colors.header, CircleShape).background(scheme.tertiaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Person, null, Modifier.size(52.dp), tint = scheme.onTertiaryContainer)
+        }
+        Box(Modifier.offset(x = 54.dp, y = 32.dp).size(34.dp).background(colors.panel, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Call, null, Modifier.size(17.dp), tint = colors.button)
+        }
+    }
+}
+
+@Composable
+private fun ContactAvatar(jid: String, size: Int, ring: Boolean = false) {
+    val scheme = MaterialTheme.colorScheme
+    val initials = callDisplayName(jid).split(' ').take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
+    val shades = listOf(scheme.primaryContainer, scheme.secondaryContainer, scheme.tertiaryContainer, scheme.surfaceContainerHigh)
+    val shade = shades[(jid.hashCode() and Int.MAX_VALUE) % shades.size]
+    Box(Modifier.size(size.dp).clearAndSetSemantics { }.then(if (ring) Modifier.border(1.5.dp, scheme.primary, CircleShape).padding(4.dp) else Modifier)
+        .background(shade, CircleShape), contentAlignment = Alignment.Center) {
+        Text(initials, color = scheme.onSurface, fontSize = (size * 0.30f).sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+internal data class FamilyCallActions(
+    val answer: () -> Unit = {}, val hangup: () -> Unit = {}, val mute: () -> Unit = {},
+    val speaker: () -> Unit = {}, val camera: () -> Unit = {}, val flip: () -> Unit = {},
+)
 
 @Composable
 fun FamilyCallOverlay(client: FamilyClient) {
     val state by client.state.collectAsStateWithLifecycle()
     val call = state.call ?: return
-    val permissions = permissionRequest()
-    val incoming = call.callee == state.me && call.stage == "ringing"
-    val peer = call.peer(state.me)
-    val name = callDisplayName(peer)
-    val connectedAt = state.connectedAtElapsed
+    val permission = permissionRequest()
+    val remote by client.media.remoteVideo.collectAsStateWithLifecycle()
     var elapsed by remember(call.id) { mutableLongStateOf(0L) }
-    LaunchedEffect(call.id, connectedAt) {
-        val start = connectedAt ?: return@LaunchedEffect
-        while (true) {
-            elapsed = (SystemClock.elapsedRealtime() - start) / 1000
-            delay(1000)
-        }
+    LaunchedEffect(call.id, state.connectedAtElapsed) {
+        val start = state.connectedAtElapsed ?: return@LaunchedEffect
+        while (true) { elapsed = (SystemClock.elapsedRealtime() - start) / 1000; delay(1000) }
     }
-    val remoteVideo by client.media.remoteVideo.collectAsStateWithLifecycle()
-    val videoActive = call.kind == "video" && call.stage == "active"
+    Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false,
+        dismissOnBackPress = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
+        val view = androidx.compose.ui.platform.LocalView.current
+        val video = call.kind == "video" && call.stage == "active"
+        val lightStatusBar = !video && MaterialTheme.colorScheme.primaryContainer.luminance() > 0.5f
+        val lightNavigationBar = !video && MaterialTheme.colorScheme.surface.luminance() > 0.5f
+        DisposableEffect(view, lightStatusBar, lightNavigationBar) {
+            (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.let { window ->
+                androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = lightStatusBar
+                    isAppearanceLightNavigationBars = lightNavigationBar
+                }
+            }
+            onDispose { }
+        }
+        FamilyCallContent(state, elapsed, FamilyCallActions(
+            answer = { permission(call.kind == "video") { client.acceptCall() } }, hangup = { client.hangup() },
+            mute = { client.mute() }, speaker = { client.speaker() }, camera = { client.toggleCamera() }, flip = { client.switchCamera() }),
+            remoteReady = remote != null,
+            remoteVideo = { VideoSurface(client.media, false, Modifier.fillMaxSize()) },
+            localVideo = { VideoSurface(client.media, true, Modifier.fillMaxSize()) })
+    }
+}
+
+@Composable
+internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions: FamilyCallActions = FamilyCallActions(),
+    remoteReady: Boolean = false, remoteVideo: @Composable () -> Unit = {}, localVideo: @Composable () -> Unit = {}) {
+    val colors = MaterialTheme.colorScheme
+    val call = state.call ?: return
+    val incoming = call.callee == state.me && call.stage == "ringing"
+    val video = call.kind == "video" && call.stage == "active"
+    val name = callDisplayName(call.peer(state.me))
+    val ink = if (video) Color.White else colors.onSurface
+    val muted = if (video) Color.White.copy(alpha = 0.75f) else colors.onSurfaceVariant
     val status = when {
         incoming -> "Incoming ${call.kind} call"
         call.stage == "ringing" -> "Calling…"
         state.mediaConnected -> "%02d:%02d".format(elapsed / 60, elapsed % 60)
-        connectedAt != null -> "Reconnecting…"
+        state.connectedAtElapsed != null -> "Reconnecting…"
         else -> "Connecting…"
     }
-    Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false,
-        dismissOnBackPress = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
-        Surface(Modifier.fillMaxSize(), color = Color(0xFF101D26), contentColor = Color.White) {
-          Box(Modifier.fillMaxSize()) {
-            if (videoActive) Column(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black), contentAlignment = Alignment.Center) {
-                    VideoSurface(client.media, false, Modifier.fillMaxSize())
-                    if (remoteVideo == null) Text("Waiting for video…", color = Color.White.copy(alpha = 0.7f))
-                }
-                HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
-                Box(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF22343E)), contentAlignment = Alignment.Center) {
-                    if (state.camera) VideoSurface(client.media, true, Modifier.fillMaxSize())
-                    else Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.VideocamOff, null, Modifier.size(36.dp), tint = Color.White)
-                        Text("Your camera is off", color = Color.White.copy(alpha = 0.7f))
-                    }
-                    Text("You", Modifier.align(Alignment.TopStart).padding(16.dp)
-                        .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 5.dp),
-                        color = Color.White, style = MaterialTheme.typography.labelMedium)
+    BoxWithConstraints(Modifier.fillMaxSize().background(colors.surface)) {
+        val compact = maxHeight < 500.dp
+        if (video) Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f).fillMaxWidth().background(colors.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+                remoteVideo()
+                if (!remoteReady) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ContactAvatar(call.peer(state.me), 72)
+                    Text("Waiting for video…", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
                 }
             }
-            Column(Modifier.fillMaxSize().background(Brush.verticalGradient(if (videoActive)
-                listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                else listOf(Color(0xFF193A42), Color(0xFF101D26))))
-                .statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(if (call.kind == "video") Icons.Default.Videocam else Icons.Default.Call, null, Modifier.size(16.dp), tint = Color(0xFF91D5C5))
-                    Text(if (call.kind == "video") "FAMILY VIDEO CALL" else "FAMILY VOICE CALL",
-                        style = MaterialTheme.typography.labelMedium, color = Color(0xFFB4CBCB))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+            Box(Modifier.weight(1f).fillMaxWidth().background(colors.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+                if (state.camera) localVideo()
+                else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.VideocamOff, null, Modifier.size(30.dp), tint = Color.White.copy(alpha = 0.6f))
+                    Text("Camera off", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
                 }
-                Text(name, style = if (videoActive) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(peer, style = MaterialTheme.typography.bodySmall, color = Color(0xFFB4CBCB), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(status, style = MaterialTheme.typography.bodyLarge,
-                    fontFamily = if (state.mediaConnected) FontFamily.Monospace else FontFamily.Default,
-                    color = Color(0xFF91D5C5))
-                Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(24.dp)), contentAlignment = Alignment.Center) {
-                    if (!videoActive) CallAvatar(name)
-                }
-                state.error?.let { Text(it, color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center) }
-                if (call.stage == "active") {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        CallControl(if (state.muted) Icons.Default.MicOff else Icons.Default.Mic,
-                            if (state.muted) "Unmute" else "Mute", state.muted, action = { client.mute() })
-                        CallControl(if (state.speaker) Icons.Default.VolumeUp else Icons.Default.Hearing,
-                            "Speaker", state.speaker, action = { client.speaker() })
-                        if (call.kind == "video") {
-                            CallControl(if (state.camera) Icons.Default.Videocam else Icons.Default.VideocamOff,
-                                "Camera", !state.camera, action = { client.toggleCamera() })
-                            CallControl(Icons.Default.Cameraswitch, "Flip", enabled = state.camera, action = { client.switchCamera() })
-                        }
-                    }
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    CallControl(Icons.Default.CallEnd, if (incoming) "Decline" else if (call.stage == "ringing") "Cancel" else "End call",
-                        color = Color(0xFFD94B59), action = { client.hangup() })
-                    if (incoming) CallControl(if (call.kind == "video") Icons.Default.Videocam else Icons.Default.Call, "Answer",
-                        color = Color(0xFF24846C), action = { permissions(call.kind == "video") { client.acceptCall() } })
+                Text("You", Modifier.align(Alignment.TopStart).padding(16.dp).background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = Color.White, fontSize = 11.sp)
+            }
+        }
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(if (video)
+            listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent, Color.Black.copy(alpha = 0.78f))
+            else listOf(colors.primaryContainer, colors.surface, colors.surface))))
+        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.FavoriteBorder, null, Modifier.size(16.dp), tint = muted)
+                Text(if (video) name else "Family", Modifier.padding(start = 8.dp).weight(1f), color = ink, fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (video) Text(status, Modifier.background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(18.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = Color.White, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            }
+            Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                if (!video) {
+                    ContactAvatar(call.peer(state.me), if (compact) 48 else 128)
+                    Spacer(Modifier.height(if (compact) 8.dp else 24.dp))
+                    Text(name, color = ink, fontSize = if (compact) 20.sp else 30.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(status, color = muted, fontSize = 14.sp,
+                        fontFamily = if (state.mediaConnected) FontFamily.Monospace else FontFamily.Default, modifier = Modifier.padding(top = 8.dp))
                 }
             }
-          }
+            state.error?.let { Text(it, color = colors.error, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(bottom = 12.dp)) }
+            if (call.stage == "active") {
+                Row(Modifier.fillMaxWidth().background((if (video) Color.White else colors.primary).copy(alpha = if (video) 0.13f else 0.055f), RoundedCornerShape(28.dp)).padding(vertical = 16.dp, horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly) {
+                    CallControl(if (state.muted) Icons.Default.MicOff else Icons.Default.Mic, if (state.muted) "Unmute" else "Mute", state.muted, onVideo = video, action = actions.mute)
+                    CallControl(if (state.speaker) Icons.Default.VolumeUp else Icons.Default.Hearing, "Speaker", state.speaker, onVideo = video, action = actions.speaker)
+                    if (call.kind == "video") {
+                        CallControl(if (state.camera) Icons.Default.Videocam else Icons.Default.VideocamOff, "Camera", !state.camera, onVideo = video, action = actions.camera)
+                        CallControl(Icons.Default.Cameraswitch, "Flip", enabled = state.camera, onVideo = video, action = actions.flip)
+                    }
+                    if (compact) CallControl(Icons.Default.CallEnd, "End call", color = colors.error, onVideo = video, action = actions.hangup)
+                }
+                if (!compact) Spacer(Modifier.height(24.dp))
+            }
+            if (!compact || call.stage != "active") Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                if (incoming) CallControl(if (call.kind == "video") Icons.Default.Videocam else Icons.Default.Call, "Accept", color = colors.primary, large = true, onVideo = video, action = actions.answer)
+                CallControl(Icons.Default.CallEnd, if (incoming) "Decline" else if (call.stage == "ringing") "Cancel" else "End call",
+                    color = colors.error, large = incoming, onVideo = video, action = actions.hangup)
+            }
         }
     }
 }
@@ -324,28 +503,20 @@ private fun callDisplayName(jid: String): String = jid.substringBefore('@').repl
     .split(' ').filter { it.isNotBlank() }.joinToString(" ") { it.replaceFirstChar(Char::titlecase) }.ifBlank { "Family member" }
 
 @Composable
-private fun CallAvatar(name: String) {
-    Box(Modifier.size(176.dp).background(Color.White.copy(alpha = 0.04f), CircleShape), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(140.dp).background(Color(0xFF315A60), CircleShape), contentAlignment = Alignment.Center) {
-            Text(name.split(' ').take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase(),
-                style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Medium, color = Color(0xFFD5F5EB))
-        }
-    }
-}
-
-@Composable
 private fun CallControl(icon: ImageVector, label: String, active: Boolean = false, enabled: Boolean = true,
-    color: Color? = null, action: () -> Unit) {
+    color: Color? = null, large: Boolean = false, onVideo: Boolean = false, action: () -> Unit) {
+    val theme = MaterialTheme.colorScheme
+    val ink = if (onVideo) Color.White else theme.onSurface
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FilledIconButton(onClick = action, enabled = enabled,
-            modifier = Modifier.size(56.dp).semantics { selected = active },
+            modifier = Modifier.size(if (large) 72.dp else 52.dp).semantics { selected = active },
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = color ?: if (active) Color(0xFFD5F5EB) else Color.White.copy(alpha = 0.12f),
-                contentColor = if (active && color == null) Color(0xFF173D35) else Color.White,
-                disabledContainerColor = Color.White.copy(alpha = 0.04f), disabledContentColor = Color.White.copy(alpha = 0.35f))) {
-            Icon(icon, contentDescription = label, modifier = Modifier.size(26.dp))
+                containerColor = color ?: if (active) theme.primaryContainer else if (onVideo) Color.White.copy(alpha = 0.12f) else theme.surfaceContainerHigh,
+                contentColor = when { color == theme.error -> theme.onError; color != null -> theme.onPrimary; active -> theme.onPrimaryContainer; else -> ink },
+                disabledContainerColor = ink.copy(alpha = 0.04f), disabledContentColor = ink.copy(alpha = 0.35f))) {
+            Icon(icon, contentDescription = label, modifier = Modifier.size(if (large) 30.dp else 23.dp))
         }
-        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = if (enabled) 0.9f else 0.4f))
+        Text(label, fontSize = 11.sp, color = ink.copy(alpha = if (enabled) 0.85f else 0.4f))
     }
 }
 

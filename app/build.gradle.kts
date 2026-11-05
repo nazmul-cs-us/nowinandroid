@@ -285,6 +285,7 @@ dependencies {
     testDemoImplementation(libs.androidx.navigation.testing)
     testDemoImplementation(libs.robolectric)
     testDemoImplementation(libs.roborazzi)
+    testDemoImplementation(libs.androidx.compose.ui.test)
     testDemoImplementation(projects.core.screenshotTesting)
     testDemoImplementation(projects.core.testing)
 

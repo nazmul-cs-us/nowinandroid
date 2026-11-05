@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -1575,4 +1576,28 @@ private fun readBundledSalahNormParams(): String? {
     val data = platform.Foundation.NSData.dataWithContentsOfFile(bundled) ?: return null
     val text = platform.Foundation.NSString.create(data = data, encoding = platform.Foundation.NSUTF8StringEncoding)
     return text as? String
+}
+
+/** Native Family screens consume the exact palette used by the shared app theme. */
+class FamilyThemePalette(dark: Boolean) {
+    private val defaults = platform.Foundation.NSUserDefaults.standardUserDefaults
+    private val brand = ThemeBrand.entries.firstOrNull { it.name == defaults.stringForKey("ios_theme_brand") } ?: ThemeBrand.COASTAL
+    private val colors = iosColorScheme(brand, dark,
+        defaults.stringForKey("ios_custom_primary")?.toIntOrNull() ?: 0,
+        defaults.stringForKey("ios_custom_secondary")?.toIntOrNull() ?: 0,
+        defaults.stringForKey("ios_custom_tertiary")?.toIntOrNull() ?: 0)
+    val panel: Int = colors.surface.toArgb()
+    val field: Int = colors.surfaceContainerLow.toArgb()
+    val ink: Int = colors.onSurface.toArgb()
+    val muted: Int = colors.onSurfaceVariant.toArgb()
+    val accent: Int = colors.primary.toArgb()
+    val header: Int = colors.primaryContainer.toArgb()
+    val onHeader: Int = colors.onPrimaryContainer.toArgb()
+    val onButton: Int = colors.onPrimary.toArgb()
+    val error: Int = colors.error.toArgb()
+    val onError: Int = colors.onError.toArgb()
+    val secondaryContainer: Int = colors.secondaryContainer.toArgb()
+    val onSecondaryContainer: Int = colors.onSecondaryContainer.toArgb()
+    val tertiaryContainer: Int = colors.tertiaryContainer.toArgb()
+    val onTertiaryContainer: Int = colors.onTertiaryContainer.toArgb()
 }
