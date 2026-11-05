@@ -16,6 +16,9 @@
 
 package com.starception.submission.shared.ui
 
+import com.starception.submission.core.designsystem.theme.homeFeedPalette
+import com.starception.submission.core.designsystem.theme.drawHomeFeedGlow
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -292,6 +295,7 @@ fun PrayerTimesScreen(
     val playback by com.starception.submission.shared.media.QuranPlaybackBus.state.collectAsState()
     val isOnline by com.starception.submission.shared.connectivity.appConnectivity.isOnline.collectAsState()
     val homeCanvas = screenCanvasBrush()
+    val homeFeed = homeFeedPalette(MaterialTheme.colorScheme)
     val nextPrayerState = remember(day, notifications) {
         day.prayerAlertState(notifications)
     }
@@ -561,7 +565,7 @@ fun PrayerTimesScreen(
                         homeCoverHeaderUsesLightText(coverPage, coverNightArtwork),
                         with(LocalDensity.current) { homePortraitScroll.value.toDp().value },
                         with(LocalDensity.current) { homeCoverHeightPx.intValue.toDp().value },
-                        homeIsDark, Color(0xFF080B14), isPagerRevealed)
+                        homeFeed.background, isPagerRevealed)
                     NativeBarAppearance(
                         lightIcons = homeBannerUsesLightIcons(syncState.wobbleIntensity, MaterialTheme.colorScheme.tertiaryContainer) ?: artworkIcons)
                 }
@@ -882,9 +886,10 @@ fun PrayerTimesScreen(
                                               if (isPhoneHome && !isPagerRevealed && homeCoverHeightPx.intValue > 0) {
                                                   val coverBottom = homeCoverHeightPx.intValue + homeTopGap.toPx()
                                                   val start = (coverBottom - 150.dp.toPx()).coerceAtLeast(0f)
-                                                  drawRect(homeReflectionScrim(start, start + 450.dp.toPx(), Color(0xFF080B14)),
+                                                  drawRect(homeReflectionScrim(start, start + 450.dp.toPx(), homeFeed.background),
                                                       topLeft = androidx.compose.ui.geometry.Offset(0f, start),
                                                       size = androidx.compose.ui.geometry.Size(size.width, (size.height - start).coerceAtLeast(0f)))
+                                                  drawHomeFeedGlow(homeFeed, coverBottom)
                                               }
                                           },
                                       verticalArrangement = Arrangement.spacedBy(sectionGap),
@@ -969,7 +974,7 @@ fun PrayerTimesScreen(
                                                       bottomClearance = 96.dp, expanded = exploreExpanded,
                                                       onExpandedChange = { exploreExpanded = it }) { card, _ -> openHomeInsight(card.page) }
                                               },
-                                              onDarkCover = !homeIsDark,
+                                              onDarkCover = true,
                                               onClick = {
                                                   when (val target = HomePageReflections.cards[coverPage]?.target) {
                                                       is DeenlyKnowledgeTarget.Surah -> onOpenQuran(target.number)

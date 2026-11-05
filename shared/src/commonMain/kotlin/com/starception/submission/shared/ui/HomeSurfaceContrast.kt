@@ -6,7 +6,6 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 
-private val ReflectionInk = Color(0xFF0B1020)
 private const val ReflectionOpaqueStart = .35f
 private const val ReflectionOpaqueEnd = .68f
 
@@ -22,8 +21,8 @@ internal fun homeBackdropFeedOpacity(scrollOffset: Float, coverHeight: Float): F
 internal fun homeReflectionScrim(startY: Float, endY: Float, feedBackground: Color): Brush =
     Brush.verticalGradient(
         0f to Color.Transparent,
-        ReflectionOpaqueStart to ReflectionInk.copy(alpha = .94f),
-        ReflectionOpaqueEnd to ReflectionInk,
+        ReflectionOpaqueStart to feedBackground.copy(alpha = .94f),
+        ReflectionOpaqueEnd to feedBackground,
         1f to feedBackground,
         startY = startY,
         endY = endY,
@@ -38,7 +37,6 @@ internal fun homeStatusBarUsesLightIcons(
     coverUsesLightText: Boolean,
     scrollOffset: Float,
     coverHeight: Float,
-    isDarkTheme: Boolean,
     feedBackground: Color,
     readerExpanded: Boolean,
 ): Boolean {
@@ -47,19 +45,17 @@ internal fun homeStatusBarUsesLightIcons(
     val artworkTone = if (coverUsesLightText) Color(0xFF102033) else Color(0xFFDDE4E8)
     var background = lerp(
         artworkTone,
-        if (isDarkTheme) Color(0xFF080B14) else feedBackground,
+        feedBackground,
         homeBackdropFeedOpacity(scrollOffset, coverHeight),
     )
-    if (!isDarkTheme) {
-        val reflectionStart = (coverHeight + 8f - 150f).coerceAtLeast(0f)
-        val p = ((scrollOffset - reflectionStart) / 450f).coerceIn(0f, 1f)
-        val overlay = when {
-            p < ReflectionOpaqueStart -> lerp(Color.Transparent, ReflectionInk.copy(alpha = .94f), p / ReflectionOpaqueStart)
-            p < ReflectionOpaqueEnd -> lerp(ReflectionInk.copy(alpha = .94f), ReflectionInk,
-                (p - ReflectionOpaqueStart) / (ReflectionOpaqueEnd - ReflectionOpaqueStart))
-            else -> lerp(ReflectionInk, feedBackground, (p - ReflectionOpaqueEnd) / (1f - ReflectionOpaqueEnd))
-        }
-        background = overlay.compositeOver(background)
+    val reflectionStart = (coverHeight + 8f - 150f).coerceAtLeast(0f)
+    val p = ((scrollOffset - reflectionStart) / 450f).coerceIn(0f, 1f)
+    val overlay = when {
+        p < ReflectionOpaqueStart -> lerp(Color.Transparent, feedBackground.copy(alpha = .94f), p / ReflectionOpaqueStart)
+        p < ReflectionOpaqueEnd -> lerp(feedBackground.copy(alpha = .94f), feedBackground,
+            (p - ReflectionOpaqueStart) / (ReflectionOpaqueEnd - ReflectionOpaqueStart))
+        else -> feedBackground
     }
+    background = overlay.compositeOver(background)
     return background.luminance() < .179f
 }

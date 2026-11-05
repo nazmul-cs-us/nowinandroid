@@ -1,5 +1,7 @@
 package com.starception.submission.feature.prayertimes
 
+import com.starception.submission.core.designsystem.theme.homeFeedPalette
+
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -125,12 +127,12 @@ internal fun homeCoverCopyUsesLightText(
 ): Boolean = true
 
 /** Keep the cover title readable while the artwork fades into the reflection. */
-internal fun homeCoverScrim(prayerVisibility: Float): Brush = Brush.verticalGradient(
-    0f to Color(0xFF071C30).copy(alpha = .12f),
-    (.48f + .03f * prayerVisibility) to Color(0xFF0B1D2C).copy(alpha = .22f),
-    (.72f + .03f * prayerVisibility) to Color(0xFF071725).copy(alpha = .55f),
-    .91f to Color(0xFF080B14).copy(alpha = .98f),
-    1f to Color(0xFF080B14),
+internal fun homeCoverScrim(prayerVisibility: Float, feedBackground: Color): Brush = Brush.verticalGradient(
+    0f to feedBackground.copy(alpha = .12f),
+    (.48f + .03f * prayerVisibility) to feedBackground.copy(alpha = .22f),
+    (.72f + .03f * prayerVisibility) to feedBackground.copy(alpha = .55f),
+    .91f to feedBackground.copy(alpha = .98f),
+    1f to feedBackground,
 )
 
 @Composable
@@ -166,6 +168,7 @@ internal fun HomeCoverArtworkBackdrop(
     scrollOffsetPx: Int = 0,
     coverHeightPx: Int = 0,
 ) {
+    val feedBackground = homeFeedPalette(MaterialTheme.colorScheme).background
     val scrollPosition = position.value
     val lowerPage = scrollPosition.toInt().coerceIn(0, 4)
     val swipeProgress = (scrollPosition - lowerPage).coerceIn(0f, 1f)
@@ -179,8 +182,8 @@ internal fun HomeCoverArtworkBackdrop(
         // Shade the upper window locally so the greeting remains legible while
         // preserving natural daylight on the prayer rug.
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-            0f to Color(0xFF101C2B).copy(alpha = .36f * prayerVisibility),
-            .30f to Color(0xFF101C2B).copy(alpha = .12f * prayerVisibility),
+            0f to feedBackground.copy(alpha = .36f * prayerVisibility),
+            .30f to feedBackground.copy(alpha = .12f * prayerVisibility),
             .46f to Color.Transparent,
         )))
     }
@@ -188,7 +191,7 @@ internal fun HomeCoverArtworkBackdrop(
     // blurred scene kept Home rendering continuously even at rest (~50% of a
     // core on Samsung); the single image and scrim settle near idle instead.
     Box(Modifier.fillMaxSize().background(
-        homeCoverScrim(prayerVisibility)
+        homeCoverScrim(prayerVisibility, feedBackground)
     ))
     // The cover scene is fixed behind the vertically scrolling feed. Once the
     // cover leaves the viewport, fully cover it so no stale artwork shows
@@ -198,7 +201,7 @@ internal fun HomeCoverArtworkBackdrop(
         if (feedOpacity > 0f) {
             Box(
                 Modifier.fillMaxSize().background(
-                    (if (isDarkTheme) Color(0xFF080B14) else Color.White).copy(alpha = feedOpacity)
+                    feedBackground.copy(alpha = feedOpacity)
                 ),
             )
         }

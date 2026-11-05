@@ -1,5 +1,17 @@
 package com.starception.submission.feature.prayertimes
 
+import com.starception.submission.core.designsystem.theme.DarkChiliSpiceColorScheme
+import com.starception.submission.core.designsystem.theme.DarkChocolateTruffleColorScheme
+import com.starception.submission.core.designsystem.theme.DarkDamsonCuracaoColorScheme
+import com.starception.submission.core.designsystem.theme.DarkPurpleGoldColorScheme
+import com.starception.submission.core.designsystem.theme.LightChiliSpiceColorScheme
+import com.starception.submission.core.designsystem.theme.LightChocolateTruffleColorScheme
+import com.starception.submission.core.designsystem.theme.LightDamsonCuracaoColorScheme
+import com.starception.submission.core.designsystem.theme.LightPurpleGoldColorScheme
+import com.starception.submission.core.designsystem.theme.homeFeedPalette
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -23,8 +35,8 @@ class HomeSurfaceContrastTest {
         assertFalse(icons(coverLightText = false, darkTheme = true))
     }
 
-    @Test fun scrollingFromTheReflectionToLightFeedChangesIconContrast() {
-        assertTrue(icons(coverLightText = false, darkTheme = false, scroll = 600f))
+    @Test fun reflectionAndLightFeedUseTheSameIconContrast() {
+        assertFalse(icons(coverLightText = false, darkTheme = false, scroll = 600f))
         assertFalse(icons(coverLightText = true, darkTheme = false, scroll = 1100f))
     }
 
@@ -38,10 +50,33 @@ class HomeSurfaceContrastTest {
             coverUsesLightText = true,
             scrollOffset = 1100f,
             coverHeight = 550f,
-            isDarkTheme = false,
             feedBackground = Color(0xFF080B14),
             readerExpanded = false,
         ))
+    }
+
+    @Test fun everyCuratedHomeFeedKeepsWhiteTextAndStatusIconsLegible() {
+        val schemes = listOf(
+            LightPurpleGoldColorScheme, DarkPurpleGoldColorScheme,
+            LightChocolateTruffleColorScheme, DarkChocolateTruffleColorScheme,
+            LightDamsonCuracaoColorScheme, DarkDamsonCuracaoColorScheme,
+            LightChiliSpiceColorScheme, DarkChiliSpiceColorScheme,
+            // Also protect legacy/custom selections with very pale accents.
+            lightColorScheme(primary = Color.White, secondary = Color.White),
+        )
+        val palettes = schemes.map(::homeFeedPalette)
+        assertEquals("Each curated selection must change the Home feed", 8,
+            palettes.take(8).map { it.background }.distinct().size)
+        palettes.forEach { palette ->
+            val strongestGlow = palette.secondaryGlow.copy(alpha = .34f).compositeOver(
+                palette.primaryGlow.copy(alpha = .48f).compositeOver(palette.background))
+            listOf(palette.background, palette.primarySurface, palette.secondarySurface, strongestGlow)
+                .forEach { background ->
+                    val whiteTextContrast = 1.05f / (background.luminance() + .05f)
+                    assertTrue("Home white text contrast must be at least 4.5:1", whiteTextContrast >= 4.5f)
+                }
+            assertTrue(homeStatusBarUsesLightIcons(false, 1100f, 550f, palette.background, false))
+        }
     }
 
     private fun icons(
@@ -53,7 +88,6 @@ class HomeSurfaceContrastTest {
         coverUsesLightText = coverLightText,
         scrollOffset = scroll,
         coverHeight = 550f,
-        isDarkTheme = darkTheme,
         feedBackground = if (darkTheme) Color(0xFF080B14) else Color(0xFFF7F8F0),
         readerExpanded = reader,
     )

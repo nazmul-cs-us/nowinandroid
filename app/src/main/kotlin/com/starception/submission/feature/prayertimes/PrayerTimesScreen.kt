@@ -27,6 +27,9 @@ import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.starception.submission.core.designsystem.theme.homeFeedPalette
+import com.starception.submission.core.designsystem.theme.drawHomeFeedGlow
+
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import com.starception.submission.core.designsystem.component.homeLocationNeedsCollapse
@@ -95,7 +98,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -3066,6 +3068,7 @@ fun PrayerTimesScreen(
                     .asPaddingValues().calculateBottomPadding()
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
                 val darkHome = LocalDarkTheme.current
+                val homeFeed = homeFeedPalette(MaterialTheme.colorScheme)
                 var coverPage by rememberSaveable { mutableIntStateOf(0) }
                 var exploreExpanded by rememberSaveable { mutableStateOf(false) }
                 val coverScrollPosition = remember { mutableFloatStateOf(coverPage.toFloat()) }
@@ -3199,9 +3202,8 @@ fun PrayerTimesScreen(
                         coverUsesLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
                         scrollOffset = portraitScrollState.value.toDp().value,
                         coverHeight = insightHeightPx.toDp().value,
-                        isDarkTheme = darkHome,
                         feedBackground = if (outerIsLandscape) MaterialTheme.colorScheme.background
-                            else Color(0xFF080B14),
+                            else homeFeed.background,
                         readerExpanded = insightTileExpanded,
                     )
                 }
@@ -3219,7 +3221,7 @@ fun PrayerTimesScreen(
                     onDispose { com.starception.submission.ui.HomeSystemBarAppearance.update(null) }
                 }
                 Box(Modifier.fillMaxSize().then(
-                    if (darkHome || !outerIsLandscape) Modifier.background(Color(0xFF080B14))
+                    if (darkHome || !outerIsLandscape) Modifier.background(homeFeed.background)
                     else Modifier.background(mainPageBackgroundBrush()),
                 )) {
                 if (!outerIsLandscape) {
@@ -3689,8 +3691,8 @@ fun PrayerTimesScreen(
                                         colorScheme = if (darkHome || !outerIsLandscape) {
                                             androidx.compose.material3.darkColorScheme(
                                                 primary = feedAccent,
-                                                background = Color(0xFF080B14),
-                                                surface = Color(0xFF131B27),
+                                                background = homeFeed.background,
+                                                surface = homeFeed.primarySurface,
                                             )
                                         } else {
                                             ambientScheme.copy(
@@ -3766,54 +3768,12 @@ fun PrayerTimesScreen(
                                                             // Start inside the artwork and carry the reflection's
                                                             // ink into the entire feed, with no pale horizontal seam.
                                                             brush = homeReflectionScrim(
-                                                                start, start + 450.dp.toPx(), Color(0xFF080B14),
+                                                                start, start + 450.dp.toPx(), homeFeed.background,
                                                             ),
                                                             topLeft = Offset(0f, start),
                                                             size = androidx.compose.ui.geometry.Size(size.width, lowerHeight),
                                                         )
-                                                         // Low, diffused color gives the reflection depth without
-                                                         // turning its text into a card.
-                                                        val glowY = coverBottom + 118.dp.toPx()
-                                                        val glowRadius = size.width * 1.08f
-                                                        val glowTop = (coverBottom - 220.dp.toPx()).coerceAtLeast(0f)
-                                                        val glowBottom = (coverBottom + 450.dp.toPx()).coerceAtMost(size.height)
-                                                         clipRect(top = glowTop, bottom = glowBottom) {
-                                                            drawRect(
-                                                                brush = Brush.radialGradient(
-                                                                    0f to Color(0xFF9865A9).copy(alpha = .48f),
-                                                                    .32f to Color(0xFF805599).copy(alpha = .20f),
-                                                                    .74f to Color.Transparent,
-                                                                    center = Offset(size.width * .08f, glowY),
-                                                                    radius = glowRadius,
-                                                                ),
-                                                            )
-                                                            drawRect(
-                                                                brush = Brush.radialGradient(
-                                                                    0f to Color(0xFF285E96).copy(alpha = .34f),
-                                                                    .38f to Color(0xFF214473).copy(alpha = .12f),
-                                                                    .76f to Color.Transparent,
-                                                                    center = Offset(size.width * .82f, glowY + 26.dp.toPx()),
-                                                                    radius = glowRadius,
-                                                                ),
-                                                            )
-                                                         }
-                                                         // The same violet-to-blue light continues beneath the
-                                                         // artwork rail, prayer schedule and the bottom of Home.
-                                                         val feedStart = coverBottom + 420.dp.toPx()
-                                                         if (size.height > feedStart) {
-                                                             drawRect(
-                                                                 brush = Brush.verticalGradient(
-                                                                     0f to Color(0xFF080B14),
-                                                                     .42f to Color(0xFF211B35),
-                                                                     .76f to Color(0xFF11263E),
-                                                                     1f to Color(0xFF080B14),
-                                                                     startY = feedStart,
-                                                                     endY = size.height,
-                                                                 ),
-                                                                 topLeft = Offset(0f, feedStart),
-                                                                 size = androidx.compose.ui.geometry.Size(size.width, size.height - feedStart),
-                                                             )
-                                                         }
+                                                        drawHomeFeedGlow(homeFeed, coverBottom)
                                                     }
                                                 }
                                             }

@@ -23,8 +23,8 @@ class HomeSurfaceContrastTest {
         assertFalse(icons(coverLightText = false, darkTheme = true))
     }
 
-    @Test fun scrollingFromTheReflectionToLightFeedChangesIconContrast() {
-        assertTrue(icons(coverLightText = false, darkTheme = false, scroll = 600f))
+    @Test fun reflectionAndLightFeedUseTheSameIconContrast() {
+        assertFalse(icons(coverLightText = false, darkTheme = false, scroll = 600f))
         assertFalse(icons(coverLightText = true, darkTheme = false, scroll = 1100f))
     }
 
@@ -38,7 +38,6 @@ class HomeSurfaceContrastTest {
             coverUsesLightText = true,
             scrollOffset = 1100f,
             coverHeight = 550f,
-            isDarkTheme = false,
             feedBackground = Color(0xFF080B14),
             readerExpanded = false,
         ))
@@ -53,7 +52,6 @@ class HomeSurfaceContrastTest {
         coverUsesLightText = coverLightText,
         scrollOffset = scroll,
         coverHeight = 550f,
-        isDarkTheme = darkTheme,
         feedBackground = if (darkTheme) Color(0xFF080B14) else Color(0xFFF7F8F0),
         readerExpanded = reader,
     )
