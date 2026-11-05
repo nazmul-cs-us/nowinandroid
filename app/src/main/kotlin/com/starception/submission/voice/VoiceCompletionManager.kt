@@ -209,6 +209,7 @@ class VoiceCompletionManager @Inject constructor(
      * Uses the user-selected TTS voice from settings.
      */
     private suspend fun playVoicePrompt(lessonTitle: String): Boolean {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return false
         val promptText = "Say YES to mark this lesson complete, or NO to skip."
 
         // Cancel any ongoing background TTS pre-generation to get priority
@@ -247,6 +248,7 @@ class VoiceCompletionManager @Inject constructor(
      * Fallback to Android system TTS.
      */
     private suspend fun playWithAndroidTts(promptText: String): Boolean {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return false
         return suspendCancellableCoroutine { continuation ->
             try {
                 // Initialize TTS if needed
@@ -445,6 +447,7 @@ class VoiceCompletionManager @Inject constructor(
      * may not be strictly necessary on all devices.
      */
     private fun forcePhoneMicrophone() {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return
         try {
             // Save original state for restoration
             originalAudioMode = audioManager.mode
@@ -485,6 +488,7 @@ class VoiceCompletionManager @Inject constructor(
      * Restore audio state after recording is complete.
      */
     private fun restoreAudioState() {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return
         try {
             Log.d(TAG, "🎤 Restoring original audio state")
             audioManager.mode = originalAudioMode
@@ -508,6 +512,7 @@ class VoiceCompletionManager @Inject constructor(
      * Previous 2+ second delays caused user's "yes" to be missed entirely.
      */
     private suspend fun prepareAudioForRecording(): Long {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return 0L
         val isBluetoothConnected = isBluetoothAudioConnected()
         val isLocked = isDeviceLocked()
 
@@ -618,6 +623,11 @@ class VoiceCompletionManager @Inject constructor(
         onInconclusive: (String) -> Unit,
         onError: (String) -> Unit,
     ) {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) {
+            onError("A family call is using the microphone")
+            return
+        }
+
         val selectedEngine = getSelectedEngine()
         val isRetry = currentRetryCount > 0
         val isLocked = isDeviceLocked()

@@ -246,7 +246,15 @@ fun NiaApp(
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
     mainViewModel: MainActivityViewModel? = null,
     deepLinkCourseId: String? = null,
+    familyClient: com.starception.submission.family.FamilyClient? = null,
 ) {
+    if (familyClient != null) com.starception.submission.family.FamilyCallOverlay(familyClient)
+    val familyOwnsAudio by com.starception.submission.family.FamilyAudioSession.state.collectAsStateWithLifecycle()
+    LaunchedEffect(familyOwnsAudio) {
+        if (familyOwnsAudio && mainViewModel?.globalMedia?.controllerState?.value?.playback?.isPlaying == true) {
+            mainViewModel.globalMedia.pause()
+        }
+    }
     val shouldShowGradientBackground =
         appState.currentTopLevelDestination == TopLevelDestination.FOR_YOU
 

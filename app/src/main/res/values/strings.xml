@@ -128,4 +128,5 @@
   <string name="sample_search_button_label">Search</string>
   <string name="sample_mark_done_button_content_description">sample_mark_done</string>
   <string name="sample_full_bleed_image_app_widget_name">Full Bleed Snap Scrolling</string>
+    <string name="family_title">Family</string>
 </resources>

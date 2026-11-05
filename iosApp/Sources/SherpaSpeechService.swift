@@ -35,6 +35,7 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
         paths: IosSherpaRecognitionPaths,
         eventSink: IosSherpaEventSink
     ) -> Bool {
+        guard !FamilyAudioSession.shared.isActive else { return false }
         if let error = validateRecognitionPaths(paths, requiresKeywords: true) {
             emit(eventSink) { $0.onError(message: error) }
             return false
@@ -58,6 +59,7 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
         paths: IosSherpaRecognitionPaths,
         eventSink: IosSherpaEventSink
     ) -> Bool {
+        guard !FamilyAudioSession.shared.isActive else { return false }
         if let error = validateRecognitionPaths(paths, requiresKeywords: false) {
             emit(eventSink) { $0.onError(message: error) }
             return false
@@ -91,6 +93,7 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
         speed: Float,
         eventSink: IosSherpaEventSink
     ) -> Bool {
+        guard !FamilyAudioSession.shared.isActive else { return false }
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else {
             emit(eventSink) { $0.onError(message: "TTS text is empty") }
@@ -663,6 +666,7 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
     }
 
     private func deactivateAudioSession() {
+        guard !FamilyAudioSession.shared.isActive else { return }
         try? AVAudioSession.sharedInstance().setActive(
             false,
             options: .notifyOthersOnDeactivation

@@ -35,6 +35,7 @@ internal object IosAudioSessionController {
     )
 
     fun activatePlayback(): Boolean {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return false
         var activated = false
         dispatch_sync(queue) {
             val session = AVAudioSession.sharedInstance()
@@ -45,6 +46,7 @@ internal object IosAudioSessionController {
     }
 
     fun activateRecording(): Boolean {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return false
         var activated = false
         dispatch_sync(queue) {
             val session = AVAudioSession.sharedInstance()
@@ -62,6 +64,7 @@ internal object IosAudioSessionController {
     /** Deactivation does not gate subsequent UI work, so it can remain fully asynchronous. */
     fun deactivate() {
         dispatch_async(queue) {
+            if (com.starception.submission.family.FamilyAudioSession.isActive) return@dispatch_async
             AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
         }
     }

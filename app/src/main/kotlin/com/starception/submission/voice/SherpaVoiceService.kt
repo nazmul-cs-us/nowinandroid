@@ -16,6 +16,7 @@
 
 package com.starception.submission.voice
 
+import kotlinx.coroutines.flow.collect
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -214,6 +215,7 @@ class SherpaVoiceService(
      * Start real-time speech recognition
      */
     fun startListening(onResult: (VoiceSearchService.VoiceSearchResult) -> Unit) {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return
         if (!hasPermission()) {
             onResult(VoiceSearchService.VoiceSearchResult.Error("Microphone permission required"))
             return
@@ -360,5 +362,12 @@ class SherpaVoiceService(
         recognizer?.release()
         recognizer = null
         _isInitialized.value = false
+    }
+    init {
+        scope.launch {
+            com.starception.submission.family.FamilyAudioSession.state.collect { active ->
+                if (active) stopListening()
+            }
+        }
     }
 }

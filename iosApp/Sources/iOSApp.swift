@@ -65,6 +65,8 @@ struct iOSApp: App {
         PrayerNotificationCoordinator.shared.start()
     }
 
+    @State private var showingFamily = false
+
     var body: some Scene {
         WindowGroup {
             ZStack {
@@ -85,6 +87,19 @@ struct iOSApp: App {
                     .zIndex(10)
                 }
             }
+                .modifier(FamilyCallPresentation(enabled: !showingFamily))
+                .overlay(alignment: .topTrailing) {
+                    if #available(iOS 26.0, *) { EmptyView() }
+                    else {
+                        Button { showingFamily = true } label: {
+                            Label("Family", systemImage: "person.2.fill")
+                                .padding(10).background(.regularMaterial, in: Capsule())
+                        }.padding(.trailing, 12)
+                    }
+                }
+                .sheet(isPresented: $showingFamily) {
+                    NavigationStack { FamilyView().modifier(FamilyCallPresentation()) }
+                }
                 .preferredColorScheme(appPreferredColorScheme)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("sharedBarAppearanceChanged"))) { notification in
             guard let value = notification.object as? String else { return }

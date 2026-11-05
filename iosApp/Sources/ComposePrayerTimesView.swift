@@ -1102,12 +1102,19 @@ private struct MorePrayerTabsView: View {
                 NavigationLink(value: 3) {
                     Label("Course", systemImage: "play.rectangle")
                 }
+                NavigationLink(value: 7) {
+                    Label("Family", systemImage: "person.2")
+                }
             }
             .navigationTitle("More")
             .navigationDestination(for: Int.self) { index in
-                ComposePrayerTimesTabView(tabIndex: index, onSelectTab: onSelectTab)
-                    .ignoresSafeArea(.container, edges: .bottom)
-                    .navigationBarTitleDisplayMode(.inline)
+                if index == 7 {
+                    FamilyView()
+                } else {
+                    ComposePrayerTimesTabView(tabIndex: index, onSelectTab: onSelectTab)
+                        .ignoresSafeArea(.container, edges: .bottom)
+                        .navigationBarTitleDisplayMode(.inline)
+                }
             }
         }
     }

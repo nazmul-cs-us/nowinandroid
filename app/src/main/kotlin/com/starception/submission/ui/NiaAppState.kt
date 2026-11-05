@@ -215,6 +215,7 @@ class NiaAppState(
             // }
 
             when (topLevelDestination) {
+                TopLevelDestination.FAMILY -> navController.navigate(com.starception.submission.family.FamilyRoute, topLevelNavOptions)
                 FOR_YOU -> navController.navigateToForYou(topLevelNavOptions)
                 BOOKMARKS -> navController.navigateToBookmarks(topLevelNavOptions)
                 INTERESTS -> navController.navigateToInterests(null, topLevelNavOptions)

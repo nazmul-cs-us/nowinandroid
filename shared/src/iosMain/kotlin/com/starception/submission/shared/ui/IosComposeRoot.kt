@@ -16,6 +16,7 @@
 
 package com.starception.submission.shared.ui
 
+import kotlinx.coroutines.flow.collect
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -626,6 +627,18 @@ private fun createPrayerTimesViewController(
             isTravelDuaPlaying = false
             isNarrationSpeaking = false
             narrationStatus = null
+        }
+
+        LaunchedEffect(Unit) {
+            com.starception.submission.family.FamilyAudioSession.state.collect { active ->
+                if (active) {
+                    stopAllSpeech()
+                    recognitionJob?.cancel()
+                    sherpaService?.stopRecognition()
+                    speechRecognizer.stop()
+                    com.starception.submission.shared.media.QuranPlaybackBus.stop()
+                }
+            }
         }
 
         fun playTravelDua() {

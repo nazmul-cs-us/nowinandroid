@@ -100,6 +100,7 @@ import android.location.Location as AndroidLocation
  */
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
+    @Inject lateinit var familyClient: com.starception.submission.family.FamilyClient
 
     private val viewModel: MainActivityViewModel by lazy {
         ViewModelProvider(this)[MainActivityViewModel::class.java]
@@ -334,6 +335,7 @@ class MainActivity : FragmentActivity() {
                             appState = appState,
                             mainViewModel = viewModel,
                             deepLinkCourseId = deepLinkCourseId,
+                            familyClient = familyClient,
                         )
                         WidgetDiscoveryPrompt()
                     }

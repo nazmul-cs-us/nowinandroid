@@ -101,6 +101,7 @@ actual class QuranAudioPlayer actual constructor() {
     }
 
     actual fun play(url: String): Boolean {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return false
         val nsUrl = NSURL.URLWithString(url) ?: return false
         if (!audioSessionActive) {
             if (!IosAudioSessionController.activatePlayback()) return false

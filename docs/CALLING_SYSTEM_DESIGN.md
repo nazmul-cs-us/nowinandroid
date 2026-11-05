@@ -1,6 +1,6 @@
 # Private calling design — reviewed baseline
 
-Status: design only. No calling server or mobile calling implementation has been deployed. This document replaces the earlier Go/LiveKit group-first proposal.
+Status: reviewed production design. A foreground Family calling implementation is now in the repository; see [Family calling](FAMILY_CALLING.md) for its exact scope, server module, native clients and deployment/validation steps. Deployment and real-device acceptance are separate. Production identity/bootstrap and background push integration remain planned. This document replaces the earlier Go/LiveKit group-first proposal.
 
 ## Scope and selection
 

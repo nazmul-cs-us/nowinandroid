@@ -80,6 +80,13 @@ enum class TopLevelDestination(
         titleTextId = R.string.course_title,
         route = CourseRoute::class,
     ),
+    FAMILY(
+        selectedIcon = NiaIcons.Person,
+        unselectedIcon = NiaIcons.Person,
+        iconTextId = R.string.family_title,
+        titleTextId = R.string.family_title,
+        route = com.starception.submission.family.FamilyRoute::class,
+    ),
     INTERESTS(
         selectedIcon = NiaIcons.Grid3x3,
         unselectedIcon = NiaIcons.Grid3x3,

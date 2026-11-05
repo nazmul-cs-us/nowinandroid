@@ -16,6 +16,8 @@
 
 package com.starception.submission.voice
 
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -68,6 +70,7 @@ class SherpaOnnxKwsService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val assetRepository: AssetRepository,
 ) {
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main)
     companion object {
         private const val TAG = "SherpaOnnxKwsService"
 
@@ -270,6 +273,11 @@ class SherpaOnnxKwsService @Inject constructor(
         durationMs: Long = DEFAULT_LISTENING_DURATION_MS,
         callback: VoiceRecognitionCallback,
     ) = withContext(Dispatchers.IO) {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) {
+            callback.onResult(VoiceResult.Error("A family call is using the microphone"))
+            return@withContext
+        }
+
         // Prevent concurrent listening
         if (isListening) {
             Log.w(TAG, "Already listening, ignoring new request")
@@ -892,5 +900,12 @@ class SherpaOnnxKwsService @Inject constructor(
                 }
             },
         )
+    }
+    init {
+        scope.launch {
+            com.starception.submission.family.FamilyAudioSession.state.collect { active ->
+                if (active) stopListening()
+            }
+        }
     }
 }

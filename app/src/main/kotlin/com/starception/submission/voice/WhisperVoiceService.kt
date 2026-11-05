@@ -16,6 +16,7 @@
 
 package com.starception.submission.voice
 
+import kotlinx.coroutines.flow.collect
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -182,6 +183,11 @@ class WhisperVoiceService @Inject constructor(
         durationMs: Long = DEFAULT_LISTENING_DURATION_MS,
         callback: VoiceRecognitionCallback,
     ) = withContext(Dispatchers.IO) {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) {
+            callback.onResult(VoiceResult.Error("A family call is using the microphone"))
+            return@withContext
+        }
+
         // Check model is loaded
         if (!isModelReady()) {
             Log.e(TAG, "Model not loaded, attempting to load...")
@@ -480,6 +486,13 @@ class WhisperVoiceService @Inject constructor(
             whisperContext = null
             recorder = null
             isModelLoaded = false
+        }
+    }
+    init {
+        scope.launch {
+            com.starception.submission.family.FamilyAudioSession.state.collect { active ->
+                if (active) stopListening()
+            }
         }
     }
 }

@@ -1,4 +1,6 @@
 [versions]
+familyWebrtc = "150.7871.04"
+smack = "4.4.8"
 accompanist = "0.37.0"
 androidDesugarJdkLibs = "2.1.5"
 # AGP and tools should be updated together
@@ -94,6 +96,10 @@ skydovesColorpicker = "1.1.3"
 androidx-compose-ui-test = ["androidx-compose-ui-test", "androidx-compose-ui-testManifest"]
 
 [libraries]
+family-webrtc = { module = "io.github.webrtc-sdk:android", version.ref = "familyWebrtc" }
+smack-android-extensions = { module = "org.igniterealtime.smack:smack-android-extensions", version.ref = "smack" }
+smack-tcp = { module = "org.igniterealtime.smack:smack-tcp", version.ref = "smack" }
+smack-xmlparser = { module = "org.igniterealtime.smack:smack-xmlparser-xpp3", version.ref = "smack" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 skydoves-colorpicker-compose = { group = "com.github.skydoves", name = "colorpicker-compose", version.ref = "skydovesColorpicker" }
 android-desugarJdkLibs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "androidDesugarJdkLibs" }

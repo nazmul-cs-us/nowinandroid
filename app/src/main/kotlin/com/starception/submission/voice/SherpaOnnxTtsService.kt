@@ -16,6 +16,7 @@
 
 package com.starception.submission.voice
 
+import kotlinx.coroutines.flow.collect
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -416,6 +417,7 @@ class SherpaOnnxTtsService @Inject constructor(
         onComplete: (() -> Unit)? = null,
         onPlaybackStart: (() -> Unit)? = null,
     ): Boolean {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return false
         val speechText = EnglishTtsTextNormalizer.normalize(text)
         _isPreparingAudio.value = true
         stopRequested = false
@@ -1037,6 +1039,7 @@ class SherpaOnnxTtsService @Inject constructor(
         onPlaybackStart: (() -> Unit)? = null,
         retainCache: Boolean = false,
     ): Boolean {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) return false
         stopRequested = false
         playbackPaused = false
         val speechText = EnglishTtsTextNormalizer.normalize(text)
@@ -1527,6 +1530,13 @@ class SherpaOnnxTtsService @Inject constructor(
                 Log.i(TAG, "========== TTS TEST COMPLETED ==========")
             } catch (e: Exception) {
                 Log.e(TAG, "TTS TEST FAILED with exception", e)
+            }
+        }
+    }
+    init {
+        scope.launch {
+            com.starception.submission.family.FamilyAudioSession.state.collect { active ->
+                if (active) stopSpeaking()
             }
         }
     }

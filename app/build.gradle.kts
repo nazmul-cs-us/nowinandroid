@@ -128,6 +128,11 @@ android {
 }
 
 dependencies {
+    implementation(projects.core.family)
+    implementation(libs.smack.android.extensions)
+    implementation(libs.smack.tcp)
+    implementation(libs.smack.xmlparser)
+    implementation(libs.family.webrtc)
     implementation(projects.feature.interests)
     implementation(projects.feature.foryou)
     implementation(projects.feature.bookmarks)
@@ -305,3 +310,6 @@ baselineProfile {
 dependencyGuard {
     configuration("prodReleaseRuntimeClasspath")
 }
+
+// The app already uses full xpp3. Smack's minimal variant defines the same classes.
+configurations.configureEach { exclude(group = "xpp3", module = "xpp3_min") }

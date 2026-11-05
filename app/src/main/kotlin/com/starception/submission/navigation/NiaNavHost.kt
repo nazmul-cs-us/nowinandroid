@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.NavBackStackEntry
 import com.starception.submission.MainActivityViewModel
@@ -583,6 +584,9 @@ fun NiaNavHost(
                 isOffline = homeIsOffline,
                 offlineText = homeOfflineText,
             )
+            composable<com.starception.submission.family.FamilyRoute> {
+                com.starception.submission.family.FamilyScreen()
+            }
             courseScreen(
                 titleRes = TopLevelDestination.COURSE.titleTextId,
                 onSearchClick = { appState.navigateToSearch() },
