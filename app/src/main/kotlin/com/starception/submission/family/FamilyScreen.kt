@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import com.starception.submission.R
+import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -144,16 +145,16 @@ internal fun FamilyScreenContent(
     val canCall = state.serviceReady && state.call == null
     LaunchedEffect(suggestedPeer) { if (invitation.isBlank()) invitation = suggestedPeer }
     LaunchedEffect(state.connected) { if (!state.connected) { selected = null; inviting = false } }
-    Column(Modifier.fillMaxSize().background(colors.header).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(mainPageBackgroundBrush()).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp).height(64.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(34.dp).background(colors.onHeader.copy(alpha = 0.10f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.FavoriteBorder, null, Modifier.size(19.dp), tint = colors.onHeader)
+            Box(Modifier.size(34.dp).background(colors.ink.copy(alpha = 0.10f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.FavoriteBorder, null, Modifier.size(19.dp), tint = colors.ink)
             }
-            Text("Family", Modifier.padding(start = 10.dp).weight(1f), color = colors.onHeader, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+            Text("Family", Modifier.padding(start = 10.dp).weight(1f), color = colors.ink, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             if (state.connected) {
-                IconButton(onClick = { searching = !searching; if (!searching) search = "" }) { Icon(Icons.Default.Search, "Search family", tint = colors.onHeader) }
+                IconButton(onClick = { searching = !searching; if (!searching) search = "" }) { Icon(Icons.Default.Search, "Search family", tint = colors.ink) }
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreHoriz, "Family settings", tint = colors.onHeader) }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreHoriz, "Family settings", tint = colors.ink) }
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem(text = { Text("Refresh family") }, onClick = { menu = false; actions.refresh() })
                         DropdownMenuItem(text = { Text("Sign out") }, onClick = { menu = false; actions.signOut() })
@@ -165,16 +166,16 @@ internal fun FamilyScreenContent(
             LazyRow(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 item {
                     Column(Modifier.width(60.dp).clickable(enabled = state.serviceReady, role = androidx.compose.ui.semantics.Role.Button) { inviting = true }, horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.size(60.dp).border(1.dp, colors.onHeader.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Add, "Invite a member", tint = colors.onHeader, modifier = Modifier.size(24.dp))
+                        Box(Modifier.size(60.dp).border(1.dp, colors.ink.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Add, "Invite a member", tint = colors.ink, modifier = Modifier.size(24.dp))
                         }
-                        Text("Invite", fontSize = 11.sp, color = colors.onHeader, modifier = Modifier.padding(top = 8.dp))
+                        Text("Invite", fontSize = 11.sp, color = colors.ink, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
                 items(family, key = { it.jid }) { member ->
                     Column(Modifier.width(60.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { selected = member }, horizontalAlignment = Alignment.CenterHorizontally) {
                         ContactAvatar(member.jid, 60, ring = true)
-                        Text(callDisplayName(member.jid).substringBefore(' '), fontSize = 11.sp, color = colors.onHeader,
+                        Text(callDisplayName(member.jid).substringBefore(' '), fontSize = 11.sp, color = colors.ink,
                             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
@@ -182,7 +183,7 @@ internal fun FamilyScreenContent(
         } else {
             LandingIllustration(Modifier.fillMaxWidth().height(148.dp))
         }
-        Surface(Modifier.weight(1f).fillMaxWidth(), color = colors.panel, shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)) {
+        Surface(Modifier.weight(1f).fillMaxWidth(), color = colors.panel.copy(alpha = 0.78f), shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)) {
             LazyColumn(contentPadding = PaddingValues(top = 24.dp, bottom = 104.dp)) {
                 if (!state.connected) {
                     item {
@@ -351,7 +352,7 @@ private fun LandingIllustration(modifier: Modifier = Modifier) {
     val colors = familyPalette()
     val scheme = MaterialTheme.colorScheme
     Box(modifier, contentAlignment = Alignment.Center) {
-        Box(Modifier.size(160.dp).background(colors.onHeader.copy(alpha = 0.05f), CircleShape))
+        Box(Modifier.size(160.dp).background(colors.ink.copy(alpha = 0.05f), CircleShape))
         Box(Modifier.offset(x = (-43).dp, y = 7.dp).size(76.dp).background(scheme.secondaryContainer, CircleShape), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Person, null, Modifier.size(42.dp), tint = scheme.onSecondaryContainer)
         }
@@ -468,9 +469,9 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
                     color = Color.White, fontSize = 11.sp)
             }
         }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(if (immersive)
-            listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent, Color.Black.copy(alpha = 0.78f))
-            else listOf(colors.primaryContainer, colors.surface, colors.surface))))
+        Box(Modifier.fillMaxSize().background(if (immersive) Brush.verticalGradient(
+            listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent, Color.Black.copy(alpha = 0.78f)))
+            else mainPageBackgroundBrush()))
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {

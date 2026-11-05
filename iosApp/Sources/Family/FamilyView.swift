@@ -32,6 +32,10 @@ private final class FamilyAppearance: ObservableObject {
 private struct FamilyColors {
     private let raw: FamilyThemePalette
     init(dark: Bool) { raw = FamilyThemePalette(dark: dark) }
+    var canvas: [Color] {
+        raw.canvasCount == 3 ? [familyColor(raw.canvasTop), familyColor(raw.canvasMiddle), familyColor(raw.canvasBottom)] :
+            [familyColor(raw.canvasTop), familyColor(raw.canvasMiddle), familyColor(raw.canvasLower), familyColor(raw.canvasBottom)]
+    }
     var panel: Color { familyColor(raw.panel) }
     var field: Color { familyColor(raw.field) }
     var ink: Color { familyColor(raw.ink) }
@@ -97,13 +101,13 @@ struct FamilyView: View {
                     }
                     .padding(.top, 24).padding(.bottom, 24)
                     .frame(minHeight: max(0, geometry.size.height - (store.connected ? 128 : 148)), alignment: .top)
-                    .frame(maxWidth: .infinity).background(colors.panel)
+                    .frame(maxWidth: .infinity).background(colors.panel.opacity(0.78))
                     .clipShape(FamilyTopCorners(radius: 30))
                 }
-            }.background(colors.header)
+            }.background(LinearGradient(colors: colors.canvas, startPoint: .top, endPoint: .bottom).ignoresSafeArea())
         }
         .navigationTitle("Family").navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(colors.header, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
 
         .toolbar {
             if store.connected {
@@ -133,15 +137,15 @@ struct FamilyView: View {
                 Button { inviting = true } label: {
                     VStack(spacing: 8) {
                         Image(systemName: "plus").font(.system(size: 23, weight: .light)).frame(width: 60, height: 60)
-                            .overlay(Circle().strokeBorder(colors.onHeader.opacity(0.5), lineWidth: 1))
+                            .overlay(Circle().strokeBorder(colors.ink.opacity(0.5), lineWidth: 1))
                         Text("Invite").font(.system(size: 11))
-                    }.foregroundStyle(colors.onHeader.opacity(0.9))
+                    }.foregroundStyle(colors.ink.opacity(0.9))
                 }.disabled(!store.serviceReady)
                 ForEach(family) { member in
                     Button { selected = member } label: {
                         VStack(spacing: 8) {
                             FamilyContactAvatar(jid: member.jid, size: 60, ring: true)
-                            Text(familyName(member.jid).components(separatedBy: " ")[0]).font(.system(size: 11)).foregroundStyle(colors.onHeader.opacity(0.9)).lineLimit(1)
+                            Text(familyName(member.jid).components(separatedBy: " ")[0]).font(.system(size: 11)).foregroundStyle(colors.ink.opacity(0.9)).lineLimit(1)
                         }.frame(width: 60)
                     }
                 }
@@ -505,7 +509,7 @@ private struct FamilyCallView: View {
             }.ignoresSafeArea()
             LinearGradient(colors: [.black.opacity(0.55), .clear, .black.opacity(0.78)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
         } else {
-            LinearGradient(colors: [colors.header, colors.panel, colors.panel], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            LinearGradient(colors: colors.canvas, startPoint: .top, endPoint: .bottom).ignoresSafeArea()
         }
     }
     private func status(incoming: Bool, stage: String, now: Date) -> String {

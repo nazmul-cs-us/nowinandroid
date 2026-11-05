@@ -1224,23 +1224,23 @@ private fun NativePrayerVolumeController(
 internal fun screenCanvasBrush(): Brush {
     val colorScheme = MaterialTheme.colorScheme
     val isDarkTheme = colorScheme.background.luminance() < 0.5f
-    return if (isDarkTheme) {
-        Brush.verticalGradient(
-            listOf(
-                colorScheme.background,
-                colorScheme.surface,
-                colorScheme.primary.copy(alpha = 0.05f).compositeOver(colorScheme.surface),
-                colorScheme.background,
-            ),
+    return Brush.verticalGradient(homeScreenCanvasColors(colorScheme, isDarkTheme))
+}
+
+internal fun homeScreenCanvasColors(colorScheme: androidx.compose.material3.ColorScheme, dark: Boolean): List<Color> {
+    return if (dark) {
+        listOf(
+            colorScheme.background,
+            colorScheme.surface,
+            colorScheme.primary.copy(alpha = 0.05f).compositeOver(colorScheme.surface),
+            colorScheme.background,
         )
     } else {
-        Brush.verticalGradient(
-            listOf(
-                colorScheme.background,
-                colorScheme.surfaceContainerLow,
-                colorScheme.secondary.copy(alpha = 0.14f)
-                    .compositeOver(colorScheme.surfaceContainerLow),
-            ),
+        listOf(
+            colorScheme.background,
+            colorScheme.surfaceContainerLow,
+            colorScheme.secondary.copy(alpha = 0.14f)
+                .compositeOver(colorScheme.surfaceContainerLow),
         )
     }
 }

@@ -80,7 +80,6 @@ import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.prayer.service.ADHAN_AUDIO_STREAM
 import com.starception.submission.settings.components.AboutSection
-import com.starception.submission.settings.components.AppIconSection
 import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.ContentManagementSection
 import com.starception.submission.settings.components.ReciterStorageSection
@@ -293,7 +292,6 @@ fun UnifiedSettingsScreen(
                                 onChangeThemeBrand = viewModel::updateThemeBrand,
                                 onChangeDarkThemeConfig = viewModel::updateDarkThemeConfig,
                             )
-                            AppIconSection(modifier = Modifier.padding(top = 20.dp))
                         }
                     }
 

@@ -1582,6 +1582,12 @@ class FamilyThemePalette(dark: Boolean) {
         defaults.stringForKey("ios_custom_primary")?.toIntOrNull() ?: 0,
         defaults.stringForKey("ios_custom_secondary")?.toIntOrNull() ?: 0,
         defaults.stringForKey("ios_custom_tertiary")?.toIntOrNull() ?: 0)
+    private val canvas = homeScreenCanvasColors(colors, dark)
+    val canvasCount: Int = canvas.size
+    val canvasTop: Int = canvas.first().toArgb()
+    val canvasMiddle: Int = canvas[1].toArgb()
+    val canvasLower: Int = canvas[2].toArgb()
+    val canvasBottom: Int = canvas.last().toArgb()
     val panel: Int = colors.surface.toArgb()
     val field: Int = colors.surfaceContainerLow.toArgb()
     val ink: Int = colors.onSurface.toArgb()
