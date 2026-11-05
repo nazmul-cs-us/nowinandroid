@@ -44,6 +44,17 @@ sudo install -m 0644 server/family/smoke.py /tmp/deenly-family-smoke.py
 sudo -u mongooseim python3 /tmp/deenly-family-smoke.py
 ```
 
+The smoke script reads the configured C2s listener from
+`/etc/mongooseim/mongooseim.toml`, so private-interface deployments do not connect
+to an unbound loopback socket. To override it explicitly, use:
+
+```bash
+sudo -u mongooseim python3 /tmp/deenly-family-smoke.py --host 10.148.0.2 --port 5222
+```
+
+The network destination does not change certificate verification: TLS still
+verifies `xmpp.starception.com`.
+
 The installer now installs `mod_deenly_family_presence.beam` alongside the existing
 modules and restarts MongooseIM. The smoke script uses temporary accounts and checks
 live availability events, background transitions and stale activity rejection,

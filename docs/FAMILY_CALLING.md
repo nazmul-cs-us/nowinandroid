@@ -69,6 +69,8 @@ sudo install -m 0644 server/family/smoke.py /tmp/deenly-family-smoke.py
 sudo -u mongooseim python3 /tmp/deenly-family-smoke.py
 ```
 
+The smoke script reads the configured local C2s listener; `--host` and `--port` override detection. TLS always verifies `xmpp.starception.com`.
+
 The installer validates the source commit, compiles against release dependencies, backs up XMPP configuration, enables the module, and copies the existing coturn secret into a protected service-readable file. It restarts **MongooseIM**, interrupting its sessions. It does not restart/change coturn.
 
 Once the smoke test passes, bind to the documented VM private interface behind GCP NAT:
