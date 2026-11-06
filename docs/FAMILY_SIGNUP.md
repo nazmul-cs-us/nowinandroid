@@ -129,7 +129,7 @@ stream error. The corrected smoke accepts a rejected/closed stream only when a
 backend `checkUser` query confirms no account was created; timeouts still fail.
 Seven socket/XML regression tests cover this distinction and avoid printing raw
 server error text. Copy **both** updated `smoke.py` and `signup_smoke.py` to `/tmp`
-before retrying. Verified-TLS signup is still a required subsequent live step.
+before retrying. Verified-TLS signup was subsequently confirmed as recorded below.
 
 A subsequent live retry passed the pre-TLS/backend check but verified-TLS signup
 waited until `connection-timeout`. Sanitized rotated JSON logs identified
@@ -149,6 +149,19 @@ All 38 server tests and six pure config-migration tests pass. The server tests
 exercise the pinned real MongooseIM configuration parser, including its rejection
 of the incompatible option, and verify default-enabled and explicitly disabled
 signup. Deploy with the commands above to repair either the restored empty
-configuration or the incompatible rollout. VM startup and positive live signup
-still require confirmation. The helper's three services and local public-hostname
-TLS readiness passed before this MongooseIM startup failure.
+configuration or the incompatible rollout. The helper's three services and local
+public-hostname TLS readiness passed before this MongooseIM startup failure.
+
+On 6 November 2026, the user deployed `3e594d9e6` on the VM using the commands
+above. MongooseIM 6.10.0 reported both Erlang VM and boot script status `started`,
+with the C2s listener configured at `10.148.0.2:5222`. The live signup smoke passed:
+
+- Account creation was rejected before TLS.
+- Verified-TLS signup, duplicate protection, reserved names, password rules and
+  rate limiting passed against the deployed server.
+- New accounts authenticated, and calls still required invitation acceptance.
+
+The script reported that temporary signup account cleanup was attempted. This
+confirms server recovery and the live signup flow. Signup through rebuilt Android
+and iOS apps, cellular access, and iPhone helper push delivery still need their
+own device checks.
