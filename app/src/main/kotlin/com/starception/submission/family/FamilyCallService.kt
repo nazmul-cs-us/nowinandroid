@@ -6,6 +6,7 @@ import android.content.pm.ServiceInfo
 import android.os.*
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.starception.submission.R
@@ -113,12 +114,15 @@ class FamilyCallService : Service() {
         val decline = PendingIntent.getService(this, 12, Intent(this, FamilyCallService::class.java).setAction(DECLINE).putExtra("callId", call?.id),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = NotificationCompat.Builder(this, if (incoming) CHANNEL else ONGOING_CHANNEL)
-            .setSmallIcon(R.drawable.ic_notification_logo).setContentTitle(call?.peer(state.me)?.substringBefore('@') ?: "Family call")
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
+            .setContentTitle(call?.peer(state.me)?.substringBefore('@') ?: "Family call")
             .setContentText(if (incoming) "Incoming ${call?.kind} call" else if (call == null) "Checking incoming call…" else if (call.stage == "ringing") "Calling…" else if (!state.mediaConnected) "Connecting…" else "Family call in progress")
             .setCategory(NotificationCompat.CATEGORY_CALL).setPriority(if (incoming) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setOngoing(true).setOnlyAlertOnce(true).setContentIntent(view)
         if (call != null) {
-            val person = androidx.core.app.Person.Builder().setName(call.peer(state.me).substringBefore('@')).setImportant(true).build()
+            val person = androidx.core.app.Person.Builder().setName(call.peer(state.me).substringBefore('@'))
+                .setIcon(IconCompat.createWithResource(this, R.mipmap.ic_launcher)).setImportant(true).build()
             builder.setStyle(if (incoming) NotificationCompat.CallStyle.forIncomingCall(person, decline, activity(11, true))
                 else NotificationCompat.CallStyle.forOngoingCall(person, decline))
             if (incoming) builder.setFullScreenIntent(view, true).setTimeoutAfter((call.expires - System.currentTimeMillis()).coerceAtLeast(1))

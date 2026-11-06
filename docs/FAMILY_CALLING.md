@@ -20,6 +20,11 @@ Create a Family account from the landing page, or sign in with an existing Famil
 
 Incoming calls appear over other screens while signed in with the app open. Microphone capture and peer transmission start only after acceptance and permissions. Mute, speaker/earpiece, camera on/off, camera switching, decline/cancel and hang-up are supported. Other app audio yields; playback is not automatically resumed afterward.
 
+Android call notifications reuse the current Deenly launcher artwork: the
+monochrome crescent for the small notification icon and the full app icon for the
+large image and CallStyle avatar fallback. They no longer reference the legacy
+calligraphy notification logo. Rebuild and install Android to receive this change.
+
 Outgoing video calls now show a local-only camera preview while ringing, with compact caller identity and a Flip control over the full-screen feed. The caller already granted camera permission when starting the video call. This preview does not create a microphone or peer connection; it is released on cancel/backgrounding and reused after acceptance. Incoming calls do not open the recipient's camera before answering. Remote media still requires server acceptance. Android ongoing-call notifications use a separate low-importance channel and show Calling/Connecting accurately; incoming notifications retain their high-priority channel. Retest preview, cancel, background/resume and answer on signed devices after updating the apps.
 
 Preview startup follows the actual resumed UI lifecycle and handles screens that were already resumed when the call arrived. It no longer depends on the process's manually counted activities. Background-registration errors are displayed on the Family page separately from call errors; an older server that cannot register push devices must not turn a foreground call into a generic error banner. Camera-preview failures have a specific call message. Android logs only the camera exception type under `FamilyCalls`, without account credentials, to assist device diagnosis.
