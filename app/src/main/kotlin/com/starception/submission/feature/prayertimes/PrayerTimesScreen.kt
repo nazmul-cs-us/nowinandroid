@@ -318,8 +318,11 @@ internal fun availableImmersiveInsightHeightPx(
     windowBottomInWindowPx: Float,
     tileTopInWindowPx: Float,
     scrollOffsetPx: Int,
+    includeSystemBarArea: Boolean = false,
 ): Float {
-    val visibleBottom = if (windowBottomInWindowPx > 0f) {
+    val visibleBottom = if (includeSystemBarArea && windowBottomInWindowPx > 0f) {
+        windowBottomInWindowPx
+    } else if (windowBottomInWindowPx > 0f) {
         minOf(viewportBottomInWindowPx, windowBottomInWindowPx)
     } else {
         viewportBottomInWindowPx
@@ -3272,7 +3275,10 @@ fun PrayerTimesScreen(
                             .then(syncState.pullModifier)
                             .then(
                                 if (!outerIsLandscape) {
-                                    Modifier.verticalScroll(portraitScrollState)
+                                    Modifier.verticalScroll(
+                                        portraitScrollState,
+                                        enabled = !insightTileExpanded,
+                                    )
                                 } else {
                                     Modifier.scrollable(pullGestureScrollState, Orientation.Vertical)
                                 },
@@ -3373,10 +3379,11 @@ fun PrayerTimesScreen(
                                     }
                                 val portraitInsightHeight = (portraitInsightRestingHeight - syncContentCompression)
                                     .coerceAtLeast(portraitInsightMinHeight)
-                                // Draw through the floating bar, but keep its
-                                // clearance in height calculations until the
-                                // immersive reader actually hides it.
-                                val navigationClearance = if (insightTileImmersive) {
+                                // Once a tile is opened, let its artwork extend
+                                // beneath both the floating navigation and the
+                                // system gesture area. The reader adds scroll
+                                // padding so verses remain reachable above them.
+                                val navigationClearance = if (insightTileExpanded) {
                                     0.dp
                                 } else {
                                     navigationBarInset + 64.dp
@@ -3389,6 +3396,7 @@ fun PrayerTimesScreen(
                                             windowBottomInWindowPx = windowBottomPx,
                                             tileTopInWindowPx = insightTopInWindowPx,
                                             scrollOffsetPx = portraitScrollState.value,
+                                            includeSystemBarArea = insightTileExpanded,
                                         ).toDp()
                                     } else {
                                         homeViewport.height.toDp()
@@ -5151,12 +5159,9 @@ fun PrayerTimesScreen(
                         // Reserve room after the last item, inside the scrollable
                         // content. The viewport itself continues behind the
                         // floating navigation instead of ending in a fixed band.
-                        if (!outerIsLandscape) {
+                        if (!outerIsLandscape && !insightTileExpanded) {
                             Spacer(
-                                Modifier.height(
-                                    if (insightTileExpanded) navigationBarInset + 128.dp
-                                    else navigationBarInset + 64.dp,
-                                ),
+                                Modifier.height(navigationBarInset + 64.dp),
                             )
                         }
                     } // Close Column inside AppTopSearchBar content lambda

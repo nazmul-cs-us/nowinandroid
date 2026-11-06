@@ -33,6 +33,19 @@ class ImmersiveInsightHeightTest {
         )
     }
 
+    @Test fun immersiveTileBackgroundExtendsThroughTheSystemBarArea() {
+        assertEquals(
+            1480f,
+            availableImmersiveInsightHeightPx(
+                viewportBottomInWindowPx = 1500f,
+                windowBottomInWindowPx = 1600f,
+                tileTopInWindowPx = 100f,
+                scrollOffsetPx = 20,
+                includeSystemBarArea = true,
+            ),
+        )
+    }
+
     @Test fun navigationStaysVisibleUntilReaderIsScrolled() {
         assertFalse(shouldHideHomeNavigationForInsight(true, false, 100, 24f))
         assertFalse(shouldHideHomeNavigationForInsight(true, true, 0, 24f))

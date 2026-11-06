@@ -52,8 +52,6 @@ import com.starception.submission.prayer.model.prayerHadithContext
 import com.starception.submission.core.designsystem.component.rememberSmoothCompassHeading
 import com.starception.submission.core.designsystem.component.InsightMotion
 import com.starception.submission.core.designsystem.component.insightReadingEdges
-import com.starception.submission.core.designsystem.component.InsightReadingHeader
-import com.starception.submission.core.designsystem.component.InsightReadingContrastBackground
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
@@ -87,6 +85,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -321,6 +321,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 import android.view.accessibility.AccessibilityManager as AndroidAccessibilityManager
 import androidx.compose.ui.graphics.lerp as lerpColor
 import com.starception.submission.core.images.resources.Res as ImageRes
@@ -5339,7 +5340,8 @@ private fun EditorialQuranReadingStage(
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (
                 key == "quran_translation" || key == "show_translation" ||
-                key == "arabic_font" || key == "show_tajweed"
+                key == "arabic_font" || key == "show_tajweed" ||
+                key == "text_alignment"
             ) {
                 quranPreferenceVersion++
             }
@@ -5351,6 +5353,12 @@ private fun EditorialQuranReadingStage(
     val showTranslation = quranPrefs.getBoolean("show_translation", true)
     val showTajweed = quranPrefs.getBoolean("show_tajweed", false)
     val selectedArabicFont = quranPrefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
+    val textAlignment = when (quranPrefs.getString("text_alignment", "start")) {
+        "center" -> TextAlign.Center
+        "end" -> TextAlign.End
+        "justify" -> TextAlign.Justify
+        else -> TextAlign.Start
+    }
     val useIndoPakEdition = selectedArabicFont == "indopak_script" || selectedArabicFont == "pdms_saleem"
     val assetRepository = remember(context) {
         EntryPointAccessors.fromApplication(
@@ -5462,6 +5470,10 @@ private fun EditorialQuranReadingStage(
 
     val isPlaying = playback.isPlaying && playback.surahIndex == surah.number - 1
     val compression = compactProgress.coerceIn(0f, 1f)
+    var arabicFontScale by remember(surah.number) { mutableFloatStateOf(1f) }
+    val applyPinchZoom: (Float) -> Unit = { zoomChange ->
+        arabicFontScale = (arabicFontScale * zoomChange).coerceIn(0.75f, 2f)
+    }
     val readingScrollState = rememberLazyListState()
     // Keep translations paired with their verse. Arabic-only reading flows in
     // bounded passages so even long Surahs retain lazy text layout.
@@ -5476,9 +5488,9 @@ private fun EditorialQuranReadingStage(
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val arabicVerseStyle = MaterialTheme.typography.bodyMedium.copy(
             fontFamily = arabicFontFamily,
-            fontSize = (24f - 5f * compression).sp,
+            fontSize = ((24f - 5f * compression) * arabicFontScale).sp,
             // IndoPak and Uthmani diacritics extend beyond the glyph body.
-            lineHeight = (48f - 7f * compression).sp,
+            lineHeight = ((48f - 7f * compression) * arabicFontScale).sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.sp,
             textDirection = TextDirection.Rtl,
@@ -5498,6 +5510,7 @@ private fun EditorialQuranReadingStage(
             )
         }
         val naturalHeight = insightTextHeight(blocks, (maxWidth - 16.dp).coerceAtLeast(100.dp)) + 64.dp
+        val readerBottomPadding = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() + 92.dp
         LaunchedEffect(naturalHeight, ayahs.isEmpty()) {
             if (ayahs.isNotEmpty()) onPreferredHeightChange(naturalHeight)
         }
@@ -5509,16 +5522,39 @@ private fun EditorialQuranReadingStage(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
-                InsightReadingHeader(
-                    title = "SURAH ${surah.number} · ${surah.nameEnglish.uppercase()}",
-                    status = when {
-                        isPlaying -> "PLAYING"
-                        isLoadingAyahs -> "LOADING"
-                        ayahs.isEmpty() -> "TEXT UNAVAILABLE"
-                        else -> "${ayahs.size} AYAT"
-                    },
-                    accent = HomeReferenceGold,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = "SURAH ${surah.number}",
+                            style = HomeTypography.eyebrow,
+                            color = HomeReferenceGold,
+                            letterSpacing = 1.3.sp,
+                        )
+                        Text(
+                            text = surah.nameEnglish,
+                            style = HomeTypography.section,
+                            color = Color.White,
+                            maxLines = 1,
+                        )
+                    }
+                    Text(
+                        text = when {
+                            isPlaying -> "PLAYING"
+                            isLoadingAyahs -> "LOADING"
+                            ayahs.isEmpty() -> "TEXT UNAVAILABLE"
+                            else -> "${ayahs.size} AYAT"
+                        },
+                        style = HomeTypography.eyebrow,
+                        color = HomeReferenceGold.copy(alpha = 0.94f),
+                        maxLines = 1,
+                    )
+                }
             }
             if (ayahs.isEmpty()) {
                 Column(
@@ -5567,10 +5603,16 @@ private fun EditorialQuranReadingStage(
                 // The reader viewport clips naturally at its boundary.
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f)
+                    .detectPinchZoom(surah.number, applyPinchZoom),
                 state = readingScrollState,
                 overscrollEffect = null,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 20.dp),
+                contentPadding = PaddingValues(
+                    start = 8.dp,
+                    top = 20.dp,
+                    end = 8.dp,
+                    bottom = readerBottomPadding,
+                ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(
@@ -5594,37 +5636,16 @@ private fun EditorialQuranReadingStage(
                                         androidx.compose.ui.text.AnnotatedString(ayah.text.trim())
                                     },
                                 )
-                                append("\u00A0")
-                                appendInlineContent("ayah-${ayah.numberInSurah}", "(${ayah.numberInSurah.toArabicIndic()})")
-                            }
-                        }
-                    }
-                    val verseMarkers = passage.associate { ayah ->
-                        "ayah-${ayah.numberInSurah}" to InlineTextContent(
-                            // Arabic swashes can extend beyond their advance width.
-                            // Reserve breathing room on both sides of the marker.
-                            Placeholder(1.4.em, 1.1.em, PlaceholderVerticalAlign.TextCenter),
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxHeight().aspectRatio(1f).padding(2.dp)
-                                        .background(InsightReadingContrastBackground, CircleShape)
-                                        .border(0.8.dp, HomeReferenceGold.copy(alpha = 0.9f), CircleShape)
-                                        .semantics { contentDescription = "Ayah ${ayah.numberInSurah}" },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        text = ayah.numberInSurah.toArabicIndic(),
-                                        style = TextStyle(shadow = readingShadow),
-                                        fontFamily = QuranFonts.Amiri,
-                                        fontSize = arabicVerseStyle.fontSize * if (ayah.numberInSurah >= 100) 0.40f else 0.48f,
-                                        color = HomeReferenceGold,
-                                        maxLines = 1,
-                                    )
-                                }
+                                // Shape the verse label in the paragraph itself. Android
+                                // justification can move Compose inline placeholders away
+                                // from their reserved slots, placing circles over words.
+                                pushStyle(SpanStyle(
+                                    fontFamily = QuranFonts.Amiri,
+                                    fontSize = 0.65.em,
+                                    color = HomeReferenceGold,
+                                ))
+                                append("\u00A0﴿${ayah.numberInSurah.toArabicIndic()}﴾\u00A0")
+                                pop()
                             }
                         }
                     }
@@ -5634,12 +5655,9 @@ private fun EditorialQuranReadingStage(
                     ) {
                         Text(
                             text = passageText,
-                            inlineContent = verseMarkers,
                             style = arabicVerseStyle,
                             color = Color.White,
-                            // Android justification can displace inline placeholder
-                            // bounds; natural RTL spacing keeps markers with text.
-                            textAlign = TextAlign.Right,
+                            textAlign = textAlignment,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         translation?.let { translatedText ->
@@ -5655,6 +5673,33 @@ private fun EditorialQuranReadingStage(
                 }
             }
         }
+    }
+}
+
+/** Detect only two-finger scale changes; leave one-finger drags to the LazyColumn. */
+private fun Modifier.detectPinchZoom(
+    key: Any,
+    onZoom: (Float) -> Unit,
+): Modifier = pointerInput(key) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        var previousSpan = 0f
+        do {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val pointers = event.changes.filter { it.pressed }
+            if (pointers.size >= 2) {
+                val first = pointers[0].position
+                val second = pointers[1].position
+                val dx = second.x - first.x
+                val dy = second.y - first.y
+                val span = sqrt(dx * dx + dy * dy)
+                if (previousSpan > 0f && span > 0f) onZoom(span / previousSpan)
+                previousSpan = span
+                pointers.forEach { it.consume() }
+            } else {
+                previousSpan = 0f
+            }
+        } while (event.changes.any { it.pressed })
     }
 }
 

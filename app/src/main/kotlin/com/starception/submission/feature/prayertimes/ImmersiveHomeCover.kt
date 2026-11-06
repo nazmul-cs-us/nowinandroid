@@ -127,12 +127,16 @@ internal fun homeCoverCopyUsesLightText(
 ): Boolean = true
 
 /** Keep the cover title readable while the artwork fades into the reflection. */
-internal fun homeCoverScrim(prayerVisibility: Float, feedBackground: Color): Brush = Brush.verticalGradient(
+internal fun homeCoverScrim(
+    prayerVisibility: Float,
+    feedBackground: Color,
+    isExpanded: Boolean = false,
+): Brush = Brush.verticalGradient(
     0f to feedBackground.copy(alpha = .12f),
     (.48f + .03f * prayerVisibility) to feedBackground.copy(alpha = .22f),
-    (.72f + .03f * prayerVisibility) to feedBackground.copy(alpha = .55f),
-    .91f to feedBackground.copy(alpha = .98f),
-    1f to feedBackground,
+    (.72f + .03f * prayerVisibility) to feedBackground.copy(alpha = if (isExpanded) .18f else .55f),
+    .91f to feedBackground.copy(alpha = if (isExpanded) .22f else .98f),
+    1f to feedBackground.copy(alpha = if (isExpanded) .28f else 1f),
 )
 
 @Composable
@@ -191,7 +195,7 @@ internal fun HomeCoverArtworkBackdrop(
     // blurred scene kept Home rendering continuously even at rest (~50% of a
     // core on Samsung); the single image and scrim settle near idle instead.
     Box(Modifier.fillMaxSize().background(
-        homeCoverScrim(prayerVisibility, feedBackground)
+        homeCoverScrim(prayerVisibility, feedBackground, isExpanded)
     ))
     // The cover scene is fixed behind the vertically scrolling feed. Once the
     // cover leaves the viewport, fully cover it so no stale artwork shows

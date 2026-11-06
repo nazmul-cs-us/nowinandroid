@@ -4854,11 +4854,18 @@ private fun BismillahRow(
         text = bismillahText,
         style = calligraphicStyle,
         color = textColor,
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        textAlign = textAlignForSelection(textAlignment),
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 2.dp),
     )
+}
+
+private fun textAlignForSelection(alignment: String): TextAlign = when (alignment) {
+    "center" -> TextAlign.Center
+    "end" -> TextAlign.End
+    "justify" -> TextAlign.Justify
+    else -> TextAlign.Start
 }
 
 @Composable
@@ -5940,7 +5947,7 @@ private fun computeInkMarkerGeometries(
 }
 
 // ---------------------------------------------------------------------------
-// Mushaf page — renders pre-paginated justified text
+// Mushaf page — renders pre-paginated Quran text
 // ---------------------------------------------------------------------------
 @Composable
 private fun MushafPageWithFrame(
@@ -5952,6 +5959,7 @@ private fun MushafPageWithFrame(
     tajweed: List<TajweedSpan> = emptyList(),
     arabicFont: String,
     arabicFontSize: Float,
+    textAlignment: String = "justify",
     translationCode: String,
     /** Page-specific leading used to fill complete pages vertically. */
     lineHeightSp: Float = arabicFontSize * 1.45f,
@@ -6328,7 +6336,7 @@ private fun MushafPageWithFrame(
                 color = onSurfaceColor,
                 style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
                     fontSize = arabicFontSize.sp,
-                    textAlign = TextAlign.Justify,
+                    textAlign = textAlignForSelection(textAlignment),
                     // High-quality (optimizing) line breaking packs words far more
                     // evenly than the greedy default, so Justify stretches gaps much
                     // less. MUST match the paginator's measureStyle exactly.
@@ -7119,7 +7127,7 @@ private fun MushafPagerView(
             val arabicTextStyle = getArabicFontStyle(arabicFont, typesetFontSize)
             val measureStyle = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
                 fontSize = typesetFontSize.sp,
-                textAlign = TextAlign.Justify,
+                textAlign = textAlignForSelection(textAlignment),
                 // Keep in lockstep with MushafPageWithFrame's render style — the
                 // paginator slices pages at these line breaks AND the ink-geometry
                 // pass positions medallions from this layout. textDirection is part
@@ -7143,13 +7151,7 @@ private fun MushafPagerView(
                 val ayahRanges: List<Pair<Int, IntRange>>,
                 /** Rules for this page's characters, painted over the finished layout. */
                 val tajweed: List<TajweedSpan> = emptyList(),
-                /**
-                 * Full Mushaf pages distribute the otherwise-unused fraction of
-                 * a final line between their existing lines. TextAlign.Justify
-                 * only fills horizontally; without this, every page can retain
-                 * almost one complete line of dead space above the navigation
-                 * inset.
-                 */
+                /** Extra line spacing used to balance the page vertically. */
                 val lineHeightSp: Float = typesetFontSize * lineSpacingMultiplier,
             )
 
@@ -7157,6 +7159,7 @@ private fun MushafPagerView(
                 masterString,
                 typesetFontSize,
                 arabicFont,
+                textAlignment,
                 availableWidthPx,
                 fullPageHeightPx,
                 firstPageHeightPx,
@@ -7609,6 +7612,7 @@ private fun MushafPagerView(
                     translationVisibility = translationVisibility.value,
                     arabicFont = arabicFont,
                     arabicFontSize = typesetFontSize,
+                    textAlignment = textAlignment,
                     translationCode = translationCode,
                     lineHeightSp = page.lineHeightSp,
                     showBismillah = page.showBismillah,
