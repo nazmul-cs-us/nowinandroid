@@ -257,6 +257,36 @@ CODE_SIGN_STYLE = Automatic
 CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Development
 ```
 
+If the extensions are reported as **Ad Hoc Code Signed** while the parent has an
+Apple Development certificate, close Xcode and run this from the repository root
+on the Mac:
+
+```bash
+git pull --ff-only origin main
+bash iosApp/tools/repair-device-signing.sh
+open iosApp/iosApp.xcodeproj
+```
+
+The repair reads the actual app target's `DEVELOPMENT_TEAM` from Xcode's resolved
+Debug device build settings. It shares that team with both extensions through a
+managed block in the uncommitted `Config/Local.xcconfig`, selects automatic Apple
+Development signing, enables required device signing, and clears manual profile
+selectors for Debug device builds. It preserves other local settings, including
+Release-specific provisioning, and regenerates `project.yml` for the personal-team
+build. Repeated runs replace the same block. It does not read private keys,
+re-sign existing binaries, or change certificates/profiles.
+
+If no generated project/team is available, supply the actual ten-character Team ID
+shown in your Apple account/Xcode settings:
+
+```bash
+bash iosApp/tools/repair-device-signing.sh YOUR_TEAM_ID
+```
+
+Do not infer the Team ID from a signing certificate's display name or suffix.
+The common `Config/Build.xcconfig` also explicitly selects development signing for
+Debug device builds in all three targets. Simulator builds remain unsigned.
+
 Regenerate the personal-team project with `xcodegen generate --spec project.yml`,
 reopen it, select the iPhone and Debug configuration, and use Product → Clean
 Build Folder before running. Regeneration removes target overrides made in the
@@ -277,3 +307,9 @@ Kotlin framework so Gradle embeds/signs it with the current app identity.
 
 This diagnostic reads public code-signing metadata and compares leaf certificate
 fingerprints. It does not change certificates, provisioning profiles or keys.
+
+Repair regression checks run with
+`python3 -m unittest discover -s iosApp/tools -p test_repair_device_signing.py`.
+They exercise team selection, local config preservation/idempotency and failure
+handling with command fixtures. They do not establish a successful Xcode device
+build or provisioning result; those must be checked on the Mac.

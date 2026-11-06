@@ -1,5 +1,12 @@
 // Safe defaults. Override these as external xcodebuild settings or from an
 // uncommitted Config/Local.xcconfig file.
+// All three app/extension targets include this file. Device Debug builds must
+// use a development certificate; '-' produces an ad-hoc extension that cannot
+// be embedded in an Apple Development-signed app. Simulator overrides live in
+// project.yml and remain unsigned.
+CODE_SIGN_IDENTITY[config=Debug][sdk=iphoneos*] = Apple Development
+CODE_SIGNING_ALLOWED[config=Debug][sdk=iphoneos*] = YES
+CODE_SIGNING_REQUIRED[config=Debug][sdk=iphoneos*] = YES
 APNS_ENVIRONMENT = development
 PRAYER_PUSH_BACKEND_URL =
 // Enable using project-push.yml after paid Apple/APNs provisioning is available.
