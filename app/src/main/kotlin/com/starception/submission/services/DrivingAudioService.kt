@@ -99,6 +99,7 @@ class DrivingAudioService : Service() {
     private var currentTitle = "Driving Mode"
     private var currentSubtitle = ""
     private var isPaused = false
+    private var ownsTravelInterruption = false
 
     // Pending audio chain
     private var pendingHadithNumber: Int? = null
@@ -421,6 +422,11 @@ class DrivingAudioService : Service() {
      * Play travel dua audio
      */
     fun playTravelDua() {
+        if (!com.starception.submission.media.TravelDuaInterruption.controller.begin(this)) {
+            if (!ownsTravelInterruption) stopSelf()
+            return
+        }
+        ownsTravelInterruption = true
         try {
             Log.i(TAG, "🚗 Playing travel dua")
 
@@ -438,11 +444,12 @@ class DrivingAudioService : Service() {
             // without waiting for database work in a BroadcastReceiver. Reconstruct the
             // optional Daily Bukhari continuation here so background reliability does not
             // remove the existing Travel Dua → Hadith chain.
-            preparePendingHadithIfNeeded()
+            if (!com.starception.submission.media.TravelDuaInterruption.controller.hasWaitingPlayback) {
+                preparePendingHadithIfNeeded()
 
-            // 🔄 PRE-GENERATE: Start generating hadith TTS in background while travel dua plays
-            // This eliminates the gap between travel dua and hadith playback
-            preGenerateHadithTtsInBackground()
+                // Pre-generation must not change the voice/engine of interrupted speech.
+                preGenerateHadithTtsInBackground()
+            }
 
             mediaPlayer = MediaPlayer.create(this, resId).apply {
                 setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
@@ -674,6 +681,26 @@ class DrivingAudioService : Service() {
     }
 
     private fun onTravelDuaComplete() {
+        stopAndReleaseMediaPlayer("travel dua finished")
+        if (ownsTravelInterruption) {
+            ownsTravelInterruption = false
+            val coordinator = com.starception.submission.media.TravelDuaInterruption.controller
+            if (coordinator.hasWaitingPlayback) {
+                // The user's interrupted listening takes precedence over the
+                // optional driving Hadith/Quran continuation.
+                pendingHadithNumber = null
+                pendingHadithText = null
+                pendingCourseId = null
+                pendingLessonId = null
+                updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+                coordinator.finish(this)
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                hasStartedForeground = false
+                stopSelf()
+                return
+            }
+            coordinator.finish(this)
+        }
         // Check if we have pending hadith to play
         val hadithNum = pendingHadithNumber
         val hadithText = pendingHadithText
@@ -1373,15 +1400,21 @@ class DrivingAudioService : Service() {
 
         stopQuranPositionUpdates()
         stopAndReleaseMediaPlayer("stop()")
-        textToSpeech?.stop()
-        sherpaOnnxTts.stopSpeaking()
-        voiceCompletionManager.cancel()
+        if (!ownsTravelInterruption) {
+            textToSpeech?.stop()
+            sherpaOnnxTts.stopSpeaking()
+            voiceCompletionManager.cancel()
+        }
 
         isPaused = false
         updateState(PlaybackState.IDLE, "Driving Mode", "Stopped")
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         hasStartedForeground = false
+        if (ownsTravelInterruption) {
+            ownsTravelInterruption = false
+            com.starception.submission.media.TravelDuaInterruption.controller.finish(this)
+        }
         stopSelf()
     }
 
@@ -1579,6 +1612,11 @@ class DrivingAudioService : Service() {
 
         mediaPlayer?.release()
         mediaPlayer = null
+
+        if (ownsTravelInterruption) {
+            ownsTravelInterruption = false
+            com.starception.submission.media.TravelDuaInterruption.controller.finish(this)
+        }
 
         textToSpeech?.shutdown()
         textToSpeech = null

@@ -1219,7 +1219,16 @@ fun HadithDetailScreen(
                                 com.starception.submission.services.ChapterRecitationService
                                     .toggle(context)
                             } else if (isPlaying) {
-                                currentHandlePlayClick()
+                                if (sherpaOnnxTts.isSpeaking()) {
+                                    sherpaOnnxTts.pauseSpeaking()
+                                    isPlaying = false
+                                } else {
+                                    // Android TTS has no pause API. Keep the source
+                                    // and its service alive so resume can restart
+                                    // this narration rather than lose the queue.
+                                    textToSpeech?.stop()
+                                    isPlaying = false
+                                }
                             }
                         }
                         val resumeCb: () -> Unit = {
@@ -1227,7 +1236,12 @@ fun HadithDetailScreen(
                                 com.starception.submission.services.ChapterRecitationService
                                     .toggle(context)
                             } else if (!isPlaying) {
-                                currentHandlePlayClick()
+                                if (sherpaOnnxTts.isPaused()) {
+                                    sherpaOnnxTts.resumeSpeaking()
+                                    isPlaying = true
+                                } else {
+                                    currentHandlePlayClick()
+                                }
                             }
                         }
                         val carNextCb: () -> Boolean = {
@@ -2179,6 +2193,12 @@ private suspend fun speakWithAndroidTtsAndAwait(
     }
 
     fun start(tts: TextToSpeech) {
+        if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(
+                tts,
+                onDiscard = { finish(false) },
+                group = com.starception.submission.services.ChapterRecitationState,
+            ) { if (continuation.isActive) start(tts) }
+        ) return
         activeTts = tts
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) = Unit
@@ -2217,6 +2237,13 @@ private fun playWithTts(
     onPlayingChanged: (Boolean) -> Unit,
     onPlaybackCompleted: () -> Unit,
 ) {
+    if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(
+            tts ?: onPlayingChanged,
+            group = com.starception.submission.services.ChapterRecitationState,
+        ) {
+            playWithTts(context, text, language, tts, onTtsCreated, onPlayingChanged, onPlaybackCompleted)
+        }
+    ) return
     val locale = when (language) {
         "en" -> java.util.Locale.US
         "ar" -> java.util.Locale("ar")
@@ -2274,6 +2301,14 @@ private fun playWithTts(
             if (status == TextToSpeech.SUCCESS) {
                 ttsHolder?.let { createdTts ->
                     onTtsCreated(createdTts)
+                    if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(
+                            createdTts,
+                            group = com.starception.submission.services.ChapterRecitationState,
+                        ) {
+                            playWithTts(context, text, language, createdTts, onTtsCreated,
+                                onPlayingChanged, onPlaybackCompleted)
+                        }
+                    ) return@let
                     createdTts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
                             onPlayingChanged(true)

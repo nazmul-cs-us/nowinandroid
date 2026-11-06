@@ -102,6 +102,16 @@ class QuranPlaybackService : Service() {
         acquireWakeLock()
         initializeMediaSession()
         initializePlayer()
+        com.starception.submission.media.TravelDuaInterruption.controller.register(this) {
+            val player = mediaPlayer
+            if (player?.isPlaying == true) {
+                togglePlayPause()
+                val resume: () -> Unit = {
+                    if (mediaPlayer === player && !player.isPlaying) togglePlayPause()
+                }
+                resume
+            } else null
+        }
     }
 
     private fun acquireWakeLock() {
@@ -129,6 +139,7 @@ class QuranPlaybackService : Service() {
                 }
 
                 override fun onPause() {
+                    com.starception.submission.media.TravelDuaInterruption.controller.cancel(this@QuranPlaybackService)
                     if (mediaPlayer?.isPlaying == true) {
                         togglePlayPause()
                     }
@@ -172,6 +183,7 @@ class QuranPlaybackService : Service() {
             setOnPreparedListener { mp ->
                 // Only auto-start if we were playing before the track change
                 if (wasPlayingBeforeChange) {
+                    if (deferForTravelDua(mp)) return@setOnPreparedListener
                     mp.start()
                     onPlaybackStateChanged?.invoke(true)
                     onGlobalPlaybackStateChanged?.invoke(true)
@@ -368,6 +380,7 @@ class QuranPlaybackService : Service() {
                 stopProgressUpdates()
                 onProgressChanged?.invoke(player.currentPosition, player.duration)
             } else {
+                if (deferForTravelDua(player)) return
                 player.start()
                 onPlaybackStateChanged?.invoke(true)
                 onGlobalPlaybackStateChanged?.invoke(true)
@@ -389,6 +402,11 @@ class QuranPlaybackService : Service() {
         currentSurahIndex = (currentSurahIndex + 1) % QuranData.surahs.size
         playSurah(currentSurahIndex, shouldAutoPlay)
     }
+
+    private fun deferForTravelDua(player: MediaPlayer): Boolean =
+        com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(this) {
+            if (mediaPlayer === player && !player.isPlaying) togglePlayPause()
+        }
 
     fun playPrevious() {
         // Preserve the current playing state
@@ -507,6 +525,7 @@ class QuranPlaybackService : Service() {
                         mp.seekTo(startPosition)
                         Log.d("QuranService", "🕌 Seeked to position: ${startPosition / 1000}s")
                     }
+                    if (deferForTravelDua(mp)) return@setOnPreparedListener
                     mp.start()
                     onPlaybackStateChanged?.invoke(true)
                     onGlobalPlaybackStateChanged?.invoke(true)
@@ -734,7 +753,10 @@ class QuranPlaybackService : Service() {
 
         when (intent?.action) {
             ACTION_PLAY -> togglePlayPause()
-            ACTION_PAUSE -> togglePlayPause()
+            ACTION_PAUSE -> {
+                com.starception.submission.media.TravelDuaInterruption.controller.cancel(this)
+                if (mediaPlayer?.isPlaying == true) togglePlayPause()
+            }
             ACTION_NEXT -> playNext()
             ACTION_PREVIOUS -> playPrevious()
             ACTION_STOP -> stopSelf()
@@ -743,6 +765,7 @@ class QuranPlaybackService : Service() {
     }
 
     override fun onDestroy() {
+        com.starception.submission.media.TravelDuaInterruption.controller.unregister(this)
         reciterScope.cancel()
         super.onDestroy()
         Log.d("QuranService", "Service destroyed")

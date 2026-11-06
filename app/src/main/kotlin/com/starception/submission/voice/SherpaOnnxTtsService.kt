@@ -598,7 +598,7 @@ class SherpaOnnxTtsService @Inject constructor(
     /**
      * Play generated audio samples from a GeneratedAudio object.
      */
-    private fun playAudio(audio: GeneratedAudio) {
+    private suspend fun playAudio(audio: GeneratedAudio) {
         playAudioSamples(audio.samples, audio.sampleRate)
     }
 
@@ -606,7 +606,8 @@ class SherpaOnnxTtsService @Inject constructor(
      * Play audio samples continuously without gaps.
      * Uses a single AudioTrack for smooth playback.
      */
-    private fun playAudioSamples(samples: FloatArray, sampleRate: Int) {
+    private suspend fun playAudioSamples(samples: FloatArray, sampleRate: Int) {
+        var coordinatedTrack: AudioTrack? = null
         // Audio is about to start — the "Preparing audio" banner can go away.
         _isPreparingAudio.value = false
         try {
@@ -647,10 +648,44 @@ class SherpaOnnxTtsService @Inject constructor(
                 .build()
 
             audioTrack?.write(pcmData, 0, pcmData.size)
-            audioTrack?.play()
-
-            if (playbackPaused) {
-                audioTrack?.pause()
+            val track = audioTrack ?: return
+            coordinatedTrack = track
+            val started = withContext(Dispatchers.Main.immediate) {
+                val coordinator = com.starception.submission.media.TravelDuaInterruption.controller
+                coordinator.register(track, com.starception.submission.services.ChapterRecitationState) {
+                    if (audioTrack === track && isSpeakingNow && !playbackPaused) {
+                        pauseSpeaking()
+                        val resume: () -> Unit = {
+                            if (audioTrack === track) resumeSpeaking()
+                        }
+                        resume
+                    } else null
+                }
+                suspendCancellableCoroutine<Boolean> { continuation ->
+                    val start: () -> Unit = {
+                        if (continuation.isActive) {
+                            val valid = audioTrack === track && !stopRequested
+                            val started = valid && runCatching {
+                                if (!playbackPaused) track.play()
+                                true
+                            }.getOrDefault(false)
+                            continuation.resume(started)
+                        }
+                    }
+                    val discard: () -> Unit = {
+                        if (continuation.isActive) continuation.resume(false)
+                    }
+                    if (!coordinator.deferIfInterrupted(track, discard, resumeGroupBeforeStart = true, start = start)) start()
+                    continuation.invokeOnCancellation {
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            coordinator.unregister(track)
+                        }
+                    }
+                }
+            }
+            if (!started) {
+                if (audioTrack === track) stopAudioTrack()
+                return
             }
 
             // Wait in short intervals so stop/skip interrupts promptly. Paused time does
@@ -671,9 +706,18 @@ class SherpaOnnxTtsService @Inject constructor(
             // Minimal delay - mic now works immediately after TTS
             // Removed 200ms delay that was causing user's "yes" to be missed
             Thread.sleep(20)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            stopAudioTrack()
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "Error playing audio", e)
             stopAudioTrack()
+        } finally {
+            coordinatedTrack?.let { track ->
+                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.Main.immediate) {
+                    com.starception.submission.media.TravelDuaInterruption.controller.unregister(track)
+                }
+            }
         }
     }
 
@@ -681,6 +725,11 @@ class SherpaOnnxTtsService @Inject constructor(
      * Stop current speech playback.
      */
     fun stopSpeaking() {
+        audioTrack?.let { track ->
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                com.starception.submission.media.TravelDuaInterruption.controller.unregister(track)
+            }
+        }
         _isPreparingAudio.value = false
         stopRequested = true
         playbackPaused = false
@@ -703,6 +752,12 @@ class SherpaOnnxTtsService @Inject constructor(
     /** Resume a clip previously suspended by [pauseSpeaking]. */
     fun resumeSpeaking() {
         if (!isSpeakingNow || !playbackPaused || stopRequested) return
+        val track = audioTrack
+        if (track != null &&
+            com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(track) {
+                if (audioTrack === track) resumeSpeaking()
+            }
+        ) return
         playbackPaused = false
         try {
             audioTrack?.play()

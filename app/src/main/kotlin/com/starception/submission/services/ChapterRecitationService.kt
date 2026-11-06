@@ -280,6 +280,23 @@ class ChapterRecitationService : Service() {
         assetRepository = entryPoint.assetRepository()
         createNotificationChannel()
         initSession()
+        com.starception.submission.media.TravelDuaInterruption.controller.register(this, ChapterRecitationState) {
+            if (ChapterRecitationState.isPlaying) {
+                val source = currentSource
+                val generation = bookPlaylistGeneration
+                when {
+                    ChapterRecitationState.isBookPlaylistActive -> pauseBookPlaylist()
+                    isExternalPlayback -> pauseExternalPlayback()
+                    else -> if (mediaPlayer?.isPlaying == true) togglePlayPause()
+                }
+                val resume: () -> Unit = {
+                    if (source == currentSource && generation == bookPlaylistGeneration &&
+                        !ChapterRecitationState.isPlaying
+                    ) togglePlayPause()
+                }
+                resume
+            } else null
+        }
         ChapterRecitationState.onSourcePlaybackRequested =
             { source, title, subtitle, continuousHandoff ->
                 handler.post {
@@ -382,6 +399,13 @@ class ChapterRecitationService : Service() {
         subtitle: String,
         continuousHandoff: Boolean,
     ) {
+        if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(this) {
+                startPlayback(source, title, subtitle, continuousHandoff)
+            }
+        ) {
+            startForegroundNotification()
+            return
+        }
         // A fresh play request for the same source means replay from the beginning.
         // Play/pause requests arrive through ACTION_TOGGLE and never enter this branch.
         if (source == currentSource && mediaPlayer != null) {
@@ -416,6 +440,10 @@ class ChapterRecitationService : Service() {
                 .build(),
         )
         player.setOnPreparedListener { mp ->
+            if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(this) {
+                    if (mediaPlayer === mp) togglePlayPause()
+                }
+            ) return@setOnPreparedListener
             mp.start()
             ChapterRecitationState.publish(true, currentTitle, currentSubtitle)
             ChapterRecitationState.publishProgress(0, mp.duration)
@@ -524,6 +552,14 @@ class ChapterRecitationService : Service() {
         speakerId: Int,
         shuffle: Boolean,
     ) {
+        if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(this) {
+                startHadithBookPlaylist(databaseFile, collectionName, startHadith, rangeStart,
+                    rangeEnd, language, voiceName, speakerId, shuffle)
+            }
+        ) {
+            startForegroundNotification()
+            return
+        }
         if (databaseFile.isBlank() || rangeEnd < rangeStart) {
             Log.e(TAG, "Invalid Hadith book request: db=$databaseFile range=$rangeStart..$rangeEnd")
             stopPlaybackAndSelf()
@@ -803,6 +839,10 @@ class ChapterRecitationService : Service() {
                     recordingPrepared = true
                     updateMetadata(prepared.duration.toLong())
                     ChapterRecitationState.publishProgress(0, prepared.duration)
+                    if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(this@ChapterRecitationService) {
+                            resumeBookPlaylist()
+                        }
+                    ) bookPlaylistPaused = true
                     if (!bookPlaylistPaused) prepared.start()
                     updatePlaybackState(
                         if (bookPlaylistPaused) {
@@ -869,6 +909,16 @@ class ChapterRecitationService : Service() {
         }
 
         fun start(tts: TextToSpeech) {
+            if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(
+                    this@ChapterRecitationService,
+                    onDiscard = { finish(false) },
+                ) {
+                    if (continuation.isActive) {
+                        resumeBookPlaylist()
+                        start(tts)
+                    }
+                }
+            ) return
             tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(id: String?) = Unit
                 override fun onDone(id: String?) {
@@ -918,6 +968,11 @@ class ChapterRecitationService : Service() {
     }
 
     fun togglePlayPause() {
+        if (!ChapterRecitationState.isPlaying &&
+            com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(this) {
+                togglePlayPause()
+            }
+        ) return
         if (ChapterRecitationState.isBookPlaylistActive) {
             if (bookPlaylistPaused) resumeBookPlaylist() else pauseBookPlaylist()
             return
@@ -981,6 +1036,10 @@ class ChapterRecitationService : Service() {
 
     private fun resumeBookPlaylist() {
         if (!ChapterRecitationState.isBookPlaylistActive || !bookPlaylistPaused) return
+        if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(this) {
+                resumeBookPlaylist()
+            }
+        ) return
         bookPlaylistPaused = false
         when (bookRenderer) {
             BookRenderer.SHERPA -> sherpaOnnxTts.resumeSpeaking()
@@ -998,6 +1057,10 @@ class ChapterRecitationService : Service() {
 
     private fun resumeExternalPlayback() {
         if (!isExternalPlayback || ChapterRecitationState.isPlaying) return
+        if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(this) {
+                resumeExternalPlayback()
+            }
+        ) return
         val callback = ChapterRecitationState.onExternalPlay
             ?: ChapterRecitationState.onExternalToggle
         if (callback == null) {
@@ -1059,6 +1122,7 @@ class ChapterRecitationService : Service() {
     }
 
     private fun stopPlaybackAndSelf() {
+        com.starception.submission.media.TravelDuaInterruption.controller.cancelGroup(ChapterRecitationState)
         bookPlaylistGeneration += 1
         bookPlaylistJob?.cancel()
         bookPlaylistJob = null
@@ -1241,6 +1305,7 @@ class ChapterRecitationService : Service() {
     }
 
     override fun onDestroy() {
+        com.starception.submission.media.TravelDuaInterruption.controller.unregister(this)
         super.onDestroy()
         bookPlaylistGeneration += 1
         bookPlaylistJob?.cancel()
