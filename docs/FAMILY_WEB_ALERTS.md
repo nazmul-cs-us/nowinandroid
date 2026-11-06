@@ -138,3 +138,10 @@ verify public-hostname checking over loopback, rejection of an untrusted
 certificate, detection of a stale configured key, and the Home Screen manifest.
 Swift source syntax was checked; the updated native iOS sheet still needs an
 Xcode build and real iPhone UI verification.
+
+For mobile data, the original Wi-Fi-only XMPP/helper rules must allow the phone's
+network. See [mobile client reachability](FAMILY_SIGNUP.md#mobile-data--public-client-reachability)
+for the client-port rule supplied in this chat. Installing only the native iOS app
+does not enable the workaround: the VM helper must be running, and the Home Screen
+Call Alerts app must be paired with notification permission. Its 24-hour pairing
+lease must also be current.

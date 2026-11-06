@@ -17,6 +17,8 @@ python3 - "$listener_ip" <<'PY'
 import datetime,grp,ipaddress,os,pathlib,re,shutil,sys,tempfile,tomllib
 config=pathlib.Path('/etc/mongooseim/mongooseim.toml')
 text=config.read_text(); before=tomllib.loads(text)
+if 'mod_register' in before.get('modules', {}):
+    raise SystemExit('Disable mod_register before installing the create-only Family signup policy.')
 listeners=before.get('listen',{}).get('c2s',[])
 if len(listeners)!=1:
     raise SystemExit('Expected one c2s listener; preserve custom listeners with a manual config update.')
@@ -57,6 +59,7 @@ install -o root -g mongooseim -m 0640 "$build/mod_deenly_family.beam" "$beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_push.beam" "$(dirname "$beam")/mod_deenly_family_push.beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_presence.beam" "$(dirname "$beam")/mod_deenly_family_presence.beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_web.beam" "$(dirname "$beam")/mod_deenly_family_web.beam"
+install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_signup.beam" "$(dirname "$beam")/mod_deenly_family_signup.beam"
 systemctl restart mongooseim
 for attempt in {1..20}; do
   if /usr/local/bin/mongooseimctl status >/dev/null 2>&1; then

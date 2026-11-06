@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.ThemeBrand
@@ -42,6 +44,29 @@ class FamilyScreenScreenshotTest {
     private fun capture(name: String) {
         File("src/test/screenshots/Family").mkdirs()
         compose.onRoot().captureRoboImage("src/test/screenshots/Family/$name.png")
+    }
+    @Test fun signupCollectsANewUsernameAndConfirmedPassword() {
+        var submitted: List<String>? = null
+        compose.setContent { NiaTheme {
+            FamilyScreenContent(FamilyUiState(), FamilyActions(signUp = { name, secret, confirmation ->
+                submitted = listOf(name, secret, confirmation)
+            }), initialAccount = "android@xmpp.starception.com", initialPassword = "old-pilot-value")
+        } }
+        compose.onNodeWithText("New to Family? Create an account").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Choose a username").performScrollTo().performTextInput("amina")
+        compose.onNodeWithContentDescription("Password").performScrollTo().performTextInput("a secure password")
+        compose.onNodeWithContentDescription("Confirm password").performScrollTo().performTextInput("a secure password")
+        compose.onNodeWithText("Create account").performScrollTo().performClick()
+        compose.runOnIdle { kotlin.test.assertEquals(listOf("amina", "a secure password", "a secure password"), submitted) }
+        capture("signup-light")
+    }
+    @Test fun signupToggleDoesNotKeepPasswordsWhenReturningToSignIn() {
+        compose.setContent { NiaTheme { FamilyScreenContent(FamilyUiState()) } }
+        compose.onNodeWithText("New to Family? Create an account").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Password").performScrollTo().performTextInput("a secure password")
+        compose.onNodeWithText("Already have an account? Sign in").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Confirm password").assertDoesNotExist()
+        compose.onNodeWithText("Connect with family").assertExists()
     }
     @Test fun landingLight() { render(false, false); capture("landing-light") }
     @Test fun landingDark() { render(true, false); capture("landing-dark") }

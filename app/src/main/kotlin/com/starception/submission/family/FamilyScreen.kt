@@ -84,6 +84,7 @@ internal fun permissionRequest(): (Boolean, () -> Unit) -> Unit {
 
 internal data class FamilyActions(
     val signIn: (String, String) -> Unit = { _, _ -> },
+    val signUp: (String, String, String) -> Unit = { _, _, _ -> },
     val webHelper: () -> Unit = {}, val dismissWebHelper: () -> Unit = {},
     val refresh: () -> Unit = {}, val signOut: () -> Unit = {},
     val invite: (String) -> Unit = {}, val accept: (String) -> Unit = {},
@@ -100,6 +101,7 @@ fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
     val permission = permissionRequest()
     val notification = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     FamilyScreenContent(state, FamilyActions(
+        signUp = { username, secret, confirmation -> client.signUp(username, secret, confirmation) },
         signIn = { account, password ->
             if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
                 notification.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -132,6 +134,7 @@ internal fun FamilyScreenContent(
     val colors = familyPalette()
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     state.webPairing?.let { pairing ->
         AlertDialog(onDismissRequest = actions.dismissWebHelper,
             title = { Text("Temporary call alerts") },
@@ -146,6 +149,8 @@ internal fun FamilyScreenContent(
     var account by remember { mutableStateOf(initialAccount) }
     var password by remember { mutableStateOf(initialPassword) }
     var passwordVisible by remember { mutableStateOf(false) }
+    var creatingAccount by remember { mutableStateOf(false) }
+    var confirmation by remember { mutableStateOf("") }
     var invitation by remember { mutableStateOf(suggestedPeer) }
     var search by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
@@ -159,7 +164,10 @@ internal fun FamilyScreenContent(
     val shown = (if (invitations) requests else family).filter { callDisplayName(it.jid).contains(search, true) || it.jid.contains(search, true) }
     val canCall = state.serviceReady && state.call == null
     LaunchedEffect(suggestedPeer) { if (invitation.isBlank()) invitation = suggestedPeer }
-    LaunchedEffect(state.connected) { if (!state.connected) { selected = null; inviting = false } }
+    LaunchedEffect(state.connected) {
+        if (!state.connected) { selected = null; inviting = false }
+        else { password = ""; confirmation = ""; creatingAccount = false }
+    }
     Column(Modifier.fillMaxSize().background(mainPageBackgroundBrush()).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp).height(64.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(34.dp).background(colors.ink.copy(alpha = 0.10f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
@@ -209,7 +217,8 @@ internal fun FamilyScreenContent(
                                 Text("A little space for the people who matter most. Connect through voice and video.", fontSize = 14.sp, lineHeight = 21.sp, color = colors.muted)
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                FamilyField(account, { account = it }, "Family account", colors, leading = Icons.Default.PersonOutline)
+                                FamilyField(account, { account = it }, if (creatingAccount) "Choose a username" else "Family account", colors, leading = Icons.Default.PersonOutline)
+                                if (creatingAccount) Text("3–32 letters, numbers, dots, underscores or hyphens. Your account will use @${FamilyEndpoint().domain}.", fontSize = 12.sp, color = colors.muted)
                                 FamilyField(password, { password = it }, "Password", colors, leading = Icons.Default.Lock,
                                     password = !passwordVisible, trailing = {
                                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -217,12 +226,28 @@ internal fun FamilyScreenContent(
                                                 if (passwordVisible) "Hide password" else "Show password", tint = colors.muted, modifier = Modifier.size(20.dp))
                                         }
                                     })
-                                Button(onClick = { actions.signIn(account, password); password = "" },
+                                if (creatingAccount) {
+                                    Text("Use a password with 12–128 characters.", fontSize = 12.sp, color = colors.muted)
+                                    FamilyField(confirmation, { confirmation = it }, "Confirm password", colors,
+                                        leading = Icons.Default.Lock, password = !passwordVisible)
+                                }
+                                if (creatingAccount) state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+                                Button(onClick = {
+                                    focusManager.clearFocus()
+                                    if (creatingAccount) actions.signUp(account, password, confirmation)
+                                    else { actions.signIn(account, password); password = "" }
+                                },
                                     enabled = !state.busy && account.isNotBlank() && password.isNotBlank(),
                                     modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(18.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = colors.button, contentColor = colors.onButton)) {
                                     if (state.busy) CircularProgressIndicator(Modifier.size(20.dp), color = colors.onButton, strokeWidth = 2.dp)
-                                    else Text("Connect with family", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                    else Text(if (creatingAccount) "Create account" else "Connect with family", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                                TextButton(onClick = {
+                                    creatingAccount = !creatingAccount; account = ""; password = ""; confirmation = ""
+                                    actions.dismissError()
+                                }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+                                    Text(if (creatingAccount) "Already have an account? Sign in" else "New to Family? Create an account", color = colors.accent)
                                 }
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
@@ -299,7 +324,7 @@ internal fun FamilyScreenContent(
                 if (state.connected) state.pushRegistrationError?.let { message -> item {
                     Text(message, Modifier.padding(horizontal = 28.dp, vertical = 12.dp), fontSize = 12.sp, color = colors.muted)
                 } }
-                state.error?.let { message -> item {
+                state.error?.takeIf { !creatingAccount || state.connected }?.let { message -> item {
                     Row(Modifier.padding(horizontal = 24.dp, vertical = 16.dp).fillMaxWidth().background(colors.field, RoundedCornerShape(16.dp)).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Info, null, Modifier.size(18.dp), tint = colors.accent)
                         Text(message, Modifier.weight(1f).padding(10.dp), color = colors.ink, fontSize = 12.sp, lineHeight = 18.sp)
@@ -368,7 +393,7 @@ private fun FamilyField(value: String, changed: (String) -> Unit, placeholder: S
         leadingIcon = { Icon(leading, null, Modifier.size(20.dp), tint = colors.muted) }, trailingIcon = trailing,
         visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(autoCorrectEnabled = false,
-            keyboardType = if (placeholder == "Password") androidx.compose.ui.text.input.KeyboardType.Password else androidx.compose.ui.text.input.KeyboardType.Email),
+            keyboardType = if (placeholder.contains("password", ignoreCase = true)) androidx.compose.ui.text.input.KeyboardType.Password else androidx.compose.ui.text.input.KeyboardType.Email),
         colors = TextFieldDefaults.colors(focusedContainerColor = colors.field, unfocusedContainerColor = colors.field,
             focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, cursorColor = colors.accent))
 }

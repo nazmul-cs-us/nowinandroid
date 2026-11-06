@@ -113,6 +113,46 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         failed = { message -> scope.launch { endWithError(message) } },
     )
 
+    fun signUp(username: String, password: String, confirmation: String) = scope.launch {
+        if (mutable.value.busy || mutable.value.connected) return@launch
+        val policy = FamilyRegistrationPolicy()
+        policy.validate(username, password, confirmation)?.let {
+            mutable.value = mutable.value.copy(error = policy.message(it)); return@launch
+        }
+        val name = policy.username(username) ?: return@launch
+        disconnect(clearSaved = false)
+        val token = generation
+        mutable.value = mutable.value.copy(busy = true, error = null)
+        try {
+            withContext(Dispatchers.IO) {
+                val socket = XMPPTCPConnection(XMPPTCPConnectionConfiguration.builder()
+                    .setXmppDomain(FAMILY_DOMAIN).setHost(FAMILY_DOMAIN).setPort(FamilyEndpoint().port)
+                    .setSecurityMode(org.jivesoftware.smack.ConnectionConfiguration.SecurityMode.required)
+                    .setHostnameVerifier(HttpsURLConnection.getDefaultHostnameVerifier()).build())
+                try {
+                    socket.replyTimeout = 15000
+                    socket.connect()
+                    check(socket.isSecureConnection) { "TLS required" }
+                    org.jivesoftware.smackx.iqregister.AccountManager.getInstance(socket)
+                        .createAccount(org.jxmpp.jid.parts.Localpart.from(name), password)
+                } finally { runCatching { socket.disconnect() } }
+            }
+            if (token != generation) return@launch
+            mutable.value = mutable.value.copy(busy = false)
+            login("$name@$FAMILY_DOMAIN", password).join()
+            if (generation == token + 1 && !mutable.value.connected) {
+                mutable.value = mutable.value.copy(error = "Account created. Sign in with your new username and password. " + (mutable.value.error ?: ""))
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            android.util.Log.w("FamilyConnection", "Signup failed: ${e.javaClass.simpleName}")
+            if (token == generation) {
+                val code = (e as? org.jivesoftware.smack.XMPPException.XMPPErrorException)?.stanzaError?.condition?.toString() ?: "unknown"
+                mutable.value = mutable.value.copy(busy = false, error = policy.message(code))
+            }
+        }
+    }
+
     fun login(jidInput: String, password: String) = scope.launch {
         if (mutable.value.busy) return@launch
         val jid = FamilyEndpoint().account(jidInput)

@@ -64,6 +64,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     private let logger = Logger(subsystem: "com.starception.submission", category: "FamilyCalls")
     private var stream: XMPPStream?
     private var password: String?
+    private var registering = false
+    private var accountJustCreated = false
     private var pending: [String: CheckedContinuation<[String: Any], Error>] = [:]
     private var terminal: Set<String> = []
     private let callReducer = FamilyCallReducer()
@@ -111,14 +113,23 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         }
     }
     func dismissWebHelper() { webPairing = nil }
-    func login(_ input: String, password: String) {
+    func signUp(_ input: String, password: String, confirmation: String) {
+        guard !busy, !connected else { return }
+        let policy = FamilyRegistrationPolicy()
+        if let code = policy.validate(input: input, password: password, confirmation: confirmation) {
+            message = policy.message(code: code); return
+        }
+        guard let username = policy.username(input: input) else { return }
+        login(username, password: password, createAccount: true)
+    }
+    func login(_ input: String, password: String, createAccount: Bool = false) {
         guard !busy else { return }
         guard let jid = FamilyEndpoint().account(input: input),
               jid.hasSuffix("@" + Self.domain), !password.isEmpty else {
             message = "Enter your family account and password."; return
         }
         disconnect(clearSaved: false)
-        me = jid; busy = true; self.password = password
+        me = jid; busy = true; self.password = password; registering = createAccount; message = nil
         pendingCredential = (jid, password)
         let socket = XMPPStream()
         socket.myJID = XMPPJID(string: jid + "/ios-" + FamilyCredentials.deviceID + "-" + String(UUID().uuidString.prefix(8)))
@@ -143,7 +154,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             socket.send(XMPPIQ(type: "set", to: XMPPJID(string: Self.domain), elementID: UUID().uuidString, child: child))
         }
         stream = nil; socket?.removeDelegate(self); socket?.disconnectAfterSending()
-        password = nil; pendingCredential = nil; connected = false; serviceReady = false; busy = false; me = ""; members = []; connectedAt = nil
+        password = nil; registering = false; accountJustCreated = false; pendingCredential = nil; connected = false; serviceReady = false; busy = false; me = ""; members = []; connectedAt = nil
         media.close(); mediaCall = nil; call = nil; terminal.removeAll(); queuedSignals.removeAll(); callReducer.clear()
         ringingTask?.cancel(); heartbeat?.cancel(); heartbeat = nil
         rejectPending()
@@ -158,6 +169,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         password = nil; connected = false; serviceReady = false; busy = false; media.close(); mediaCall = nil
         call = nil; queuedSignals.removeAll(); ringingTask?.cancel(); heartbeat?.cancel()
         rejectPending(); message = text
+        let failed = stream; stream = nil; failed?.removeDelegate(self); failed?.disconnect()
     }
     private func rejectPending() {
         let waiting = Array(pending.values); pending.removeAll()
@@ -411,14 +423,41 @@ extension FamilyStore: XMPPStreamDelegate {
     nonisolated func xmppStreamDidConnect(_ sender: XMPPStream) {
         Task { @MainActor in
             guard sender === stream, let secret = password else { return }
+            do {
+                guard sender.isSecure else { throw FamilyError.disconnected }
+                if registering {
+                    guard sender.supportsInBandRegistration else {
+                        lost(FamilyRegistrationPolicy().message(code: "not-allowed")); return
+                    }
+                    try sender.register(withPassword: secret)
+                }
+                else { try sender.authenticate(withPassword: secret) }
+            } catch { lost("Could not connect securely to create or sign in to your Family account.") }
+        }
+    }
+    nonisolated func xmppStreamDidRegister(_ sender: XMPPStream) {
+        Task { @MainActor in
+            guard sender === stream, registering, let secret = password else { return }
+            registering = false; accountJustCreated = true
             do { try sender.authenticate(withPassword: secret) }
-            catch { lost("Could not authenticate your family account.") }
+            catch { lost("Account created. Sign in with your new username and password.") }
+        }
+    }
+    nonisolated func xmppStream(_ sender: XMPPStream, didNotRegister error: DDXMLElement) {
+        Task { @MainActor in
+            guard sender === stream, registering else { return }
+            let container = error.elements(forName: "error").first
+            let conditions = ["conflict", "resource-constraint", "not-allowed", "forbidden", "not-acceptable", "bad-request", "service-unavailable"]
+            let code = conditions.first { !(container?.elements(forLocalName: $0, uri: "urn:ietf:params:xml:ns:xmpp-stanzas").isEmpty ?? true) } ?? "unknown"
+            registering = false
+            lost(FamilyRegistrationPolicy().message(code: code))
+            stream = nil; sender.removeDelegate(self); sender.disconnect()
         }
     }
     nonisolated func xmppStreamDidAuthenticate(_ sender: XMPPStream) {
         Task { @MainActor in
             guard sender === stream else { return }
-            password = nil; connected = true; busy = false
+            password = nil; registering = false; accountJustCreated = false; connected = true; busy = false
             if let saved = pendingCredential { FamilyCredentials.save(jid: saved.0, password: saved.1) }
             pendingCredential = nil
             registerPushToken()
@@ -435,7 +474,7 @@ extension FamilyStore: XMPPStreamDelegate {
         }
     }
     nonisolated func xmppStream(_ sender: XMPPStream, didNotAuthenticate error: DDXMLElement) {
-        Task { @MainActor in if sender === stream { lost("Could not sign in. Check your family account and password.") } }
+        Task { @MainActor in if sender === stream { lost(accountJustCreated ? "Account created. Sign in with your new username and password." : "Could not sign in. Check your family account and password.") } }
     }
     nonisolated func xmppStreamDidDisconnect(_ sender: XMPPStream, withError error: Error?) {
         Task { @MainActor in if sender === stream { lost(connected ? "Family connection closed. Sign in again before calling." : "Could not connect securely to the family server. Check the device clock, certificate and firewall access on TCP 5222.") } }

@@ -14,7 +14,8 @@
 -define(TABLE, deenly_family).
 
 supported_features() -> [dynamic_domains].
-config_spec() -> #section{items = #{}}.
+config_spec() -> #section{items = #{<<"signup_enabled">> => #option{type = boolean}},
+                         defaults = #{<<"signup_enabled">> => true}}.
 start(Host, _) ->
     case mnesia:create_table(?TABLE, [{attributes, [key, value]}, {disc_copies, [node()]}]) of
         {atomic, ok} -> ok;
@@ -23,15 +24,19 @@ start(Host, _) ->
     end,
     ok = mnesia:wait_for_tables([?TABLE], 10000),
     ok = mod_deenly_family_presence:init(),
+    mod_deenly_family_signup:start(Host),
     {ok, Timer} = timer:apply_interval(5000, ?MODULE, sweep, [Host]),
     persistent_term:put({?MODULE, Host}, Timer),
     gen_iq_handler:add_iq_handler_for_domain(Host, ?NS, ejabberd_local,
                                            fun ?MODULE:process_iq/5, #{}, one_queue).
 stop(Host) ->
+    mod_deenly_family_signup:stop(Host),
     timer:cancel(persistent_term:get({?MODULE, Host})),
     persistent_term:erase({?MODULE, Host}),
     gen_iq_handler:remove_iq_handler_for_domain(Host, ?NS, ejabberd_local).
-hooks(Host) -> [{filter_local_packet, Host, fun ?MODULE:filter_packet/3, #{}, 5},
+hooks(Host) -> [{c2s_stream_features, Host, fun mod_deenly_family_signup:features/3, #{}, 50},
+                {user_send_xmlel, Host, fun mod_deenly_family_signup:packet/3, #{}, 25},
+                {filter_local_packet, Host, fun ?MODULE:filter_packet/3, #{}, 5},
                 {unset_presence, Host, fun ?MODULE:presence_removed/3, #{}, 60},
                 {sm_remove_connection, Host, fun ?MODULE:presence_removed/3, #{}, 60}].
 presence_removed(Acc, #{jid := #jid{lserver = D} = J}, _) ->

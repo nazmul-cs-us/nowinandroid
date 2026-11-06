@@ -67,6 +67,8 @@ struct FamilyView: View {
     @State private var search = ""
     @State private var searching = false
     @State private var passwordVisible = false
+    @State private var creatingAccount = false
+    @State private var confirmation = ""
     @State private var invitations = false
     @State private var inviting = false
     @State private var removing: FamilyMemberRow?
@@ -91,7 +93,7 @@ struct FamilyView: View {
                         if store.connected, let message = store.pushRegistrationMessage {
                             Text(message).font(.system(size: 12)).foregroundStyle(colors.muted).padding(.horizontal, 24).padding(.vertical, 12)
                         }
-                        if let message = store.message {
+                        if !creatingAccount || store.connected, let message = store.message {
                             HStack(spacing: 10) {
                                 Image(systemName: "info.circle").foregroundStyle(colors.accent)
                                 Text(message).font(.system(size: 12)).foregroundStyle(colors.ink).frame(maxWidth: .infinity, alignment: .leading)
@@ -131,6 +133,9 @@ struct FamilyView: View {
         .refreshable { store.refresh() }
         .onAppear { suggestPeer() }
         .onChange(of: store.me) { _ in suggestPeer() }
+        .onChange(of: store.connected) { connected in
+            if connected { password = ""; confirmation = ""; creatingAccount = false }
+        }
         .sheet(isPresented: $inviting) { invitationSheet }
         .sheet(item: $selected) { member in contactSheet(member) }
         .confirmationDialog("Remove from family?", isPresented: Binding(
@@ -255,23 +260,42 @@ struct FamilyView: View {
                     .font(.system(size: 14)).foregroundStyle(colors.muted).lineSpacing(5)
             }
             VStack(spacing: 12) {
-                accountField($account, title: "Family account", symbol: "person")
+                accountField($account, title: creatingAccount ? "Choose a username" : "Family account", symbol: "person")
+                if creatingAccount {
+                    Text("3–32 letters, numbers, dots, underscores or hyphens. Your account will use @\(FamilyStore.domain).")
+                        .font(.footnote).foregroundStyle(colors.muted)
+                }
                 HStack(spacing: 12) {
                     Image(systemName: "lock").foregroundStyle(colors.muted).frame(width: 20)
                     Group {
                         if passwordVisible { TextField("Password", text: $password) }
                         else { SecureField("Password", text: $password) }
-                    }.font(.system(size: 14)).textContentType(.password)
+                    }.font(.system(size: 14)).textContentType(creatingAccount ? .newPassword : .password)
                     Button { passwordVisible.toggle() } label: { Image(systemName: passwordVisible ? "eye.slash" : "eye").foregroundStyle(colors.muted).frame(width: 30, height: 30) }
                         .accessibilityLabel(passwordVisible ? "Hide password" : "Show password")
                 }.padding(14).background(colors.field, in: RoundedRectangle(cornerRadius: 16))
+                if creatingAccount {
+                    Text("Use a password with 12–128 characters.").font(.footnote).foregroundStyle(colors.muted)
+                    Group {
+                        if passwordVisible { TextField("Confirm password", text: $confirmation) }
+                        else { SecureField("Confirm password", text: $confirmation) }
+                    }.textContentType(.newPassword).font(.system(size: 14)).padding(16)
+                        .background(colors.field, in: RoundedRectangle(cornerRadius: 16))
+                }
+                if creatingAccount, let message = store.message {
+                    Text(message).font(.footnote).foregroundStyle(colors.error)
+                }
                 Button {
-                    store.login(account, password: password); password = ""
+                    if creatingAccount { store.signUp(account, password: password, confirmation: confirmation) }
+                    else { store.login(account, password: password); password = "" }
                 } label: {
-                    Group { if store.busy { ProgressView().tint(colors.onButton) } else { Text("Connect with family").font(.system(size: 15, weight: .semibold)) } }
+                    Group { if store.busy { ProgressView().tint(colors.onButton) } else { Text(creatingAccount ? "Create account" : "Connect with family").font(.system(size: 15, weight: .semibold)) } }
                         .foregroundStyle(colors.onButton).frame(maxWidth: .infinity).frame(height: 54)
                         .background(colors.accent, in: RoundedRectangle(cornerRadius: 18))
                 }.buttonStyle(.plain).disabled(store.busy || account.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty)
+                Button(creatingAccount ? "Already have an account? Sign in" : "New to Family? Create an account") {
+                    creatingAccount.toggle(); account = ""; password = ""; confirmation = ""; store.message = nil
+                }.font(.subheadline).foregroundStyle(colors.accent).disabled(store.busy)
             }
             Label("Only people you invite and accept", systemImage: "heart")
                 .font(.system(size: 11)).foregroundStyle(colors.muted).frame(maxWidth: .infinity)
