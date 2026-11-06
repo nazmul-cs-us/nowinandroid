@@ -9,6 +9,7 @@ import UIKit
 struct FamilyWebPairing: Identifiable {
     let code: String
     let url: URL
+    let expires: Date
     var id: String { code }
 }
 struct FamilyMemberRow: Identifiable, Equatable {
@@ -98,12 +99,15 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         Task { _ = try? await request("presence") }
     }
     func requestWebHelper() {
+        message = nil
         perform {
             let reply = try await self.request("pair_web_helper", ["deviceId": FamilyCredentials.deviceID])
             guard let value = reply["webPairing"] as? [String: Any], let code = value["code"] as? String,
                   let text = value["url"] as? String, let url = URL(string: text), url.scheme == "https",
-                  url.host == Self.domain, url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "family-helper" else { throw FamilyError.invalidResponse }
-            self.webPairing = FamilyWebPairing(code: code, url: url)
+                  url.host == Self.domain, url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "family-helper",
+                  let expires = value["expires"] as? NSNumber else { throw FamilyError.invalidResponse }
+            self.webPairing = FamilyWebPairing(code: code, url: url,
+                expires: Date(timeIntervalSince1970: expires.doubleValue / 1000))
         }
     }
     func dismissWebHelper() { webPairing = nil }

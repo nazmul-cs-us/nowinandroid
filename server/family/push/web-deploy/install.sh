@@ -14,6 +14,9 @@ PY
 for cert in /etc/mongooseim/certs/fullchain.pem /etc/mongooseim/certs/privkey.pem; do
   sudo -u mongooseim test -r "$cert" || { echo 'The existing MongooseIM TLS files must be service-readable.' >&2; exit 1; }
 done
+[ -r /opt/mongooseim-6.10.0/lib/mongooseim-6.10.0/ebin/mod_deenly_family_web.beam ] || {
+  echo 'Install the latest server/family modules first, then rerun the helper installer.' >&2; exit 1;
+}
 bash "$root/install.sh"
 /opt/deenly-family-push/venv/bin/python - "$origin" <<'PY'
 import base64, grp, json, os, pathlib, sys, tempfile
@@ -44,4 +47,4 @@ install -m 0644 "$root/web-deploy/deenly-family-web.service" /etc/systemd/system
 systemctl daemon-reload
 systemctl enable --now deenly-family-push deenly-family-web
 systemctl restart deenly-family-push deenly-family-web
-echo 'Services started. Allow TCP 8443 for the test phones, then open the HTTPS helper.'
+sudo -u mongooseim /opt/deenly-family-push/venv/bin/python /opt/deenly-family-push/web_check.py

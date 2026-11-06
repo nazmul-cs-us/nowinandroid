@@ -15,6 +15,8 @@ from http.server import ThreadingHTTPServer
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 import web_helper
+import web_check
+import shutil
 
 SECRET = 'synthetic-web-pair-secret-01234567890123456789'
 ACCOUNT = 'bob@xmpp.starception.com'
@@ -175,35 +177,68 @@ class HTTPTests(unittest.TestCase):
 
 
 class TLSTests(unittest.TestCase):
-    def test_public_helper_serves_over_verified_tls(self):
+    def setUp(self):
         from cryptography import x509
         from cryptography.x509.oid import NameOID
         from cryptography.hazmat.primitives import hashes
-        with tempfile.TemporaryDirectory() as folder:
-            key=ec.generate_private_key(ec.SECP256R1())
-            subject=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,'localhost')])
-            now=datetime.datetime.now(datetime.timezone.utc)
-            cert=(x509.CertificateBuilder().subject_name(subject).issuer_name(subject).public_key(key.public_key())
-                  .serial_number(x509.random_serial_number()).not_valid_before(now-datetime.timedelta(minutes=1))
-                  .not_valid_after(now+datetime.timedelta(days=1)).add_extension(x509.SubjectAlternativeName([x509.DNSName('localhost')]),critical=False)
-                  .sign(key,hashes.SHA256()))
-            certfile=Path(folder)/'cert.pem';keyfile=Path(folder)/'key.pem'
-            certfile.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-            keyfile.write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
-            settings={'url':'https://localhost/family-helper/','publicKey':'synthetic-public-key',
-                      'certificate':str(certfile),'certificateKey':str(keyfile)}
-            store=web_helper.Store(Path(folder)/'alerts.sqlite',SECRET)
-            server=web_helper.Server(('127.0.0.1',0),settings,store)
-            thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
-            try:
-                client=http.client.HTTPSConnection('localhost',server.server_address[1],timeout=3,
-                    context=ssl.create_default_context(cafile=str(certfile)))
-                client.request('GET','/family-helper/api/key')
-                response=client.getresponse()
-                self.assertEqual(200,response.status)
-                self.assertEqual('synthetic-public-key',json.loads(response.read())['publicKey'])
-                client.close()
-            finally:
-                server.shutdown();server.server_close();thread.join()
+        self.temp = tempfile.TemporaryDirectory()
+        folder = Path(self.temp.name)
+        key = ec.generate_private_key(ec.SECP256R1())
+        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'localhost')])
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cert = (x509.CertificateBuilder().subject_name(subject).issuer_name(subject).public_key(key.public_key())
+                .serial_number(x509.random_serial_number()).not_valid_before(now-datetime.timedelta(minutes=1))
+                .not_valid_after(now+datetime.timedelta(days=1)).add_extension(
+                    x509.SubjectAlternativeName([x509.DNSName('localhost')]), critical=False)
+                .sign(key, hashes.SHA256()))
+        self.certfile = folder / 'cert.pem'
+        keyfile = folder / 'key.pem'
+        self.certfile.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+        keyfile.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                            serialization.NoEncryption()))
+        self.settings = {'url': 'https://localhost/family-helper/', 'publicKey': 'synthetic-public-key',
+                         'certificate': str(self.certfile), 'certificateKey': str(keyfile)}
+        store = web_helper.Store(folder / 'alerts.sqlite', SECRET)
+        self.server = web_helper.Server(('127.0.0.1', 0), self.settings, store)
+        self.settings['url'] = f'https://localhost:{self.server.server_address[1]}/family-helper/'
+        self.server.static = folder / 'web'
+        shutil.copytree(Path(web_helper.__file__).with_name('web'), self.server.static)
+        icon = Path(__file__).resolve().parents[3] / 'iosApp/Sources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png'
+        shutil.copyfile(icon, self.server.static / 'icon.png')
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def tearDown(self):
+        self.server.shutdown(); self.server.server_close(); self.thread.join(); self.temp.cleanup()
+
+    def context(self):
+        return ssl.create_default_context(cafile=str(self.certfile))
+
+    def test_public_helper_serves_over_verified_tls(self):
+        client = http.client.HTTPSConnection('localhost', self.server.server_address[1], timeout=3,
+                                            context=self.context())
+        client.request('GET', '/family-helper/api/key')
+        response = client.getresponse()
+        self.assertEqual(200, response.status)
+        self.assertEqual('synthetic-public-key', json.loads(response.read())['publicKey'])
+        client.close()
+
+    def test_readiness_checks_actual_install_assets_and_key(self):
+        web_check.probe(self.settings, context=self.context())
+        with self.assertRaises(ValueError):
+            web_check.probe({**self.settings, 'publicKey': 'stale-key'}, context=self.context())
+        (self.server.static / 'manifest.webmanifest').write_text(
+            json.dumps({'display': 'browser', 'scope': '/family-helper/'}))
+        with self.assertRaises(ValueError):
+            web_check.probe(self.settings, context=self.context())
+
+    def test_readiness_rejects_untrusted_tls_certificate(self):
+        with self.assertRaises(ssl.SSLCertVerificationError):
+            web_check.probe(self.settings)
+
+    def test_readiness_verifies_public_hostname_while_connecting_to_loopback(self):
+        settings = {**self.settings, 'url': self.settings['url'].replace('localhost', 'wrong.test')}
+        with self.assertRaises(ssl.SSLCertVerificationError):
+            web_check.probe(settings, context=self.context())
 
 if __name__=='__main__': unittest.main()

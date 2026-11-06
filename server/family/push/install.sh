@@ -7,6 +7,7 @@ python3 -m venv /opt/deenly-family-push/venv
 /opt/deenly-family-push/venv/bin/pip install -r "$root/requirements.txt"
 install -o root -g mongooseim -m 0640 "$root/bridge.py" /opt/deenly-family-push/bridge.py
 install -o root -g mongooseim -m 0640 "$root/web_helper.py" /opt/deenly-family-push/web_helper.py
+install -o root -g mongooseim -m 0640 "$root/web_check.py" /opt/deenly-family-push/web_check.py
 install -d -o mongooseim -g mongooseim -m 0700 /var/lib/deenly-family-web
 install -d -o root -g mongooseim -m 0750 /opt/deenly-family-push/web
 install -o root -g mongooseim -m 0640 "$root/web/"* /opt/deenly-family-push/web/

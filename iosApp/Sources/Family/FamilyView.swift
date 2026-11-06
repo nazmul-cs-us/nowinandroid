@@ -126,14 +126,7 @@ struct FamilyView: View {
             }
         }
         .sheet(item: Binding(get: { store.webPairing }, set: { _ in store.dismissWebHelper() })) { pairing in
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Temporary call alerts").font(.title2.weight(.semibold))
-                Text("Copy this five-minute pairing code, then open the helper. Add it to your Home Screen and open its icon before enabling notifications. Alerts expire after 24 hours.")
-                Text(pairing.code).font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
-                Button("Copy pairing code") { UIPasteboard.general.string = pairing.code }
-                Link("Open helper", destination: pairing.url).buttonStyle(.borderedProminent)
-                Button("Done") { store.dismissWebHelper() }
-            }.padding(28).presentationDetents([.medium, .large])
+            FamilyCallAlertsSetup(pairing: pairing)
         }
         .refreshable { store.refresh() }
         .onAppear { suggestPeer() }
@@ -390,6 +383,57 @@ private struct FamilyContactAvatar: View {
             .frame(width: ring ? size - 8 : size, height: ring ? size - 8 : size).background(shade, in: Circle())
             .padding(ring ? 4 : 0).overlay(Circle().strokeBorder(ring ? colors.accent : .clear, lineWidth: 1.5))
             .accessibilityHidden(true)
+    }
+}
+
+private struct FamilyCallAlertsSetup: View {
+    let pairing: FamilyWebPairing
+    @ObservedObject private var store = FamilyStore.shared
+    @ObservedObject private var appearance = FamilyAppearance.shared
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openURL) private var openURL
+    @State private var copied = false
+    private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Image(systemName: "bell.badge").font(.system(size: 30)).foregroundStyle(colors.accent)
+                Text("Call alerts on iPhone").font(.title2.weight(.semibold))
+                Text("Get an alert when Deenly is closed. Tap the alert, then Open Deenly to answer before the call ends.")
+                    .foregroundStyle(colors.muted)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("1. Copy your pairing code below.")
+                    Text("2. Open setup in Safari. Choose Share → Add to Home Screen, then open the new Call Alerts icon.")
+                    Text("3. Paste the code in Call Alerts, tap Enable call alerts, and allow notifications.")
+                }.font(.subheadline)
+                Text("Already installed? Copy the code, then open your Call Alerts Home Screen icon.")
+                    .font(.footnote).foregroundStyle(colors.muted)
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let expired = context.date >= pairing.expires
+                    VStack(alignment: .leading, spacing: 12) {
+                        Button(copied ? "Code copied" : "Copy pairing code") {
+                            UIPasteboard.general.string = pairing.code; copied = true
+                        }.buttonStyle(.borderedProminent).foregroundStyle(colors.onButton).disabled(expired)
+                        Button("Open Call Alerts setup") {
+                            UIPasteboard.general.string = pairing.code; copied = true
+                            openURL(pairing.url)
+                        }.buttonStyle(.bordered).disabled(expired)
+                        Text(expired ? "This code expired. Get a new code below." : "This code expires at \(pairing.expires.formatted(date: .omitted, time: .shortened)).")
+                            .font(.footnote).foregroundStyle(colors.muted)
+                    }
+                }
+                Button("Get a new code") { copied = false; store.requestWebHelper() }
+                if let message = store.message {
+                    Text(message).font(.footnote).foregroundStyle(colors.error)
+                }
+                Text("Requires iOS 16.4+. Alerts stay enabled for 24 hours; pair again to renew. An alert opens Deenly—it does not answer automatically.")
+                    .font(.footnote).foregroundStyle(colors.muted)
+                Button("Done") { store.dismissWebHelper() }
+            }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
+        }.background(colors.panel).foregroundStyle(colors.ink).tint(colors.accent)
+            .presentationDetents([.large])
+            .onChange(of: pairing.id) { _ in copied = false }
     }
 }
 
