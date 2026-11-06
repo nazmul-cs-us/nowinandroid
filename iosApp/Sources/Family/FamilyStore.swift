@@ -77,6 +77,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
 
     override private init() {
         super.init()
+        logger.notice("Diagnostics v2 loaded")
         foreground = UIApplication.shared.applicationState == .active
         media.onSignal = { [weak self] payload in
             guard let self, let id = self.call?.id else { return }
@@ -125,6 +126,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         catch { lost("Could not reach the family server. Check that this device’s network is allowed through the server firewall on TCP 5222.") }
     }
     func disconnect(clearSaved: Bool = true) {
+        logger.info("Session reset; clearSaved=\(clearSaved); hadCall=\(self.call != nil)")
         if clearSaved { unregisterPushToken(); FamilyCredentials.clear() }
         presenceCache.clear(); webPairing = nil
         callMessage = nil; pushRegistrationMessage = nil
@@ -143,6 +145,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         rejectPending()
     }
     private func lost(_ text: String) {
+        logger.warning("Session lost; hadCall=\(self.call != nil)")
         presenceCache.clear(); webPairing = nil
         if let id = call?.id { FamilySystemCalls.shared.end(id, reason: .failed) }
         pendingCredential = nil
@@ -342,6 +345,9 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         if let current = call, current.id != next.id || current.version >= next.version { return }
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         guard callReducer.apply(id: next.id, revision: next.version, next: next.stage, expiresAt: next.expires, now: now) else { return }
+        let rawReason = object["reason"] as? String ?? ""
+        let reason = ["hangup", "expired", "family_removed", ""].contains(rawReason) ? rawReason : "other"
+        logger.info("Call update: stage=\(next.stage, privacy: .public); version=\(next.version); selected=\(next.selected); remainingMs=\(next.expires - now); serverReason=\(reason, privacy: .public)")
         if callReducer.stage == "ended" || (next.stage == "active" && !next.selected) { finish(next.id, reason: "terminal-expired-or-other-device"); return }
         if next.stage == "ringing" && next.expires <= now { finish(next.id, reason: "terminal-expired-or-other-device"); return }
         if call?.id != next.id { callMessage = nil }
@@ -380,6 +386,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         muted = false; cameraEnabled = true; speakerEnabled = false; mediaConnected = false; connectedAt = nil; callMessage = nil
     }
     private func failCall(_ text: String) async {
+        logger.warning("Media/signalling failure; hadCall=\(self.call != nil)")
         if let current = call { finish(current.id); _ = try? await request("end_call", ["callId": current.id]) }
         message = text
     }

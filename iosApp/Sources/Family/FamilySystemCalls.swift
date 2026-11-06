@@ -29,6 +29,7 @@ import WebRTC
         config.includesCallsInRecents = false
         provider = CXProvider(configuration: config)
         super.init()
+        logger.notice("System calling enabled=\(self.enabled)")
         provider.setDelegate(self, queue: .main)
         // Personal-team builds use the in-app call screen and own audio activation.
         RTCAudioSession.sharedInstance().useManualAudio = enabled
@@ -157,6 +158,7 @@ import WebRTC
     }
     nonisolated func providerDidReset(_ provider: CXProvider) {
         Task { @MainActor in
+            logger.notice("CallKit provider reset; trackedCount=\(self.calls.count)")
             let tracked = calls
             calls.removeAll(); expiryTasks.values.forEach { $0.cancel() }; expiryTasks.removeAll()
             guard let current = FamilyStore.shared.call, let id = UUID(uuidString: current.id), tracked.contains(id) else { return }
@@ -179,6 +181,7 @@ import WebRTC
     }
     nonisolated func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         Task { @MainActor in
+            logger.notice("CallKit end requested; tracked=\(self.calls.contains(action.callUUID))")
             if calls.contains(action.callUUID), FamilyStore.shared.call?.id.lowercased() == action.callUUID.uuidString.lowercased() { FamilyStore.shared.hangup() }
             calls.remove(action.callUUID); action.fulfill()
         }

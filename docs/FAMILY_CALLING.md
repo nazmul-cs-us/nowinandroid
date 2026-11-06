@@ -176,3 +176,38 @@ Answer must deliver two-way audio/video; hang up and immediately try a second
 call to verify audio/session cleanup. Repeat presence tests with two iPhones on
 the same account, one active and one backgrounded. Cloud unit/build checks do not
 replace these signed-device checks.
+
+## Read a short call diagnostic capture
+
+The 6 November uploaded log recorded 21 calls disconnecting before reaching
+Telecom Active, with incoming Ringing → Disconnected intervals of about 156–220 ms.
+No Android fatal exception appeared. `LOCAL` in Telecom is not proof of a user
+hang-up: our cleanup reports that cause even after a remote/server end. The
+`Cannot find conference` audio-route warnings follow cleanup; they do not establish
+the initiating failure.
+
+That capture records installation/process start at 14:57 Dubai time, before fix
+`dfdd0aa00` was committed at 15:21 Dubai time. No later installation/restart is
+recorded, and its app logs contain none of that fix's `FamilyCalls` finish reasons.
+Rebuilding alone does not replace the installed APK.
+
+Diagnostics v2 adds a startup marker and traces session loss/reset, authorized
+call stages, remaining ringing time, known server end reasons, Telecom callbacks,
+and foreground-service cleanup. It logs no account IDs, passwords, tokens, SDP,
+ICE payloads, or arbitrary server/exception text. iOS logs use the same
+`FamilyCalls` category, including its system-calling configuration.
+
+From the latest repository checkout, install and capture Android:
+
+```bash
+git pull --ff-only origin main
+./gradlew :app:installDemoDebug
+adb shell am force-stop com.starception.submission.demo.debug
+adb logcat -c
+adb logcat -v time FamilyCalls:V FamilyConnection:V AndroidRuntime:E '*:S' > family-call-log.txt
+```
+
+Leave that capture running, open Deenly manually, sign in if needed, and reproduce
+one call. Press Ctrl+C. The file should start with `Diagnostics v2 loaded` and
+remain small. Capture both directions separately if behavior differs. An iOS
+console capture filtered to `FamilyCalls` can then identify a peer-side hang-up.

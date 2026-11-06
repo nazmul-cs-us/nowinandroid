@@ -59,8 +59,9 @@ class FamilyCallService : Service() {
             "Deenly:FamilyCall").apply { setReferenceCounted(false); acquire(60000) }
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        android.util.Log.i("FamilyCalls", "Call service start: hasCall=${client.state.value.call != null}; resumeRequested=${intent?.hasExtra("callId") == true}")
         if (intent?.action == DECLINE) {
-            if (intent.getStringExtra("callId") == client.state.value.call?.id) client.hangup()
+            if (intent.getStringExtra("callId") == client.state.value.call?.id) client.hangup("notification-decline")
             return START_NOT_STICKY
         }
         if (Build.VERSION.SDK_INT >= 30 && client.hasForegroundActivity) {
@@ -125,8 +126,9 @@ class FamilyCallService : Service() {
         return builder.build()
     }
     override fun onDestroy() {
+        android.util.Log.i("FamilyCalls", "Call service destroyed: hasCall=${client.state.value.call != null}")
         ringtone?.stop(); if (wakeLock?.isHeld == true) wakeLock?.release()
-        scope.cancel(); FamilyTelecom.end(); super.onDestroy()
+        scope.cancel(); FamilyTelecom.end("service-destroyed"); super.onDestroy()
     }
     companion object {
         private const val CHANNEL = "family_calls"

@@ -75,6 +75,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private val visibleActivities = mutableSetOf<android.app.Activity>()
     internal val hasForegroundActivity: Boolean get() = visibleActivities.isNotEmpty()
     init {
+        android.util.Log.w("FamilyCalls", "Diagnostics v2 loaded; package=${context.packageName}")
         androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onStart(owner: androidx.lifecycle.LifecycleOwner) { activityChanged(true) }
             override fun onStop(owner: androidx.lifecycle.LifecycleOwner) { activityChanged(false) }
@@ -144,8 +145,14 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                         }
                     }, org.jivesoftware.smack.filter.StanzaTypeFilter.MESSAGE)
                     socket.addConnectionListener(object : ConnectionListener {
-                        override fun connectionClosed() { scope.launch { if (mutable.value.connected) lost(token) } }
-                        override fun connectionClosedOnError(e: Exception) { scope.launch { if (mutable.value.connected) lost(token) } }
+                        override fun connectionClosed() {
+                            android.util.Log.w("FamilyCalls", "XMPP connection closed normally")
+                            scope.launch { if (mutable.value.connected) lost(token) }
+                        }
+                        override fun connectionClosedOnError(e: Exception) {
+                            android.util.Log.w("FamilyCalls", "XMPP connection closed: ${e.javaClass.simpleName}")
+                            scope.launch { if (mutable.value.connected) lost(token) }
+                        }
                     })
                     signInPhase = "connect"
                     socket.connect()
@@ -180,6 +187,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     }
 
     fun disconnect(clearSaved: Boolean = true) {
+        android.util.Log.i("FamilyCalls", "Session reset: clearSaved=$clearSaved; hadCall=${mutable.value.call != null}")
         if (clearSaved) credentials.clear()
         generation++
         presenceCache.clear()
@@ -206,6 +214,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     }
     private fun lost(token: Int) {
         if (token != generation) return
+        android.util.Log.w("FamilyCalls", "Session lost: hadCall=${mutable.value.call != null}")
         generation++
         presenceCache.clear()
         heartbeat?.cancel(); heartbeat = null
@@ -285,8 +294,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     fun acceptCall() = perform(callAction = true) {
         mutable.value.call?.let { apply(request("accept_call", "callId" to it.id)) }
     }
-    fun hangup() = scope.launch {
+    fun hangup(origin: String = "in-app") = scope.launch {
         val call = mutable.value.call ?: return@launch
+        android.util.Log.i("FamilyCalls", "Hangup requested: origin=$origin; stage=${call.stage}")
         finish(call.id, "local-hangup")
         runCatching { request("end_call", "callId" to call.id) }
     }
@@ -394,6 +404,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         val current = mutable.value.call
         if (current != null && (current.id != call.id || current.version >= call.version)) return
         if (!callReducer.apply(call.id, call.version, call.stage, call.expires, System.currentTimeMillis())) return
+        // Fixed enums/numbers only. Never log JIDs, payloads, credentials or SDP.
+        val reason = value.optString("reason").takeIf { it in setOf("hangup", "expired", "family_removed", "") } ?: "other"
+        android.util.Log.i("FamilyCalls", "Call update: stage=${call.stage}; version=${call.version}; selected=${call.selected}; remainingMs=${call.expires - System.currentTimeMillis()}; serverReason=$reason")
         if (callReducer.stage == "ended" || (call.stage == "active" && !call.selected)) { finish(call.id, "terminal-expired-or-other-device"); return }
         if (call.stage == "ringing" && call.expires <= System.currentTimeMillis()) { finish(call.id, "terminal-expired-or-other-device"); return }
         mutable.value = mutable.value.copy(call = call, speaker = if (call.stage == "active") call.kind == "video" else mutable.value.speaker)
@@ -425,6 +438,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
     }
     private suspend fun endWithError(message: String) {
+        android.util.Log.w("FamilyCalls", "Media/signalling failure: hadCall=${mutable.value.call != null}")
         val call = mutable.value.call
         call?.let { finish(it.id); runCatching { request("end_call", "callId" to it.id) } }
         mutable.value = mutable.value.copy(error = message)

@@ -17,6 +17,7 @@ internal object FamilyTelecom {
         runCatching { context.getSystemService(TelecomManager::class.java).registerPhoneAccount(
             PhoneAccount.builder(handle(context), "Family calls").setCapabilities(PhoneAccount.CAPABILITY_SELF_MANAGED)
                 .setSupportedUriSchemes(listOf(PhoneAccount.SCHEME_SIP)).build()) }
+            .onFailure { android.util.Log.w("FamilyCalls", "Telecom registration failed: ${it.javaClass.simpleName}") }
     }
     fun update(context: Context, state: FamilyUiState) {
         val call = state.call ?: return
@@ -30,12 +31,15 @@ internal object FamilyTelecom {
                     putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle(context))
                     putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, extras)
                 })
-            }
+            }.onFailure { android.util.Log.w("FamilyCalls", "Telecom announcement failed: ${it.javaClass.simpleName}") }
         }
         if (state.mediaConnected) connection?.setActive()
     }
     fun attach(value: Connection) { connection = value }
-    fun end() { connection?.setDisconnected(DisconnectCause(DisconnectCause.LOCAL)); connection?.destroy(); connection = null; announced = null }
+    fun end(reason: String = "service-idle") {
+        android.util.Log.i("FamilyCalls", "Telecom cleanup: reason=$reason; hadConnection=${connection != null}")
+        connection?.setDisconnected(DisconnectCause(DisconnectCause.LOCAL)); connection?.destroy(); connection = null; announced = null
+    }
 }
 
 @AndroidEntryPoint
@@ -55,10 +59,13 @@ class FamilyConnectionService : ConnectionService() {
                 startActivity(Intent(this@FamilyConnectionService, FamilyIncomingActivity::class.java)
                     .putExtra("callId", call.id).putExtra("answer", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
-            private fun endCurrent() { if (client.state.value.call?.id == call.id) client.hangup() }
-            override fun onReject() { endCurrent() }
-            override fun onDisconnect() { endCurrent() }
-            override fun onAbort() { endCurrent() }
+            private fun endCurrent(origin: String) {
+                android.util.Log.i("FamilyCalls", "Telecom callback: $origin; matchesCurrent=${client.state.value.call?.id == call.id}")
+                if (client.state.value.call?.id == call.id) client.hangup(origin)
+            }
+            override fun onReject() { endCurrent("system-reject") }
+            override fun onDisconnect() { endCurrent("system-disconnect") }
+            override fun onAbort() { endCurrent("system-abort") }
         }.apply {
             connectionProperties = Connection.PROPERTY_SELF_MANAGED
             connectionCapabilities = Connection.CAPABILITY_MUTE
