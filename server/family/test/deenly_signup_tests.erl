@@ -6,7 +6,19 @@ signup_test_() -> {setup, fun() ->
     ets:new(signup_test_accounts, [named_table, public, set])
 end, fun(_) -> ets:delete(deenly_family_signup_rate), ets:delete(signup_test_accounts) end,
 [?_test(validation()), ?_test(create_and_duplicate()), ?_test(tls_required()),
- ?_test(rate_is_atomic()), ?_test(global_rate()), ?_test(query_and_response_privacy())]}.
+ ?_test(rate_is_atomic()), ?_test(global_rate()), ?_test(query_and_response_privacy()),
+ ?_test(legacy_configuration_defaults_to_enabled()), ?_test(explicit_disable_is_preserved())]}.
+legacy_configuration_defaults_to_enabled() ->
+    mongoose_config:set_opts(#{{modules, <<"xmpp.test">>} => #{mod_deenly_family => #{}}}),
+    try
+        {ok, Features} = mod_deenly_family_signup:features([], #{}, #{host_type => <<"xmpp.test">>}),
+        ?assertMatch([#xmlel{name = <<"register">>}], Features)
+    after mongoose_config:erase_opts() end.
+explicit_disable_is_preserved() ->
+    mongoose_config:set_opts(#{{modules, <<"xmpp.test">>} => #{mod_deenly_family => #{signup_enabled => false}}}),
+    try
+        ?assertEqual({ok, []}, mod_deenly_family_signup:features([], #{}, #{host_type => <<"xmpp.test">>}))
+    after mongoose_config:erase_opts() end.
 reset() -> ets:delete_all_objects(deenly_family_signup_rate), ets:delete_all_objects(signup_test_accounts).
 password() -> <<"Signup password 123!">>.
 validation() ->

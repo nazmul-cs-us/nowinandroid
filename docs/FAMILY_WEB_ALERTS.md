@@ -1,7 +1,9 @@
 # Temporary Family call alerts
 
-Status: implementation and local checks are available; deployment and real
-Android/iPhone Web Push delivery still require device acceptance testing.
+Status: deployment on the existing VM was confirmed on 6 November 2026: all
+three services were active and the local HTTPS/key/Home Screen asset checks
+passed. Real Android/iPhone Web Push delivery and tap-to-answer still require
+device acceptance testing.
 
 This optional Home Screen web app receives a visible browser notification for an
 authorized family call. It uses standard VAPID Web Push and needs no paid Apple

@@ -119,3 +119,14 @@ backend `checkUser` query confirms no account was created; timeouts still fail.
 Seven socket/XML regression tests cover this distinction and avoid printing raw
 server error text. Copy **both** updated `smoke.py` and `signup_smoke.py` to `/tmp`
 before retrying. Verified-TLS signup is still a required subsequent live step.
+
+A subsequent live retry passed the pre-TLS/backend check but verified-TLS signup
+waited until `connection-timeout`. Sanitized rotated JSON logs identified
+`hook_failed` with `{badkey,signup_enabled}`: the running module retained an empty
+option map. The hook now supplies the same `true` default as its schema; the
+installer writes the missing option explicitly and preserves an existing `false`.
+The regression reproduces the old failure using the pinned real `gen_mod` and
+`mongoose_config` APIs and verifies both the default and explicit disable.
+All 37 server tests and four pure config-migration tests pass. A live VM rerun is
+still required after deploying this fix; the helper's three services and local
+public-hostname TLS readiness were already confirmed on the VM.

@@ -15,6 +15,17 @@ trap 'rm -rf "$build"' EXIT
 ERL_LIBS="$source_dir/_build/default/lib" erlc -I "$source_dir/include" -o "$build" "$root/mod_deenly_family"*.erl
 python3 - "$listener_ip" <<'PY'
 import datetime,grp,ipaddress,os,pathlib,re,shutil,sys,tempfile,tomllib
+def ensure_signup_option(text):
+    modules = tomllib.loads(text).get('modules', {})
+    if 'mod_deenly_family' not in modules:
+        return text + '\n[modules.mod_deenly_family]\nsignup_enabled = true\n'
+    if 'signup_enabled' in modules['mod_deenly_family']:
+        return text
+    text, count = re.subn(r'(?m)^(\[modules\.mod_deenly_family\][^\n]*)$',
+                          r'\1\nsignup_enabled = true', text, count=1)
+    if count != 1:
+        raise SystemExit('Could not locate the Family module section to add the signup setting.')
+    return text
 config=pathlib.Path('/etc/mongooseim/mongooseim.toml')
 text=config.read_text(); before=tomllib.loads(text)
 if 'mod_register' in before.get('modules', {}):
@@ -32,7 +43,7 @@ old=section.group()
 if not re.search(r'(?m)^ip_address\s*=',old): raise SystemExit('Expected an explicit c2s ip_address.')
 new=re.sub(r'(?m)^ip_address\s*=.*$', 'ip_address = "'+str(address)+'"', old)
 text=text[:section.start()]+new+text[section.end():]
-if 'mod_deenly_family' not in before.get('modules',{}): text+='\n[modules.mod_deenly_family]\n'
+text=ensure_signup_option(text)
 after=tomllib.loads(text)
 if after['listen']['c2s'][0]['tls']['mode']!='starttls_required':
     raise SystemExit('STARTTLS must remain mandatory.')
