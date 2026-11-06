@@ -61,7 +61,9 @@ sudo -u mongooseim python3 /tmp/deenly-signup-smoke.py --host 10.148.0.2
 This installs `mod_deenly_family_signup.beam` alongside the existing Family
 modules and restarts MongooseIM. It adds no network listener and needs no Firebase,
 APNs, or web-helper credential. The signup smoke uses real TLS/XMPP registration,
-checks duplicate/reserved/weak-password/rate denials, authenticates new accounts,
+accepts either an IQ denial or a stream rejection/closure for the pre-TLS test,
+independently confirms that the plaintext account does not exist, then checks
+duplicate/reserved/weak-password/rate denials, authenticates new accounts,
 and verifies that family invitation acceptance is still required. It attempts to
 remove its temporary relationships/accounts afterward and prints no passwords.
 If the VM's source IP has just exhausted its signup allowance, wait for the next
@@ -109,3 +111,11 @@ Server sources compile against the pinned MongooseIM 6.10.0 interfaces. These
 checks do not establish a successful live PostgreSQL registration. Run the VM
 signup smoke above for that evidence. Native Xcode compilation, iPhone signup,
 and actual mobile network/firewall behavior require the Mac/phones/VM.
+
+The first VM rollout on 6 November confirmed MongooseIM startup but stopped at the
+plaintext negative test because it required an IQ error and instead received a
+stream error. The corrected smoke accepts a rejected/closed stream only when a
+backend `checkUser` query confirms no account was created; timeouts still fail.
+Seven socket/XML regression tests cover this distinction and avoid printing raw
+server error text. Copy **both** updated `smoke.py` and `signup_smoke.py` to `/tmp`
+before retrying. Verified-TLS signup is still a required subsequent live step.

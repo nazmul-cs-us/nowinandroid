@@ -5,10 +5,24 @@ import socket
 import ssl
 import uuid
 import xml.etree.ElementTree as ET
-from smoke import Client, DOMAIN, CLIENT, STREAM, account, connection_target, require
+from smoke import Client, DOMAIN, CLIENT, XmppStreamFailure, account, connection_target, require
 
 REGISTER = '{jabber:iq:register}'
 ERROR = '{urn:ietf:params:xml:ns:xmpp-stanzas}'
+
+
+def check_plaintext_rejection(client, username, account_exists):
+    # A TLS-required listener may reject the IQ or terminate the entire stream.
+    # Timeouts/connect failures are not accepted as evidence of enforcement.
+    try:
+        result = client.create(username, 'public-diagnostic-placeholder-123')
+    except XmppStreamFailure:
+        result = 'stream-rejected'
+    require(result in {'not-allowed', 'not-authorized', 'policy-violation',
+                       'encryption-required', 'stream-rejected'},
+            'Signup was not rejected before TLS.')
+    require(account_exists(username) is False,
+            'A plaintext signup unexpectedly created an account.')
 
 
 class RegistrationClient(Client):
@@ -48,9 +62,9 @@ def main():
     try:
         plain = RegistrationClient(endpoint, secure=False)
         clients.append(plain)
-        # Public synthetic value only: never submit a real password before TLS.
-        require(plain.create(names[2], 'public-diagnostic-placeholder-123') == 'not-allowed',
-                'Signup was not rejected before TLS.')
+        # Confirm the backend too: a stream error alone must not be a false PASS.
+        check_plaintext_rejection(plain, names[2],
+            lambda name: account('checkUser', user=name + '@' + DOMAIN)['exist'])
         print('PASS: account creation rejected before TLS.')
         registration = RegistrationClient(endpoint)
         clients.append(registration)

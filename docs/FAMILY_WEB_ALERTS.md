@@ -31,6 +31,10 @@ sudo bash server/family/install.sh "$HOME/mongooseim-6.10.0" 10.148.0.2
 sudo bash server/family/push/web-deploy/install.sh https://xmpp.starception.com:8443
 ```
 
+On Debian/Ubuntu the installer installs `python3-venv` if `venv`/`ensurepip`
+is missing, then completes or reuses its private virtual environment. Rerunning
+after a partial venv failure preserves existing configuration and VAPID keys.
+
 The helper installer installs the existing private push bridge and the public
 helper, generates a VAPID key once, and enables `deenly-family-push` and
 `deenly-family-web`. It first checks that the Family pairing module is installed,

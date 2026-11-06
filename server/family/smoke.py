@@ -24,6 +24,12 @@ SASL = "{urn:ietf:params:xml:ns:xmpp-sasl}"
 BIND = "{urn:ietf:params:xml:ns:xmpp-bind}"
 
 
+class XmppStreamFailure(RuntimeError):
+    """A rejected/closed stream, with no raw server stanza or credentials in the error."""
+    def __init__(self, condition):
+        super().__init__(f"XMPP stream/authentication failed ({condition}).")
+
+
 def account(action, **fields):
     args = ["/usr/local/bin/mongooseimctl", "account", action]
     for key, value in fields.items():
@@ -101,12 +107,18 @@ class Client:
         while True:
             for _, element in self.parser.read_events():
                 if element.tag in (STREAM + "error", SASL + "failure"):
-                    raise RuntimeError("XMPP stream/authentication failed.")
+                    known = {"policy-violation", "not-authorized", "encryption-required",
+                             "invalid-namespace", "invalid-xml", "not-well-formed",
+                             "internal-server-error", "connection-timeout", "host-unknown",
+                             "unsupported-stanza-type", "temporary-auth-failure"}
+                    condition = next((child.tag.rsplit("}", 1)[-1] for child in element
+                                      if child.tag.rsplit("}", 1)[-1] in known), "unknown")
+                    raise XmppStreamFailure(condition)
                 if predicate(element):
                     return element
             data = self.sock.recv(65536)
             if not data:
-                raise RuntimeError("XMPP connection closed.")
+                raise XmppStreamFailure("connection-closed")
             self.parser.feed(data)
 
     def request(self, action, expected_error=None, **fields):

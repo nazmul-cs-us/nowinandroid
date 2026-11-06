@@ -2,6 +2,14 @@
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo 'Run with sudo.' >&2; exit 1; }
 root=$(cd "$(dirname "$0")" && pwd)
+if ! python3 -c 'import venv, ensurepip' >/dev/null 2>&1; then
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo 'Install the venv/ensurepip package for Python 3, then rerun this installer.' >&2
+    exit 1
+  fi
+  apt-get update
+  apt-get install -y python3-venv
+fi
 install -d -o root -g mongooseim -m 0750 /opt/deenly-family-push
 python3 -m venv /opt/deenly-family-push/venv
 /opt/deenly-family-push/venv/bin/pip install -r "$root/requirements.txt"
