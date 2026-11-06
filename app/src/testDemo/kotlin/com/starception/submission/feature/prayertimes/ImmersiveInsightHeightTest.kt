@@ -9,6 +9,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ImmersiveInsightHeightTest {
+    @Test fun fullBleedContentClearsNavigationWithoutShrinkingArtwork() {
+        assertEquals(100.dp, expandedInsightContentBottomInset(true, false, 24.dp))
+        assertEquals(36.dp, expandedInsightContentBottomInset(true, true, 24.dp))
+        assertEquals(0.dp, expandedInsightContentBottomInset(false, false, 24.dp))
+    }
+
+    @Test fun measuredNavigationClearanceDoesNotCountExistingInsetsTwice() {
+        assertEquals(62.dp, expandedInsightContentBottomInset(
+            fullBleed = true,
+            navigationHidden = false,
+            systemBottomInset = 24.dp,
+            cardBottomInWindowPx = 1000f,
+            navigationTopInWindowPx = 900f,
+            density = 2f,
+        ))
+    }
+
     @Test fun heldBannerReducesAvailableTileHeight() {
         assertEquals(
             1530f,

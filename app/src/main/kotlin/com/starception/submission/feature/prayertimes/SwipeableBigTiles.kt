@@ -3390,6 +3390,19 @@ internal fun InsightPreviewCard(
 ) {
     val editorialExpanded = isExpanded && useEditorialExpandedLayout
     val engravedHomeHeader = isExpanded && fluidFullBleed
+    val homeNavigationHidden by com.starception.submission.ui.InsightImmersiveBus.immersive
+        .collectAsStateWithLifecycle()
+    val navigationTopInWindowPx by com.starception.submission.ui.InsightImmersiveBus.navigationTopInWindowPx
+        .collectAsStateWithLifecycle()
+    var cardBottomInWindowPx by remember { mutableFloatStateOf(Float.NaN) }
+    val contentBottomInset = expandedInsightContentBottomInset(
+        fullBleed = engravedHomeHeader,
+        navigationHidden = homeNavigationHidden,
+        systemBottomInset = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding(),
+        cardBottomInWindowPx = cardBottomInWindowPx,
+        navigationTopInWindowPx = navigationTopInWindowPx,
+        density = LocalDensity.current.density,
+    )
     val readerChrome = rememberInsightReaderChrome(editorialExpanded)
     val chromeProgress = insightReaderChromeProgress(readerChrome, editorialExpanded)
     LaunchedEffect(editorialExpanded, readerChrome.hidden, isFocused) {
@@ -3485,7 +3498,10 @@ internal fun InsightPreviewCard(
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .onGloballyPositioned { cardTopInWindowPx = it.positionInWindow().y }
+            .onGloballyPositioned {
+                cardTopInWindowPx = it.positionInWindow().y
+                cardBottomInWindowPx = cardTopInWindowPx + it.size.height
+            }
             .shadow(
                 elevation = shadowElevation,
                 shape = shape,
@@ -4796,7 +4812,8 @@ internal fun InsightPreviewCard(
                                 maxOf(if (prayerRecap.isNotEmpty()) 88.dp else 64.dp,
                                     tagTopInset + 56.dp) - 16.dp * chromeProgress
                             },
-                            bottom = (24f - 16f * chromeProgress).dp,
+                            bottom = if (engravedHomeHeader) contentBottomInset else
+                                (24f - 16f * chromeProgress).dp,
                         ),
                     spacing = 12.dp,
                     minimumStageHeight = minimumExpandedContentHeight,
@@ -4840,7 +4857,7 @@ internal fun InsightPreviewCard(
                             end = titleHorizontalPadding,
                             // The visual grip is small; keep only compact breathing
                             // room while its larger touch target overlays the corner.
-                            bottom = titleBottomPadding + 8.dp,
+                            bottom = if (engravedHomeHeader) contentBottomInset else titleBottomPadding + 8.dp,
                         )
                         // A measured header zone keeps every expanded payload out
                         // of the top controls. The weighted middle absorbs banner
@@ -4856,6 +4873,25 @@ internal fun InsightPreviewCard(
             }
         }
     }
+}
+
+internal fun expandedInsightContentBottomInset(
+    fullBleed: Boolean,
+    navigationHidden: Boolean,
+    systemBottomInset: Dp,
+    cardBottomInWindowPx: Float = Float.NaN,
+    navigationTopInWindowPx: Float? = null,
+    density: Float = 1f,
+): Dp = if (fullBleed) {
+    if (!navigationHidden && cardBottomInWindowPx.isFinite() &&
+        navigationTopInWindowPx != null && navigationTopInWindowPx.isFinite() && density > 0f
+    ) {
+        ((cardBottomInWindowPx - navigationTopInWindowPx).coerceAtLeast(0f) / density).dp + 12.dp
+    } else {
+        systemBottomInset + if (navigationHidden) 12.dp else 76.dp
+    }
+} else {
+    0.dp
 }
 
 private fun Int.toArabicIndic(): String = toString().map { c ->
@@ -5509,8 +5545,7 @@ private fun EditorialQuranReadingStage(
                 },
             )
         }
-        val naturalHeight = insightTextHeight(blocks, (maxWidth - 16.dp).coerceAtLeast(100.dp)) + 64.dp
-        val readerBottomPadding = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() + 92.dp
+        val naturalHeight = insightTextHeight(blocks, maxWidth.coerceAtLeast(100.dp)) + 64.dp
         LaunchedEffect(naturalHeight, ayahs.isEmpty()) {
             if (ayahs.isNotEmpty()) onPreferredHeightChange(naturalHeight)
         }
@@ -5523,7 +5558,9 @@ private fun EditorialQuranReadingStage(
         ) {
             Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    // The tile shell already supplies the shared horizontal
+                    // margins used by Salah, Qibla and the other expanded tiles.
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(
@@ -5608,10 +5645,8 @@ private fun EditorialQuranReadingStage(
                 state = readingScrollState,
                 overscrollEffect = null,
                 contentPadding = PaddingValues(
-                    start = 8.dp,
                     top = 20.dp,
-                    end = 8.dp,
-                    bottom = readerBottomPadding,
+                    bottom = 20.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -5637,35 +5672,10 @@ private fun EditorialQuranReadingStage(
                                     },
                                 )
                                 append("\u00A0")
-                                // One neutral object character occupies the reserved slot.
-                                // Parenthesized digits introduce a separate bidi run and
-                                // make RTL placeholder placement resolve the wrong edge.
-                                appendInlineContent("ayah-${ayah.numberInSurah}", "\uFFFC")
+                                pushStringAnnotation(QURAN_AYAH_MARKER_TAG, ayah.numberInSurah.toArabicIndic())
+                                append('\uFFFC')
+                                pop()
                                 append("\u00A0")
-                            }
-                        }
-                    }
-                    val verseMarkers = passage.associate { ayah ->
-                        "ayah-${ayah.numberInSurah}" to InlineTextContent(
-                            Placeholder(1.4.em, 1.1.em, PlaceholderVerticalAlign.TextCenter),
-                        ) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Box(
-                                    modifier = Modifier.fillMaxHeight().aspectRatio(1f).padding(2.dp)
-                                        .background(Color(0xFF6B5943).copy(alpha = 0.48f), CircleShape)
-                                        .border(0.65.dp, HomeReferenceGold.copy(alpha = 0.76f), CircleShape)
-                                        .semantics { contentDescription = "Ayah ${ayah.numberInSurah}" },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        text = ayah.numberInSurah.toArabicIndic(),
-                                        style = TextStyle(shadow = readingShadow),
-                                        fontFamily = QuranFonts.Amiri,
-                                        fontSize = arabicVerseStyle.fontSize * if (ayah.numberInSurah >= 100) 0.40f else 0.48f,
-                                        color = HomeReferenceGold,
-                                        maxLines = 1,
-                                    )
-                                }
                             }
                         }
                     }
@@ -5673,11 +5683,10 @@ private fun EditorialQuranReadingStage(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text(
+                        QuranPassageText(
                             text = passageText,
-                            inlineContent = verseMarkers,
                             style = arabicVerseStyle,
-                            color = Color.White,
+                            selectedArabicFont = selectedArabicFont,
                             textAlign = textAlignment,
                             modifier = Modifier.fillMaxWidth(),
                         )

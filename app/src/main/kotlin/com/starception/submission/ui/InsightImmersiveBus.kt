@@ -17,6 +17,12 @@ import kotlinx.coroutines.flow.asStateFlow
 object InsightImmersiveBus {
     private val mutableImmersive = MutableStateFlow(false)
     val immersive = mutableImmersive.asStateFlow()
+    private val mutableNavigationTop = MutableStateFlow<Float?>(null)
+    val navigationTopInWindowPx = mutableNavigationTop.asStateFlow()
+
+    fun updateNavigationTop(top: Float?) {
+        mutableNavigationTop.value = top
+    }
 
     fun update(value: Boolean) {
         mutableImmersive.value = value

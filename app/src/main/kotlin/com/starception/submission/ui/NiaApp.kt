@@ -539,6 +539,9 @@ private fun NiaFloatingBottomBar(
     // which looks like a jump instead of a travelling liquid mass.
     val latestCurrentDestination = rememberUpdatedState(currentDestination)
     val latestUnreadDestinations = rememberUpdatedState(unreadDestinations)
+    DisposableEffect(vertical) {
+        onDispose { InsightImmersiveBus.updateNavigationTop(null) }
+    }
     val pill = remember(appState, vertical, backdrop) {
         @Composable { sizeModifier: Modifier ->
             val colors = latestGlassColors.value
@@ -552,7 +555,13 @@ private fun NiaFloatingBottomBar(
                 color = Color.Transparent,
                 // navigationGlass owns the exterior-only shadow.
                 shadowElevation = 0.dp,
-                modifier = sizeModifier.navigationGlass(backdrop, RoundedCornerShape(navBarHeight / 2), colors),
+                modifier = sizeModifier
+                    .onGloballyPositioned { coordinates ->
+                        if (!vertical) {
+                            InsightImmersiveBus.updateNavigationTop(coordinates.positionInWindow().y)
+                        }
+                    }
+                    .navigationGlass(backdrop, RoundedCornerShape(navBarHeight / 2), colors),
             ) {
                 val destinations = appState.topLevelDestinations
                 val selectedIndex = destinations.indexOfFirst { destination ->
