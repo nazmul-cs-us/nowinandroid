@@ -276,6 +276,14 @@ Release-specific provisioning, and regenerates `project.yml` for the personal-te
 build. Repeated runs replace the same block. It does not read private keys,
 re-sign existing binaries, or change certificates/profiles.
 
+The generated app and both extension Debug targets now explicitly select Apple
+Development signing through the `debugDeviceSigning` setting group in
+`project.yml`. After regeneration, the repair asks Xcode for the resolved settings
+of all three targets. It prints one PASS/FAIL line per target and fails if an
+extension still resolves to ad hoc signing, the team differs, signing is disabled,
+or a target is missing. A generated project alone does not establish that the
+settings took effect. Share only these PASS/FAIL lines if verification fails.
+
 If no generated project/team is available, supply the actual ten-character Team ID
 shown in your Apple account/Xcode settings:
 
@@ -293,6 +301,20 @@ Build Folder before running. Regeneration removes target overrides made in the
 generated project. Do not mix a manually signed extension with an automatically
 signed parent. Each target has its own bundle ID/profile, while the certificate
 must match. `project-push.yml` is reserved for paid APNs provisioning.
+
+If all three resolved settings checks pass but Xcode still validates an older
+ad hoc extension, build into a separate Derived Data directory from `iosApp/`:
+
+```bash
+xcodebuild -project iosApp.xcodeproj -scheme iosApp -configuration Debug \
+  -destination 'generic/platform=iOS' -derivedDataPath ../work/ios-device-signed \
+  -allowProvisioningUpdates build
+```
+
+This uses the shared team and normal development signing, leaving the existing
+Xcode Derived Data directory intact. Provisioning still needs the Apple account
+configured in Xcode. A successful signed device build is required before claiming
+that the certificate mismatch is resolved.
 
 If it persists, expand the error to identify the embedded path, or inspect the
 built `.app` on the Mac:

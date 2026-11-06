@@ -34,6 +34,15 @@ packages:
     url: https://github.com/andrewzimmer906/Swift3D
     from: 1.0.0
 
+settingGroups:
+  debugDeviceSigning:
+    configs:
+      Debug:
+        # Write these into every generated target, rather than relying on a
+        # shared xcconfig to override target-level signing defaults.
+        "CODE_SIGN_IDENTITY[sdk=iphoneos*]": Apple Development
+        "CODE_SIGNING_ALLOWED[sdk=iphoneos*]": "YES"
+        "CODE_SIGNING_REQUIRED[sdk=iphoneos*]": "YES"
 
 targets:
   iosApp:
@@ -248,6 +257,7 @@ targets:
       Debug: Config/Build.xcconfig
       Release: Config/Build.xcconfig
     settings:
+      groups: [debugDeviceSigning]
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission
         # Swift finds the ORTObjectiveC module through its module map in the
@@ -337,6 +347,7 @@ targets:
       Debug: Config/Build.xcconfig
       Release: Config/Build.xcconfig
     settings:
+      groups: [debugDeviceSigning]
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission.PrayerLiveActivity
         SWIFT_VERSION: "5.0"
@@ -369,6 +380,7 @@ targets:
       path: PrayerWidget/PrayerWidgetExtension.entitlements
       properties: {}
     settings:
+      groups: [debugDeviceSigning]
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission.PrayerWidget
         SWIFT_VERSION: "5.0"

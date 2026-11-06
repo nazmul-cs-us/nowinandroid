@@ -26,13 +26,27 @@ class DeviceSigningRepairTests(unittest.TestCase):
         self.environment = dict(os.environ, PATH=str(binaries) + os.pathsep + os.environ['PATH'])
         self.command(binaries, 'xcodebuild', """
 import json, os, sys
-if os.environ.get('DEENLY_TEST_BUILD_SETTINGS_FAIL'):
+if '-alltargets' not in sys.argv and os.environ.get('DEENLY_TEST_BUILD_SETTINGS_FAIL'):
     print('private-build-setting-marker', file=sys.stderr)
     sys.exit(1)
-print(json.dumps([
-    {'target': 'PrayerWidgetExtension', 'buildSettings': {'DEVELOPMENT_TEAM': 'OTHERTEAM1'}},
-    {'target': 'iosApp', 'buildSettings': {'DEVELOPMENT_TEAM': 'A1B2C3D4E5'}}
-]))
+if '-alltargets' not in sys.argv:
+    rows = [
+        {'target': 'PrayerWidgetExtension', 'buildSettings': {'DEVELOPMENT_TEAM': 'OTHERTEAM1'}},
+        {'target': 'iosApp', 'buildSettings': {'DEVELOPMENT_TEAM': 'A1B2C3D4E5'}}
+    ]
+else:
+    rows = [{'target': name, 'buildSettings': {
+        'DEVELOPMENT_TEAM': os.environ.get('DEENLY_TEST_EXPECTED_TEAM', 'A1B2C3D4E5'),
+        'CODE_SIGN_IDENTITY': 'Apple Development', 'CODE_SIGN_STYLE': 'Automatic',
+        'CODE_SIGNING_ALLOWED': 'YES', 'CODE_SIGNING_REQUIRED': 'YES'
+    }} for name in ['iosApp', 'PrayerLiveActivityExtension', 'PrayerWidgetExtension']]
+    if os.environ.get('DEENLY_TEST_ADHOC'):
+        rows[-1]['buildSettings']['CODE_SIGN_IDENTITY'] = '-'
+    if os.environ.get('DEENLY_TEST_WRONG_TEAM'):
+        rows[-1]['buildSettings']['DEVELOPMENT_TEAM'] = 'OTHERTEAM1'
+    if os.environ.get('DEENLY_TEST_MISSING_EXTENSION'):
+        rows.pop()
+print(json.dumps(rows))
 """)
         self.command(binaries, 'xcodegen', """
 import json, os, pathlib, sys
@@ -56,6 +70,7 @@ sys.exit(1 if os.environ.get('DEENLY_TEST_GENERATION_FAIL') else 0)
         text = self.local.read_text()
         self.assertIn('DEVELOPMENT_TEAM[config=Debug][sdk=iphoneos*] = A1B2C3D4E5', text)
         self.assertNotIn('OTHERTEAM1', text)
+        self.assertIn('resolved Debug signing settings verified', result.stdout)
         self.assertIn('CODE_SIGN_IDENTITY[config=Debug][sdk=iphoneos*] = Apple Development', text)
         self.assertIn('CODE_SIGNING_ALLOWED[config=Debug][sdk=iphoneos*] = YES', text)
         self.assertEqual(['generate', '--spec', 'project.yml'],
@@ -74,6 +89,7 @@ sys.exit(1 if os.environ.get('DEENLY_TEST_GENERATION_FAIL') else 0)
     def test_explicit_team_works_without_an_existing_project(self):
         (self.root / 'iosApp.xcodeproj').rmdir()
         self.environment['DEENLY_TEST_BUILD_SETTINGS_FAIL'] = '1'
+        self.environment['DEENLY_TEST_EXPECTED_TEAM'] = 'Z9Y8X7W6V5'
         result = self.run_repair('Z9Y8X7W6V5')
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn('= Z9Y8X7W6V5', self.local.read_text())
@@ -105,6 +121,26 @@ sys.exit(1 if os.environ.get('DEENLY_TEST_GENERATION_FAIL') else 0)
         result = self.run_repair()
         self.assertNotEqual(0, result.returncode)
         self.assertNotIn('Project regenerated.', result.stdout)
+
+    def test_adhoc_extension_fails_resolved_settings_check(self):
+        self.environment['DEENLY_TEST_ADHOC'] = '1'
+        result = self.run_repair()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('FAIL: PrayerWidgetExtension: identity=ad hoc', result.stdout)
+        self.assertNotIn('signing settings verified', result.stdout)
+
+    def test_extension_team_mismatch_fails_resolved_settings_check(self):
+        self.environment['DEENLY_TEST_WRONG_TEAM'] = '1'
+        result = self.run_repair()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('team matches=False', result.stdout)
+        self.assertNotIn('signing settings verified', result.stdout)
+
+    def test_missing_extension_is_not_treated_as_success(self):
+        self.environment['DEENLY_TEST_MISSING_EXTENSION'] = '1'
+        result = self.run_repair()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('FAIL: PrayerWidgetExtension: missing', result.stdout)
 
 
 if __name__ == '__main__':

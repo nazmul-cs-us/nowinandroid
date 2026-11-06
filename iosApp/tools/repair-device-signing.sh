@@ -62,5 +62,40 @@ print('Shared Debug device signing configured for the app and both extensions; o
 PY
 cd "$root"
 xcodegen generate --spec project.yml
-echo 'Project regenerated. Reopen iosApp.xcodeproj, select your iPhone, then Product > Clean Build Folder and Run.'
+if ! xcodebuild -showBuildSettings -project "$root/iosApp.xcodeproj" \
+    -alltargets -configuration Debug -sdk iphoneos -json \
+    >"$task_dir/resolved.json" 2>"$task_dir/resolved.log"; then
+  echo 'Project generated, but Xcode could not resolve signing settings. No signing verification succeeded.' >&2
+  exit 1
+fi
+python3 - "$task_dir/resolved.json" "$team" <<'PY'
+import json, sys
+try:
+    rows = json.load(open(sys.argv[1]))
+    settings = {row['target']: row['buildSettings'] for row in rows}
+except (ValueError, KeyError, TypeError):
+    raise SystemExit('Xcode returned unreadable build settings; signing verification did not pass.')
+failed = False
+for target in ('iosApp', 'PrayerLiveActivityExtension', 'PrayerWidgetExtension'):
+    value = settings.get(target)
+    if value is None:
+        print(f'FAIL: {target}: missing from resolved Xcode build settings.')
+        failed = True
+        continue
+    identity = value.get('CODE_SIGN_IDENTITY', '')
+    development = identity == 'Apple Development' or identity.startswith('Apple Development:')
+    same_team = value.get('DEVELOPMENT_TEAM') == sys.argv[2]
+    allowed = value.get('CODE_SIGNING_ALLOWED') == 'YES'
+    required = value.get('CODE_SIGNING_REQUIRED') == 'YES'
+    automatic = value.get('CODE_SIGN_STYLE') == 'Automatic'
+    passed = development and same_team and allowed and required and automatic
+    label = 'Apple Development' if development else 'ad hoc' if identity == '-' else 'unexpected/missing'
+    print(f'{"PASS" if passed else "FAIL"}: {target}: identity={label}; '
+          f'team matches={same_team}; signing allowed={allowed}; required={required}; automatic={automatic}.')
+    failed |= not passed
+if failed:
+    raise SystemExit('Resolved signing settings still differ. Share only the PASS/FAIL lines above for diagnosis.')
+PY
+echo 'Project regenerated and resolved Debug signing settings verified for all three targets.'
+echo 'Reopen iosApp.xcodeproj, select your iPhone, then Product > Clean Build Folder and Run.'
 echo 'A device build on this Mac is still needed to verify signing and provisioning.'
