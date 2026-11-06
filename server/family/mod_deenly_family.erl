@@ -63,6 +63,10 @@ process_iq(Acc, From, #jid{lserver = Domain}, #iq{type = set, sub_el = El} = IQ,
         end) of
             {atomic, {Reply, Events}} ->
                 deliver(Domain, Events),
+                case maps:get(<<"action">>, Request) of
+                    <<"invite_call">> -> spawn(fun mod_deenly_family_push:drain/0);
+                    _ -> ok
+                end,
                 maps:merge(#{<<"ok">> => true, <<"v">> => 1}, Reply);
             {aborted, {denied, Code}} -> #{<<"ok">> => false, <<"error">> => Code};
             _ -> #{<<"ok">> => false, <<"error">> => <<"unavailable">>}
@@ -72,6 +76,8 @@ process_iq(Acc, From, #jid{lserver = Domain}, #iq{type = set, sub_el = El} = IQ,
 process_iq(Acc, _, _, IQ, _) ->
     {Acc, IQ#iq{type = error, sub_el = [mongoose_xmpp_errors:not_allowed()]}}.
 
+execute(D, U, _, #{<<"action">> := <<"pair_web_helper">>} = R) ->
+    mod_deenly_family_web:pair(D, U, R);
 execute(D, U, F, #{<<"action">> := <<"register_device">>} = R) ->
     mod_deenly_family_push:register(D, U, F, R);
 execute(D, U, _, #{<<"action">> := <<"unregister_device">>, <<"deviceId">> := Device}) ->

@@ -118,11 +118,22 @@ struct FamilyView: View {
                     Button { searching.toggle(); if !searching { search = "" } } label: { Image(systemName: "magnifyingglass") }
                         .accessibilityLabel("Search family")
                     Menu {
+                        Button { store.requestWebHelper() } label: { Label("Temporary call alerts", systemImage: "bell.badge") }
                         Button { store.refresh() } label: { Label("Refresh family", systemImage: "arrow.clockwise") }
                         Button(role: .destructive) { store.disconnect() } label: { Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right") }
                     } label: { Image(systemName: "ellipsis") }.accessibilityLabel("Family settings")
                 }
             }
+        }
+        .sheet(item: Binding(get: { store.webPairing }, set: { _ in store.dismissWebHelper() })) { pairing in
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Temporary call alerts").font(.title2.weight(.semibold))
+                Text("Copy this five-minute pairing code, then open the helper. Add it to your Home Screen and open its icon before enabling notifications. Alerts expire after 24 hours.")
+                Text(pairing.code).font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
+                Button("Copy pairing code") { UIPasteboard.general.string = pairing.code }
+                Link("Open helper", destination: pairing.url).buttonStyle(.borderedProminent)
+                Button("Done") { store.dismissWebHelper() }
+            }.padding(28).presentationDetents([.medium, .large])
         }
         .refreshable { store.refresh() }
         .onAppear { suggestPeer() }

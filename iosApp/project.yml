@@ -188,6 +188,10 @@ targets:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: Deenly
+        CFBundleURLTypes:
+          - CFBundleURLName: com.starception.submission
+            CFBundleURLSchemes:
+              - deenly
         CFBundleShortVersionString: "0.1.2"
         CFBundleVersion: "2"
         # Required by Compose Multiplatform, which refuses to start without it:

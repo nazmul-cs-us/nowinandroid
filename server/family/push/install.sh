@@ -6,6 +6,11 @@ install -d -o root -g mongooseim -m 0750 /opt/deenly-family-push
 python3 -m venv /opt/deenly-family-push/venv
 /opt/deenly-family-push/venv/bin/pip install -r "$root/requirements.txt"
 install -o root -g mongooseim -m 0640 "$root/bridge.py" /opt/deenly-family-push/bridge.py
+install -o root -g mongooseim -m 0640 "$root/web_helper.py" /opt/deenly-family-push/web_helper.py
+install -d -o mongooseim -g mongooseim -m 0700 /var/lib/deenly-family-web
+install -d -o root -g mongooseim -m 0750 /opt/deenly-family-push/web
+install -o root -g mongooseim -m 0640 "$root/web/"* /opt/deenly-family-push/web/
+install -o root -g mongooseim -m 0640 "$root/../../../iosApp/Sources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" /opt/deenly-family-push/web/icon.png
 if [ ! -f /etc/mongooseim/push-bridge-secret ]; then
   python3 - <<'PY'
 import grp, os, secrets

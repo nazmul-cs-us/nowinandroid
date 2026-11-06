@@ -84,6 +84,7 @@ internal fun permissionRequest(): (Boolean, () -> Unit) -> Unit {
 
 internal data class FamilyActions(
     val signIn: (String, String) -> Unit = { _, _ -> },
+    val webHelper: () -> Unit = {}, val dismissWebHelper: () -> Unit = {},
     val refresh: () -> Unit = {}, val signOut: () -> Unit = {},
     val invite: (String) -> Unit = {}, val accept: (String) -> Unit = {},
     val remove: (String) -> Unit = {}, val voice: (String) -> Unit = {},
@@ -103,7 +104,7 @@ fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
             if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
                 notification.launch(Manifest.permission.POST_NOTIFICATIONS)
             client.login(account, password)
-        }, refresh = { client.refresh() }, signOut = { client.disconnect() },
+        }, webHelper = { client.requestWebHelper() }, dismissWebHelper = { client.dismissWebHelper() }, refresh = { client.refresh() }, signOut = { client.disconnect() },
         invite = { client.invite(it) }, accept = { client.acceptMember(it) }, remove = { client.removeMember(it) },
         voice = { peer -> permission(false) { client.call(peer, false) } },
         video = { peer -> permission(true) { client.call(peer, true) } }, dismissError = { client.dismissError() }),
@@ -129,6 +130,19 @@ internal fun FamilyScreenContent(
     initialAccount: String = "", initialPassword: String = "", suggestedPeer: String = "",
 ) {
     val colors = familyPalette()
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    state.webPairing?.let { pairing ->
+        AlertDialog(onDismissRequest = actions.dismissWebHelper,
+            title = { Text("Temporary call alerts") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Copy this five-minute pairing code, then open the helper. On iPhone, add it to the Home Screen and open its icon to enable alerts. Alerts expire after 24 hours.")
+                androidx.compose.foundation.text.selection.SelectionContainer { Text(pairing.code, fontSize = 11.sp, maxLines = 8) }
+                TextButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(pairing.code)) }) { Text("Copy pairing code") }
+            } },
+            confirmButton = { TextButton(onClick = { uriHandler.openUri(pairing.url) }) { Text("Open helper") } },
+            dismissButton = { TextButton(onClick = actions.dismissWebHelper) { Text("Done") } })
+    }
     var account by remember { mutableStateOf(initialAccount) }
     var password by remember { mutableStateOf(initialPassword) }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -157,6 +171,7 @@ internal fun FamilyScreenContent(
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreHoriz, "Family settings", tint = colors.ink) }
                     DropdownMenu(menu, { menu = false }) {
+                        DropdownMenuItem(text = { Text("Temporary call alerts") }, onClick = { menu = false; actions.webHelper() })
                         DropdownMenuItem(text = { Text("Refresh family") }, onClick = { menu = false; actions.refresh() })
                         DropdownMenuItem(text = { Text("Sign out") }, onClick = { menu = false; actions.signOut() })
                     }

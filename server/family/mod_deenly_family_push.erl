@@ -22,7 +22,8 @@ register(D, U, F, R) ->
           resource => F, updated => now_ms()}),
     {#{}, []}.
 unregister(D, U, Device) ->
-    mnesia:delete({?T, {device, D, U, Device}}), {#{}, []}.
+    mnesia:delete({?T, {device, D, U, Device}}),
+    mod_deenly_family_web:revoke(D, U, Device), {#{}, []}.
 
 enqueue(D, C) ->
     Id = maps:get(<<"id">>, C), Callee = maps:get(<<"callee">>, C), Now = now_ms(),
@@ -39,7 +40,8 @@ enqueue(D, C) ->
                 _ -> ok
             end;
         (_) -> ok
-    end, rows()).
+    end, rows()),
+    mod_deenly_family_web:enqueue(D, C).
 
 drain() ->
     %% Claim jobs in a transaction, but never perform network IO under Mnesia locks.
@@ -49,8 +51,13 @@ drain() ->
             ({K = {push, D, Id, Device}, #{expires := Exp, next := Next, user := U} = Job}) ->
                 mnesia:read(?T, {lock, D}, write),
                 Current = read({call, D, Id}), Registered = read({device, D, U, Device}),
+                Registration = maps:get(registration, Job),
+                IsCurrent = case maps:get(platform, Registration) of
+                    <<"web">> -> mod_deenly_family_web:current(D, U, Registration);
+                    _ -> Registered =:= Registration
+                end,
                 Allowed = is_map(Current) andalso maps:get(<<"stage">>, Current) =:= <<"ringing">>
-                    andalso Registered =:= maps:get(registration, Job),
+                    andalso IsCurrent,
                 case Exp > Now andalso Allowed of
                     false -> mnesia:delete({?T, K}), false;
                     true when Next =< Now -> write(K, Job#{next => Now + 30000}), {true, {K, Job}};
@@ -71,7 +78,11 @@ send(K, #{registration := Registration, payload := Payload, attempts := Attempts
         Secret = string:trim(Secret0),
         true = byte_size(Secret) >= 32,
         application:ensure_all_started(inets),
-        Public = maps:from_list([{atom_to_binary(Key), maps:get(Key, Registration)} || Key <- [token, platform, environment]]),
+        Public0 = maps:from_list([{atom_to_binary(Key), maps:get(Key, Registration)} || Key <- [token, platform, environment]]),
+        Public = case maps:get(platform, Registration) of
+            <<"web">> -> Public0#{<<"generations">> => maps:get(generations, Registration)};
+            _ -> Public0
+        end,
         Body = jiffy:encode(#{<<"registration">> => Public,
                               <<"payload">> => Payload}),
         {ok, {{_, Code, _}, _, Response}} = httpc:request(post,

@@ -103,6 +103,14 @@
         <service android:name=".family.FamilyConnectionService" android:exported="true" android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE">
             <intent-filter><action android:name="android.telecom.ConnectionService" /></intent-filter>
         </service>
+        <activity android:name=".family.FamilyWebEntryActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="deenly" android:host="family-call" />
+            </intent-filter>
+        </activity>
         <activity android:name=".family.FamilyIncomingActivity" android:exported="false" android:launchMode="singleTop" android:excludeFromRecents="true" />
         <activity
             android:name=".VideoSplashActivity"

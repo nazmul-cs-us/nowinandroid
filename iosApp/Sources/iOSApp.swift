@@ -109,7 +109,15 @@ struct iOSApp: App {
             NativeAppearanceBridge.shared.update(owner: owner, lightIcons: fields[1] == "system" ? nil : fields[1] == "true")
         }
                 .onOpenURL { url in
-                    guard url.scheme == "deenly", url.host == "prayer-times" else { return }
+                    guard url.scheme == "deenly" else { return }
+                    if url.host == "family-call" {
+                        showingFamily = true
+                        if let id = FamilyCallLink().callId(input: url.absoluteString) {
+                            Task { if !(await FamilyStore.shared.resumeForPush(id)) { FamilyStore.shared.message = "This call is no longer ringing. Open Family to call back." } }
+                        }
+                        return
+                    }
+                    guard url.host == "prayer-times" else { return }
                     IosComposeRootKt.OpenPrayerTimesFromLiveActivity()
                     NotificationCenter.default.post(name: .openPrayerLiveActivity, object: nil)
                 }

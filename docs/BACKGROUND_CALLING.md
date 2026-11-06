@@ -4,6 +4,10 @@ Status as of 5 November 2026: code committed; provider/VM deployment and closed-
 
 The foreground Android-to-iOS call was confirmed on real devices before this change. The new native UI and background paths require a fresh signed-device test. A local build or provider mock test does not prove delivery to a locked/terminated phone.
 
+For temporary visible alerts before native provider setup, see
+[Home Screen call alerts](FAMILY_WEB_ALERTS.md). This optional route opens the app
+for server validation; it does not provide automatic native iOS wake-up.
+
 ## Delivery flow
 
 1. After authenticated XMPP login, each installation registers its FCM or VoIP APNs token. Installation IDs and XMPP resources survive process restarts. Sign-out clears saved credentials and unregisters the device.

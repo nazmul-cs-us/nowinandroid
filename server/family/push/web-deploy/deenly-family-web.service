@@ -1,0 +1,23 @@
+[Unit]
+Description=Deenly temporary Family web call alerts
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mongooseim
+Group=mongooseim
+EnvironmentFile=/etc/mongooseim/family-push.env
+ExecStart=/opt/deenly-family-push/venv/bin/python /opt/deenly-family-push/web_helper.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/deenly-family-web
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

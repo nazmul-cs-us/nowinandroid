@@ -242,3 +242,38 @@ When `PRAYER_PUSH_BACKEND_URL` is a valid HTTPS URL, the app posts JSON containi
 and `updatedAt`. The endpoint should treat token replacement as an upsert. The
 request intentionally has no embedded authorization header; add server-side
 abuse controls or an app-attestation exchange if the endpoint is public.
+
+### Embedded binary certificate mismatch on iPhone
+
+All embedded extensions must use the **same signing certificate** as `iosApp`.
+Select the same Team and Automatic signing for `iosApp`,
+`PrayerLiveActivityExtension`, and `PrayerWidgetExtension`; check Debug build
+settings for stale manual profile or distribution-certificate overrides. Set the
+team in `Config/Local.xcconfig` so regeneration keeps it shared:
+
+```xcconfig
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Development
+```
+
+Regenerate the personal-team project with `xcodegen generate --spec project.yml`,
+reopen it, select the iPhone and Debug configuration, and use Product → Clean
+Build Folder before running. Regeneration removes target overrides made in the
+generated project. Do not mix a manually signed extension with an automatically
+signed parent. Each target has its own bundle ID/profile, while the certificate
+must match. `project-push.yml` is reserved for paid APNs provisioning.
+
+If it persists, expand the error to identify the embedded path, or inspect the
+built `.app` on the Mac:
+
+```bash
+bash tools/check-embedded-signing.sh /path/to/Debug-iphoneos/iosApp.app
+```
+
+If the mismatched binary is `Shared.framework`, also run `./gradlew :shared:clean`
+from the repository root, then rebuild in Xcode. This removes a previously signed
+Kotlin framework so Gradle embeds/signs it with the current app identity.
+
+This diagnostic reads public code-signing metadata and compares leaf certificate
+fingerprints. It does not change certificates, provisioning profiles or keys.

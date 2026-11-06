@@ -58,6 +58,8 @@ Removing membership stops further authorized signalling and credential issuance.
 
 The issuer reads `/etc/mongooseim/turn-secret`, never sends that static secret to phones, and returns temporary HMAC credentials. Keep coturn's existing quotas. Rotate its shared secret and the protected issuer file together.
 
+For the optional, explicitly paired browser alert workaround, see [temporary call alerts](FAMILY_WEB_ALERTS.md).
+
 ## Deploy on the VM
 
 Pull the latest `main` checkout on the VM before installing.

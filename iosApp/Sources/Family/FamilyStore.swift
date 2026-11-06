@@ -5,6 +5,11 @@ import KissXML
 import Shared
 import UIKit
 
+struct FamilyWebPairing: Identifiable {
+    let code: String
+    let url: URL
+    var id: String { code }
+}
 struct FamilyMemberRow: Identifiable, Equatable {
     let jid: String
     let status: String
@@ -41,6 +46,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     @Published private(set) var connected = false
     @Published private(set) var busy = false
     @Published private(set) var serviceReady = false
+    @Published private(set) var webPairing: FamilyWebPairing?
     @Published private(set) var me = ""
     @Published private(set) var members: [FamilyMemberRow] = []
     @Published private(set) var call: FamilyCallInfo?
@@ -97,6 +103,16 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         guard connected else { return }
         Task { _ = try? await request("presence") }
     }
+    func requestWebHelper() {
+        perform {
+            let reply = try await self.request("pair_web_helper", ["deviceId": FamilyCredentials.deviceID])
+            guard let value = reply["webPairing"] as? [String: Any], let code = value["code"] as? String,
+                  let text = value["url"] as? String, let url = URL(string: text), url.scheme == "https",
+                  url.host == Self.domain, url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "family-helper" else { throw FamilyError.invalidResponse }
+            self.webPairing = FamilyWebPairing(code: code, url: url)
+        }
+    }
+    func dismissWebHelper() { webPairing = nil }
     func login(_ input: String, password: String) {
         guard !busy else { return }
         guard let jid = FamilyEndpoint().account(input: input),
@@ -117,7 +133,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     func disconnect(clearSaved: Bool = true) {
         if clearSaved { unregisterPushToken(); FamilyCredentials.clear() }
-        presenceCache.clear()
+        presenceCache.clear(); webPairing = nil
         callMessage = nil; pushRegistrationMessage = nil
         if let id = call?.id { FamilySystemCalls.shared.end(id) }
         let socket = stream
@@ -134,7 +150,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         rejectPending()
     }
     private func lost(_ text: String) {
-        presenceCache.clear()
+        presenceCache.clear(); webPairing = nil
         if let id = call?.id { FamilySystemCalls.shared.end(id, reason: .failed) }
         pendingCredential = nil
         callMessage = nil
@@ -361,6 +377,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         switch code {
         case "not_family": return "Only accepted family members can call each other."
         case "busy": return "One of you is already in a call."
+        case "web_helper_unavailable": return "Temporary call alerts are not enabled on the server yet."
         case "invitation_not_found", "accept_invitation_first": return "Accept the pending invitation first."
         case "invalid_member", "member_not_found": return "Enter a valid family account on this server."
         case "call_ended", "answered_elsewhere": return "This call ended or was answered on another device."

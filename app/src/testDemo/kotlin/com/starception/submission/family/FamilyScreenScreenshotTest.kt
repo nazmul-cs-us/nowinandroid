@@ -61,6 +61,16 @@ class FamilyScreenScreenshotTest {
         compose.onNodeWithText("Online").assertDoesNotExist()
         compose.onNodeWithText("Status unavailable").assertExists()
     }
+    @Test fun temporaryAlertsRequireAnExplicitFamilyMenuAction() {
+        var requested = 0
+        compose.setContent { NiaTheme {
+            FamilyScreenContent(FamilyUiState(connected = true, serviceReady = true),
+                FamilyActions(webHelper = { requested++ }))
+        } }
+        compose.onNodeWithContentDescription("Family settings").performClick()
+        compose.onNodeWithText("Temporary call alerts").performClick()
+        compose.runOnIdle { kotlin.test.assertEquals(1, requested) }
+    }
     @Test fun contactsDark() { render(true, true); capture("contacts-dark") }
     @Test fun previewStartsWhenAlreadyResumedAndRestartsAfterPause() {
         var starts = 0

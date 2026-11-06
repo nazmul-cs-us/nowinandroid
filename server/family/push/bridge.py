@@ -32,6 +32,9 @@ def deliver(registration, payload):
     if expires <= now:
         return 200
     token = registration["token"]
+    if registration["platform"] == "web":
+        import web_helper
+        return web_helper.deliver(registration, payload)
     with httpx.Client(http2=True, timeout=6) as client:
         if registration["platform"] == "android":
             if not PROJECT:

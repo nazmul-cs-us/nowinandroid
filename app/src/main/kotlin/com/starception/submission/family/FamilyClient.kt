@@ -26,6 +26,7 @@ import javax.net.ssl.HttpsURLConnection
 internal val FAMILY_DOMAIN = FamilyEndpoint().domain
 internal const val FAMILY_NS = "urn:starception:family:1"
 
+data class FamilyWebPairing(val code: String, val url: String, val expires: Long)
 data class FamilyMember(val jid: String, val status: String, val presence: String = "unknown")
 data class FamilyCall(
     val id: String, val caller: String, val callee: String, val kind: String,
@@ -34,6 +35,7 @@ data class FamilyCall(
 data class FamilyUiState(
     val me: String = "", val connected: Boolean = false, val busy: Boolean = false,
     val serviceReady: Boolean = false,
+    val webPairing: FamilyWebPairing? = null,
     val callError: String? = null, val pushRegistrationError: String? = null,
     val members: List<FamilyMember> = emptyList(), val call: FamilyCall? = null,
     val error: String? = null, val muted: Boolean = false, val camera: Boolean = true,
@@ -201,7 +203,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         heartbeat?.cancel(); heartbeat = null
         mediaInstance?.close(); rtcCallId = null; queuedSignals.clear(); ringingJob?.cancel()
         mutable.value = mutable.value.copy(connected = false, serviceReady = false, busy = false, call = null,
-            connectedAtElapsed = null,
+            connectedAtElapsed = null, webPairing = null,
             error = "Connection lost. Sign in again before calling.")
     }
     fun dismissError() { mutable.value = mutable.value.copy(error = null) }
@@ -237,9 +239,16 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         if (!ensureSession()) return false
         return runCatching {
             apply(request("snapshot"))
-            mutable.value.call?.let { it.id == callId && it.callee == mutable.value.me && it.stage == "ringing" } == true
+            mutable.value.call?.let { it.id.equals(callId, ignoreCase = true) && it.callee == mutable.value.me && it.stage == "ringing" } == true
         }.getOrDefault(false)
     }
+    fun requestWebHelper() = perform {
+        val value = request("pair_web_helper", "deviceId" to credentials.deviceId).getJSONObject("webPairing")
+        val uri = android.net.Uri.parse(value.getString("url"))
+        check(uri.scheme == "https" && uri.host == FAMILY_DOMAIN && uri.path?.trimEnd('/') == "/family-helper")
+        mutable.value = mutable.value.copy(webPairing = FamilyWebPairing(value.getString("code"), uri.toString(), value.getLong("expires")))
+    }
+    fun dismissWebHelper() { mutable.value = mutable.value.copy(webPairing = null) }
     fun refresh() = perform { apply(request("snapshot")) }
     fun invite(input: String) = perform {
         val peer = FamilyEndpoint().account(input) ?: error("invalid_member")
@@ -405,6 +414,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
     }
     private fun friendly(code: String?) = when (code) {
+        "web_helper_unavailable" -> "Temporary call alerts are not enabled on the server yet."
         "family_unavailable" -> "Signed in, but the Family service did not respond. Tap Refresh to retry."
 
         "not_family" -> "Only accepted family members can call each other."

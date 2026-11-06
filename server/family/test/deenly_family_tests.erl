@@ -21,7 +21,8 @@ family_test_() -> {setup, fun setup/0, fun cleanup/1, [
     ?_test(presence_is_family_private()), ?_test(presence_combines_devices()),
     ?_test(stale_activity_cannot_restore_online()), ?_test(presence_disconnect_and_expiry()),
     ?_test(presence_removal_revokes_updates()), ?_test(presence_heartbeats_are_coalesced()),
-    ?_test(raw_peer_presence_is_rejected())]}.
+    ?_test(raw_peer_presence_is_rejected()), ?_test(web_pairing_and_logout_are_scoped()),
+    ?_test(web_call_outbox_is_idempotent())]}.
 setup() ->
     Dir = "/tmp/deenly-family-eunit-" ++ integer_to_list(erlang:unique_integer([positive])),
     application:set_env(mnesia, dir, Dir),
@@ -194,3 +195,40 @@ presence_heartbeats_are_coalesced() ->
 raw_peer_presence_is_rejected() ->
     ?assertEqual({stop, drop}, mod_deenly_family:filter_packet(
         {jid:from_binary(?A), jid:from_binary(?B), #{}, {xmlel, <<"presence">>, #{<<"type">> => <<"probe">>}, []}}, #{}, #{})).
+
+with_web(Fun) ->
+    Base = "/tmp/deenly-web-test-" ++ integer_to_list(erlang:unique_integer([positive])),
+    Config = Base ++ ".json", Secret = Base ++ ".secret",
+    ok = file:write_file(Config, <<"{\"url\":\"https://xmpp.starception.com:8443/family-helper/\"}">>),
+    ok = file:write_file(Secret, <<"synthetic-web-pair-secret-01234567890123456789">>),
+    os:putenv("FAMILY_WEB_CONFIG_FILE", Config), os:putenv("FAMILY_PUSH_SECRET_FILE", Secret),
+    try Fun() after os:unsetenv("FAMILY_WEB_CONFIG_FILE"), os:unsetenv("FAMILY_PUSH_SECRET_FILE"), file:delete(Config), file:delete(Secret) end.
+web_pairing_and_logout_are_scoped() -> reset(), with_web(fun() ->
+    {atomic, {#{<<"webPairing">> := Pair}, []}} = act(?B, ?BF, <<"pair_web_helper">>, #{<<"deviceId">> => device(), <<"account">> => ?A}),
+    ?assert(byte_size(maps:get(<<"code">>, Pair)) > 64),
+    [Encoded, _] = binary:split(maps:get(<<"code">>, Pair), <<".">>),
+    Standard = binary:replace(binary:replace(Encoded, <<"-">>, <<"+">>, [global]), <<"_">>, <<"/">>, [global]),
+    Padding = binary:copy(<<"=">>, (4 - byte_size(Standard) rem 4) rem 4),
+    Claim = jiffy:decode(base64:decode(<<Standard/binary, Padding/binary>>), [return_maps]),
+    ?assertEqual(?B, maps:get(<<"account">>, Claim)),
+    ?assertEqual(device(), maps:get(<<"owner">>, Claim)),
+    ?assert(maps:get(<<"expires">>, Pair) > erlang:system_time(millisecond)),
+    {atomic, Gen} = mnesia:transaction(fun() -> mnesia:read(deenly_family, {web_generation, ?D, ?B, device()}) end),
+    ?assertMatch([{_, _, 0}], Gen),
+    {atomic, _} = act(?A, ?AF, <<"unregister_device">>, #{<<"deviceId">> => device()}),
+    {atomic, Gen2} = mnesia:transaction(fun() -> mnesia:read(deenly_family, {web_generation, ?D, ?B, device()}) end),
+    ?assertEqual(Gen, Gen2),
+    {atomic, _} = act(?B, ?BF, <<"unregister_device">>, #{<<"deviceId">> => device()}),
+    {atomic, [{_, _, 1}]} = mnesia:transaction(fun() -> mnesia:read(deenly_family, {web_generation, ?D, ?B, device()}) end)
+end).
+web_call_outbox_is_idempotent() -> reset(), with_web(fun() ->
+    family(),
+    {atomic, _} = act(?B, ?BF, <<"pair_web_helper">>, #{<<"deviceId">> => device()}),
+    {atomic, _} = call(), {atomic, _} = call(),
+    [{_, #{registration := Registration}}] = push_rows(),
+    ?assertEqual(<<"web">>, maps:get(platform, Registration)),
+    {atomic, true} = mnesia:transaction(fun() -> mod_deenly_family_web:current(?D, ?B, Registration) end),
+    {atomic, _} = act(?B, ?BF, <<"unregister_device">>, #{<<"deviceId">> => device()}),
+    ?assertEqual([], push_rows()),
+    {atomic, false} = mnesia:transaction(fun() -> mod_deenly_family_web:current(?D, ?B, Registration) end)
+end).
