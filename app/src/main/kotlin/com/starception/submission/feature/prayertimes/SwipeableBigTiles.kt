@@ -5636,16 +5636,36 @@ private fun EditorialQuranReadingStage(
                                         androidx.compose.ui.text.AnnotatedString(ayah.text.trim())
                                     },
                                 )
-                                // Shape the verse label in the paragraph itself. Android
-                                // justification can move Compose inline placeholders away
-                                // from their reserved slots, placing circles over words.
-                                pushStyle(SpanStyle(
-                                    fontFamily = QuranFonts.Amiri,
-                                    fontSize = 0.65.em,
-                                    color = HomeReferenceGold,
-                                ))
-                                append("\u00A0﴿${ayah.numberInSurah.toArabicIndic()}﴾\u00A0")
-                                pop()
+                                append("\u00A0")
+                                // One neutral object character occupies the reserved slot.
+                                // Parenthesized digits introduce a separate bidi run and
+                                // make RTL placeholder placement resolve the wrong edge.
+                                appendInlineContent("ayah-${ayah.numberInSurah}", "\uFFFC")
+                                append("\u00A0")
+                            }
+                        }
+                    }
+                    val verseMarkers = passage.associate { ayah ->
+                        "ayah-${ayah.numberInSurah}" to InlineTextContent(
+                            Placeholder(1.4.em, 1.1.em, PlaceholderVerticalAlign.TextCenter),
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier.fillMaxHeight().aspectRatio(1f).padding(2.dp)
+                                        .background(Color(0xFF6B5943).copy(alpha = 0.48f), CircleShape)
+                                        .border(0.65.dp, HomeReferenceGold.copy(alpha = 0.76f), CircleShape)
+                                        .semantics { contentDescription = "Ayah ${ayah.numberInSurah}" },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = ayah.numberInSurah.toArabicIndic(),
+                                        style = TextStyle(shadow = readingShadow),
+                                        fontFamily = QuranFonts.Amiri,
+                                        fontSize = arabicVerseStyle.fontSize * if (ayah.numberInSurah >= 100) 0.40f else 0.48f,
+                                        color = HomeReferenceGold,
+                                        maxLines = 1,
+                                    )
+                                }
                             }
                         }
                     }
@@ -5655,6 +5675,7 @@ private fun EditorialQuranReadingStage(
                     ) {
                         Text(
                             text = passageText,
+                            inlineContent = verseMarkers,
                             style = arabicVerseStyle,
                             color = Color.White,
                             textAlign = textAlignment,
