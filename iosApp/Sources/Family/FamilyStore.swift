@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import Combine
 import XMPPFramework
 import KissXML
@@ -59,13 +60,13 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     @Published private(set) var mediaConnected = false
     @Published private(set) var connectedAt: Date?
     let media = FamilyWebRTC()
+    private let logger = Logger(subsystem: "com.starception.submission", category: "FamilyCalls")
     private var stream: XMPPStream?
     private var password: String?
     private var pending: [String: CheckedContinuation<[String: Any], Error>] = [:]
     private var terminal: Set<String> = []
     private let callReducer = FamilyCallReducer()
     private let presenceCache = FamilyPresenceCache()
-    private var presenceObservers: [NSObjectProtocol] = []
     private var foreground = false
     private var activityVersion: Int64 = 0
     private var mediaCall: String?
@@ -77,14 +78,6 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     override private init() {
         super.init()
         foreground = UIApplication.shared.applicationState == .active
-        presenceObservers = [
-            NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.activityChanged(true) }
-            },
-            NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.activityChanged(false) }
-            },
-        ]
         media.onSignal = { [weak self] payload in
             guard let self, let id = self.call?.id else { return }
             Task { do { _ = try await self.request("signal", ["callId": id, "payload": payload]) }
@@ -97,7 +90,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         }
         media.onFailure = { [weak self] message in Task { await self?.failCall(message) } }
     }
-    private func activityChanged(_ active: Bool) {
+    func activityChanged(_ active: Bool) {
         guard foreground != active else { return }
         foreground = active; activityVersion += 1
         guard connected else { return }
@@ -194,19 +187,30 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     func answer() {
         if let id = call?.id { FamilySystemCalls.shared.answer(id) }
     }
-    func answerFromSystem(_ id: String) async -> Bool {
+    func acceptIncomingCall(_ id: String) async -> Bool {
         guard await resumeForPush(id), let incoming = call else { return false }
         guard await FamilyWebRTC.permissions(video: incoming.kind == "video") else {
-            message = "Allow microphone and camera access in Settings before answering."; return false
+            callMessage = "Allow microphone and camera access in Settings before answering."; return false
         }
         do {
             try await apply(request("accept_call", ["callId": incoming.id]))
             return call?.id == incoming.id && call?.stage == "active"
-        } catch { return false }
+        } catch {
+            if call?.id == incoming.id { callMessage = "Could not answer this call. Please retry." }
+            return false
+        }
+    }
+    func systemCallUnavailable(_ id: String) {
+        guard call?.id.lowercased() == id.lowercased(), media.ready else { return }
+        do { try media.activateInAppAudio() }
+        catch { Task {
+            guard call?.id.lowercased() == id.lowercased() else { return }
+            await failCall("Could not activate call audio.")
+        } }
     }
     func hangup() { if let current = call { endCall(current) } }
     private func endCall(_ current: FamilyCallInfo) {
-        finish(current.id)
+        finish(current.id, reason: "local-hangup")
         Task { _ = try? await request("end_call", ["callId": current.id]) }
     }
     func previewCamera() async {
@@ -278,7 +282,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         child.stringValue = String(decoding: data, as: UTF8.self)
         let id = UUID().uuidString
         let iq = XMPPIQ(type: "set", to: XMPPJID(string: Self.domain), elementID: id, child: child)
-        return try await withCheckedThrowingContinuation { continuation in
+        let callRevision = callReducer.snapshotRevision
+        var response: [String: Any] = try await withCheckedThrowingContinuation { continuation in
             pending[id] = continuation
             socket.send(iq)
             Task { [weak self] in
@@ -286,6 +291,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
                 self?.pending.removeValue(forKey: id)?.resume(throwing: FamilyError.disconnected)
             }
         }
+        response["_localCallRevision"] = callRevision
+        return response
     }
     private func apply(_ body: [String: Any]) async {
         presenceCache.beginEpoch(next: body["presenceEpoch"] as? String ?? "")
@@ -311,7 +318,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         if let current = body["call"] as? [String: Any] { await updateCall(current) }
         if let calls = body["calls"] as? [[String: Any]] {
             if let first = calls.first { await updateCall(first) }
-            else if let current = call { finish(current.id) }
+            else if let revision = body["_localCallRevision"] as? Int64,
+                    callReducer.canClearFromSnapshot(requestRevision: revision), let current = call { finish(current.id, reason: "current-empty-snapshot") }
         }
     }
     private func publishMembers(_ rows: [FamilyMemberRow]) {
@@ -334,8 +342,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         if let current = call, current.id != next.id || current.version >= next.version { return }
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         guard callReducer.apply(id: next.id, revision: next.version, next: next.stage, expiresAt: next.expires, now: now) else { return }
-        if callReducer.stage == "ended" || (next.stage == "active" && !next.selected) { finish(next.id); return }
-        if next.stage == "ringing" && next.expires <= now { finish(next.id); return }
+        if callReducer.stage == "ended" || (next.stage == "active" && !next.selected) { finish(next.id, reason: "terminal-expired-or-other-device"); return }
+        if next.stage == "ringing" && next.expires <= now { finish(next.id, reason: "terminal-expired-or-other-device"); return }
         if call?.id != next.id { callMessage = nil }
         call = next
         FamilySystemCalls.shared.update(next, me: me)
@@ -346,7 +354,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             ringingTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: UInt64(max(0, next.expires - now)) * 1_000_000)
                 guard !Task.isCancelled, self?.call?.id == next.id, self?.call?.stage == "ringing" else { return }
-                self?.finish(next.id)
+                self?.finish(next.id, reason: "ring-timeout")
             }
         }
         if next.stage == "active", mediaCall != next.id {
@@ -354,17 +362,19 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             do {
                 let response = try await request("turn", ["callId": next.id])
                 guard call?.id == next.id, let servers = response["iceServers"] as? [[String: Any]] else { return }
-                try await media.start(servers, video: next.kind == "video", caller: next.caller == me)
+                try await media.start(servers, video: next.kind == "video", caller: next.caller == me,
+                                      systemAudio: FamilySystemCalls.shared.usesSystemAudio(next.id))
                 let queued = queuedSignals.filter { $0.0 == next.id }; queuedSignals.removeAll()
                 for (_, payload) in queued { await media.receive(payload) }
             } catch { if call?.id == next.id { await failCall("Could not start media. Check permissions and relay configuration.") } }
         }
     }
-    private func finish(_ id: String) {
+    private func finish(_ id: String, reason: String = "media-failure") {
         callReducer.finishCall(id: id)
         terminal.insert(id)
         // The server expires/prunes calls; retain all terminal IDs for this signed-in session.
         guard let current = call, current.id == id else { return }
+        logger.info("Ending local call presentation: \(reason, privacy: .public)")
         FamilySystemCalls.shared.end(id)
         call = nil; ringingTask?.cancel(); media.close(); mediaCall = nil; queuedSignals.removeAll()
         muted = false; cameraEnabled = true; speakerEnabled = false; mediaConnected = false; connectedAt = nil; callMessage = nil

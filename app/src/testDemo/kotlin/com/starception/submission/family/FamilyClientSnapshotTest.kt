@@ -1,0 +1,48 @@
+package com.starception.submission.family
+
+import androidx.test.core.app.ApplicationProvider
+import dagger.hilt.android.testing.HiltTestApplication
+import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
+import org.json.JSONObject
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.LooperMode
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+
+@RunWith(RobolectricTestRunner::class)
+@Config(application = HiltTestApplication::class)
+@LooperMode(LooperMode.Mode.PAUSED)
+class FamilyClientSnapshotTest {
+    @Test fun delayedEmptySnapshotKeepsIncomingCallButCurrentSnapshotCanEndIt() = runBlocking {
+        val client = FamilyClient(ApplicationProvider.getApplicationContext())
+        val id = "d244dbda-0aa5-4d82-b970-a68c58e2ca0d"
+        try {
+            val invitation = JSONObject().put("id", id)
+                .put("caller", "android@xmpp.starception.com")
+                .put("callee", "ios@xmpp.starception.com")
+                .put("kind", "voice").put("stage", "ringing")
+                .put("version", 1).put("expires", System.currentTimeMillis() + 45_000)
+            client.apply(JSONObject().put("call", invitation))
+
+            // This snapshot was requested before the invitation arrived.
+            client.apply(JSONObject().put("calls", JSONArray()).put("_localCallRevision", 0))
+            assertEquals(id, client.state.value.call?.id)
+
+            // A subsequent snapshot can reconcile a missed server end event.
+            client.apply(JSONObject().put("calls", JSONArray()).put("_localCallRevision", 1))
+            assertNull(client.state.value.call)
+        } finally { client.disconnect(clearSaved = false) }
+    }
+
+    @Test fun emptyInitialSnapshotWithoutACallIsHarmless() = runBlocking {
+        val client = FamilyClient(ApplicationProvider.getApplicationContext())
+        try {
+            client.apply(JSONObject().put("calls", JSONArray()).put("_localCallRevision", 0))
+            assertNull(client.state.value.call)
+        } finally { client.disconnect(clearSaved = false) }
+    }
+}

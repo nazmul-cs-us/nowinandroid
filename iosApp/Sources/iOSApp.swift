@@ -121,7 +121,9 @@ struct iOSApp: App {
                     IosComposeRootKt.OpenPrayerTimesFromLiveActivity()
                     NotificationCenter.default.post(name: .openPrayerLiveActivity, object: nil)
                 }
+                .onAppear { FamilyStore.shared.activityChanged(scenePhase == .active) }
                 .onChange(of: scenePhase) { phase in
+                    FamilyStore.shared.activityChanged(phase == .active)
                     if phase == .active {
                         PrayerNotificationCoordinator.shared.refresh()
                     }

@@ -7,7 +7,9 @@ from foreground availability. Invitations never expose availability. No last-see
 timestamps are collected or displayed.
 
 Both clients publish foreground/background changes over their authenticated Family
-XMPP connection. The server derives the account and resource from that connection;
+XMPP connection. iOS uses the SwiftUI scene phase, including its initial state,
+so a fresh installation does not depend on receiving legacy application lifecycle
+notifications. The server derives the account and resource from that connection;
 a client cannot publish presence for another person. Each connection has a unique
 resource and a monotonically increasing activity version. Delayed foreground
 heartbeats cannot override a newer background transition. Multiple devices combine:
@@ -77,3 +79,16 @@ are required.
 Cloud checks cover server privacy/aggregation/expiry, shared cache ordering and
 Android UI states. Xcode compilation and two-device timing require a Mac/phones;
 they are not established by Swift syntax checks or server unit tests.
+
+## A newly installed iPhone remains offline
+
+Installation alone does not sign a phone into XMPP. Sign in on its Family page,
+confirm the service is connected, and keep the app in the foreground. An accepted
+family member should then see Online. A second installation of the same account
+adds another resource; it does not replace the first phone's session. When either
+installation is active, the account remains online.
+
+If sign-in cannot connect on the new phone, first check its network: the current
+GCP TCP 5222 rule allows selected public IPs. Cellular data or another Wi-Fi may
+be outside that allowlist. Do not confuse this with missing notification setup;
+foreground presence does not use Firebase, APNs or the temporary web helper.

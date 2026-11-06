@@ -154,3 +154,25 @@ On the VM, check `sudo systemctl is-active mongooseim` and
 listener is correct, verify that the phone's current network egress IP is included
 in the existing GCP `webrtc-family-xmpp` firewall rule. Membership/push deployment
 success alone does not verify network access from a phone.
+
+## Incoming screen immediately disappears (6 November 2026 fix)
+
+Both clients now attach a local call-state revision to each snapshot request.
+An empty response may clear a call only if no call transition arrived while the
+request was in flight. This prevents a pre-call snapshot from erasing a newly
+received invitation; a current empty snapshot still recovers missed end events.
+
+The iOS personal-team configuration (`FAMILY_BACKGROUND_CALLS=NO`) uses in-app
+Answer/Decline and owns audio activation. A CallKit report/transaction failure
+must not hang up the shared server call, and provider reset/end callbacks must
+belong to a tracked system call. The full-screen view retains its presented call
+while SwiftUI dismisses it, preventing an empty white dismissal frame. CallKit
+failures log only their error domain/code in the `FamilyCalls` category.
+
+After rebuilding both apps, verify Android → iOS and iOS → Android voice/video
+with the receiving app on Family and on Home. Ringing should remain until an
+explicit answer/decline, caller cancellation, server termination or timeout.
+Answer must deliver two-way audio/video; hang up and immediately try a second
+call to verify audio/session cleanup. Repeat presence tests with two iPhones on
+the same account, one active and one backgrounded. Cloud unit/build checks do not
+replace these signed-device checks.

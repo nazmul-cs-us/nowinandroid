@@ -398,8 +398,8 @@ struct FamilyCallPresentation: ViewModifier {
     @ObservedObject private var store = FamilyStore.shared
     @Environment(\.scenePhase) private var scenePhase
     func body(content: Content) -> some View {
-        content.fullScreenCover(item: Binding(get: { enabled ? store.call : nil }, set: { _ in })) { _ in
-            FamilyCallView().interactiveDismissDisabled()
+        content.fullScreenCover(item: Binding(get: { enabled ? store.call : nil }, set: { _ in })) { call in
+            FamilyCallView(presentedCall: call).interactiveDismissDisabled()
         }
         .onChange(of: scenePhase) { phase in
             if phase == .background { store.backgrounded() }
@@ -409,19 +409,26 @@ struct FamilyCallPresentation: ViewModifier {
 }
 
 private struct FamilyCallView: View {
+    let presentedCall: FamilyCallInfo
+    @State private var lastCall: FamilyCallInfo?
     @ObservedObject private var store = FamilyStore.shared
     @ObservedObject private var media = FamilyStore.shared.media
     @ObservedObject private var appearance = FamilyAppearance.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
-    private var video: Bool { store.call?.kind == "video" && store.call?.stage == "active" }
-    private var preview: Bool { store.call?.kind == "video" && store.call?.stage == "ringing" && store.call?.caller == store.me && media.localVideo != nil }
+    private var call: FamilyCallInfo {
+        if let current = store.call, current.id == presentedCall.id { return current }
+        return lastCall ?? presentedCall
+    }
+    private var video: Bool { call.kind == "video" && call.stage == "active" }
+    private var preview: Bool { call.kind == "video" && call.stage == "ringing" && call.caller == store.me && media.localVideo != nil }
     private var immersive: Bool { video || preview }
     private var ink: Color { immersive ? .white : colors.ink }
     private var muted: Color { immersive ? .white.opacity(0.75) : colors.muted }
     var body: some View {
-        if let call = store.call {
+        let call = self.call
+        return Group {
             let incoming = call.stage == "ringing" && call.callee == store.me
             GeometryReader { geometry in
                 let compact = geometry.size.height < 500
@@ -469,6 +476,10 @@ private struct FamilyCallView: View {
                         }
                     }.padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 24)
                 }
+            }
+            .disabled(store.call?.id != presentedCall.id)
+            .onChange(of: store.call?.version) { _ in
+                if let current = store.call, current.id == presentedCall.id { lastCall = current }
             }
             .task(id: call.id) { await store.previewCamera() }
             .task(id: scenePhase) { if scenePhase == .active { await store.previewCamera() } }
@@ -535,7 +546,7 @@ private struct FamilyCallView: View {
         }
     }
     private func status(incoming: Bool, stage: String, now: Date) -> String {
-        if incoming { return "Incoming \(store.call?.kind ?? "voice") call" }
+        if incoming { return "Incoming \(call.kind) call" }
         if stage == "ringing" { return "Calling…" }
         if store.mediaConnected, let start = store.connectedAt {
             let seconds = max(0, Int(now.timeIntervalSince(start)))

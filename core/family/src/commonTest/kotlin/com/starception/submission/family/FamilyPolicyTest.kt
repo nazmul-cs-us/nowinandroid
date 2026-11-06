@@ -7,6 +7,34 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FamilyPolicyTest {
+    @Test fun emptySnapshotStartedBeforeIncomingCallCannotDismissIt() {
+        val reducer = FamilyCallReducer()
+        val request = reducer.snapshotRevision
+        assertTrue(reducer.apply("incoming", 1, "ringing", 100, 0))
+        assertFalse(reducer.canClearFromSnapshot(request))
+    }
+
+    @Test fun emptySnapshotCannotUndoAnAnswerReceivedWhileItWasInFlight() {
+        val reducer = FamilyCallReducer()
+        reducer.apply("incoming", 1, "ringing", 100, 0)
+        val request = reducer.snapshotRevision
+        reducer.apply("incoming", 2, "active", 100, 1)
+        assertFalse(reducer.canClearFromSnapshot(request))
+        assertTrue(reducer.canClearFromSnapshot(reducer.snapshotRevision))
+    }
+
+    @Test fun currentEmptySnapshotCanRecoverAMissedEndEvent() {
+        val reducer = FamilyCallReducer()
+        reducer.apply("incoming", 1, "ringing", 100, 0)
+        val request = reducer.snapshotRevision
+        assertTrue(reducer.canClearFromSnapshot(request))
+        reducer.finishCall("incoming")
+        assertFalse(reducer.canClearFromSnapshot(request))
+        reducer.clear()
+        reducer.apply("next-login", 1, "ringing", 100, 0)
+        assertFalse(reducer.canClearFromSnapshot(request))
+    }
+
     @Test fun invitationsDoNotGrantCallingRights() {
         val policy = FamilyPolicy()
         listOf("incoming", "outgoing", "removed", "blocked", "").forEach { assertFalse(policy.canCall(it)) }

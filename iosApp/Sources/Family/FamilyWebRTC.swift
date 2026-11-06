@@ -24,6 +24,7 @@ import Shared
     private var hasRemoteDescription = false
     private var epoch = 0
     private var ownsAudio = false
+    private var ownsActivation = false
     private var previousCategory: AVAudioSession.Category?
     private var previousMode: AVAudioSession.Mode?
     private var previousOptions: AVAudioSession.CategoryOptions = []
@@ -37,7 +38,7 @@ import Shared
         if video { return await AVCaptureDevice.requestAccess(for: .video) }
         return true
     }
-    func start(_ servers: [[String: Any]], video: Bool, caller: Bool) async throws {
+    func start(_ servers: [[String: Any]], video: Bool, caller: Bool, systemAudio: Bool) async throws {
         close(preservePreview: video && caller && peer == nil && localVideo != nil)
         let token = epoch
         FamilyAudioSession.shared.setActive(active: true)
@@ -48,9 +49,13 @@ import Shared
         NotificationCenter.default.post(name: .familyCallWillStart, object: nil)
         SherpaSpeechService.shared.stopRecognition()
         SherpaSpeechService.shared.stopSpeaking()
-        try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
-        // CallKit activates/deactivates the audio session through its provider.
         ownsAudio = true
+        try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
+        let rtcAudio = RTCAudioSession.sharedInstance()
+        if systemAudio {
+            if !rtcAudio.useManualAudio { rtcAudio.isAudioEnabled = false }
+            rtcAudio.useManualAudio = true
+        } else { try activateInAppAudio() }
         speaker(video)
         let configuration = RTCConfiguration()
         configuration.sdpSemantics = .unifiedPlan
@@ -80,6 +85,13 @@ import Shared
             guard epoch == token else { return }
             onSignal?(["type": "offer", "sdp": offer.sdp])
         }
+    }
+    /// Foreground calls work without CallKit/APNs; this path owns activation and cleanup.
+    func activateInAppAudio() throws {
+        try AVAudioSession.sharedInstance().setActive(true)
+        ownsActivation = true
+        RTCAudioSession.sharedInstance().useManualAudio = false
+        RTCAudioSession.sharedInstance().isAudioEnabled = true
     }
     private func makeCamera() {
         let source = Self.factory.videoSource()
@@ -183,7 +195,12 @@ import Shared
         if ownsAudio {
             let session = AVAudioSession.sharedInstance()
             try? session.overrideOutputAudioPort(.none)
-            // CallKit releases activation after the call is reported ended.
+            // CallKit releases its own activation; in-app calls release ours here.
+            if ownsActivation {
+                RTCAudioSession.sharedInstance().isAudioEnabled = false
+                try? session.setActive(false, options: .notifyOthersOnDeactivation)
+                ownsActivation = false
+            }
             if let category = previousCategory, let mode = previousMode {
                 try? session.setCategory(category, mode: mode, options: previousOptions)
             }

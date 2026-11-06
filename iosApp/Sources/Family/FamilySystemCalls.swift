@@ -1,6 +1,7 @@
 import AVFoundation
 import CallKit
 import Foundation
+import OSLog
 import PushKit
 import UIKit
 import WebRTC
@@ -12,6 +13,8 @@ import WebRTC
     private let controller = CXCallController()
     private var registry: PKPushRegistry?
     private var calls: Set<UUID> = []
+    private var unavailable: Set<UUID> = []
+    private let logger = Logger(subsystem: "com.starception.submission", category: "FamilyCalls")
     private var expiryTasks: [UUID: Task<Void, Never>] = [:]
     var token: String?
     var enabled: Bool {
@@ -27,8 +30,9 @@ import WebRTC
         provider = CXProvider(configuration: config)
         super.init()
         provider.setDelegate(self, queue: .main)
-        RTCAudioSession.sharedInstance().useManualAudio = true
-        RTCAudioSession.sharedInstance().isAudioEnabled = false
+        // Personal-team builds use the in-app call screen and own audio activation.
+        RTCAudioSession.sharedInstance().useManualAudio = enabled
+        RTCAudioSession.sharedInstance().isAudioEnabled = !enabled
     }
     func start() {
         guard enabled, registry == nil else { return }
@@ -36,7 +40,7 @@ import WebRTC
         value.delegate = self; value.desiredPushTypes = [.voIP]; registry = value
     }
     func update(_ call: FamilyCallInfo, me: String) {
-        guard let uuid = UUID(uuidString: call.id) else { return }
+        guard enabled, let uuid = UUID(uuidString: call.id), !unavailable.contains(uuid) else { return }
         if calls.contains(uuid) {
             if call.stage == "active" { expiryTasks.removeValue(forKey: uuid)?.cancel() }
             return
@@ -49,10 +53,7 @@ import WebRTC
             action.isVideo = call.kind == "video"
             controller.request(CXTransaction(action: action)) { [weak self] error in
                 Task { @MainActor in
-                    if error != nil {
-                        self?.calls.remove(uuid)
-                        if FamilyStore.shared.call?.id.lowercased() == uuid.uuidString.lowercased() { FamilyStore.shared.hangup() }
-                    }
+                    if let error { self?.useInAppCall(uuid, error: error) }
                 }
             }
         }
@@ -64,13 +65,29 @@ import WebRTC
             provider.reportOutgoingCall(with: uuid, connectedAt: Date())
         }
     }
+    func usesSystemAudio(_ id: String) -> Bool {
+        guard enabled, let uuid = UUID(uuidString: id) else { return false }
+        return calls.contains(uuid)
+    }
     func answer(_ id: String) {
-        guard let uuid = UUID(uuidString: id), calls.contains(uuid) else { return }
-        controller.request(CXTransaction(action: CXAnswerCallAction(call: uuid))) { _ in }
+        guard let uuid = UUID(uuidString: id) else { return }
+        guard usesSystemAudio(id) else {
+            Task { _ = await FamilyStore.shared.acceptIncomingCall(id) }; return
+        }
+        controller.request(CXTransaction(action: CXAnswerCallAction(call: uuid))) { [weak self] error in
+            guard let error else { return }
+            Task { @MainActor in
+                self?.useInAppCall(uuid, error: error)
+                // The user explicitly tapped Accept; authenticate/validate again before accepting.
+                _ = await FamilyStore.shared.acceptIncomingCall(id)
+            }
+        }
     }
     func end(_ id: String, reason: CXCallEndedReason = .remoteEnded) {
-        guard let uuid = UUID(uuidString: id), calls.remove(uuid) != nil else { return }
+        guard let uuid = UUID(uuidString: id) else { return }
+        unavailable.remove(uuid)
         expiryTasks.removeValue(forKey: uuid)?.cancel()
+        guard calls.remove(uuid) != nil else { return }
         provider.reportCall(with: uuid, endedAt: Date(), reason: reason)
     }
     private func report(_ id: UUID, caller: String, video: Bool, expires: Int64, completion: @escaping (Error?) -> Void) {
@@ -82,10 +99,7 @@ import WebRTC
         update.hasVideo = video; update.supportsHolding = false; update.supportsGrouping = false; update.supportsUngrouping = false
         provider.reportNewIncomingCall(with: id, update: update) { error in
             Task { @MainActor in
-                if error != nil {
-                    self.calls.remove(id)
-                    if FamilyStore.shared.call?.id.lowercased() == id.uuidString.lowercased() { FamilyStore.shared.hangup() }
-                }
+                if let error { self.useInAppCall(id, error: error) }
                 completion(error)
             }
         }
@@ -95,6 +109,17 @@ import WebRTC
             guard !Task.isCancelled else { return }
             self?.end(id.uuidString, reason: .unanswered)
         }
+    }
+    private func useInAppCall(_ id: UUID, error: Error) {
+        guard calls.remove(id) != nil else { return }
+        expiryTasks.removeValue(forKey: id)?.cancel()
+        unavailable.insert(id)
+        // Log only the error domain/code: never handles, push tokens or credentials.
+        let failure = error as NSError
+        logger.warning("System call unavailable; keeping in-app call. domain=\(failure.domain, privacy: .public) code=\(failure.code)")
+        provider.reportCall(with: id, endedAt: Date(), reason: .failed)
+        // Reporting failure is not a user decline and must not send end_call to the server.
+        FamilyStore.shared.systemCallUnavailable(id.uuidString)
     }
     nonisolated func pushRegistry(_ registry: PKPushRegistry, didUpdate credentials: PKPushCredentials, for type: PKPushType) {
         let value = credentials.token.map { String(format: "%02x", $0) }.joined()
@@ -132,40 +157,52 @@ import WebRTC
     }
     nonisolated func providerDidReset(_ provider: CXProvider) {
         Task { @MainActor in
+            let tracked = calls
             calls.removeAll(); expiryTasks.values.forEach { $0.cancel() }; expiryTasks.removeAll()
-            FamilyStore.shared.hangup()
+            guard let current = FamilyStore.shared.call, let id = UUID(uuidString: current.id), tracked.contains(id) else { return }
+            if current.stage == "active" { FamilyStore.shared.hangup() }
+            else { unavailable.insert(id) }
         }
     }
     nonisolated func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
         Task { @MainActor in
+            guard calls.contains(action.callUUID) else { action.fail(); return }
             provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: Date()); action.fulfill()
         }
     }
     nonisolated func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         Task { @MainActor in
-            if await FamilyStore.shared.answerFromSystem(action.callUUID.uuidString) { action.fulfill() }
+            guard calls.contains(action.callUUID) else { action.fail(); return }
+            if await FamilyStore.shared.acceptIncomingCall(action.callUUID.uuidString) { action.fulfill() }
             else { action.fail(); end(action.callUUID.uuidString, reason: .failed) }
         }
     }
     nonisolated func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         Task { @MainActor in
-            if FamilyStore.shared.call?.id.lowercased() == action.callUUID.uuidString.lowercased() { FamilyStore.shared.hangup() }
+            if calls.contains(action.callUUID), FamilyStore.shared.call?.id.lowercased() == action.callUUID.uuidString.lowercased() { FamilyStore.shared.hangup() }
             calls.remove(action.callUUID); action.fulfill()
         }
     }
     nonisolated func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
         Task { @MainActor in
-            guard FamilyStore.shared.call?.id.lowercased() == action.callUUID.uuidString.lowercased() else { action.fail(); return }
+            guard calls.contains(action.callUUID), FamilyStore.shared.call?.id.lowercased() == action.callUUID.uuidString.lowercased() else { action.fail(); return }
             if FamilyStore.shared.muted != action.isMuted { FamilyStore.shared.mute() }
             action.fulfill()
         }
     }
     nonisolated func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
-        RTCAudioSession.sharedInstance().audioSessionDidActivate(audioSession)
-        RTCAudioSession.sharedInstance().isAudioEnabled = true
+        Task { @MainActor in
+            guard let current = FamilyStore.shared.call, usesSystemAudio(current.id) else { return }
+            RTCAudioSession.sharedInstance().useManualAudio = true
+            RTCAudioSession.sharedInstance().audioSessionDidActivate(audioSession)
+            RTCAudioSession.sharedInstance().isAudioEnabled = true
+        }
     }
     nonisolated func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
-        RTCAudioSession.sharedInstance().isAudioEnabled = false
-        RTCAudioSession.sharedInstance().audioSessionDidDeactivate(audioSession)
+        Task { @MainActor in
+            guard RTCAudioSession.sharedInstance().useManualAudio else { return }
+            RTCAudioSession.sharedInstance().isAudioEnabled = false
+            RTCAudioSession.sharedInstance().audioSessionDidDeactivate(audioSession)
+        }
     }
 }

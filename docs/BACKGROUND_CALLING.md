@@ -91,7 +91,7 @@ Keep the phone on a network allowed to reach XMPP TCP 5222. The previous pilot f
 
 ## iOS activation (paid Apple account required)
 
-The normal `project.yml` keeps remote VoIP delivery disabled and preserves personal-team builds. CallKit still handles foreground calls/audio. The existing app identifiers and all extensions must be signed by the same team.
+The normal `project.yml` keeps remote VoIP delivery disabled and preserves personal-team builds. With `FAMILY_BACKGROUND_CALLS=NO`, foreground calls use the in-app screen and activate/release their own audio session; they do not depend on CallKit transactions. Setting it to `YES` enables CallKit/PushKit and CallKit audio ownership. A rejected system-call report falls back to the authenticated in-app call instead of sending a hang-up to the server. The existing app identifiers and all extensions must be signed by the same team.
 
 Once a paid Apple Developer account and APNs key are available:
 

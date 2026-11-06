@@ -287,7 +287,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     }
     fun hangup() = scope.launch {
         val call = mutable.value.call ?: return@launch
-        finish(call.id)
+        finish(call.id, "local-hangup")
         runCatching { request("end_call", "callId" to call.id) }
     }
     fun previewCamera(callId: String? = null) {
@@ -319,7 +319,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
     }
     private suspend fun request(action: String, vararg values: Pair<String, Any>): JSONObject {
-        val activity = withContext(Dispatchers.Main.immediate) { foreground to activityVersion }
+        val activity = withContext(Dispatchers.Main.immediate) { Triple(foreground, activityVersion, callReducer.snapshotRevision) }
         return withContext(Dispatchers.IO) {
             val socket = connection ?: error("not_connected")
             val token = generation
@@ -340,10 +340,14 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                 throw e
             }
             check(token == generation && mutable.value.connected) { "not_connected" }
-            JSONObject(response.body).also { if (!it.optBoolean("ok")) error(it.optString("error", "unavailable")) }
+            JSONObject(response.body).also {
+                if (!it.optBoolean("ok")) error(it.optString("error", "unavailable"))
+                // Local request context, never taken from a server-supplied field.
+                it.put("_localCallRevision", activity.third)
+            }
         }
     }
-    private suspend fun apply(body: JSONObject) {
+    internal suspend fun apply(body: JSONObject) {
         presenceCache.beginEpoch(body.optString("presenceEpoch"))
         if (body.has("members")) {
             val rows = body.getJSONArray("members")
@@ -364,8 +368,10 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
         body.optJSONObject("call")?.let { updateCall(it) }
         body.optJSONArray("calls")?.let { calls ->
-            if (calls.length() == 0) mutable.value.call?.let { finish(it.id) }
-            else updateCall(calls.getJSONObject(0))
+            if (calls.length() == 0) {
+                if (callReducer.canClearFromSnapshot(body.optLong("_localCallRevision", -1)))
+                    mutable.value.call?.let { finish(it.id, "current-empty-snapshot") }
+            } else updateCall(calls.getJSONObject(0))
         }
     }
     private suspend fun event(body: JSONObject) {
@@ -388,15 +394,15 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         val current = mutable.value.call
         if (current != null && (current.id != call.id || current.version >= call.version)) return
         if (!callReducer.apply(call.id, call.version, call.stage, call.expires, System.currentTimeMillis())) return
-        if (callReducer.stage == "ended" || (call.stage == "active" && !call.selected)) { finish(call.id); return }
-        if (call.stage == "ringing" && call.expires <= System.currentTimeMillis()) { finish(call.id); return }
+        if (callReducer.stage == "ended" || (call.stage == "active" && !call.selected)) { finish(call.id, "terminal-expired-or-other-device"); return }
+        if (call.stage == "ringing" && call.expires <= System.currentTimeMillis()) { finish(call.id, "terminal-expired-or-other-device"); return }
         mutable.value = mutable.value.copy(call = call, speaker = if (call.stage == "active") call.kind == "video" else mutable.value.speaker)
         FamilyCallService.ensure(context, microphone = call.stage == "active" && hasForegroundActivity,
             camera = call.stage == "active" && call.kind == "video" && hasForegroundActivity)
         if (call.stage == "ringing") {
             ringingJob?.cancel()
             ringingJob = scope.launch { delay((call.expires - System.currentTimeMillis()).coerceAtLeast(0));
-                if (mutable.value.call?.id == call.id && mutable.value.call?.stage == "ringing") finish(call.id) }
+                if (mutable.value.call?.id == call.id && mutable.value.call?.stage == "ringing") finish(call.id, "ring-timeout") }
         }
         if (call.stage == "active" && rtcCallId != call.id) {
             ringingJob?.cancel(); rtcCallId = call.id
@@ -409,10 +415,11 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             } catch (_: Exception) { if (mutable.value.call?.id == call.id) endWithError("Could not start this call. Check microphone/camera permissions and relay configuration.") }
         }
     }
-    private fun finish(id: String) {
+    private fun finish(id: String, reason: String = "media-failure") {
         callReducer.finishCall(id)
         terminal.add(id); while (terminal.size > 256) terminal.remove(terminal.first())
         if (mutable.value.call?.id == id) {
+            android.util.Log.i("FamilyCalls", "Ending local call presentation: $reason")
             mutable.value = mutable.value.copy(call = null, muted = false, camera = true, speaker = false, mediaConnected = false, connectedAtElapsed = null, callError = null)
             ringingJob?.cancel(); mediaInstance?.close(); rtcCallId = null; queuedSignals.clear()
         }

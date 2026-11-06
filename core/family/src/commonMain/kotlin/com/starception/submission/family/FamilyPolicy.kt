@@ -15,6 +15,9 @@ class FamilyPolicy {
 
 /** Retains terminal state so delayed/replayed ringing cannot revive a finished call. */
 class FamilyCallReducer {
+    /** Captured when a snapshot request starts, before it can race a live event. */
+    var snapshotRevision: Long = 0
+        private set
     var callId: String = ""
         private set
     var version: Long = -1
@@ -29,11 +32,15 @@ class FamilyCallReducer {
         callId = id
         version = revision
         stage = if (next == "ringing" && expiresAt <= now) "ended" else next
+        snapshotRevision++
         return true
     }
 
-    fun finishCall(id: String) { if (callId == id) stage = "ended" }
-    fun clear() { callId = ""; version = -1; stage = "idle" }
+    fun canClearFromSnapshot(requestRevision: Long): Boolean =
+        requestRevision == snapshotRevision && stage in setOf("ringing", "active")
+
+    fun finishCall(id: String) { if (callId == id) { stage = "ended"; snapshotRevision++ } }
+    fun clear() { callId = ""; version = -1; stage = "idle"; snapshotRevision++ }
 }
 
 /** Coordinates microphone/audio ownership across existing media features. */
