@@ -41,9 +41,20 @@ new signup validation rules.
   not log credentials. The existing server's overall logging settings still
   need to avoid verbose raw-stanza logging.
 
-`[modules.mod_deenly_family]` accepts `signup_enabled = false` to disable signup.
-The module defaults to enabled after deploying this version. A disabled/older
-server yields a signup-unavailable message instead of a fake local account.
+Keep `[modules.mod_deenly_family]` empty. MongooseIM 6.10 uses an empty generic
+configuration schema for custom modules and rejects options in this section.
+Signup defaults to enabled after deploying this version. To disable signup, use
+`sudo systemctl edit mongooseim` and add:
+
+```ini
+[Service]
+Environment=FAMILY_SIGNUP_ENABLED=false
+```
+
+Then run `sudo systemctl daemon-reload` and `sudo systemctl restart mongooseim`.
+An absent environment variable, `true`, or `1` enables signup; other values
+disable it. A disabled/older server yields a signup-unavailable message instead
+of a fake local account.
 
 ## Deploy and test
 
@@ -118,4 +129,39 @@ stream error. The corrected smoke accepts a rejected/closed stream only when a
 backend `checkUser` query confirms no account was created; timeouts still fail.
 Seven socket/XML regression tests cover this distinction and avoid printing raw
 server error text. Copy **both** updated `smoke.py` and `signup_smoke.py` to `/tmp`
-before retrying. Verified-TLS signup is still a required subsequent live step.
+before retrying. Verified-TLS signup was subsequently confirmed as recorded below.
+
+A subsequent live retry passed the pre-TLS/backend check but verified-TLS signup
+waited until `connection-timeout`. Sanitized rotated JSON logs identified
+`hook_failed` with `{badkey,signup_enabled}`: the running module retained an empty
+option map. The attempted repair in `95eeb089d` added that option to TOML, but the
+real MongooseIM 6.10 parser rejects custom module options, preventing startup.
+Restoring the preceding config alone may leave systemd's restart limit active.
+
+The corrected installer keeps the custom module section empty, removes the
+incompatible `signup_enabled = true` line from that rollout, and clears systemd's
+failed state before restarting. Signup reads `FAMILY_SIGNUP_ENABLED` from the
+service environment instead of module options. If an administrator explicitly
+set the incompatible TOML option to `false`, installation stops: move that policy
+to the service environment above and remove the TOML option before retrying.
+
+All 38 server tests and six pure config-migration tests pass. The server tests
+exercise the pinned real MongooseIM configuration parser, including its rejection
+of the incompatible option, and verify default-enabled and explicitly disabled
+signup. Deploy with the commands above to repair either the restored empty
+configuration or the incompatible rollout. The helper's three services and local
+public-hostname TLS readiness passed before this MongooseIM startup failure.
+
+On 6 November 2026, the user deployed `3e594d9e6` on the VM using the commands
+above. MongooseIM 6.10.0 reported both Erlang VM and boot script status `started`,
+with the C2s listener configured at `10.148.0.2:5222`. The live signup smoke passed:
+
+- Account creation was rejected before TLS.
+- Verified-TLS signup, duplicate protection, reserved names, password rules and
+  rate limiting passed against the deployed server.
+- New accounts authenticated, and calls still required invitation acceptance.
+
+The script reported that temporary signup account cleanup was attempted. This
+confirms server recovery and the live signup flow. Signup through rebuilt Android
+and iOS apps, cellular access, and iPhone helper push delivery still need their
+own device checks.

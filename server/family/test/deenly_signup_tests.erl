@@ -1,12 +1,35 @@
 -module(deenly_signup_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include("jlib.hrl").
+-include("mongoose_config_spec.hrl").
 signup_test_() -> {setup, fun() ->
     ets:new(deenly_family_signup_rate, [named_table, public, set]),
     ets:new(signup_test_accounts, [named_table, public, set])
 end, fun(_) -> ets:delete(deenly_family_signup_rate), ets:delete(signup_test_accounts) end,
 [?_test(validation()), ?_test(create_and_duplicate()), ?_test(tls_required()),
- ?_test(rate_is_atomic()), ?_test(global_rate()), ?_test(query_and_response_privacy())]}.
+ ?_test(rate_is_atomic()), ?_test(global_rate()), ?_test(query_and_response_privacy()),
+ ?_test(legacy_configuration_defaults_to_enabled()), ?_test(explicit_disable_is_preserved()),
+ ?_test(custom_module_toml_schema_is_empty())]}.
+legacy_configuration_defaults_to_enabled() ->
+    Previous = os:getenv("FAMILY_SIGNUP_ENABLED"), os:unsetenv("FAMILY_SIGNUP_ENABLED"),
+    mongoose_config:set_opts(#{{modules, <<"xmpp.test">>} => #{mod_deenly_family => #{}}}),
+    try
+        {ok, Features} = mod_deenly_family_signup:features([], #{}, #{host_type => <<"xmpp.test">>}),
+        ?assertMatch([#xmlel{name = <<"register">>}], Features)
+    after mongoose_config:erase_opts(), restore_env(Previous) end.
+explicit_disable_is_preserved() ->
+    Previous = os:getenv("FAMILY_SIGNUP_ENABLED"), os:putenv("FAMILY_SIGNUP_ENABLED", "false"),
+    mongoose_config:set_opts(#{{modules, <<"xmpp.test">>} => #{mod_deenly_family => #{}}}),
+    try
+        ?assertEqual({ok, []}, mod_deenly_family_signup:features([], #{}, #{host_type => <<"xmpp.test">>}))
+    after mongoose_config:erase_opts(), restore_env(Previous) end.
+restore_env(false) -> os:unsetenv("FAMILY_SIGNUP_ENABLED");
+restore_env(Value) -> os:putenv("FAMILY_SIGNUP_ENABLED", Value).
+custom_module_toml_schema_is_empty() ->
+    ?assertNot(lists:member(mod_deenly_family, mongoose_config_spec:configurable_modules())),
+    ?assertEqual([], mongoose_config_parser_toml:parse_section([], #{}, #section{})),
+    ?assertError(#{what := unexpected_key}, mongoose_config_parser_toml:parse_section([], #{<<"signup_enabled">> => true}, #section{})),
+    ?assertEqual(#section{}, mod_deenly_family:config_spec()).
 reset() -> ets:delete_all_objects(deenly_family_signup_rate), ets:delete_all_objects(signup_test_accounts).
 password() -> <<"Signup password 123!">>.
 validation() ->

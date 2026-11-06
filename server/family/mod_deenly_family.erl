@@ -14,8 +14,8 @@
 -define(TABLE, deenly_family).
 
 supported_features() -> [dynamic_domains].
-config_spec() -> #section{items = #{<<"signup_enabled">> => #option{type = boolean}},
-                         defaults = #{<<"signup_enabled">> => true}}.
+%% MongooseIM 6.10 only accepts empty options for modules outside its schema list.
+config_spec() -> #section{items = #{}}.
 start(Host, _) ->
     case mnesia:create_table(?TABLE, [{attributes, [key, value]}, {disc_copies, [node()]}]) of
         {atomic, ok} -> ok;

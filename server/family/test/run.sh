@@ -5,6 +5,11 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 build=$(mktemp -d)
 trap 'rm -rf "$build"' EXIT
+# Exercise the custom module schema against the real pinned configuration API.
+erlc -I "$MONGOOSE_SOURCE/include" -o "$build" "$MONGOOSE_SOURCE/src/gen_mod.erl" "$MONGOOSE_SOURCE/src/config/mongoose_config.erl"
+erlc -I "$MONGOOSE_SOURCE/include" -o "$build" "$MONGOOSE_SOURCE/src/config/mongoose_config_spec.erl"
+# Export the pinned parser's section entry point only in the test build.
+erlc +export_all -I "$MONGOOSE_SOURCE/include" -o "$build" "$MONGOOSE_SOURCE/src/config/mongoose_config_parser_toml.erl"
 erlc -DTEST -I "$MONGOOSE_SOURCE/include" -o "$build" "$root/mod_deenly_family"*.erl
 # Source-only SDK fixtures may not yet have this pure XML query module compiled.
 exml_dir=$(erl +S 2:2 -noshell -eval 'io:format("~s", [code:lib_dir(exml)]), halt().')

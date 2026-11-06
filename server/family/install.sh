@@ -15,6 +15,24 @@ trap 'rm -rf "$build"' EXIT
 ERL_LIBS="$source_dir/_build/default/lib" erlc -I "$source_dir/include" -o "$build" "$root/mod_deenly_family"*.erl
 python3 - "$listener_ip" <<'PY'
 import datetime,grp,ipaddress,os,pathlib,re,shutil,sys,tempfile,tomllib
+def ensure_family_module(text):
+    modules = tomllib.loads(text).get('modules', {})
+    if 'mod_deenly_family' not in modules:
+        return text + '\n[modules.mod_deenly_family]\n'
+    options = modules['mod_deenly_family']
+    if not options:
+        return text
+    if options != {'signup_enabled': True}:
+        raise SystemExit('Custom module TOML options are unsupported in MongooseIM 6.10. Move signup control to FAMILY_SIGNUP_ENABLED in the service environment first.')
+    header = re.search(r'(?m)^\[modules\.mod_deenly_family\][^\n]*(?:\n|$)', text)
+    if not header:
+        raise SystemExit('Could not locate the Family section for removal of the incompatible signup setting.')
+    next_header = re.search(r'(?m)^\[', text[header.end():])
+    end = header.end() + next_header.start() if next_header else len(text)
+    body, count = re.subn(r'(?m)^[ \t]*signup_enabled[ \t]*=[ \t]*true[ \t]*(?:#[^\n]*)?(?:\n|$)', '', text[header.end():end])
+    if count != 1:
+        raise SystemExit('Could not safely remove the incompatible signup setting.')
+    return text[:header.end()] + body + text[end:]
 config=pathlib.Path('/etc/mongooseim/mongooseim.toml')
 text=config.read_text(); before=tomllib.loads(text)
 if 'mod_register' in before.get('modules', {}):
@@ -32,7 +50,7 @@ old=section.group()
 if not re.search(r'(?m)^ip_address\s*=',old): raise SystemExit('Expected an explicit c2s ip_address.')
 new=re.sub(r'(?m)^ip_address\s*=.*$', 'ip_address = "'+str(address)+'"', old)
 text=text[:section.start()]+new+text[section.end():]
-if 'mod_deenly_family' not in before.get('modules',{}): text+='\n[modules.mod_deenly_family]\n'
+text=ensure_family_module(text)
 after=tomllib.loads(text)
 if after['listen']['c2s'][0]['tls']['mode']!='starttls_required':
     raise SystemExit('STARTTLS must remain mandatory.')
@@ -60,6 +78,7 @@ install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_push.beam" "$(di
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_presence.beam" "$(dirname "$beam")/mod_deenly_family_presence.beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_web.beam" "$(dirname "$beam")/mod_deenly_family_web.beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_signup.beam" "$(dirname "$beam")/mod_deenly_family_signup.beam"
+systemctl reset-failed mongooseim
 systemctl restart mongooseim
 for attempt in {1..20}; do
   if /usr/local/bin/mongooseimctl status >/dev/null 2>&1; then
