@@ -41,9 +41,20 @@ new signup validation rules.
   not log credentials. The existing server's overall logging settings still
   need to avoid verbose raw-stanza logging.
 
-`[modules.mod_deenly_family]` accepts `signup_enabled = false` to disable signup.
-The module defaults to enabled after deploying this version. A disabled/older
-server yields a signup-unavailable message instead of a fake local account.
+Keep `[modules.mod_deenly_family]` empty. MongooseIM 6.10 uses an empty generic
+configuration schema for custom modules and rejects options in this section.
+Signup defaults to enabled after deploying this version. To disable signup, use
+`sudo systemctl edit mongooseim` and add:
+
+```ini
+[Service]
+Environment=FAMILY_SIGNUP_ENABLED=false
+```
+
+Then run `sudo systemctl daemon-reload` and `sudo systemctl restart mongooseim`.
+An absent environment variable, `true`, or `1` enables signup; other values
+disable it. A disabled/older server yields a signup-unavailable message instead
+of a fake local account.
 
 ## Deploy and test
 
@@ -123,10 +134,21 @@ before retrying. Verified-TLS signup is still a required subsequent live step.
 A subsequent live retry passed the pre-TLS/backend check but verified-TLS signup
 waited until `connection-timeout`. Sanitized rotated JSON logs identified
 `hook_failed` with `{badkey,signup_enabled}`: the running module retained an empty
-option map. The hook now supplies the same `true` default as its schema; the
-installer writes the missing option explicitly and preserves an existing `false`.
-The regression reproduces the old failure using the pinned real `gen_mod` and
-`mongoose_config` APIs and verifies both the default and explicit disable.
-All 37 server tests and four pure config-migration tests pass. A live VM rerun is
-still required after deploying this fix; the helper's three services and local
-public-hostname TLS readiness were already confirmed on the VM.
+option map. The attempted repair in `95eeb089d` added that option to TOML, but the
+real MongooseIM 6.10 parser rejects custom module options, preventing startup.
+Restoring the preceding config alone may leave systemd's restart limit active.
+
+The corrected installer keeps the custom module section empty, removes the
+incompatible `signup_enabled = true` line from that rollout, and clears systemd's
+failed state before restarting. Signup reads `FAMILY_SIGNUP_ENABLED` from the
+service environment instead of module options. If an administrator explicitly
+set the incompatible TOML option to `false`, installation stops: move that policy
+to the service environment above and remove the TOML option before retrying.
+
+All 38 server tests and six pure config-migration tests pass. The server tests
+exercise the pinned real MongooseIM configuration parser, including its rejection
+of the incompatible option, and verify default-enabled and explicitly disabled
+signup. Deploy with the commands above to repair either the restored empty
+configuration or the incompatible rollout. VM startup and positive live signup
+still require confirmation. The helper's three services and local public-hostname
+TLS readiness passed before this MongooseIM startup failure.

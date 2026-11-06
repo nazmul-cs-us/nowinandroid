@@ -14,9 +14,15 @@ start(Host) ->
     gen_iq_handler:add_iq_handler_for_domain(Host, ?NS, ejabberd_local,
         fun ?MODULE:process_iq/5, #{}, one_queue).
 stop(Host) -> gen_iq_handler:remove_iq_handler_for_domain(Host, ?NS, ejabberd_local).
-%% Older deployments can retain an empty module option map. Match config_spec's
-%% declared default while preserving an explicit administrator disable.
-enabled(Host) -> gen_mod:get_module_opt(Host, mod_deenly_family, signup_enabled, true).
+%% MongooseIM 6.10 uses an empty generic schema for custom modules, so this
+%% switch belongs to the service environment, not the module's TOML section.
+enabled(_Host) ->
+    case os:getenv("FAMILY_SIGNUP_ENABLED") of
+        false -> true;
+        "true" -> true;
+        "1" -> true;
+        _ -> false
+    end.
 features(Acc, _, #{host_type := Host}) ->
     case enabled(Host) of
         true -> {ok, [#xmlel{name = <<"register">>,
