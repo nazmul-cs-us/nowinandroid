@@ -3,7 +3,7 @@
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo 'Run with sudo.' >&2; exit 1; }
 source_dir=${1:?Usage: sudo bash install.sh /path/to/MongooseIM-6.10.0 [listener-IP]}
-listener_ip=${2:-127.0.0.1}
+listener_ip=${2:-}
 release=/opt/mongooseim-6.10.0
 root=$(cd "$(dirname "$0")" && pwd)
 [ "$(git -C "$source_dir" rev-parse HEAD)" = 872cfdb8bc8512aa495a10ff54e52a3c5e09b5db ] || {
@@ -15,14 +15,15 @@ trap 'rm -rf "$build"' EXIT
 ERL_LIBS="$source_dir/_build/default/lib" erlc -I "$source_dir/include" -o "$build" "$root/mod_deenly_family"*.erl
 python3 - "$listener_ip" <<'PY'
 import datetime,grp,ipaddress,os,pathlib,re,shutil,sys,tempfile,tomllib
-address=ipaddress.ip_address(sys.argv[1])
-if address.version != 4 or not (address.is_loopback or address.is_private):
-    raise SystemExit('Use loopback or the VM private IPv4 address, not a public/NAT address.')
 config=pathlib.Path('/etc/mongooseim/mongooseim.toml')
 text=config.read_text(); before=tomllib.loads(text)
 listeners=before.get('listen',{}).get('c2s',[])
 if len(listeners)!=1:
     raise SystemExit('Expected one c2s listener; preserve custom listeners with a manual config update.')
+# Module updates must not silently move a working private listener back to loopback.
+address=ipaddress.ip_address(sys.argv[1] or listeners[0].get('ip_address','127.0.0.1'))
+if address.version != 4 or not (address.is_loopback or address.is_private):
+    raise SystemExit('Use loopback or the VM private IPv4 address, not a public/NAT address.')
 section=re.search(r'(?ms)^\[\[listen\.c2s\]\].*?(?=^\[|\Z)', text)
 if section is None: raise SystemExit('Could not locate the c2s listener.')
 old=section.group()
@@ -47,6 +48,7 @@ for path,value in [(pathlib.Path('/etc/mongooseim/turn-secret'),secrets[0]+'\n')
     fd,tmp=tempfile.mkstemp(dir=path.parent)
     with os.fdopen(fd,'w') as out: out.write(value)
     os.chown(tmp,0,gid);os.chmod(tmp,0o640);os.replace(tmp,path)
+print('C2s listener:',str(address)+':'+str(after['listen']['c2s'][0].get('port',5222)))
 print('Family config and private TURN issuer secret installed. Backup:',backup)
 PY
 beam="$release/lib/mongooseim-6.10.0/ebin/mod_deenly_family.beam"

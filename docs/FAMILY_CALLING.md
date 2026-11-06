@@ -73,6 +73,10 @@ sudo -u mongooseim python3 /tmp/deenly-family-smoke.py
 
 The smoke script reads the configured local C2s listener; `--host` and `--port` override detection. TLS always verifies `xmpp.starception.com`.
 
+When the listener-IP argument is omitted, the installer preserves the current
+C2s bind address. Pass `10.148.0.2` explicitly to restore this VM's private listener
+if an older update moved it to loopback. The installer prints the chosen address.
+
 The installer validates the source commit, compiles against release dependencies, backs up XMPP configuration, enables the module, and copies the existing coturn secret into a protected service-readable file. It restarts **MongooseIM**, interrupting its sessions. It does not restart/change coturn.
 
 Once the smoke test passes, bind to the documented VM private interface behind GCP NAT:
@@ -131,3 +135,22 @@ The EUnit tests use real Mnesia with small external-directory test doubles. `smo
 Background support requires deploying the push bridge, granting its FCM provider access, and rebuilding the apps. iOS incoming wake requires paid Apple Developer/APNs configuration and the optional push-enabled project spec; the regular project remains usable without those credentials. The new paths require locked/background/terminated-device acceptance tests before treating them as working in production. Explicit Android force stop prevents push delivery until the app is reopened. Production Firebase identity bootstrap is also pending.
 
 Before production, validate backups/restore, monitoring, abuse/load limits, certificate renewal deployment to MongooseIM, restrictive-network TURN/TLS on 443, and the signed-device acceptance matrix. A successful build is not a production-readiness claim.
+
+
+## Android sign-in diagnostics
+
+The public endpoint remains `xmpp.starception.com:5222`, with mandatory verified
+STARTTLS. Optional Firebase initialization/token failure is reported separately
+and must not undo successful XMPP sign-in. Failure stages and exception class names
+are logged without exception messages, stanzas, passwords or tokens:
+
+```bash
+adb logcat -d -s FamilyConnection
+```
+
+On the VM, check `sudo systemctl is-active mongooseim` and
+`sudo ss -lntp '( sport = :5222 )'`. A private-interface deployment must listen on
+`10.148.0.2:5222`; binding only `127.0.0.1` prevents phone connections. If the
+listener is correct, verify that the phone's current network egress IP is included
+in the existing GCP `webrtc-family-xmpp` firewall rule. Membership/push deployment
+success alone does not verify network access from a phone.

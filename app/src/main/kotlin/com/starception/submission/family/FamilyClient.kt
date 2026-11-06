@@ -122,6 +122,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         val token = generation
         mutable.value = FamilyUiState(me = jid, busy = true)
         var attemptedSocket: XMPPTCPConnection? = null
+        var signInPhase = "initialization"
         try {
             ProviderManager.addIQProvider("family", FAMILY_NS, FamilyIqProvider())
             val socket = withContext(Dispatchers.IO) {
@@ -146,10 +147,14 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                         override fun connectionClosed() { scope.launch { if (mutable.value.connected) lost(token) } }
                         override fun connectionClosedOnError(e: Exception) { scope.launch { if (mutable.value.connected) lost(token) } }
                     })
-                    socket.connect().login()
+                    signInPhase = "connect"
+                    socket.connect()
+                    signInPhase = "authenticate"
+                    socket.login()
                 }
             }
             if (token != generation) { withContext(Dispatchers.IO) { socket.disconnect() }; return@launch }
+            signInPhase = "local-session"
             connection = socket
             mutable.value = mutable.value.copy(connected = true, busy = false)
             runCatching { credentials.save(jid, password) }.onFailure {
@@ -161,6 +166,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                 while (isActive) { delay(20000); runCatching { apply(request("snapshot")) } }
             }
         } catch (e: Exception) {
+            // Never log exception messages/stanzas: they can contain account or authentication data.
+            val types = generateSequence<Throwable>(e) { it.cause }.take(8).joinToString(" > ") { it.javaClass.simpleName }
+            android.util.Log.w("FamilyConnection", "Sign-in failed at $signInPhase: $types")
             if (token == generation) {
                 generation++
                 mutable.value = mutable.value.copy(busy = false, connected = false,
@@ -208,18 +216,29 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     }
     fun dismissError() { mutable.value = mutable.value.copy(error = null) }
     fun registerPushToken() {
-        com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            if (mutable.value.connected) scope.launch {
-                val session = generation
-                try {
-                    registerDevice(token)
-                    if (session == generation) mutable.value = mutable.value.copy(pushRegistrationError = null)
-                } catch (error: CancellationException) { throw error }
-                catch (_: Exception) {
-                    if (session == generation) mutable.value = mutable.value.copy(pushRegistrationError =
-                        "Background call registration is unavailable. Calls can still work while both apps are open.")
-                }
+        val session = generation
+        fun unavailable() {
+            if (session == generation && mutable.value.connected) {
+                mutable.value = mutable.value.copy(pushRegistrationError =
+                    "Background call registration is unavailable. Calls can still work while both apps are open.")
             }
+        }
+        // Firebase is optional. A missing/default-app configuration must never undo XMPP authentication.
+        try {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                .addOnSuccessListener { token ->
+                    if (session == generation && mutable.value.connected) scope.launch {
+                        try {
+                            registerDevice(token)
+                            if (session == generation) mutable.value = mutable.value.copy(pushRegistrationError = null)
+                        } catch (error: CancellationException) { throw error }
+                        catch (_: Exception) { unavailable() }
+                    }
+                }
+                .addOnFailureListener { scope.launch { unavailable() } }
+        } catch (error: Exception) {
+            android.util.Log.w("FamilyConnection", "Optional push setup unavailable: ${error.javaClass.simpleName}")
+            unavailable()
         }
     }
     internal suspend fun registerDevice(token: String) {

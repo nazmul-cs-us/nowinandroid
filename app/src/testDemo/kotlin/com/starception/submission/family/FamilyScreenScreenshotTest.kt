@@ -71,6 +71,17 @@ class FamilyScreenScreenshotTest {
         compose.onNodeWithText("Temporary call alerts").performClick()
         compose.runOnIdle { kotlin.test.assertEquals(1, requested) }
     }
+    @Test fun missingFirebaseConfigurationCannotThrowIntoSignIn() {
+        compose.setContent { androidx.compose.material3.Text("Optional notification setup") }
+        compose.runOnIdle {
+            val context = compose.activity.applicationContext
+            com.google.firebase.FirebaseApp.getApps(context).forEach { it.delete() }
+            kotlin.test.assertFailsWith<IllegalStateException> { com.google.firebase.messaging.FirebaseMessaging.getInstance() }
+            val client = FamilyClient(context)
+            client.registerPushToken()
+            kotlin.test.assertNull(client.state.value.error)
+        }
+    }
     @Test fun contactsDark() { render(true, true); capture("contacts-dark") }
     @Test fun previewStartsWhenAlreadyResumedAndRestartsAfterPause() {
         var starts = 0
