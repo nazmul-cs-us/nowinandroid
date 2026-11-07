@@ -470,7 +470,8 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                 startupStep = "native-initialization"
                 val activeMedia = media
                 startupStep = "native-media"
-                activeMedia.start(servers, call.kind == "video", call.caller == mutable.value.me)
+                FamilyTelecom.update(context, mutable.value)
+                activeMedia.start(servers, call.kind == "video", call.caller == mutable.value.me, call.id)
                 startupStep = "queued-signals"
                 val pending = queuedSignals.filter { it.first == call.id }; queuedSignals.clear()
                 pending.forEach { media.receive(it.second) }

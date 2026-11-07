@@ -29,7 +29,7 @@ class AndroidFamilyMedia(
     val localVideo = MutableStateFlow<VideoTrack?>(null)
     val remoteVideo = MutableStateFlow<VideoTrack?>(null)
     private val audio = context.getSystemService(AudioManager::class.java)
-    private val focus = FamilyAudioFocus(audio)
+    private val focus = FamilyAudioFocus(audio, scope, FamilyTelecom.audioFocus)
     private var previousMode = AudioManager.MODE_NORMAL
     private var previousSpeaker = false
     private var ownsAudio = false
@@ -55,13 +55,13 @@ class AndroidFamilyMedia(
         android.util.Log.i("FamilyCalls", "Media startup: step=$step")
     }
 
-    suspend fun start(servers: JSONArray, video: Boolean, caller: Boolean) {
+    suspend fun start(servers: JSONArray, video: Boolean, caller: Boolean, callId: String) {
         starting("audio-focus")
         close(preservePreview = video && caller && peer == null && localVideo.value != null)
         val token = epoch
         FamilyAudioSession.setActive(true)
         previousMode = audio.mode; previousSpeaker = audio.isSpeakerphoneOn
-        focus.acquire { scope.launch { if (token == epoch) failed("Call interrupted by another audio session.") } }
+        focus.acquire(callId) { scope.launch { if (token == epoch) failed("Call interrupted by another audio session.") } }
         if (token != epoch) return
         ownsAudio = true
         starting("audio-routing")

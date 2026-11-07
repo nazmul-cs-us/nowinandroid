@@ -258,3 +258,27 @@ Telecom acceptance before media connectivity for both directions. Verify the fix
 on the phones after rebuilding Android; the existing iOS/server deployment does
 not require a change for this failure. Look for `Audio focus granted` followed
 by the remaining media startup steps, then confirm bidirectional audio/video.
+
+A subsequent capture from `3c6460a9e` still received a delayed AudioManager grant
+that never arrived before the three-second timeout. Bounded waiting alone did not
+resolve that device failure. Telecom-managed calls now use the system's
+`ConnectionService.onConnectionServiceFocusGained` resource grant instead of
+requesting a competing AudioManager focus lease. See the framework's
+[focus callback contract](https://github.com/aosp-mirror/platform_frameworks_base/blob/master/telecomm/java/android/telecom/ConnectionService.java).
+
+That grant is scoped to the attached service and matching accepted call. Early
+grants wait for attachment/acceptance; callbacks from another service cannot
+grant or revoke the current call's resources. Focus loss closes call capture and
+acknowledges `connectionServiceFocusReleased`, as the system requires. Ending a
+call removes its scope, and service destruction revokes its resource grant.
+When Telecom cannot manage a call, the standalone delayed AudioManager path
+remains available. The app's minimum SDK is 28, where these service focus
+callbacks are supported.
+
+The updated device trace should show `Telecom call audio focus granted` and
+`Audio focus granted: owner=Telecom`, followed by peer/microphone startup.
+Regression tests cover system-owned focus even when a second AudioManager
+request would be denied, waiting for grant and acceptance, focus loss, timeout,
+cancellation, service identity, and standalone fallback. These tests do not
+establish a successful Android/iPhone media call; repeat both directions on the
+phones after updating Android.

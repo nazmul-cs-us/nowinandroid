@@ -7,6 +7,7 @@ import dagger.hilt.android.testing.HiltTestApplication
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -22,6 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -135,5 +137,109 @@ class FamilyAudioFocusTest {
         focus.release()
         listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
         assertEquals(1, interruptions)
+    }
+
+    @Test fun telecomGrantUsesSystemOwnershipEvenWhenAnotherAudioManagerRequestWouldBeDenied() = runTest {
+        shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+        val state = MutableStateFlow(FamilyTelecomAudioState("call", true, true, true))
+        val gate = FamilyAudioFocus(audio, backgroundScope, state)
+        val before = shadow.lastAudioFocusRequest
+        try {
+            gate.acquire("call") {}
+            assertSame(before, shadow.lastAudioFocusRequest)
+        } finally { gate.release() }
+    }
+
+    @Test fun telecomCaptureWaitsForTheResourceGrant() = runTest {
+        val state = MutableStateFlow(FamilyTelecomAudioState("call", true, true, false))
+        val gate = FamilyAudioFocus(audio, backgroundScope, state)
+        var started = false
+        try {
+            launch { gate.acquire("call") {}; started = true }
+            runCurrent()
+            assertFalse(started)
+            state.value = state.value.copy(granted = true)
+            runCurrent()
+            assertTrue(started)
+        } finally { gate.release() }
+    }
+
+    @Test fun telecomFocusAloneDoesNotAuthorizeAnUnacceptedCall() = runTest {
+        val state = MutableStateFlow(FamilyTelecomAudioState("call", true, false, true))
+        val gate = FamilyAudioFocus(audio, backgroundScope, state)
+        var started = false
+        try {
+            launch { gate.acquire("call") {}; started = true }
+            runCurrent()
+            assertFalse(started)
+            state.value = state.value.copy(accepted = true)
+            runCurrent()
+            assertTrue(started)
+        } finally { gate.release() }
+    }
+
+    @Test fun telecomFocusLossInterruptsItsCurrentCall() = runTest {
+        val state = MutableStateFlow(FamilyTelecomAudioState("call", true, true, true))
+        val gate = FamilyAudioFocus(audio, backgroundScope, state)
+        var interruptions = 0
+        try {
+            gate.acquire("call") { interruptions++ }
+            state.value = state.value.copy(granted = false)
+            runCurrent()
+            assertEquals(1, interruptions)
+            gate.release()
+            state.value = state.value.copy(granted = true)
+            runCurrent()
+            assertEquals(1, interruptions)
+        } finally { gate.release() }
+    }
+
+    @Test fun endingTelecomStartupIgnoresALateGrant() = runTest {
+        val state = MutableStateFlow(FamilyTelecomAudioState("call", true, true, false))
+        val gate = FamilyAudioFocus(audio, backgroundScope, state)
+        var started = false
+        val job = launch { gate.acquire("call") {}; started = true }
+        runCurrent()
+        gate.release()
+        state.value = state.value.copy(granted = true)
+        runCurrent()
+        assertTrue(job.isCancelled)
+        assertFalse(started)
+    }
+
+    @Test fun aRemovedTelecomCallCancelsPendingCapture() = runTest {
+        val state = MutableStateFlow(FamilyTelecomAudioState("call", true, true, false))
+        val gate = FamilyAudioFocus(audio, backgroundScope, state)
+        var started = false
+        try {
+            val job = launch { gate.acquire("call") {}; started = true }
+            runCurrent()
+            state.value = FamilyTelecomAudioState()
+            runCurrent()
+            assertTrue(job.isCancelled)
+            assertFalse(started)
+        } finally { gate.release() }
+    }
+
+    @Test fun missingTelecomGrantFailsWithoutStartingCaptureOrRequestingCompetingFocus() = runTest {
+        val state = MutableStateFlow(FamilyTelecomAudioState("call", true, true, false))
+        val gate = FamilyAudioFocus(audio, backgroundScope, state)
+        val before = shadow.lastAudioFocusRequest
+        try {
+            val failure = async { runCatching { gate.acquire("call") {} }.exceptionOrNull() }
+            advanceUntilIdle()
+            assertIs<FamilyAudioFocus.Unavailable>(failure.await())
+            assertSame(before, shadow.lastAudioFocusRequest)
+        } finally { gate.release() }
+    }
+
+    @Test fun unmanagedCallsStillRequestTheirOwnFocus() = runTest {
+        shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        val state = MutableStateFlow(FamilyTelecomAudioState("call", false))
+        val gate = FamilyAudioFocus(audio, backgroundScope, state)
+        try {
+            gate.acquire("call") {}
+            assertNotNull(shadow.lastAudioFocusRequest)
+        } finally { gate.release() }
     }
 }

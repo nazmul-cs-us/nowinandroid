@@ -7,19 +7,32 @@ import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Main-thread audio ownership; capture starts only after focus is granted. */
-internal class FamilyAudioFocus(private val audio: AudioManager) {
+internal class FamilyAudioFocus(private val audio: AudioManager,
+    private val scope: CoroutineScope? = null,
+    private val telecom: StateFlow<FamilyTelecomAudioState>? = null) {
     class Unavailable : IllegalStateException("call_audio_focus_unavailable")
-    private class Lease(val request: AudioFocusRequest, val gained: CompletableDeferred<Unit>) {
+    private class Lease(val request: AudioFocusRequest?, val gained: CompletableDeferred<Unit>) {
         var acquired = false
+        var observer: Job? = null
     }
     private var lease: Lease? = null
 
-    suspend fun acquire(onLost: () -> Unit) {
+    suspend fun acquire(callId: String? = null, onLost: () -> Unit) {
         release()
+        if (callId != null && telecom?.value?.let { it.callId == callId && it.managed } == true) {
+            acquireTelecom(callId, onLost)
+            return
+        }
         val gained = CompletableDeferred<Unit>()
         lateinit var current: Lease
         val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
@@ -67,10 +80,46 @@ internal class FamilyAudioFocus(private val audio: AudioManager) {
         }
     }
 
+    private suspend fun acquireTelecom(callId: String, onLost: () -> Unit) {
+        val source = checkNotNull(telecom)
+        val current = Lease(null, CompletableDeferred())
+        lease = current
+        android.util.Log.i("FamilyCalls", "Audio focus waiting: Telecom ownership")
+        try {
+            current.observer = checkNotNull(scope).launch(start = CoroutineStart.UNDISPATCHED) {
+                source.collect { state ->
+                    if (lease !== current) return@collect
+                    if (state.callId != callId) {
+                        current.gained.cancel()
+                    } else if (!state.managed) {
+                        current.gained.completeExceptionally(Unavailable())
+                        if (current.acquired) { current.acquired = false; onLost() }
+                    } else if (state.accepted && state.granted) {
+                        current.acquired = true
+                        current.gained.complete(Unit)
+                    } else if (current.acquired) {
+                        current.acquired = false
+                        onLost()
+                    }
+                }
+            }
+            val acquired = withTimeoutOrNull(3000) { current.gained.await(); true }
+            if (acquired != true) throw Unavailable()
+            if (lease !== current) throw CancellationException("Call audio acquisition cancelled")
+            // Telecom has granted this ConnectionService call-resource ownership.
+            // Another AudioManager request can queue behind Telecom's own locked focus.
+            android.util.Log.i("FamilyCalls", "Audio focus granted: owner=Telecom")
+        } catch (error: Exception) {
+            if (lease === current) release()
+            throw error
+        }
+    }
+
     fun release() {
         val previous = lease ?: return
         lease = null
+        previous.observer?.cancel()
         previous.gained.cancel()
-        audio.abandonAudioFocusRequest(previous.request)
+        previous.request?.let { audio.abandonAudioFocusRequest(it) }
     }
 }
