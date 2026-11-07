@@ -1,8 +1,6 @@
 package com.starception.submission.family
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
 import android.media.AudioManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -31,7 +29,7 @@ class AndroidFamilyMedia(
     val localVideo = MutableStateFlow<VideoTrack?>(null)
     val remoteVideo = MutableStateFlow<VideoTrack?>(null)
     private val audio = context.getSystemService(AudioManager::class.java)
-    private var focus: AudioFocusRequest? = null
+    private val focus = FamilyAudioFocus(audio)
     private var previousMode = AudioManager.MODE_NORMAL
     private var previousSpeaker = false
     private var ownsAudio = false
@@ -63,16 +61,9 @@ class AndroidFamilyMedia(
         val token = epoch
         FamilyAudioSession.setActive(true)
         previousMode = audio.mode; previousSpeaker = audio.isSpeakerphoneOn
-        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
-            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
-            .setOnAudioFocusChangeListener { change ->
-                if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-                    scope.launch { if (token == epoch) failed("Call interrupted by another audio session.") }
-                }
-            }.build()
-        check(audio.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
-        focus = request; ownsAudio = true
+        focus.acquire { scope.launch { if (token == epoch) failed("Call interrupted by another audio session.") } }
+        if (token != epoch) return
+        ownsAudio = true
         starting("audio-routing")
         audio.mode = AudioManager.MODE_IN_COMMUNICATION
         speaker(video)
@@ -207,8 +198,10 @@ class AndroidFamilyMedia(
         audioSource?.dispose(); audioSource = null
         if (ownsAudio) {
             audio.mode = previousMode; speaker(previousSpeaker)
-            focus?.let { audio.abandonAudioFocusRequest(it) }; focus = null; ownsAudio = false
+            ownsAudio = false
         }
+        // Also revoke delayed focus when a call is cancelled before capture starts.
+        focus.release()
         FamilyAudioSession.setActive(false)
         connected(false)
     }

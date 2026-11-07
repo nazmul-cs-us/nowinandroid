@@ -12,6 +12,7 @@ import javax.inject.Inject
 internal object FamilyTelecom {
     private var connection: Connection? = null
     private var announced: String? = null
+    private var acceptedCall: String? = null
     fun handle(context: Context) = PhoneAccountHandle(ComponentName(context, FamilyConnectionService::class.java), "family")
     fun register(context: Context) {
         runCatching { context.getSystemService(TelecomManager::class.java).registerPhoneAccount(
@@ -33,12 +34,23 @@ internal object FamilyTelecom {
                 })
             }.onFailure { android.util.Log.w("FamilyCalls", "Telecom announcement failed: ${it.javaClass.simpleName}") }
         }
-        if (state.mediaConnected) connection?.setActive()
+        if (call.stage == "active") accepted(call.id)
     }
-    fun attach(value: Connection) { connection = value }
+    fun accepted(callId: String) {
+        if (announced != null && announced != callId) return
+        acceptedCall = callId
+        if (announced == callId && connection?.state != Connection.STATE_ACTIVE) connection?.setActive()
+    }
+    fun attach(value: Connection, callId: String) {
+        if (announced != callId) {
+            value.setDisconnected(DisconnectCause(DisconnectCause.CANCELED)); value.destroy(); return
+        }
+        connection = value
+        if (acceptedCall == callId) value.setActive()
+    }
     fun end(reason: String = "service-idle") {
         android.util.Log.i("FamilyCalls", "Telecom cleanup: reason=$reason; hadConnection=${connection != null}")
-        connection?.setDisconnected(DisconnectCause(DisconnectCause.LOCAL)); connection?.destroy(); connection = null; announced = null
+        connection?.setDisconnected(DisconnectCause(DisconnectCause.LOCAL)); connection?.destroy(); connection = null; announced = null; acceptedCall = null
     }
 }
 
@@ -73,7 +85,7 @@ class FamilyConnectionService : ConnectionService() {
             setAddress(Uri.fromParts("sip", call.peer(client.state.value.me), null), TelecomManager.PRESENTATION_ALLOWED)
             setCallerDisplayName(call.peer(client.state.value.me).substringBefore('@'), TelecomManager.PRESENTATION_ALLOWED)
             if (incoming) setRinging() else setDialing()
-            FamilyTelecom.attach(this)
+            FamilyTelecom.attach(this, call.id)
         }
     }
 }

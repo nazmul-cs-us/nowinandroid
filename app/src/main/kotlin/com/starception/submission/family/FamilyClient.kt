@@ -450,6 +450,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         if (callReducer.stage == "ended" || (call.stage == "active" && !call.selected)) { finish(call.id, "terminal-expired-or-other-device"); return }
         if (call.stage == "ringing" && call.expires <= System.currentTimeMillis()) { finish(call.id, "terminal-expired-or-other-device"); return }
         mutable.value = mutable.value.copy(call = call, speaker = if (call.stage == "active") call.kind == "video" else mutable.value.speaker)
+        // Acceptance, rather than ICE connectivity, ends Telecom's ringing/dialling
+        // state. Waiting for media here can leave audio focus locked by the system.
+        if (call.stage == "active") FamilyTelecom.accepted(call.id)
         FamilyCallService.ensure(context, microphone = call.stage == "active" && hasForegroundActivity,
             camera = call.stage == "active" && call.kind == "video" && hasForegroundActivity)
         if (call.stage == "ringing") {
@@ -478,7 +481,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                 val code = error.message?.takeIf { it in setOf("not_active", "call_not_found", "not_family",
                     "not_connected", "invalid_signal", "invalid_request", "unavailable") } ?: "none"
                 android.util.Log.w("FamilyCalls", "Call startup failed: step=$step; type=${error.javaClass.simpleName}; serverCode=$code")
-                if (mutable.value.call?.id == call.id) endWithError("Could not start this call. Check microphone/camera permissions and relay configuration.")
+                if (mutable.value.call?.id == call.id) endWithError(if (error is FamilyAudioFocus.Unavailable)
+                    "Call audio is unavailable. End other calls, keep Deenly open, and try again."
+                    else "Could not start this call. Check microphone/camera permissions and relay configuration.")
             }
         }
     }

@@ -237,3 +237,24 @@ The user reran that VM smoke on 7 November: every check passed, including TLS
 logins, call acceptance, participant-scoped TURN issuance and signalling delivery.
 Native media startup for the failing phone attempt remains unresolved; this
 server result does not establish native relay delivery or audio/video capture.
+
+The next 7 November capture identified `step=audio-focus`, with an
+`IllegalStateException`, immediately after successful relay credential retrieval.
+Android required an immediate audio-focus grant and ended the call when the
+system denied it. Telecom also remained ringing/dialling until ICE connected,
+even after the server had authorized acceptance.
+
+The Android fix marks the matching Telecom call active on authorized server
+acceptance, including connections attached afterward. Media requests transient
+voice-communication focus, accepts a delayed grant, and allows a bounded
+three-second handoff before reporting an audio-specific failure. No microphone
+or peer starts until focus is granted. Ending/cancelling a call abandons queued
+focus, and late callbacks from an old request cannot start a new call. Genuine
+focus loss after acquisition still interrupts the current call.
+
+Robolectric regressions cover immediate/delayed grants, a brief denial followed
+by a grant, permanent denial, cancellation/cleanup, stale focus callbacks, and
+Telecom acceptance before media connectivity for both directions. Verify the fix
+on the phones after rebuilding Android; the existing iOS/server deployment does
+not require a change for this failure. Look for `Audio focus granted` followed
+by the remaining media startup steps, then confirm bidirectional audio/video.
