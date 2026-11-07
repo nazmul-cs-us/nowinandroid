@@ -50,8 +50,15 @@ class AndroidFamilyMedia(
     private val candidates = mutableListOf<IceCandidate>()
     private var epoch = 0
     val ready: Boolean get() = peer != null
+    internal var startupStep: String = "idle"
+        private set
+    private fun starting(step: String) {
+        startupStep = step
+        android.util.Log.i("FamilyCalls", "Media startup: step=$step")
+    }
 
     suspend fun start(servers: JSONArray, video: Boolean, caller: Boolean) {
+        starting("audio-focus")
         close(preservePreview = video && caller && peer == null && localVideo.value != null)
         val token = epoch
         FamilyAudioSession.setActive(true)
@@ -66,8 +73,10 @@ class AndroidFamilyMedia(
             }.build()
         check(audio.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
         focus = request; ownsAudio = true
+        starting("audio-routing")
         audio.mode = AudioManager.MODE_IN_COMMUNICATION
         speaker(video)
+        starting("ice-configuration")
         val iceServers = (0 until servers.length()).map { i ->
             val item = servers.getJSONObject(i); val urls = item.getJSONArray("urls")
             PeerConnection.IceServer.builder((0 until urls.length()).map { urls.getString(it) })
@@ -77,6 +86,7 @@ class AndroidFamilyMedia(
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
         }
+        starting("peer-connection")
         peer = factory.createPeerConnection(config, object : PeerConnection.Observer {
             override fun onSignalingChange(state: PeerConnection.SignalingState?) = Unit
             override fun onIceConnectionReceivingChange(receiving: Boolean) = Unit
@@ -102,19 +112,24 @@ class AndroidFamilyMedia(
                 if (token == epoch) remoteVideo.value = transceiver?.receiver?.track() as? VideoTrack
             } }
         }) ?: error("Could not create media session")
+        starting("microphone")
         audioSource = factory.createAudioSource(MediaConstraints())
         microphone = factory.createAudioTrack("family-audio", audioSource)
         peer!!.addTrack(microphone, listOf("family"))
         if (video) {
+            starting("camera")
             preview()
             peer!!.addTrack(localVideo.value, listOf("family"))
         }
         if (caller) {
+            starting("create-offer")
             val offer = create(true)
             if (token != epoch) return
+            starting("set-local-offer")
             set(offer, true)
             if (token == epoch) signal(JSONObject().put("type", "offer").put("sdp", offer.description))
         }
+        starting("ready")
     }
     /** Local-only camera. No peer, microphone or signalling is created. */
     fun preview() {

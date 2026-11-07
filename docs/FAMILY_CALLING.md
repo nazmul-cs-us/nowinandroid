@@ -216,3 +216,24 @@ Leave that capture running, open Deenly manually, sign in if needed, and reprodu
 one call. Press Ctrl+C. The file should start with `Diagnostics v2 loaded` and
 remain small. Capture both directions separately if behavior differs. An iOS
 console capture filtered to `FamilyCalls` can then identify a peer-side hang-up.
+
+The 7 November Android capture reached authorized `active` revision 2, then ran
+the local media/signalling failure handler about 600 ms later. The displayed
+"Could not start this call" message narrows that attempt to relay-credential
+fetching, native media startup, or draining queued signalling; it does not
+identify which operation failed. This is a different failure from the earlier
+immediate dismissal before acceptance.
+
+Android startup tracing now prints fixed step labels for relay credentials,
+native initialization, audio focus/routing, ICE configuration, peer creation,
+microphone/camera, offer creation/application and queued signalling. A startup
+exception logs its class and an allowlisted server error code, without exception
+messages, account/call IDs, credentials, SDP or ICE candidates. Confirm the
+startup marker includes `startup tracing enabled` after installing the updated
+APK. These traces improve diagnosis; they are not evidence that the call failure
+has been fixed. The existing VM Family smoke separately checks accepted calls,
+TURN credential issuance and authorized signalling against the deployed server.
+The user reran that VM smoke on 7 November: every check passed, including TLS
+logins, call acceptance, participant-scoped TURN issuance and signalling delivery.
+Native media startup for the failing phone attempt remains unresolved; this
+server result does not establish native relay delivery or audio/video capture.

@@ -20,6 +20,27 @@ import kotlin.test.assertFalse
 @Config(application = HiltTestApplication::class)
 @LooperMode(LooperMode.Mode.PAUSED)
 class FamilyClientSnapshotTest {
+    @Test fun relayFetchFailureIdentifiesTheStepWithoutLoggingAccountOrCallData() = runBlocking {
+        ShadowLog.clear()
+        val client = FamilyClient(ApplicationProvider.getApplicationContext())
+        val privateValue = "private-startup-diagnostic-789"
+        try {
+            // No socket exists: this must fail before native media is initialized.
+            client.apply(JSONObject().put("call", JSONObject()
+                .put("id", privateValue).put("caller", "$privateValue@xmpp.starception.com")
+                .put("callee", "ios@xmpp.starception.com").put("kind", "voice")
+                .put("stage", "active").put("version", 2).put("selected", true)
+                .put("expires", System.currentTimeMillis() + 45_000)))
+            val messages = ShadowLog.getLogsForTag("FamilyCalls").joinToString("\n") { it.msg }
+            assertTrue(messages.contains("Call startup failed: step=relay-credentials"))
+            assertTrue(messages.contains("serverCode=not_connected"))
+            assertFalse(messages.contains("Media startup:"))
+            assertFalse(messages.contains(privateValue))
+            assertFalse(messages.contains("@xmpp.starception.com"))
+            assertNull(client.state.value.call)
+        } finally { client.disconnect(clearSaved = false) }
+    }
+
     @Test fun diagnosticsKeepProtocolPayloadsAndAccountNamesOutOfLogs() = runBlocking {
         ShadowLog.clear()
         val client = FamilyClient(ApplicationProvider.getApplicationContext())

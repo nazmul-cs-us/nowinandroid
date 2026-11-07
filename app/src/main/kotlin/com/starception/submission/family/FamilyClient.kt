@@ -75,7 +75,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private val visibleActivities = mutableSetOf<android.app.Activity>()
     internal val hasForegroundActivity: Boolean get() = visibleActivities.isNotEmpty()
     init {
-        android.util.Log.w("FamilyCalls", "Diagnostics v2 loaded; package=${context.packageName}")
+        android.util.Log.w("FamilyCalls", "Diagnostics v2 loaded; startup tracing enabled; package=${context.packageName}")
         androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onStart(owner: androidx.lifecycle.LifecycleOwner) { activityChanged(true) }
             override fun onStop(owner: androidx.lifecycle.LifecycleOwner) { activityChanged(false) }
@@ -459,13 +459,27 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
         if (call.stage == "active" && rtcCallId != call.id) {
             ringingJob?.cancel(); rtcCallId = call.id
+            var startupStep = "relay-credentials"
             try {
+                android.util.Log.i("FamilyCalls", "Call startup: step=$startupStep")
                 val servers = request("turn", "callId" to call.id).getJSONArray("iceServers")
                 if (mutable.value.call?.id != call.id) return
-                media.start(servers, call.kind == "video", call.caller == mutable.value.me)
+                startupStep = "native-initialization"
+                val activeMedia = media
+                startupStep = "native-media"
+                activeMedia.start(servers, call.kind == "video", call.caller == mutable.value.me)
+                startupStep = "queued-signals"
                 val pending = queuedSignals.filter { it.first == call.id }; queuedSignals.clear()
                 pending.forEach { media.receive(it.second) }
-            } catch (_: Exception) { if (mutable.value.call?.id == call.id) endWithError("Could not start this call. Check microphone/camera permissions and relay configuration.") }
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                val step = if (startupStep == "native-media") mediaInstance?.startupStep ?: startupStep else startupStep
+                // Exception messages may contain protocol data. Only print known server codes.
+                val code = error.message?.takeIf { it in setOf("not_active", "call_not_found", "not_family",
+                    "not_connected", "invalid_signal", "invalid_request", "unavailable") } ?: "none"
+                android.util.Log.w("FamilyCalls", "Call startup failed: step=$step; type=${error.javaClass.simpleName}; serverCode=$code")
+                if (mutable.value.call?.id == call.id) endWithError("Could not start this call. Check microphone/camera permissions and relay configuration.")
+            }
         }
     }
     private fun finish(id: String, reason: String = "media-failure") {
