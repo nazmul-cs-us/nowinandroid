@@ -282,3 +282,17 @@ request would be denied, waiting for grant and acceptance, focus loss, timeout,
 cancellation, service identity, and standalone fallback. These tests do not
 establish a successful Android/iPhone media call; repeat both directions on the
 phones after updating Android.
+
+The user subsequently confirmed voice calls work with the Telecom ownership fix.
+A video attempt reached camera setup, offer creation/application and local media
+`ready`, then reported a signalling-send failure. Both phones displayed the
+generic signalling interruption message. That capture does not contain the
+server response code, so it does not establish a message-size rejection or a
+peer-side negotiation failure.
+
+Android now logs a failed send's signal type, UTF-8 JSON payload size, exception
+class and allowlisted server code. It never logs SDP/candidate contents, account
+IDs, credentials or arbitrary exception text. Failures from a previous call
+cannot terminate a newer call. The next video capture should include
+`Signalling send failed: type=...; bytes=...; exception=...; serverCode=...`.
+Video-call success is still pending device confirmation.

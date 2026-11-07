@@ -105,8 +105,15 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     val media: AndroidFamilyMedia get() = mediaInstance ?: createMedia().also { mediaInstance = it }
     private fun createMedia() = AndroidFamilyMedia(context, scope,
         signal = { payload -> mutable.value.call?.let { call ->
-            scope.launch { runCatching { request("signal", "callId" to call.id, "payload" to payload) }
-                .onFailure { endWithError("Call signalling was interrupted.") } }
+            scope.launch {
+                if (mutable.value.call?.id != call.id) return@launch
+                try { request("signal", "callId" to call.id, "payload" to payload) }
+                catch (error: CancellationException) { throw error }
+                catch (error: Exception) {
+                    android.util.Log.w("FamilyCalls", familySignalFailureDiagnostic(payload, error))
+                    if (mutable.value.call?.id == call.id) endWithError("Call signalling was interrupted.")
+                }
+            }
         } },
         connected = { connected -> mutable.value = mutable.value.copy(mediaConnected = connected,
             connectedAtElapsed = mutable.value.connectedAtElapsed ?: if (connected) android.os.SystemClock.elapsedRealtime() else null) },
