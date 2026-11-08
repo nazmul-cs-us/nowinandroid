@@ -71,12 +71,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.starception.submission.R
 import com.starception.submission.core.images.resources.Res
-import com.starception.submission.core.images.resources.home_cover_prayer_day_portrait
-import com.starception.submission.core.images.resources.home_cover_prayer_night_portrait
-import com.starception.submission.core.images.resources.home_cover_salah_portrait
-import com.starception.submission.core.images.resources.home_cover_quran_portrait
-import com.starception.submission.core.images.resources.home_cover_qibla_portrait
-import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -136,16 +130,17 @@ internal object HomePageGenerationCache {
     }
 }
 
-private val homeArtworkCards by lazy {
-    listOf(
+@Composable
+private fun homeArtworkCards(): List<HomeArtworkCard> {
+    return listOf(
         HomeArtworkCard(2, "Today's reading", "Quran for today",
-            Res.drawable.home_cover_quran_portrait),
+            homeCoverArtwork(2, false)),
         HomeArtworkCard(1, "Today's salah", "Prayer & hadith",
-            Res.drawable.home_cover_salah_portrait),
+            homeCoverArtwork(1, false)),
         HomeArtworkCard(3, "Qibla", "Direction to Makkah",
-            Res.drawable.home_cover_qibla_portrait),
+            homeCoverArtwork(3, false)),
         HomeArtworkCard(4, "AI suggested", "For this moment",
-            Res.drawable.home_cover_suggestion_portrait),
+            homeCoverArtwork(4, false)),
     )
 }
 
@@ -199,10 +194,9 @@ internal fun HomeArtworkRail(
 ) {
     val prayerNow = HomeArtworkCard(
         0, "Prayer now", "Your next prayer",
-        if (useNightArtwork) Res.drawable.home_cover_prayer_night_portrait
-        else Res.drawable.home_cover_prayer_day_portrait,
+        homeCoverArtwork(0, useNightArtwork),
     )
-    val cards = homeArtworkCards + prayerNow
+    val cards = homeArtworkCards() + prayerNow
     FluidHomeReveal(
         title = stringResource(R.string.home_explore_title),
         subtitle = stringResource(R.string.home_explore_subtitle),

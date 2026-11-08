@@ -267,12 +267,6 @@ import com.starception.submission.core.images.resources.prayer_now_mountains_nig
 import com.starception.submission.core.images.resources.prayer_now_mosque_day
 import com.starception.submission.core.images.resources.prayer_now_mosque_lights
 import com.starception.submission.core.images.resources.prayer_now_mosque_night
-import com.starception.submission.core.images.resources.home_cover_prayer_day_portrait
-import com.starception.submission.core.images.resources.home_cover_prayer_night_portrait
-import com.starception.submission.core.images.resources.home_cover_salah_portrait
-import com.starception.submission.core.images.resources.home_cover_quran_portrait
-import com.starception.submission.core.images.resources.home_cover_qibla_portrait
-import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.removeBismillahIfNeeded
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
@@ -2240,7 +2234,7 @@ internal fun SwipeableBigTiles(
                                     "$prayersRemaining remain · $nextUnmarkedPrayer is next"
                                 else -> "$prayersRemaining prayers remain today"
                             },
-                            backgroundPainterRes = if (immersiveHome) ImageRes.drawable.home_cover_salah_portrait
+                            backgroundPainterRes = if (immersiveHome) homeCoverArtwork(1, false)
                                 else ImageRes.drawable.insight_prayer_background,
                             foregroundPainterRes = if (immersiveHome) null
                                 else ImageRes.drawable.insight_prayer_foreground,
@@ -2361,7 +2355,7 @@ internal fun SwipeableBigTiles(
                             } else {
                                 "Surah ${dailySurah.number} · ${dailySurah.revelationType}"
                             },
-                            backgroundPainterRes = if (immersiveHome) ImageRes.drawable.home_cover_quran_portrait
+                            backgroundPainterRes = if (immersiveHome) homeCoverArtwork(2, false)
                                 else ImageRes.drawable.insight_quran_background,
                             foregroundPainterRes = if (immersiveHome) null
                                 else ImageRes.drawable.insight_quran_foreground_v2,
@@ -2470,7 +2464,7 @@ internal fun SwipeableBigTiles(
                             } else {
                                 "Open the live compass and 3D globe"
                             },
-                            backgroundPainterRes = if (immersiveHome) ImageRes.drawable.home_cover_qibla_portrait
+                            backgroundPainterRes = if (immersiveHome) homeCoverArtwork(3, false)
                                 else ImageRes.drawable.insight_qibla_background,
                             // The compact scene uses the antique compass as its
                             // subject. Expanded mode supplies a live direction
@@ -2563,7 +2557,7 @@ internal fun SwipeableBigTiles(
                             } else {
                                 "Tap to open the verified source"
                             },
-                            backgroundPainterRes = if (immersiveHome) ImageRes.drawable.home_cover_suggestion_portrait
+                            backgroundPainterRes = if (immersiveHome) homeCoverArtwork(4, false)
                                 else ImageRes.drawable.insight_suggestion,
                             backgroundBaseScale = if (immersiveHome) 1f else 1.28f,
                             backgroundHorizontalBias = if (immersiveHome) 0f else 0.13f,
@@ -3235,10 +3229,8 @@ private fun PrayerPosterInsightCard(
             statusText = statusText,
             statusMetaText = statusMetaText,
             weatherThresholds = weatherThresholds,
-            backgroundPainterRes = if (fluidFullBleed && effectiveIsNight) {
-                ImageRes.drawable.home_cover_prayer_night_portrait
-            } else if (fluidFullBleed) {
-                ImageRes.drawable.home_cover_prayer_day_portrait
+            backgroundPainterRes = if (fluidFullBleed) {
+                homeCoverArtwork(0, effectiveIsNight)
             } else if (effectiveIsNight) {
                 ImageRes.drawable.prayer_now_insight_night
             } else {

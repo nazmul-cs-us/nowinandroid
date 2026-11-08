@@ -43,24 +43,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.images.resources.Res
-import com.starception.submission.core.images.resources.home_cover_prayer_day_portrait
-import com.starception.submission.core.images.resources.home_cover_prayer_night_portrait
-import com.starception.submission.core.images.resources.home_cover_salah_portrait
-import com.starception.submission.core.images.resources.home_cover_quran_portrait
-import com.starception.submission.core.images.resources.home_cover_qibla_portrait
-import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableResource = when (page) {
-    0 -> if (useNightArtwork) Res.drawable.home_cover_prayer_night_portrait else Res.drawable.home_cover_prayer_day_portrait
-    1 -> Res.drawable.home_cover_salah_portrait
-    2 -> Res.drawable.home_cover_quran_portrait
-    3 -> Res.drawable.home_cover_qibla_portrait
-    else -> Res.drawable.home_cover_suggestion_portrait
-}
+@Composable
+internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableResource =
+    com.starception.submission.core.images.currentHomeArtwork(page, useNightArtwork)
 
 internal data class HomeCoverCopy(val eyebrow: String, val title: String, val detail: String)
 
@@ -112,12 +102,9 @@ internal fun homeCoverCopy(
     else -> HomeCoverCopy("AI SUGGESTED", "A verified reading", "Quran, Hadith or dua for this moment")
 }
 
-/** Cover ink follows the photograph; the app theme alone cannot describe its contrast. */
-internal fun homeCoverHeaderUsesLightText(page: Int, useNightArtwork: Boolean): Boolean = when (page) {
-    0 -> true // The prayer poster needs the same white, quiet greeting as the reference.
-    2 -> false // The indigo landscape has pale mist behind the greeting.
-    else -> true
-}
+/** All Getty covers have a dark upper scrim protecting the greeting and system icons. */
+@Suppress("UNUSED_PARAMETER")
+internal fun homeCoverHeaderUsesLightText(page: Int, useNightArtwork: Boolean): Boolean = true
 
 /** Every portrait cover keeps white copy on the same deep, blurred lower surface. */
 internal fun homeCoverCopyUsesLightText(
@@ -189,15 +176,12 @@ internal fun HomeCoverArtworkBackdrop(
             epochSeconds = epochSeconds, latitude = latitude, longitude = longitude,
             isNight = useNightArtwork, playing = false, modifier = Modifier.graphicsLayer { alpha = visible })
     }
-    if (!useNightArtwork && prayerVisibility > 0f) {
-        // Shade the upper window locally so the greeting remains legible while
-        // preserving natural daylight on the prayer rug.
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-            0f to feedBackground.copy(alpha = .36f * prayerVisibility),
-            .30f to feedBackground.copy(alpha = .12f * prayerVisibility),
-            .46f to Color.Transparent,
-        )))
-    }
+    // Protect white header ink on every rotating artwork, in either app theme.
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+        0f to Color.Black.copy(alpha = .66f),
+        .20f to Color.Black.copy(alpha = .60f),
+        .48f to Color.Transparent,
+    )))
     // The lower scrim already protects the cover copy. A second full-screen
     // blurred scene kept Home rendering continuously even at rest (~50% of a
     // core on Samsung); the single image and scrim settle near idle instead.
