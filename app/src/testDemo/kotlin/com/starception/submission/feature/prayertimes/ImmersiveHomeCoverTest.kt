@@ -160,17 +160,17 @@ class ImmersiveHomeCoverTest {
         assertTrue(homeCoverHeaderUsesLightText(page = 0, useNightArtwork = true))
         assertTrue(homeCoverCopyUsesLightText(page = 0, useNightArtwork = true, isDarkTheme = false))
         assertTrue(homeCoverHeaderUsesLightText(page = 0, useNightArtwork = false))
-        assertFalse(homeCoverHeaderUsesLightText(page = 2, useNightArtwork = false))
+        assertTrue(homeCoverHeaderUsesLightText(page = 2, useNightArtwork = false))
     }
 
-    @Test fun daytimePrayerCoverMatchesTheWindowLitArtworkFamily() {
+    @Test fun daytimePrayerCoverShowsGettyCloudArtwork() {
         compose.setContent {
             CoverTestScene(dark = false, onOpen = {})
         }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/immersive_home_prayer_sun.png")
     }
 
-    @Test fun nighttimePrayerCoverKeepsTheSameInteriorComposition() {
+    @Test fun nighttimePrayerCoverKeepsTheSameGettyComposition() {
         compose.setContent {
             CoverTestScene(dark = true, onOpen = {})
         }

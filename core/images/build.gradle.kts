@@ -35,7 +35,10 @@ kotlin {
             api(compose.runtime)
             api(compose.ui)
             api(compose.components.resources)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.coroutines.core)
         }
+        commonTest.dependencies { implementation(libs.kotlin.test) }
     }
 }
 

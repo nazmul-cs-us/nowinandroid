@@ -127,6 +127,8 @@ fun AppearanceSection(
             }
         }
 
+        HomeArtworkSettingsSection()
+
         // Dark Mode Section with modern segmented button
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ModernSectionTitle(text = "Display Mode")

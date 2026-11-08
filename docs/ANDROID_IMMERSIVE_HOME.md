@@ -50,3 +50,19 @@ markers so bright artwork cannot wash out the labels. iOS already hides its
 navigation when the reader opens. `ExpandedReadingLayoutTest` checks header
 spacing, larger text and nested passage scrolling; `ImmersiveHomeReaderTest`
 checks that the carousel forwards hide/show changes to Home.
+
+Home artwork now rotates through eight reviewed Getty Open Content nature works.
+Every day is the default. Settings → Appearance → Home artwork offers Every hour,
+Every day, Every week, Every month, and Keep current. The preference and rotation
+anchor persist across app launches. Daily changes follow local midnight, weekly
+changes follow each seven local days from the selected cadence, and monthly
+changes follow calendar-month boundaries. While Home remains open, the date is
+checked once a minute, so a change appears within a minute of its boundary.
+Keep current freezes the currently displayed set, including across relaunches.
+Switching cadence preserves the current set and starts the new cadence from that
+point. The eight-work gallery repeats rather than fetching unreviewed artwork.
+The cover, rail, and readers resolve the same artwork for each page; five different
+works are displayed at any one rotation. Prayer Now retains its night treatment.
+Artwork credits and links to the current five Getty records appear below the
+frequency control. See [third-party assets](THIRD_PARTY_ASSETS.md#getty-home-artwork)
+for provenance and regeneration instructions.

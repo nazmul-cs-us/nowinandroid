@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -48,10 +49,21 @@ class HomeArtworkRailTest {
             }
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Column(Modifier.fillMaxSize().background(Color(0xFF0C110F)).padding(24.dp)) {
-                    HomeArtworkRail { card, bounds ->
-                        selected = card.page
-                        assertTrue(bounds.width > 0f && bounds.height > 0f)
-                    }
+                    var expanded by remember { mutableStateOf(false) }
+                    HomeReflectionPrompt(
+                        exploreExpanded = expanded,
+                        onExploreToggle = { expanded = !expanded },
+                        exploreContent = {
+                            HomeArtworkRail(
+                                expanded = expanded,
+                                onExpandedChange = { expanded = it },
+                            ) { card, bounds ->
+                                selected = card.page
+                                assertTrue(bounds.width > 0f && bounds.height > 0f)
+                            }
+                        },
+                        onClick = {},
+                    )
                 }
             }
         }

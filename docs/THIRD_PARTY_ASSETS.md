@@ -68,3 +68,40 @@ redistributing, or reviewing the asset under Flaticon's applicable license terms
 
 The delivered database contains 56 chapters and 322 narration records. The printed source
 numbering ends at 320 because numbers 261 and 264 are each used for two distinct records.
+
+## Getty home artwork
+
+The five home covers, their Explore cards, and expanded readers share a bundled
+gallery of eight nature artworks without human figures. Android and iOS use the
+same images and persisted rotation policy. Every day is the default; Appearance
+settings also offer hourly, weekly, monthly, and Keep current. The bundled gallery
+cycles; it does not download new, unreviewed images from Getty. All artwork works
+offline.
+
+Digital image courtesy of Getty’s Open Content Program.
+
+- Image license: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+- Usage guidance: [Getty Open Content FAQs](https://www.getty.edu/projects/open-content-program/faqs/)
+- Catalog, original image URLs, license metadata, and SHA-256 source digests:
+  `core/images/artwork/getty-home-artwork.json`
+- Rebuild: `python tools/prepare_getty_home_artwork.py` (requires Pillow)
+- Local files: `core/images/src/commonMain/composeResources/drawable/`
+- Adaptations: border trimming, portrait cropping, WebP compression, and a
+  darker, desaturated night version of each image. The runtime header and footer
+  scrims keep white text readable over every artwork.
+
+| Artwork | Artist | Getty record | Day resource |
+| --- | --- | --- | --- |
+| Study of Clouds with a Sunset near Rome | Simon Alexandre Clément Denis | [10986B](https://www.getty.edu/art/collection/object/10986B) | `home_cover_prayer_day_portrait.webp` |
+| Wheatstacks, Snow Effect, Morning (Meules, Effet de Neige, Le Matin) | Claude Monet | [103RK8](https://www.getty.edu/art/collection/object/103RK8) | `home_cover_salah_portrait.webp` |
+| Irises | Vincent van Gogh | [103JNH](https://www.getty.edu/art/collection/object/103JNH) | `home_cover_quran_portrait.webp` |
+| Mount Snowdon through Clearing Clouds | Alfred William Hunt | [109KKN](https://www.getty.edu/art/collection/object/109KKN) | `home_cover_qibla_portrait.webp` |
+| [Seascape] | Paul Martin | [10492H](https://www.getty.edu/art/collection/object/10492H) | `home_cover_suggestion_portrait.webp` |
+| Grotto of Sarrazine near Nans-sous-Sainte-Anne | Gustave Courbet | [1096PR](https://www.getty.edu/art/collection/object/1096PR) | `home_getty_grotto_day.webp` |
+| Still Life with Flowers and Fruit | Claude Monet | [103RF8](https://www.getty.edu/art/collection/object/103RF8) | `home_getty_flowers_day.webp` |
+| [Water Lilies] | Eugène Atget | [104JKW](https://www.getty.edu/art/collection/object/104JKW) | `home_getty_lilies_day.webp` |
+
+Each source record declared the image CC0 when retrieved on 2026-11-07. The
+preparation script rechecks the license and source digest before recreating an
+asset. Review the full image for human figures before adding any catalog entry;
+CC0 alone does not establish suitability. No Getty endorsement is implied.
