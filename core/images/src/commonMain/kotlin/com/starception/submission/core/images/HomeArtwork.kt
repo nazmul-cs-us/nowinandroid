@@ -17,24 +17,13 @@
 package com.starception.submission.core.images
 
 import androidx.compose.runtime.Composable
-import com.starception.submission.core.images.resources.Res
-import com.starception.submission.core.images.resources.home_cover_prayer_day_portrait
-import com.starception.submission.core.images.resources.home_cover_prayer_night_portrait
-import com.starception.submission.core.images.resources.home_cover_qibla_portrait
-import com.starception.submission.core.images.resources.home_cover_quran_portrait
-import com.starception.submission.core.images.resources.home_cover_salah_portrait
-import com.starception.submission.core.images.resources.home_cover_suggestion_portrait
-import com.starception.submission.core.images.resources.home_getty_flowers_day
-import com.starception.submission.core.images.resources.home_getty_flowers_night
-import com.starception.submission.core.images.resources.home_getty_grotto_day
-import com.starception.submission.core.images.resources.home_getty_grotto_night
-import com.starception.submission.core.images.resources.home_getty_irises_night
-import com.starception.submission.core.images.resources.home_getty_lilies_day
-import com.starception.submission.core.images.resources.home_getty_lilies_night
-import com.starception.submission.core.images.resources.home_getty_seascape_night
-import com.starception.submission.core.images.resources.home_getty_snowdon_night
-import com.starception.submission.core.images.resources.home_getty_wheatstacks_night
 import org.jetbrains.compose.resources.DrawableResource
+
+enum class HomeArtworkSubject {
+    ISLAMIC_ARCHITECTURE,
+    ISLAMIC_PATTERN,
+    CALM_NATURE,
+}
 
 data class HomeArtwork(
     val title: String,
@@ -42,34 +31,7 @@ data class HomeArtwork(
     val sourceUrl: String,
     val day: DrawableResource,
     val night: DrawableResource,
-)
-
-/** Reviewed, human-free CC0 images; provenance and source digests live beside this module. */
-val homeArtworkGallery: List<HomeArtwork> = listOf(
-    HomeArtwork("Study of Clouds with a Sunset near Rome", "Simon Alexandre Clément Denis",
-        "https://www.getty.edu/art/collection/object/10986B",
-        Res.drawable.home_cover_prayer_day_portrait, Res.drawable.home_cover_prayer_night_portrait),
-    HomeArtwork("Wheatstacks, Snow Effect, Morning", "Claude Monet",
-        "https://www.getty.edu/art/collection/object/103RK8",
-        Res.drawable.home_cover_salah_portrait, Res.drawable.home_getty_wheatstacks_night),
-    HomeArtwork("Irises", "Vincent van Gogh",
-        "https://www.getty.edu/art/collection/object/103JNH",
-        Res.drawable.home_cover_quran_portrait, Res.drawable.home_getty_irises_night),
-    HomeArtwork("Mount Snowdon through Clearing Clouds", "Alfred William Hunt",
-        "https://www.getty.edu/art/collection/object/109KKN",
-        Res.drawable.home_cover_qibla_portrait, Res.drawable.home_getty_snowdon_night),
-    HomeArtwork("Seascape", "Paul Martin",
-        "https://www.getty.edu/art/collection/object/10492H",
-        Res.drawable.home_cover_suggestion_portrait, Res.drawable.home_getty_seascape_night),
-    HomeArtwork("Grotto of Sarrazine near Nans-sous-Sainte-Anne", "Gustave Courbet",
-        "https://www.getty.edu/art/collection/object/1096PR",
-        Res.drawable.home_getty_grotto_day, Res.drawable.home_getty_grotto_night),
-    HomeArtwork("Still Life with Flowers and Fruit", "Claude Monet",
-        "https://www.getty.edu/art/collection/object/103RF8",
-        Res.drawable.home_getty_flowers_day, Res.drawable.home_getty_flowers_night),
-    HomeArtwork("Water Lilies", "Eugène Atget",
-        "https://www.getty.edu/art/collection/object/104JKW",
-        Res.drawable.home_getty_lilies_day, Res.drawable.home_getty_lilies_night),
+    val subject: HomeArtworkSubject,
 )
 
 fun homeArtworkIndex(page: Int, rotation: Int): Int =

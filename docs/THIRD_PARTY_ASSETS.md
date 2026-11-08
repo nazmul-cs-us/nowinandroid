@@ -71,37 +71,49 @@ numbering ends at 320 because numbers 261 and 264 are each used for two distinct
 
 ## Getty home artwork
 
-The five home covers, their Explore cards, and expanded readers share a bundled
-gallery of eight nature artworks without human figures. Android and iOS use the
-same images and persisted rotation policy. Every day is the default; Appearance
-settings also offer hourly, weekly, monthly, and Keep current. The bundled gallery
-cycles; it does not download new, unreviewed images from Getty. All artwork works
-offline.
+The five home covers, Explore cards, and expanded readers share a bundled gallery
+of twelve reviewed images: eight Islamic architectural or ornamental details from
+the Alhambra and four calm, human-free nature scenes. Android and iOS use the same
+images and persisted rotation policy. Every day is the default; Appearance settings
+also offer hourly, weekly, monthly, and Keep current. The gallery cycles offline;
+it does not download arbitrary Getty search results.
+
+The compact settings card shows today's five images and one refresh picker.
+Artwork credits and source links appear in the About the artwork dialog.
+Controls stack vertically on narrow screens or with larger text.
 
 Digital image courtesy of Getty’s Open Content Program.
 
 - Image license: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 - Usage guidance: [Getty Open Content FAQs](https://www.getty.edu/projects/open-content-program/faqs/)
-- Catalog, original image URLs, license metadata, and SHA-256 source digests:
+- Reviewed allowlist, source URLs, source SHA-256 digests, category, and review notes:
   `core/images/artwork/getty-home-artwork.json`
 - Rebuild: `python tools/prepare_getty_home_artwork.py` (requires Pillow)
-- Local files: `core/images/src/commonMain/composeResources/drawable/`
-- Adaptations: border trimming, portrait cropping, WebP compression, and a
-  darker, desaturated night version of each image. The runtime header and footer
-  scrims keep white text readable over every artwork.
+- Approval checks: `python -m unittest discover -s tools -p test_prepare_getty_home_artwork.py`
+- Generated runtime catalog: `core/images/src/commonMain/kotlin/com/starception/submission/core/images/HomeArtworkCatalog.kt`
+- Local images: `core/images/src/commonMain/composeResources/drawable/`
+- Adaptations: remove scan borders using recorded crop rectangles, portrait cropping,
+  WebP compression, and a darker, desaturated version for Prayer Now at night.
 
-| Artwork | Artist | Getty record | Day resource |
+| Artwork | Artist/photographer | Category | Getty record |
 | --- | --- | --- | --- |
-| Study of Clouds with a Sunset near Rome | Simon Alexandre Clément Denis | [10986B](https://www.getty.edu/art/collection/object/10986B) | `home_cover_prayer_day_portrait.webp` |
-| Wheatstacks, Snow Effect, Morning (Meules, Effet de Neige, Le Matin) | Claude Monet | [103RK8](https://www.getty.edu/art/collection/object/103RK8) | `home_cover_salah_portrait.webp` |
-| Irises | Vincent van Gogh | [103JNH](https://www.getty.edu/art/collection/object/103JNH) | `home_cover_quran_portrait.webp` |
-| Mount Snowdon through Clearing Clouds | Alfred William Hunt | [109KKN](https://www.getty.edu/art/collection/object/109KKN) | `home_cover_qibla_portrait.webp` |
-| [Seascape] | Paul Martin | [10492H](https://www.getty.edu/art/collection/object/10492H) | `home_cover_suggestion_portrait.webp` |
-| Grotto of Sarrazine near Nans-sous-Sainte-Anne | Gustave Courbet | [1096PR](https://www.getty.edu/art/collection/object/1096PR) | `home_getty_grotto_day.webp` |
-| Still Life with Flowers and Fruit | Claude Monet | [103RF8](https://www.getty.edu/art/collection/object/103RF8) | `home_getty_flowers_day.webp` |
-| [Water Lilies] | Eugène Atget | [104JKW](https://www.getty.edu/art/collection/object/104JKW) | `home_getty_lilies_day.webp` |
+| [Archways, the Alhambra] | Unknown | Islamic Architecture | [107JW5](https://www.getty.edu/art/collection/object/107JW5) |
+| [Archway, the Alhambra] | Unknown | Islamic Architecture | [107JW6](https://www.getty.edu/art/collection/object/107JW6) |
+| [Interior of Alhambra] | Unknown | Islamic Architecture | [104KMH](https://www.getty.edu/art/collection/object/104KMH) |
+| Alhambra | Unknown | Islamic Architecture | [104G6V](https://www.getty.edu/art/collection/object/104G6V) |
+| [Archway in the Alhambra] | Unknown | Islamic Pattern | [107JSE](https://www.getty.edu/art/collection/object/107JSE) |
+| [Archway in the Alhambra] | Unknown | Islamic Pattern | [107JVV](https://www.getty.edu/art/collection/object/107JVV) |
+| Panel from the Alhambra | Hugh Owen | Islamic Pattern | [107VD6](https://www.getty.edu/art/collection/object/107VD6) |
+| [Three tiles from The Alhambra] | William Chaffers | Islamic Pattern | [108VZD](https://www.getty.edu/art/collection/object/108VZD) |
+| Study of Clouds with a Sunset near Rome | Simon Alexandre Clément Denis | Calm Nature | [10986B](https://www.getty.edu/art/collection/object/10986B) |
+| Mount Snowdon through Clearing Clouds | Alfred William Hunt | Calm Nature | [109KKN](https://www.getty.edu/art/collection/object/109KKN) |
+| [Seascape] | Paul Martin | Calm Nature | [10492H](https://www.getty.edu/art/collection/object/10492H) |
+| [Water Lilies] | Eugène Atget | Calm Nature | [104JKW](https://www.getty.edu/art/collection/object/104JKW) |
 
-Each source record declared the image CC0 when retrieved on 2026-11-07. The
-preparation script rechecks the license and source digest before recreating an
-asset. Review the full image for human figures before adding any catalog entry;
-CC0 alone does not establish suitability. No Getty endorsement is implied.
+The CC0 metadata and reviewed source images were checked by 2026-11-08. The builder
+rejects missing review metadata, human figures, subjects outside Islamic architecture,
+Islamic patterns, and calm nature, and non-CC0 licenses. It then rechecks each source
+record's license and image digest before rebuilding. Review the complete source image
+before setting `reviewed: true`; category or keyword matching alone is insufficient.
+There is no automatic image-classification or religious-compliance claim. No Getty
+endorsement is implied.

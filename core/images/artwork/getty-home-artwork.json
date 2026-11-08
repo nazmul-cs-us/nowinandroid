@@ -1,5 +1,189 @@
 [
   {
+    "id": "107JW5",
+    "title": "[Archways, the Alhambra]",
+    "artist": "Unknown",
+    "date": "1865–1875",
+    "source": "https://www.getty.edu/art/collection/object/107JW5",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "image_url": "https://media.getty.edu/iiif/image/4f5529e4-4cee-487e-8a99-9b4ee65d1812/full/!1600,1600/0/default.jpg",
+    "source_sha256": "2806ec63670c179894998b0b39d8ab10eb3934ead16c8d9229f3bccf37562b77",
+    "day": "home_cover_prayer_day_portrait",
+    "night": "home_cover_prayer_night_portrait",
+    "crop_center_x": 0.5,
+    "source_crop": [
+      0.05,
+      0.04,
+      0.95,
+      0.93
+    ],
+    "subject": "ISLAMIC_ARCHITECTURE",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "Islamic architectural or geometric detail from the Alhambra; the complete source image was reviewed for human figures."
+  },
+  {
+    "id": "107JW6",
+    "title": "[Archway, the Alhambra]",
+    "artist": "Unknown",
+    "date": "1865–1875",
+    "source": "https://www.getty.edu/art/collection/object/107JW6",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "image_url": "https://media.getty.edu/iiif/image/cee93c53-8501-40f2-8d53-f041454ba90b/full/!1600,1600/0/default.jpg",
+    "source_sha256": "5f2106799c95ba9ce390bb3afe8b621cc5a682616c5f68e30a15b88a89b25fe6",
+    "day": "home_cover_salah_portrait",
+    "night": "home_getty_columns_night",
+    "crop_center_x": 0.5,
+    "source_crop": [
+      0.06,
+      0.05,
+      0.95,
+      0.93
+    ],
+    "subject": "ISLAMIC_ARCHITECTURE",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "Islamic architectural or geometric detail from the Alhambra; the complete source image was reviewed for human figures."
+  },
+  {
+    "id": "104KMH",
+    "title": "[Interior of Alhambra]",
+    "artist": "Unknown",
+    "date": "about 1850",
+    "source": "https://www.getty.edu/art/collection/object/104KMH",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "image_url": "https://media.getty.edu/iiif/image/f57c3c9e-9f04-49dc-ab10-6dc482f74625/full/!1600,1600/0/default.jpg",
+    "source_sha256": "1c741333f71e89a91f84aad420b7dd9ba61788bec9e2681c7c231c2424845063",
+    "day": "home_cover_quran_portrait",
+    "night": "home_getty_courtyard_night",
+    "crop_center_x": 0.5,
+    "source_crop": [
+      0.01,
+      0.01,
+      0.99,
+      0.98
+    ],
+    "subject": "ISLAMIC_ARCHITECTURE",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "Islamic architectural or geometric detail from the Alhambra; the complete source image was reviewed for human figures."
+  },
+  {
+    "id": "104G6V",
+    "title": "Alhambra",
+    "artist": "Unknown",
+    "date": "1865",
+    "source": "https://www.getty.edu/art/collection/object/104G6V",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "image_url": "https://media.getty.edu/iiif/image/fe48c0b4-8c94-49ec-a82f-23f3095bbdd4/full/!1600,1600/0/default.jpg",
+    "source_sha256": "04d7c57658bf4a29428b0bfbb6a0dce29247caf6d664f41c915ca78b7c809e85",
+    "day": "home_cover_qibla_portrait",
+    "night": "home_getty_arches_night",
+    "crop_center_x": 0.5,
+    "source_crop": [
+      0.05,
+      0.04,
+      0.95,
+      0.94
+    ],
+    "subject": "ISLAMIC_ARCHITECTURE",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "Islamic architectural or geometric detail from the Alhambra; the complete source image was reviewed for human figures."
+  },
+  {
+    "id": "107JSE",
+    "title": "[Archway in the Alhambra]",
+    "artist": "Unknown",
+    "date": "1865–1875",
+    "source": "https://www.getty.edu/art/collection/object/107JSE",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "image_url": "https://media.getty.edu/iiif/image/4c2cfc71-76c6-4b6e-a1b3-b8033ef0a1ba/full/!1600,1600/0/default.jpg",
+    "source_sha256": "8f6c13ff9d8d24676f99f1a2efabf7fc1ecc89dbac4dce0a1c84f1154da8db76",
+    "day": "home_cover_suggestion_portrait",
+    "night": "home_getty_geometry_night",
+    "crop_center_x": 0.5,
+    "source_crop": [
+      0.06,
+      0.04,
+      0.95,
+      0.9
+    ],
+    "subject": "ISLAMIC_PATTERN",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "Islamic architectural or geometric detail from the Alhambra; the complete source image was reviewed for human figures."
+  },
+  {
+    "id": "107JVV",
+    "title": "[Archway in the Alhambra]",
+    "artist": "Unknown",
+    "date": "1865–1875",
+    "source": "https://www.getty.edu/art/collection/object/107JVV",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "image_url": "https://media.getty.edu/iiif/image/033a9819-aeec-47f8-b429-ffb556462a1a/full/!1600,1600/0/default.jpg",
+    "source_sha256": "8b6dc7410be5a248a60a5f743ebcfc8ded4f448c9d5b3c680e099d74b15fcaf4",
+    "day": "home_getty_carving_day",
+    "night": "home_getty_carving_night",
+    "crop_center_x": 0.5,
+    "source_crop": [
+      0.08,
+      0.05,
+      0.92,
+      0.87
+    ],
+    "subject": "ISLAMIC_PATTERN",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "Islamic architectural or geometric detail from the Alhambra; the complete source image was reviewed for human figures."
+  },
+  {
+    "id": "107VD6",
+    "title": "Panel from the Alhambra",
+    "artist": "Hugh Owen",
+    "date": "May 1–October 15, 1851",
+    "source": "https://www.getty.edu/art/collection/object/107VD6",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "image_url": "https://media.getty.edu/iiif/image/71dbdd07-f660-47cf-a06d-89be84b63cfa/full/!1600,1600/0/default.jpg",
+    "source_sha256": "34ae7e16aa174d382919f7d11b6458949a96d5eac2f7254bc5c96a7fb2b7bd22",
+    "day": "home_getty_panel_day",
+    "night": "home_getty_panel_night",
+    "crop_center_x": 0.5,
+    "source_crop": [
+      0.31,
+      0.32,
+      0.71,
+      0.83
+    ],
+    "subject": "ISLAMIC_PATTERN",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "Islamic architectural or geometric detail from the Alhambra; the complete source image was reviewed for human figures."
+  },
+  {
+    "id": "108VZD",
+    "title": "[Three tiles from The Alhambra]",
+    "artist": "William Chaffers",
+    "date": "1872",
+    "source": "https://www.getty.edu/art/collection/object/108VZD",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "image_url": "https://media.getty.edu/iiif/image/0ba6d77a-a008-4d5b-bfb9-cfbe7c3d17f8/full/!1600,1600/0/default.jpg",
+    "source_sha256": "d0d11a6f6607d842e692cbca880cd14ccc135b3ba8a5a7c41178f3f898e39f38",
+    "day": "home_getty_tiles_day",
+    "night": "home_getty_tiles_night",
+    "crop_center_x": 0.5,
+    "source_crop": [
+      0.18,
+      0.16,
+      0.82,
+      0.68
+    ],
+    "subject": "ISLAMIC_PATTERN",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "Islamic architectural or geometric detail from the Alhambra; the complete source image was reviewed for human figures."
+  },
+  {
     "id": "10986B",
     "title": "Study of Clouds with a Sunset near Rome",
     "artist": "Simon Alexandre Clément Denis",
@@ -8,38 +192,19 @@
     "license": "https://creativecommons.org/publicdomain/zero/1.0/",
     "image_url": "https://media.getty.edu/iiif/image/1015bbe6-d4cb-48c0-8419-2bc0d00e02b4/full/!2000,2000/0/default.jpg",
     "source_sha256": "990bcfa38c4d959361049ac9ec1a9c9f3b03588d35904c546660dca17a452d90",
-    "day": "home_cover_prayer_day_portrait",
-    "night": "home_cover_prayer_night_portrait",
+    "day": "home_getty_clouds_day",
+    "night": "home_getty_clouds_night",
     "crop_center_x": 0.55,
-    "trim_border": 0
-  },
-  {
-    "id": "103RK8",
-    "title": "Wheatstacks, Snow Effect, Morning (Meules, Effet de Neige, Le Matin)",
-    "artist": "Claude Monet",
-    "date": "1891",
-    "source": "https://www.getty.edu/art/collection/object/103RK8",
-    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "image_url": "https://media.getty.edu/iiif/image/c7a070ce-bae3-4424-8ad3-55e3dea5e1ff/full/!2000,2000/0/default.jpg",
-    "source_sha256": "a1c4f3eb52aff219b8a4e1cf2e202f10e88819601749abf2b45e52d6c34aba2a",
-    "day": "home_cover_salah_portrait",
-    "night": "home_getty_wheatstacks_night",
-    "crop_center_x": 0.65,
-    "trim_border": 0
-  },
-  {
-    "id": "103JNH",
-    "title": "Irises",
-    "artist": "Vincent van Gogh",
-    "date": "1889",
-    "source": "https://www.getty.edu/art/collection/object/103JNH",
-    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "image_url": "https://media.getty.edu/iiif/image/8c255d80-7382-46db-9fa8-892c0d37247e/full/!2000,2000/0/default.jpg",
-    "source_sha256": "dfe6c93e2927d4fbf1015efab070464d011012f7d96a2a5f6a4ed60c12cc0051",
-    "day": "home_cover_quran_portrait",
-    "night": "home_getty_irises_night",
-    "crop_center_x": 0.55,
-    "trim_border": 0
+    "subject": "CALM_NATURE",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "A quiet, human-free natural scene suitable behind prayer and Quran content.",
+    "source_crop": [
+      0,
+      0,
+      1,
+      1
+    ]
   },
   {
     "id": "109KKN",
@@ -50,10 +215,19 @@
     "license": "https://creativecommons.org/publicdomain/zero/1.0/",
     "image_url": "https://media.getty.edu/iiif/image/fb8cf51f-aa8c-4698-9588-6db1b2b9e69e/full/!2000,2000/0/default.jpg",
     "source_sha256": "e76925ee58ec6041ab9b919872b7c610d9d420f0ad863ceacdb413fea0784c1b",
-    "day": "home_cover_qibla_portrait",
-    "night": "home_getty_snowdon_night",
+    "day": "home_getty_mountains_day",
+    "night": "home_getty_mountains_night",
     "crop_center_x": 0.59,
-    "trim_border": 0.02
+    "subject": "CALM_NATURE",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "A quiet, human-free natural scene suitable behind prayer and Quran content.",
+    "source_crop": [
+      0.02,
+      0.02,
+      0.98,
+      0.98
+    ]
   },
   {
     "id": "10492H",
@@ -64,38 +238,19 @@
     "license": "https://creativecommons.org/publicdomain/zero/1.0/",
     "image_url": "https://media.getty.edu/iiif/image/2162daa8-5542-4ba0-9780-fd898943ae0f/full/!2000,2000/0/default.jpg",
     "source_sha256": "04b8a16ab52f5488e50c07a150c560a85520cc2dd40eb421936b445e851e9f3e",
-    "day": "home_cover_suggestion_portrait",
-    "night": "home_getty_seascape_night",
+    "day": "home_getty_coast_day",
+    "night": "home_getty_coast_night",
     "crop_center_x": 0.55,
-    "trim_border": 0.025
-  },
-  {
-    "id": "1096PR",
-    "title": "Grotto of Sarrazine near Nans-sous-Sainte-Anne",
-    "artist": "Gustave Courbet",
-    "date": "about 1864",
-    "source": "https://www.getty.edu/art/collection/object/1096PR",
-    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "image_url": "https://media.getty.edu/iiif/image/7167aee0-1cc2-46a2-9d78-b72a7448f7af/full/!2000,2000/0/default.jpg",
-    "source_sha256": "4a247488b02a58226712f1d01bb7d63de84e1e912316683cb04ed5cb70d1506d",
-    "day": "home_getty_grotto_day",
-    "night": "home_getty_grotto_night",
-    "crop_center_x": 0.53,
-    "trim_border": 0
-  },
-  {
-    "id": "103RF8",
-    "title": "Still Life with Flowers and Fruit",
-    "artist": "Claude Monet",
-    "date": "1869",
-    "source": "https://www.getty.edu/art/collection/object/103RF8",
-    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "image_url": "https://media.getty.edu/iiif/image/a27c10c4-f475-47fe-bc33-3497e5afa14e/full/!2000,2000/0/default.jpg",
-    "source_sha256": "d52f3d0184de9418fb688493cff4711889381b75b55a203a88a1283c39c7f86f",
-    "day": "home_getty_flowers_day",
-    "night": "home_getty_flowers_night",
-    "crop_center_x": 0.5,
-    "trim_border": 0
+    "subject": "CALM_NATURE",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "A quiet, human-free natural scene suitable behind prayer and Quran content.",
+    "source_crop": [
+      0.025,
+      0.025,
+      0.975,
+      0.975
+    ]
   },
   {
     "id": "104JKW",
@@ -109,6 +264,15 @@
     "day": "home_getty_lilies_day",
     "night": "home_getty_lilies_night",
     "crop_center_x": 0.5,
-    "trim_border": 0.035
+    "subject": "CALM_NATURE",
+    "reviewed": true,
+    "human_figures": false,
+    "relevance": "A quiet, human-free natural scene suitable behind prayer and Quran content.",
+    "source_crop": [
+      0.035,
+      0.035,
+      0.965,
+      0.965
+    ]
   }
 ]
