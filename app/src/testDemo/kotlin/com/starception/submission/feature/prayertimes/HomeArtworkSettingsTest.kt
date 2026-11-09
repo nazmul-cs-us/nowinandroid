@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -41,6 +42,13 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.starception.submission.core.images.rememberHomeArtworkState
+import kotlin.time.Clock
+import kotlin.time.Instant
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.starception.submission.core.images.ArtworkFrequency
 import com.starception.submission.core.images.HomeArtworkSchedule
@@ -90,6 +98,36 @@ class HomeArtworkSettingsTest {
         // Leave the shared singleton at the normal default for other component tests.
         compose.onNodeWithTag("homeArtworkFrequency").performClick()
         compose.onNodeWithText("Every day").performClick()
+    }
+
+    @Test fun hourlyChoiceShowsItsNextDueTime() {
+        compose.setContent { ArtworkSettingsScene() }
+        compose.onNodeWithTag("homeArtworkFrequency").performClick()
+        compose.onNodeWithText("Every hour").performClick()
+        compose.onNodeWithText("Next update at", substring = true).assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkFrequency").performClick()
+        compose.onNodeWithText("Every day").performClick()
+    }
+
+    @Test fun resumingAndroidImmediatelyCatchesUpMissedHourlyChanges() {
+        var wallTime = Instant.parse("2026-11-09T08:12:17Z")
+        val clock = object : Clock { override fun now() = wallTime }
+        val settings = HomeArtworkSettings(HomeArtworkSchedule(ArtworkFrequency.HOURLY, wallTime).encode()) {}
+        val owner = object : LifecycleOwner {
+            override val lifecycle = LifecycleRegistry(this)
+        }
+        compose.setContent {
+            CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+                Text("Artwork rotation ${rememberHomeArtworkState(settings, clock).rotation}")
+            }
+        }
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+        compose.onNodeWithText("Artwork rotation 0").assertIsDisplayed()
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.STARTED }
+        compose.runOnIdle { wallTime = Instant.parse("2026-11-09T11:12:17Z") }
+        compose.onNodeWithText("Artwork rotation 0").assertIsDisplayed()
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+        compose.onNodeWithText("Artwork rotation 3").assertIsDisplayed()
     }
 
     @Test fun lightArtworkSettingsStayCompactAndHideCreditsUntilRequested() {

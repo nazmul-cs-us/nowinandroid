@@ -19,12 +19,20 @@ package com.starception.submission.core.images
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
 enum class ArtworkFrequency(val label: String) {
@@ -56,6 +64,25 @@ data class HomeArtworkSchedule(
 
     fun withFrequency(frequency: ArtworkFrequency, now: Instant, zone: TimeZone = TimeZone.currentSystemDefault()) =
         HomeArtworkSchedule(frequency, now, rotationAt(now, zone))
+
+    fun nextUpdateAt(now: Instant, zone: TimeZone = TimeZone.currentSystemDefault()): Instant? {
+        val start = anchor.toLocalDateTime(zone).date
+        val today = now.toLocalDateTime(zone).date
+        return when (frequency) {
+            ArtworkFrequency.HOURLY -> {
+                val hours = ((now.epochSeconds - anchor.epochSeconds) / 3600).coerceAtLeast(0)
+                Instant.fromEpochSeconds(anchor.epochSeconds + (hours + 1) * 3600)
+            }
+            ArtworkFrequency.DAILY -> today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(zone)
+            ArtworkFrequency.WEEKLY -> {
+                val weeks = ((today.toEpochDays() - start.toEpochDays()) / 7).coerceAtLeast(0)
+                start.plus((weeks + 1) * 7, DateTimeUnit.DAY).atStartOfDayIn(zone)
+            }
+            ArtworkFrequency.MONTHLY -> LocalDate(today.year, today.monthNumber, 1)
+                .plus(1, DateTimeUnit.MONTH).atStartOfDayIn(zone)
+            ArtworkFrequency.FIXED -> null
+        }
+    }
 
     fun encode(): String = "${frequency.name}|${anchor.epochSeconds}|$rotation"
 
@@ -95,17 +122,41 @@ class HomeArtworkSettings(saved: String?, private val save: (String) -> Unit) {
 @Composable
 expect fun rememberHomeArtworkSettings(): HomeArtworkSettings
 
-/** Calendar cadences use the device's local date, including DST and time-zone changes. */
-@Composable
-fun rememberHomeArtworkRotation(): Int {
-    val schedule = rememberHomeArtworkSettings().schedule
-    val now by produceState(Clock.System.now(), schedule) {
-        while (true) {
-            val current = Clock.System.now()
-            value = current
-            if (schedule.frequency == ArtworkFrequency.FIXED) break
-            delay(60_000L - current.toEpochMilliseconds() % 60_000L)
-        }
+data class HomeArtworkState(val rotation: Int, val nextUpdateAt: Instant?)
+
+/** A fresh collection starts with wall-clock time, so resuming after missed periods catches up immediately. */
+internal fun homeArtworkUpdates(
+    schedule: HomeArtworkSchedule,
+    clock: Clock = Clock.System,
+    zone: () -> TimeZone = { TimeZone.currentSystemDefault() },
+): Flow<HomeArtworkState> = flow {
+    while (true) {
+        val now = clock.now()
+        val currentZone = zone()
+        val next = schedule.nextUpdateAt(now, currentZone)
+        emit(HomeArtworkState(schedule.rotationAt(now, currentZone), next))
+        if (next == null) break
+        // Wake at the actual deadline, including an hourly anchor partway through a minute.
+        // The one-minute cap also notices wall-clock or time-zone changes while visible.
+        delay((next.toEpochMilliseconds() - now.toEpochMilliseconds()).coerceIn(1L, 60_000L))
     }
-    return schedule.rotationAt(now)
 }
+
+/** Restart from wall time whenever Android/iOS resumes; don't run a UI timer in the background. */
+@Composable
+fun rememberHomeArtworkState(
+    settings: HomeArtworkSettings = rememberHomeArtworkSettings(),
+    clock: Clock = Clock.System,
+): HomeArtworkState {
+    val schedule = settings.schedule
+    val updates = remember(schedule, clock) { homeArtworkUpdates(schedule, clock) }
+    val now = clock.now()
+    val state by updates.collectAsStateWithLifecycle(
+        initialValue = HomeArtworkState(schedule.rotationAt(now), schedule.nextUpdateAt(now)),
+        minActiveState = Lifecycle.State.RESUMED,
+    )
+    return state
+}
+
+@Composable
+fun rememberHomeArtworkRotation(): Int = rememberHomeArtworkState().rotation

@@ -71,16 +71,24 @@ import com.starception.submission.core.images.ArtworkFrequency
 import com.starception.submission.core.images.HomeArtwork
 import com.starception.submission.core.images.homeArtworkGallery
 import com.starception.submission.core.images.homeArtworkIndex
-import com.starception.submission.core.images.rememberHomeArtworkRotation
+import com.starception.submission.core.images.rememberHomeArtworkState
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import com.starception.submission.core.images.rememberHomeArtworkSettings
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun HomeArtworkSettingsSection() {
     val settings = rememberHomeArtworkSettings()
-    val rotation = rememberHomeArtworkRotation()
+    val artworkState = rememberHomeArtworkState()
+    val rotation = artworkState.rotation
     val frequency = settings.schedule.frequency
     val artworks = (0..4).map { homeArtworkGallery[homeArtworkIndex(it, rotation)] }
+    val nextUpdateLabel = if (frequency == ArtworkFrequency.HOURLY) {
+        artworkState.nextUpdateAt?.toLocalDateTime(TimeZone.currentSystemDefault())?.let {
+            "Next update at ${it.hour.toString().padStart(2, '0')}:${it.minute.toString().padStart(2, '0')}"
+        }
+    } else null
     var showDetails by rememberSaveable { mutableStateOf(false) }
 
     Column(
@@ -131,13 +139,13 @@ fun HomeArtworkSettingsSection() {
                     val stackControls = maxWidth < 280.dp || LocalDensity.current.fontScale > 1.2f
                     if (stackControls) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ArtworkFrequencyLabel(frequency)
+                            ArtworkFrequencyLabel(frequency, nextUpdateLabel = nextUpdateLabel)
                             ArtworkFrequencyPicker(frequency, settings::setFrequency, Modifier.fillMaxWidth())
                         }
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            ArtworkFrequencyLabel(frequency, Modifier.weight(1f))
+                            ArtworkFrequencyLabel(frequency, Modifier.weight(1f), nextUpdateLabel)
                             ArtworkFrequencyPicker(frequency, settings::setFrequency)
                         }
                     }
@@ -169,10 +177,14 @@ fun HomeArtworkSettingsSection() {
 }
 
 @Composable
-private fun ArtworkFrequencyLabel(frequency: ArtworkFrequency, modifier: Modifier = Modifier) {
+private fun ArtworkFrequencyLabel(
+    frequency: ArtworkFrequency,
+    modifier: Modifier = Modifier,
+    nextUpdateLabel: String? = null,
+) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text("Change artwork", style = MaterialTheme.typography.bodyMedium)
-        Text(frequency.description, style = MaterialTheme.typography.bodySmall,
+        Text(nextUpdateLabel ?: frequency.description, style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

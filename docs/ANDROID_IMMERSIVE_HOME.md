@@ -57,8 +57,14 @@ Every day is the default. Settings → Appearance → Home artwork offers Every 
 Every day, Every week, Every month, and Keep current. The preference and rotation
 anchor persist across app launches. Daily changes follow local midnight, weekly
 changes follow each seven local days from the selected cadence, and monthly
-changes follow calendar-month boundaries. While Home remains open, the date is
-checked once a minute, so a change appears within a minute of its boundary.
+changes follow calendar-month boundaries. Hourly changes occur one full hour
+from the selected cadence's anchor (for example, selecting Hourly at 09:20 gives
+10:20 as the next update); settings show the next due time in local time.
+The visible screen wakes at the actual deadline and checks wall-clock/time-zone
+changes at most a minute apart. Collection is paused in the background and starts
+with the current wall-clock time as soon as Android/iOS resumes, catching up any
+missed intervals without waiting for the next poll. No background alarm is needed
+because the artwork is derived from the persisted schedule when it becomes visible.
 Keep current freezes the currently displayed set, including across relaunches.
 Refresh now advances all five covers immediately, even in Keep current mode. It
 preserves the frequency and next scheduled change, saves the new selection, and
