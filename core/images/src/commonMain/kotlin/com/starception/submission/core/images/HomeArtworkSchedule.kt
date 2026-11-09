@@ -84,6 +84,12 @@ class HomeArtworkSettings(saved: String?, private val save: (String) -> Unit) {
         schedule = schedule.withFrequency(frequency, Clock.System.now())
         save(schedule.encode())
     }
+
+    /** Advance immediately, including in Keep current mode, without moving the next scheduled change. */
+    fun refreshNow() {
+        schedule = schedule.copy(rotation = ((schedule.rotation.toLong() + 1) % Int.MAX_VALUE).toInt())
+        save(schedule.encode())
+    }
 }
 
 @Composable

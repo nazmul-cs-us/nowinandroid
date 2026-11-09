@@ -36,9 +36,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -123,6 +125,7 @@ fun HomeArtworkSettingsSection() {
                     Text("Islamic architecture, patterns and quiet nature.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ArtworkAvailability()
                 }
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val stackControls = maxWidth < 280.dp || LocalDensity.current.fontScale > 1.2f
@@ -143,7 +146,7 @@ fun HomeArtworkSettingsSection() {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     if (maxWidth < 280.dp || LocalDensity.current.fontScale > 1.2f) {
                         Column {
-                            ArtworkAvailability()
+                            ArtworkRefreshButton(settings::refreshNow, Modifier.fillMaxWidth())
                             TextButton(onClick = { showDetails = true },
                                 modifier = Modifier.align(Alignment.End).testTag("homeArtworkDetails")) {
                                 Text("About the artwork", style = MaterialTheme.typography.labelMedium)
@@ -152,7 +155,7 @@ fun HomeArtworkSettingsSection() {
                     } else {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween) {
-                            ArtworkAvailability()
+                            ArtworkRefreshButton(settings::refreshNow)
                             TextButton(onClick = { showDetails = true }, modifier = Modifier.testTag("homeArtworkDetails")) {
                                 Text("About the artwork", style = MaterialTheme.typography.labelMedium)
                             }
@@ -210,6 +213,19 @@ private fun ArtworkAvailability() {
     Text("${homeArtworkGallery.size} artworks · Offline",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun ArtworkRefreshButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = modifier.testTag("homeArtworkRefreshNow"),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Icon(Icons.Outlined.Refresh, contentDescription = null,
+            modifier = Modifier.padding(end = 6.dp).size(16.dp))
+        Text("Refresh now", style = MaterialTheme.typography.labelMedium)
+    }
 }
 
 private val ArtworkFrequency.shortLabel: String

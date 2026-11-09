@@ -78,6 +78,14 @@ class HomeArtworkSettingsTest {
             val restored = HomeArtworkSettings(prefs.getString("schedule", null)) {}
             assertEquals(ArtworkFrequency.FIXED, restored.schedule.frequency)
         }
+        val beforeRefresh = HomeArtworkSchedule.decode(prefs.getString("schedule", null))
+        compose.onNodeWithTag("homeArtworkRefreshNow").assertIsDisplayed().performClick()
+        compose.runOnIdle {
+            val restored = HomeArtworkSettings(prefs.getString("schedule", null)) {}.schedule
+            assertEquals(beforeRefresh.rotation + 1, restored.rotation)
+            assertEquals(beforeRefresh.anchor, restored.anchor)
+            assertEquals(ArtworkFrequency.FIXED, restored.frequency)
+        }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_artwork_settings.png")
         // Leave the shared singleton at the normal default for other component tests.
         compose.onNodeWithTag("homeArtworkFrequency").performClick()
@@ -108,6 +116,7 @@ class HomeArtworkSettingsTest {
         compose.onNodeWithTag("homeArtworkFrequency").assertIsDisplayed().performClick()
         compose.onNodeWithText("Keep current").performClick()
         compose.onNodeWithTag("homeArtworkDetails").assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkRefreshNow").assertIsDisplayed()
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_artwork_settings_large_text.png")
         compose.onNodeWithTag("homeArtworkFrequency").performClick()
         compose.onNodeWithText("Every day").performClick()
