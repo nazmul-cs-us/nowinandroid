@@ -75,6 +75,29 @@ class HomeArtworkScheduleTest {
     }
 
     @Test
+    fun manualRefreshPersistsAndPreservesEveryCadenceAndItsNextBoundary() {
+        val now = Instant.parse("2026-11-10T10:00:00Z")
+        for (frequency in ArtworkFrequency.entries) {
+            val original = HomeArtworkSchedule(frequency, anchor, rotation = 2)
+            var saved = original.encode()
+            val settings = HomeArtworkSettings(saved) { saved = it }
+            settings.refreshNow()
+            val refreshed = HomeArtworkSchedule.decode(saved)
+            assertEquals(original.anchor, refreshed.anchor)
+            assertEquals(frequency, refreshed.frequency)
+            assertEquals(original.rotationAt(now, dubai) + 1, refreshed.rotationAt(now, dubai))
+            val tomorrow = Instant.parse("2026-11-11T10:00:00Z")
+            assertEquals(original.rotationAt(tomorrow, dubai) - original.rotationAt(now, dubai),
+                refreshed.rotationAt(tomorrow, dubai) - refreshed.rotationAt(now, dubai))
+            assertEquals(refreshed, HomeArtworkSettings(saved) {}.schedule)
+            for (page in 0..4) {
+                assertNotEquals(homeArtworkIndex(page, original.rotationAt(now, dubai)),
+                    homeArtworkIndex(page, refreshed.rotationAt(now, dubai)))
+            }
+        }
+    }
+
+    @Test
     fun missingOrCorruptPreferenceDefaultsToDailyWithoutCrashing() {
         for (saved in listOf(null, "", "WEEKLY|bad|1", "UNKNOWN|0|0", "DAILY|0|-1")) {
             val schedule = HomeArtworkSchedule.decode(saved, anchor)

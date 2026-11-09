@@ -60,6 +60,9 @@ changes follow each seven local days from the selected cadence, and monthly
 changes follow calendar-month boundaries. While Home remains open, the date is
 checked once a minute, so a change appears within a minute of its boundary.
 Keep current freezes the currently displayed set, including across relaunches.
+Refresh now advances all five covers immediately, even in Keep current mode. It
+preserves the frequency and next scheduled change, saves the new selection, and
+uses the bundled gallery without downloading new images.
 Switching cadence preserves the current set and starts the new cadence from that
 point. The twelve-image allowlist repeats rather than fetching unreviewed artwork.
 The cover, rail, and readers resolve the same artwork for each page; five different
