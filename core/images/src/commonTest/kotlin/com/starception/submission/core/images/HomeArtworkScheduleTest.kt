@@ -17,6 +17,14 @@
 package com.starception.submission.core.images
 
 import kotlin.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,6 +52,50 @@ class HomeArtworkScheduleTest {
         val weekly = HomeArtworkSchedule(ArtworkFrequency.WEEKLY, anchor)
         assertEquals(0, weekly.rotationAt(Instant.parse("2026-11-13T19:59:59Z"), dubai))
         assertEquals(1, weekly.rotationAt(Instant.parse("2026-11-13T20:00:00Z"), dubai))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun hourlyStreamUpdatesAtItsExactDeadlineAndCatchesUpWhenRecollected() = runTest {
+        val start = Instant.parse("2026-11-09T08:12:17Z")
+        val schedule = HomeArtworkSchedule(ArtworkFrequency.HOURLY, start)
+        val clock = object : Clock {
+            override fun now() = start + testScheduler.currentTime.milliseconds
+        }
+        val updates = mutableListOf<HomeArtworkState>()
+        var observer = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            homeArtworkUpdates(schedule, clock) { dubai }.collect(updates::add)
+        }
+        assertEquals(0, updates.last().rotation)
+        assertEquals(Instant.parse("2026-11-09T09:12:17Z"), updates.last().nextUpdateAt)
+        advanceTimeBy(3_599_999)
+        runCurrent()
+        assertEquals(0, updates.last().rotation)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(1, updates.last().rotation)
+        observer.cancel()
+        advanceTimeBy(7_200_000)
+        observer = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            homeArtworkUpdates(schedule, clock) { dubai }.collect(updates::add)
+        }
+        assertEquals(3, updates.last().rotation)
+        assertEquals(Instant.parse("2026-11-09T12:12:17Z"), updates.last().nextUpdateAt)
+        observer.cancel()
+    }
+
+    @Test
+    fun nextUpdateUsesTheSameCalendarBoundariesAsRotation() {
+        val now = Instant.parse("2026-11-07T19:45:00Z")
+        assertEquals(Instant.parse("2026-11-07T20:30:00Z"),
+            HomeArtworkSchedule(ArtworkFrequency.HOURLY, anchor).nextUpdateAt(now, dubai))
+        assertEquals(Instant.parse("2026-11-07T20:00:00Z"),
+            HomeArtworkSchedule(ArtworkFrequency.DAILY, anchor).nextUpdateAt(now, dubai))
+        assertEquals(Instant.parse("2026-11-13T20:00:00Z"),
+            HomeArtworkSchedule(ArtworkFrequency.WEEKLY, anchor).nextUpdateAt(now, dubai))
+        assertEquals(Instant.parse("2026-11-30T20:00:00Z"),
+            HomeArtworkSchedule(ArtworkFrequency.MONTHLY, anchor).nextUpdateAt(now, dubai))
+        assertEquals(null, HomeArtworkSchedule(ArtworkFrequency.FIXED, anchor).nextUpdateAt(now, dubai))
     }
 
     @Test
