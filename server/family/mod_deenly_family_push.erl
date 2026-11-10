@@ -83,8 +83,8 @@ send(K, #{registration := Registration, payload := Payload, attempts := Attempts
             <<"web">> -> Public0#{<<"generations">> => maps:get(generations, Registration)};
             _ -> Public0
         end,
-        Body = jiffy:encode(#{<<"registration">> => Public,
-                              <<"payload">> => Payload}),
+        Body = iolist_to_binary(jiffy:encode(#{<<"registration">> => Public,
+                              <<"payload">> => Payload})),
         {ok, {{_, Code, _}, _, Response}} = httpc:request(post,
             {"http://127.0.0.1:8789/v1/call", [{"authorization", "Bearer " ++ binary_to_list(Secret)}],
              "application/json", Body}, [{timeout, 8000}, {connect_timeout, 1000}], [{body_format, binary}]),

@@ -1,5 +1,6 @@
 -module(deenly_family_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include("jlib.hrl").
 -define(D, <<"xmpp.test">>).
 -define(A, <<"alice@xmpp.test">>).
 -define(B, <<"bob@xmpp.test">>).
@@ -22,7 +23,55 @@ family_test_() -> {setup, fun setup/0, fun cleanup/1, [
     ?_test(stale_activity_cannot_restore_online()), ?_test(presence_disconnect_and_expiry()),
     ?_test(presence_removal_revokes_updates()), ?_test(presence_heartbeats_are_coalesced()),
     ?_test(raw_peer_presence_is_rejected()), ?_test(web_pairing_and_logout_are_scoped()),
-    ?_test(web_call_outbox_is_idempotent())]}.
+    ?_test(web_call_outbox_is_idempotent()),
+    ?_test(voice_sized_offer_passes_full_iq_path()),
+    ?_test(video_sized_offer_passes_full_iq_path()),
+    ?_test(video_sized_answer_passes_full_iq_path()),
+    ?_test(signal_size_limit_still_applies()),
+    ?_test(overall_request_limit_still_applies())]}.
+
+video_payload(Type, Size) -> #{<<"type">> => Type, <<"sdp">> => binary:copy(<<"a">>, Size)}.
+signal_iq(U, Payload) ->
+    Request = #{<<"v">> => 1, <<"action">> => <<"signal">>, <<"callId">> => ?ID,
+                <<"payload">> => Payload},
+    Encoded = iolist_to_binary(jiffy:encode(Request)),
+    El = #xmlel{name = <<"family">>, attrs = #{<<"xmlns">> => <<"urn:starception:family:1">>},
+        children = [#xmlcdata{content = Encoded}]},
+    {_, #iq{sub_el = [Response]}} = mod_deenly_family:process_iq(#{}, jid:from_binary(U),
+        jid:from_binary(?D), #iq{type = set, sub_el = El}, #{}),
+    ?assertMatch([#xmlcdata{content = Content}] when is_binary(Content), Response#xmlel.children),
+    jiffy:decode(exml_query:cdata(Response), [return_maps]).
+assert_routed_signal(To, Payload) ->
+    receive
+        {family_test_route, #{to := Target, packet := Packet}} ->
+            ?assertEqual(To, jid:to_binary(Target)),
+            [Body] = Packet#xmlel.children,
+            ?assertMatch([#xmlcdata{content = Content}] when is_binary(Content), Body#xmlel.children),
+            Event = jiffy:decode(exml_query:cdata(Body), [return_maps]),
+            ?assertEqual(<<"signal">>, maps:get(<<"event">>, Event)),
+            ?assertEqual(Payload, maps:get(<<"payload">>, Event))
+    after 1000 -> error(expected_routed_signal)
+    end.
+video_sized_offer_passes_full_iq_path() ->
+    reset(), active(), Payload = video_payload(<<"offer">>, 3950),
+    ?assertEqual(true, maps:get(<<"ok">>, signal_iq(?AF, Payload))),
+    assert_routed_signal(?BF, Payload).
+voice_sized_offer_passes_full_iq_path() ->
+    reset(), active(), Payload = video_payload(<<"offer">>, 1000),
+    ?assertEqual(true, maps:get(<<"ok">>, signal_iq(?AF, Payload))),
+    assert_routed_signal(?BF, Payload).
+video_sized_answer_passes_full_iq_path() ->
+    reset(), active(), Payload = video_payload(<<"answer">>, 8000),
+    ?assertEqual(true, maps:get(<<"ok">>, signal_iq(?BF, Payload))),
+    assert_routed_signal(?AF, Payload).
+signal_size_limit_still_applies() ->
+    reset(), active(), Response = signal_iq(?AF, video_payload(<<"offer">>, 35000)),
+    ?assertEqual(<<"invalid_signal">>, maps:get(<<"error">>, Response)),
+    receive {family_test_route, _} -> error(oversized_signal_was_forwarded) after 0 -> ok end.
+overall_request_limit_still_applies() ->
+    reset(), active(), Response = signal_iq(?AF, video_payload(<<"offer">>, 40000)),
+    ?assertEqual(<<"invalid_request">>, maps:get(<<"error">>, Response)),
+    receive {family_test_route, _} -> error(oversized_request_was_forwarded) after 0 -> ok end.
 setup() ->
     Dir = "/tmp/deenly-family-eunit-" ++ integer_to_list(erlang:unique_integer([positive])),
     application:set_env(mnesia, dir, Dir),

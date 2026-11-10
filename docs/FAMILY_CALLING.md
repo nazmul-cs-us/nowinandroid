@@ -296,3 +296,41 @@ IDs, credentials or arbitrary exception text. Failures from a previous call
 cannot terminate a newer call. The next video capture should include
 `Signalling send failed: type=...; bytes=...; exception=...; serverCode=...`.
 Video-call success is still pending device confirmation.
+
+On 10 November, the new device capture reported an offer of 3,974 JSON bytes
+rejected with `invalid_request`, after successful camera and offer startup. The
+server incorrectly applied `byte_size/1` to `jiffy:encode/1`. Jiffy 2.0.2 (the
+pinned MongooseIM dependency) returns iodata: smaller documents often encode as
+one binary, while video-sized documents can encode as a list of chunks. Calling
+`byte_size` on that list raised `badarg`, which the handler converted to
+`invalid_request`. This reproduced with the real pinned native codec at roughly
+the same payload size; the earlier JSON test double always flattened output and
+masked the contract mismatch.
+
+The server now measures encoded JSON with `iolist_size/1` and flattens it at XML
+CDATA, signed-pairing and HTTP-body boundaries. Existing 40,000-byte request and
+35,000-byte signalling limits remain in place. Full-IQ regressions cover small
+voice payloads, video-sized offer/answer delivery to the selected participant,
+binary stanza contents, and rejection of oversized inputs without forwarding.
+The default codec fixture preserves the iodata contract. Developers can also run
+the suite with `FAMILY_REAL_JIFFY_EBIN` pointing to the pinned compiled Jiffy
+`ebin` directory, avoiding the codec fixture entirely.
+All 43 server regressions passed with both the real Jiffy 2.0.2 native library
+and the iodata-preserving fixture; 13 Python signup/config checks also passed.
+
+Deploy this server correction on the VM between calls:
+
+```bash
+cd "$HOME/deenly-family-setup" &&
+git pull --ff-only origin main &&
+sudo bash server/family/install.sh "$HOME/mongooseim-6.10.0" 10.148.0.2 &&
+sudo install -m 0644 server/family/smoke.py /tmp/deenly-family-smoke.py &&
+sudo -u mongooseim python3 /tmp/deenly-family-smoke.py --host 10.148.0.2
+```
+
+The updated live smoke creates a temporary accepted video call, sends synthetic
+video-sized offers and answers intact in both directions, checks the signalling
+size limit and participant authorization, and removes its temporary accounts.
+It exercises the deployed codec and XMPP serialization, rather than native media.
+After it passes, retry video calls using the installed Android/iOS apps. Confirm
+two-way video and audio on the phones before claiming live video success.

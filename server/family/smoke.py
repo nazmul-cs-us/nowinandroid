@@ -194,7 +194,7 @@ def main():
         require(member.get("presence") == "offline", "An old foreground update restored online status.")
         require(outsider.request("snapshot")["members"] == [], "Presence exposed non-family data.")
         print("PASS: live accepted-family presence, background updates and stale-update protection.", flush=True)
-        a.request("invite_call", peer=b.jid, callId=call_id, kind="voice")
+        a.request("invite_call", peer=b.jid, callId=call_id, kind="video")
         b.event("call", call_id, "ringing")
         outsider.request("accept_call", "call_not_found", callId=call_id)
         b.request("accept_call", callId=call_id)
@@ -207,11 +207,16 @@ def main():
         other_device.request("accept_call", "answered_elsewhere", callId=call_id)
         other_device.request("turn", "not_active", callId=call_id)
         print("PASS: a second device cannot take over an answered call.", flush=True)
-        payload = {"type": "offer", "sdp": "synthetic-diagnostic-offer"}
-        a.request("signal", callId=call_id, payload=payload)
-        require(b.event("signal", call_id)["payload"] == payload, "Authorized signalling was not delivered.")
+        # Large enough to exercise Jiffy's chunked JSON output; no real media credentials.
+        for sender, receiver, kind in ((a, b, "offer"), (b, a, "answer")):
+            payload = {"type": kind, "sdp": "v=0\r\n" + "a=x-deenly-diagnostic:synthetic-video-line\r\n" * 150}
+            sender.request("signal", callId=call_id, payload=payload)
+            require(receiver.event("signal", call_id)["payload"] == payload,
+                    "Video-sized signalling was not delivered intact.")
+        a.request("signal", "invalid_signal", callId=call_id,
+                  payload={"type": "offer", "sdp": "x" * 35000})
         outsider.request("signal", "call_not_found", callId=call_id, payload=payload)
-        print("PASS: signalling delivered only for an authorized call participant.", flush=True)
+        print("PASS: video-sized offer/answer signalling, size limit and participant authorization.", flush=True)
         b.request("remove_member", peer=a.jid)
         require(a.request("snapshot")["calls"] == [], "Removed family call remained active.")
         a.request("turn", "not_active", callId=call_id)

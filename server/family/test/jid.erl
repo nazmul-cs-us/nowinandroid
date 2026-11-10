@@ -7,8 +7,13 @@
 -type lresource() :: binary().
 -include_lib("jid/include/jid.hrl").
 from_binary(B) ->
-    [Bare | Resource] = binary:split(B, <<"/">>, [global]),
-    [User, Server] = binary:split(Bare, <<"@">>),
+    [Bare | Resource] = binary:split(B, <<"/">>),
+    {User, Server} = case binary:split(Bare, <<"@">>) of
+        [S] -> {<<>>, S};
+        [U, S] -> {U, S}
+    end,
     R = case Resource of [] -> <<>>; [X] -> X end,
     #jid{luser = User, lserver = Server, lresource = R}.
-to_binary(#jid{luser = U, lserver = S}) -> <<U/binary, "@", S/binary>>.
+to_binary(#jid{luser = U, lserver = S, lresource = R}) ->
+    Bare = case U of <<>> -> S; _ -> <<U/binary, "@", S/binary>> end,
+    case R of <<>> -> Bare; _ -> <<Bare/binary, "/", R/binary>> end.

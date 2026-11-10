@@ -58,7 +58,8 @@ process_iq(Acc, From, #jid{lserver = Domain}, #iq{type = set, sub_el = El} = IQ,
     Result = try
         Request = jiffy:decode(exml_query:cdata(El), [return_maps]),
         true = maps:get(<<"v">>, Request) =:= 1,
-        true = byte_size(jiffy:encode(Request)) =< 40000,
+        %% Jiffy can return chunked iodata for larger (notably video SDP) JSON.
+        true = iolist_size(jiffy:encode(Request)) =< 40000,
         true = From#jid.lserver =:= Domain,
         case mnesia:transaction(fun() ->
             %% Domain-wide lock serializes eligibility checks, answers and revocations.
@@ -194,7 +195,7 @@ execute(D, U, F, #{<<"action">> := Action, <<"callId">> := Id} = Req) ->
             true_or_deny(selected(C, F) andalso maps:get(<<"stage">>, C) =:= <<"active">>, <<"not_active">>),
             family(D, maps:get(<<"caller">>, C), maps:get(<<"callee">>, C)),
             Payload = maps:get(<<"payload">>, Req),
-            true_or_deny(is_map(Payload) andalso byte_size(jiffy:encode(Payload)) < 35000, <<"invalid_signal">>),
+            true_or_deny(is_map(Payload) andalso iolist_size(jiffy:encode(Payload)) < 35000, <<"invalid_signal">>),
             Other = case F =:= maps:get(<<"callerFull">>, C) of
                 true -> maps:get(<<"calleeFull">>, C); false -> maps:get(<<"callerFull">>, C) end,
             {#{}, [{Other, #{<<"event">> => <<"signal">>, <<"callId">> => Id, <<"payload">> => Payload}}]};
@@ -294,7 +295,7 @@ deliver(D, Events) ->
         mongoose_router:route(mongoose_acc:new(From, jid:from_binary(Target), Packet, ?LOCATION))
     end, Events).
 element(Name, NS, Body) -> #xmlel{name = Name, attrs = #{<<"xmlns">> => NS},
-                               children = [#xmlcdata{content = jiffy:encode(Body)}]}.
+                               children = [#xmlcdata{content = iolist_to_binary(jiffy:encode(Body))}]}.
 bare(F) -> hd(binary:split(F, <<"/">>)).
 now_ms() -> erlang:system_time(millisecond).
 true_or_deny(true, _) -> ok;

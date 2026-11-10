@@ -16,5 +16,13 @@ exml_dir=$(erl +S 2:2 -noshell -eval 'io:format("~s", [code:lib_dir(exml)]), hal
 if [ -f "$exml_dir/src/exml_query.erl" ]; then
   erlc -I "$exml_dir/include" -o "$build" "$exml_dir/src/exml_query.erl"
 fi
-erlc -I "$MONGOOSE_SOURCE/include" -o "$build" "$root/test/"*.erl
-erl +S 2:2 -noshell -pa "$build" -eval 'case eunit:test([deenly_family_tests, deenly_signup_tests], [verbose]) of ok -> halt(0); _ -> halt(1) end.'
+for source in "$root/test/"*.erl; do
+  if [ "$(basename "$source")" = jiffy.erl ] && [ -n "${FAMILY_REAL_JIFFY_EBIN:-}" ]; then continue; fi
+  erlc -I "$MONGOOSE_SOURCE/include" -o "$build" "$source"
+done
+json_path=()
+if [ -n "${FAMILY_REAL_JIFFY_EBIN:-}" ]; then
+  [ -f "$FAMILY_REAL_JIFFY_EBIN/jiffy.beam" ] || { echo 'Real Jiffy beam not found.' >&2; exit 1; }
+  json_path=(-pa "$FAMILY_REAL_JIFFY_EBIN")
+fi
+erl +S 2:2 -noshell -pa "$build" "${json_path[@]}" -eval 'case eunit:test([deenly_family_tests, deenly_signup_tests], [verbose]) of ok -> halt(0); _ -> halt(1) end.'
