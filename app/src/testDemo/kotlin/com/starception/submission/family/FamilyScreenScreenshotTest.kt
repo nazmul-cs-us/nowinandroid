@@ -192,7 +192,7 @@ class FamilyScreenScreenshotTest {
     }
     @Test fun contactActionsAreAvailableFromTheAvatarStrip() {
         render(false, true)
-        compose.onNodeWithText("Amina").performClick()
+        compose.onNodeWithContentDescription("Contact details for Amina Khan").performClick()
         compose.onNodeWithContentDescription("Video call").assertExists()
         compose.onNodeWithContentDescription("Voice call").assertExists()
         compose.onNodeWithText("amina.khan@xmpp.starception.com").assertExists()
@@ -211,12 +211,27 @@ class FamilyScreenScreenshotTest {
         val me = "omar@xmpp.starception.com"; val peer = members.first().jid
         compose.setContent { NiaTheme(themeBrand = ThemeBrand.COASTAL, disableDynamicTheming = true) {
             FamilyScreenContent(FamilyUiState(me = me, connected = true, serviceReady = true, members = members, chatPeer = peer,
-                messages = listOf(FamilyChatMessage("one", peer, me, "Assalamu alaikum! How is everyone at home?", 1, 1000000),
-                    FamilyChatMessage("two", me, peer, "Wa alaikum assalam. All well, alhamdulillah 🌿", 2, 1060000)), chatDraft = "Shall we call after Maghrib?"))
+                messages = listOf(FamilyChatMessage("intro", me, peer, "Thanks, Amina.", 1, 1000000),
+                    FamilyChatMessage("one", peer, me, "Assalamu alaikum! How is everyone at home?", 2, 1060000),
+                    FamilyChatMessage("plan", peer, me, "We’re getting the family together tomorrow evening. Mum and Dad would love to see you. Can you come over after Maghrib?", 3, 1120000),
+                    FamilyChatMessage("two", me, peer, "Wa alaikum assalam. All well, alhamdulillah 🌿", 4, 1180000),
+                    FamilyChatMessage("three", me, peer, "We’d love to come. What time?", 5, 1190000),
+                    FamilyChatMessage("four", peer, me, "After Maghrib, insha’Allah.", 6, 4000000),
+                    FamilyChatMessage("five", me, peer, "I’ll call you when we leave.", 7, 4050000)), chatDraft = ""))
         } }
         compose.onNodeWithText("Assalamu alaikum! How is everyone at home?").assertExists()
         compose.onNodeWithContentDescription("Send message").assertExists()
         capture("chat-light")
+    }
+    @Test fun familyNavigationSwitchesBetweenChatsAndContactDetails() {
+        render(false, true)
+        compose.onNodeWithContentDescription("Family contacts").performClick()
+        compose.onNodeWithText("Contacts").assertExists()
+        compose.onNodeWithText("Amina Khan").performClick()
+        compose.onNodeWithText("FAMILY ACCOUNT").assertExists()
+        compose.onNodeWithContentDescription("Back to family").performClick()
+        compose.onNodeWithContentDescription("Family chats").performClick()
+        compose.onNodeWithText("Chats").assertExists()
     }
     @Test fun invitationIsACompactDismissibleSheet() {
         render(false, true)

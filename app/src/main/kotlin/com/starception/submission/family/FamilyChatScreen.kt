@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ internal fun FamilyChatContent(state: FamilyUiState, actions: FamilyActions) {
     val colors = MaterialTheme.colorScheme
     val brand = familyBrandColor()
     var details by remember(peer) { mutableStateOf(false) }
+    var more by remember(peer) { mutableStateOf(false) }
     val list = rememberLazyListState()
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     BackHandler { actions.closeChat() }
@@ -61,16 +63,16 @@ internal fun FamilyChatContent(state: FamilyUiState, actions: FamilyActions) {
     if (details) AlertDialog(onDismissRequest = { details = false }, title = { Text(callDisplayName(peer)) },
         text = { Text(peer) }, confirmButton = { TextButton(onClick = { details = false }) { Text("Done") } })
     Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        Row(Modifier.fillMaxWidth().height(66.dp).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(60.dp).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = actions.closeChat) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to family", tint = colors.primary) }
-            ContactAvatar(peer, 34, online = state.serviceReady && state.members.find { it.jid == peer }?.presence == "online")
+            ContactAvatar(peer, 30, online = state.serviceReady && state.members.find { it.jid == peer }?.presence == "online")
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                Text(callDisplayName(peer), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface, maxLines = 1)
+                Text(callDisplayName(peer), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.onSurface, maxLines = 1)
                 Text(when (state.members.find { it.jid == peer }?.presence) { "online" -> "Online"; "offline" -> "Offline"; else -> "Family member" }, fontSize = 10.sp, color = colors.onSurfaceVariant)
             }
-            IconButton(onClick = { actions.voice(peer) }, enabled = state.serviceReady && state.call == null, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.Call, "Voice call", Modifier.size(21.dp), tint = colors.primary) }
-            IconButton(onClick = { actions.video(peer) }, enabled = state.serviceReady && state.call == null, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.Videocam, "Video call", Modifier.size(22.dp), tint = colors.primary) }
-            IconButton(onClick = { details = true }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Info, "Contact details", Modifier.size(20.dp), tint = colors.primary) }
+            IconButton(onClick = { actions.voice(peer) }, enabled = state.serviceReady && state.call == null, modifier = Modifier.size(40.dp)) { Icon(Icons.Outlined.Call, "Voice call", Modifier.size(21.dp), tint = colors.primary) }
+            IconButton(onClick = { actions.video(peer) }, enabled = state.serviceReady && state.call == null, modifier = Modifier.size(40.dp)) { Icon(Icons.Outlined.Videocam, "Video call", Modifier.size(22.dp), tint = colors.primary) }
+            IconButton(onClick = { details = true }, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.Info, "Contact details", Modifier.size(20.dp), tint = colors.primary) }
         }
         HorizontalDivider(color = colors.outlineVariant.copy(alpha = .2f))
         LazyColumn(state = list, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
@@ -91,15 +93,15 @@ internal fun FamilyChatContent(state: FamilyUiState, actions: FamilyActions) {
                 Row(Modifier.fillMaxWidth().padding(top = if (newGroup && !newDay) 14.dp else 4.dp), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
                     verticalAlignment = Alignment.Bottom) {
                     if (!mine) {
-                        if (newGroup) ContactAvatar(peer, 26) else Spacer(Modifier.width(26.dp))
+                        if (newGroup) Box(Modifier.padding(bottom = 14.dp)) { ContactAvatar(peer, 26) } else Spacer(Modifier.width(26.dp))
                         Spacer(Modifier.width(7.dp))
                     }
-                    Column(Modifier.widthIn(max = 284.dp), horizontalAlignment = if (mine) Alignment.End else Alignment.Start) {
-                        Surface(shape = RoundedCornerShape(18.dp, 18.dp, if (mine) 4.dp else 18.dp, if (mine) 18.dp else 4.dp),
+                    Column(Modifier.widthIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp * .66f).coerceAtMost(288.dp)), horizontalAlignment = if (mine) Alignment.End else Alignment.Start) {
+                        Surface(shape = RoundedCornerShape(18.dp),
                             color = if (mine) brand else colors.primaryContainer) {
                             androidx.compose.foundation.text.selection.SelectionContainer {
                                 Text(message.text, modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
-                                    color = if (mine) androidx.compose.ui.graphics.Color.White else colors.onPrimaryContainer, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.sp)
+                                    color = if (mine) androidx.compose.ui.graphics.Color.White else colors.onPrimaryContainer, fontSize = 14.sp, lineHeight = 19.sp, letterSpacing = 0.sp)
                             }
                         }
                         Row(Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -117,12 +119,22 @@ internal fun FamilyChatContent(state: FamilyUiState, actions: FamilyActions) {
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box {
+                IconButton(onClick = { more = true }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.Add, "Conversation actions", Modifier.size(20.dp).background(colors.tertiaryContainer, CircleShape).padding(3.dp), tint = colors.onTertiaryContainer)
+                }
+                DropdownMenu(more, { more = false }) {
+                    DropdownMenuItem(text = { Text("Voice call") }, enabled = state.serviceReady && state.call == null, onClick = { more = false; actions.voice(peer) })
+                    DropdownMenuItem(text = { Text("Video call") }, enabled = state.serviceReady && state.call == null, onClick = { more = false; actions.video(peer) })
+                    DropdownMenuItem(text = { Text("Contact details") }, onClick = { more = false; details = true })
+                }
+            }
             androidx.compose.foundation.text.BasicTextField(state.chatDraft, actions.chatDraft, maxLines = 5,
                 textStyle = androidx.compose.ui.text.TextStyle(color = colors.onSurface, fontSize = 15.sp),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.primary),
-                modifier = Modifier.weight(1f).background(colors.surfaceContainerLow, RoundedCornerShape(26.dp)).padding(horizontal = 18.dp, vertical = 14.dp),
+                modifier = Modifier.weight(1f).background(colors.surfaceContainerLow, RoundedCornerShape(26.dp)).padding(horizontal = 12.dp, vertical = 12.dp),
                 decorationBox = { field -> Box { if (state.chatDraft.isEmpty()) Text("Message…", color = colors.onSurfaceVariant, fontSize = 15.sp); field() } })
-            IconButton(onClick = actions.sendMessage, enabled = state.connected && !state.chatSending && state.chatDraft.isNotBlank(), modifier = Modifier.size(48.dp)) {
+            IconButton(onClick = actions.sendMessage, enabled = state.connected && !state.chatSending && state.chatDraft.isNotBlank(), modifier = Modifier.size(40.dp)) {
                 if (state.chatSending) CircularProgressIndicator(Modifier.size(20.dp), color = colors.primary, strokeWidth = 2.dp)
                 else Icon(Icons.AutoMirrored.Filled.Send, "Send message", tint = colors.primary)
             }

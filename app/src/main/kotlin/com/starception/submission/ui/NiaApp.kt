@@ -314,6 +314,7 @@ fun NiaApp(
                     deepLinkCourseId = deepLinkCourseId,
                     familyUnreadCount = familyClient?.state?.collectAsStateWithLifecycle()?.value?.unreadCount ?: 0,
                     familyChatOpen = familyClient?.state?.collectAsStateWithLifecycle()?.value?.chatPeer != null,
+                    familySignedIn = familyClient?.state?.collectAsStateWithLifecycle()?.value?.let { it.connected || it.reconnecting } == true,
                 )
             }
 
@@ -359,6 +360,7 @@ internal fun NiaAppContent(
     deepLinkCourseId: String? = null,
     familyUnreadCount: Int = 0,
     familyChatOpen: Boolean = false,
+    familySignedIn: Boolean = false,
 ) {
     val contentUnreadDestinations by appState.topLevelDestinationsWithUnreadResources
         .collectAsStateWithLifecycle()
@@ -371,7 +373,7 @@ internal fun NiaAppContent(
     // Check if we should hide the bottom navigation bar (for detail screens)
     val insightImmersive by InsightImmersiveBus.immersive.collectAsStateWithLifecycle()
     val shouldHideBottomBar = appState.shouldHideBottomBar || insightImmersive ||
-        (familyChatOpen && appState.currentTopLevelDestination == TopLevelDestination.FAMILY)
+        ((familyChatOpen || familySignedIn) && appState.currentTopLevelDestination == TopLevelDestination.FAMILY)
 
     // Status bar visibility: show on parent tabs, hide on detail screens and Settings
     val view = LocalView.current

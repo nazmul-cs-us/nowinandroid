@@ -85,3 +85,20 @@ After reviewing the uploaded 24-second reference video and stills, the contact l
 ### Foreground session recovery
 
 The previous restoration path ran on app foreground only; a socket closing while the app stayed open could leave the sign-in form visible. Both native clients now retry saved credentials on transient foreground loss, back off to 30 seconds, probe on network restoration and detect half-open sockets through failed heartbeats. During recovery the Family list/chat stays visible; offline users are not marked online and call controls remain disabled. Explicit sign-out and rejected credentials suppress recovery. Shared policy tests cover these guards and bounded backoff; a Compose check keeps the reconnecting state out of the login form. Network handoff and long idle sessions still need real-device validation on Android and iPhone.
+
+## Reference composition pass
+
+The earlier pass retained too much of the original app structure. The reference uses a dedicated chat navigation bar and a floating video tray; matching its header color alone did not produce the same composition.
+
+| Reference detail | Implementation in this pass |
+| --- | --- |
+| Dedicated chat footer with a raised center action | Signed-in Family replaces the app-wide navigation with Contacts, Chats, Invite, Notifications and Family settings. Back to app remains in settings/menu. Signed-out Family keeps the app navigation. |
+| Compact unlabeled avatar strip | Smaller circles with explicit accessible contact labels; profile details remain one tap away. |
+| Neutral compact typography | Android Family uses platform sans-serif with zero default tracking, while other app typography is preserved. Native iOS uses its existing system font. Colors continue to derive from the selected Deenly theme. |
+| Narrow rounded conversation bubbles | Width is bounded relative to the phone, with bottom-aligned sender avatars, external timestamps, a slim composer and a functional conversation-actions menu. The additional menu offers supported call/contact actions. |
+| End-call button above the translucent control tray | Hang-up floats over the tray edge. Real local and remote participant tiles replace the oversized Family-video-call text panel. The selected ICE route remains visible below the timer. |
+| Tall contact poster and feature footer | The full-page contact profile uses the same feature navigation and a theme-derived poster fallback for accounts without a photo. |
+
+The longer conversation screenshot uses realistic family-message fixtures to exercise multiple bubble lengths, sender groups and timestamps. These messages are test data, never inserted into real accounts. The reference includes photographs, voice recordings and multiple participants; the current private service supplies account initials, text messages and one-to-one calls. The implementation displays those real capabilities without fabricated profiles or group-call controls.
+
+The renders include Family's feature footer. Android's app-wide bar is suppressed while signed into Family; native iOS hides its app tab bar on these pages. Navigation actions, contact opening/back, call controls, invite dismissal, notifications and screenshot baselines are checked with the real Compose UI. Native iOS syntax is checked separately; Xcode and a signed-device pass remain necessary.

@@ -1,6 +1,6 @@
 # Family chat and inbox
 
-Android and iOS support one-to-one text conversations between **accepted Family members**. The server derives the sender from authenticated XMPP; it checks the current relationship on every send, history request, and read cursor update. Pending invitations never grant chat access. Membership is invite-and-accept; Deenly does not independently verify mahram relationships.
+Android and iOS support one-to-one text conversations between **accepted Family members**. Signed-in Family has its own Contacts/Chats/Invite/Notifications/Settings footer, replacing the app-wide navigation while in this feature. Return through Back to app in Family settings/menu. The server derives the sender from authenticated XMPP; it checks the current relationship on every send, history request, and read cursor update. Pending invitations never grant chat access. Membership is invite-and-accept; Deenly does not independently verify mahram relationships.
 
 Tap an accepted contact row to open chat. Avatar shortcuts open the full-page contact profile with voice/video actions. Rows show a short message preview, local timestamp, and unread count, ordered by the latest conversation. The conversation has earlier-message pagination, selectable text, a multiline composer, and voice/video shortcuts. Sending clears the draft only after server acknowledgement; retries of the same failed draft reuse the message UUID. An acknowledgement means the server stored the message, not that another person read it.
 

@@ -70,6 +70,8 @@ struct FamilyView: View {
     @State private var passwordVisible = false
     @State private var creatingAccount = false
     @State private var confirmation = ""
+    @State private var directory = false
+    @State private var settings = false
     @State private var invitations = false
     @State private var inviting = false
     @State private var inbox = false
@@ -124,10 +126,9 @@ struct FamilyView: View {
             }
             .overlay(alignment: .bottom) {
                 if store.signedIn {
-                    Button { inviting = true } label: {
-                        Image(systemName: "plus").font(.system(size: 24, weight: .medium)).foregroundStyle(colors.onTertiary)
-                            .frame(width: 56, height: 56).background(colors.tertiary, in: Circle()).shadow(color: .black.opacity(0.12), radius: 12, y: 5)
-                    }.accessibilityLabel("Invite a member").padding(.bottom, 24)
+                    FamilyFeatureBar(directory: directory, unread: store.unreadCount,
+                        contacts: { directory = true; invitations = false }, chats: { directory = false; invitations = false },
+                        invite: { inviting = true }, alerts: { inbox = true; store.acknowledgeNotifications() }, settings: { settings = true })
                 }
             }
         }
@@ -135,6 +136,7 @@ struct FamilyView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
 
         .toolbar(store.signedIn ? .hidden : .visible, for: .navigationBar)
+        .toolbar(store.signedIn ? .hidden : .visible, for: .tabBar)
         .sheet(item: Binding(get: { store.webPairing }, set: { _ in store.dismissWebHelper() })) { pairing in
             FamilyCallAlertsSetup(pairing: pairing)
         }
@@ -142,6 +144,7 @@ struct FamilyView: View {
             FamilyChatView()
         }
         .sheet(isPresented: $inbox) { notificationInbox }
+        .sheet(isPresented: $settings) { familySettings }
         .refreshable { store.refresh() }
         .onAppear { suggestPeer(); NativeAppearanceBridge.shared.setCallAppearance(lightIcons: store.signedIn || colorScheme == .dark) }
         .onDisappear { if store.call == nil { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: nil) } }
@@ -165,24 +168,15 @@ struct FamilyView: View {
     private var contactHeader: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18)).frame(width: 24, height: 44) }.accessibilityLabel("Back")
-                Text("Family").font(.system(size: 26, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading)
-                Button { inbox = true; store.acknowledgeNotifications() } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "bell").frame(width: 40, height: 44)
-                        if store.unreadCount > 0 {
-                            Text("\(min(99, store.unreadCount))").font(.system(size: 9, weight: .bold)).foregroundStyle(colors.onButton)
-                                .padding(3).background(colors.accent, in: Capsule())
-                        }
-                    }
-                }.accessibilityLabel("Family notifications")
+                Text(directory ? "Contacts" : "Chats").font(.system(size: 24, weight: .medium)).frame(maxWidth: .infinity, alignment: .leading)
                 Menu {
                     Button(requests.isEmpty ? "Invitations" : "Invitations · \(requests.count)") { invitations = true }
                     Button { store.requestWebHelper() } label: { Label("Temporary call alerts", systemImage: "bell.badge") }
                     Button { store.refresh() } label: { Label("Refresh family", systemImage: "arrow.clockwise") }
+                    Button("Back to app") { dismiss() }
                     Button(role: .destructive) { store.disconnect() } label: { Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right") }
-                } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)).frame(width: 32, height: 44) }.accessibilityLabel("Family settings")
-            }.foregroundStyle(.white).frame(height: 64).padding(.horizontal, 24)
+                } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)).frame(width: 32, height: 44) }.accessibilityLabel("Family menu")
+            }.foregroundStyle(.white).frame(height: 64).padding(.horizontal, 20).padding(.top, 24)
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.white.opacity(0.7))
                 TextField("", text: $search, prompt: Text("Search your family").foregroundColor(.white.opacity(0.65)))
@@ -191,16 +185,14 @@ struct FamilyView: View {
             }.padding(.horizontal, 14).frame(height: 44).background(.white.opacity(0.1), in: Capsule()).padding(.horizontal, 24).padding(.bottom, 18)
             if !family.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 18) {
+                    HStack(alignment: .top, spacing: 14) {
                         ForEach(family) { member in
                             Button { selected = member } label: {
-                                VStack(spacing: 6) {
-                                    FamilyContactAvatar(jid: member.jid, size: 46, online: store.serviceReady && member.presence == "online")
-                                    Text(familyName(member.jid).components(separatedBy: " ")[0]).font(.system(size: 10)).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
-                                }.frame(width: 48)
+                                FamilyContactAvatar(jid: member.jid, size: 44, online: store.serviceReady && member.presence == "online")
+                                    .accessibilityElement(children: .ignore).accessibilityLabel("Contact details for \(familyName(member.jid))")
                             }
                         }
-                    }.padding(.horizontal, 24).padding(.bottom, 20)
+                    }.padding(.horizontal, 20).padding(.bottom, 24)
                 }.buttonStyle(.plain)
             }
         }.background(colors.brand)
@@ -230,20 +222,20 @@ struct FamilyView: View {
     private func memberRow(_ member: FamilyMemberRow) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 14) {
-                Button { if member.status == "accepted" { store.openChat(member.jid) } else { selected = member } } label: {
+                Button { if member.status == "accepted" && !directory { store.openChat(member.jid) } else { selected = member } } label: {
                     HStack(spacing: 14) {
                         FamilyContactAvatar(jid: member.jid, size: 46, online: member.status == "accepted" && store.serviceReady && member.presence == "online")
                         VStack(alignment: .leading, spacing: 4) {
                             Text(familyName(member.jid)).font(.system(size: 15, weight: .medium)).foregroundStyle(colors.ink).lineLimit(1)
                             let presence = store.signedIn && store.serviceReady ? member.presence : "unknown"
                             HStack(spacing: 6) {
-                                Text(store.conversations.first(where: { $0.peer == member.jid })?.lastMessage?.text ?? (member.status == "incoming" ? "Invited you to join" : member.status == "outgoing" ? "Waiting for acceptance" : presence == "online" ? "Online" : presence == "offline" ? "Offline" : "Status unavailable"))
+                                Text((directory ? nil : store.conversations.first(where: { $0.peer == member.jid })?.lastMessage?.text) ?? (member.status == "incoming" ? "Invited you to join" : member.status == "outgoing" ? "Waiting for acceptance" : presence == "online" ? "Online" : presence == "offline" ? "Offline" : "Status unavailable"))
                                     .font(.system(size: 12)).foregroundStyle(colors.muted).lineLimit(1)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain)
-                if let summary = store.conversations.first(where: { $0.peer == member.jid }) {
+                if !directory, let summary = store.conversations.first(where: { $0.peer == member.jid }) {
                     VStack(alignment: .trailing, spacing: 6) {
                         if let last = summary.lastMessage {
                             Text(Date(timeIntervalSince1970: Double(last.createdAt) / 1000), style: .time).font(.system(size: 10)).foregroundStyle(colors.muted)
@@ -253,6 +245,10 @@ struct FamilyView: View {
                                 .padding(6).background(colors.accent, in: Capsule())
                         }
                     }
+                }
+                if directory && member.status == "accepted" {
+                    Button { store.startCall(member.jid, video: false) } label: { Image(systemName: "phone").foregroundStyle(colors.accent).frame(width: 44, height: 44) }
+                        .disabled(!canCall).accessibilityLabel("Call \(familyName(member.jid))")
                 }
                 if member.status != "accepted" {
                     Button { selected = member } label: { Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(colors.muted).frame(width: 32, height: 44) }
@@ -267,6 +263,19 @@ struct FamilyView: View {
                 }.padding(.leading, 88).padding(.bottom, 14)
             }
         }
+    }
+    private var familySettings: some View {
+        NavigationStack {
+            List {
+                Section("Family account") { Text(store.me).textSelection(.enabled) }
+                Button("Invitations") { settings = false; invitations = true }
+                Button("Temporary call alerts") { settings = false; store.requestWebHelper() }
+                Button("Refresh family") { settings = false; store.refresh() }
+                Button("Back to app") { settings = false; dismiss() }
+                Button("Sign out", role: .destructive) { settings = false; store.disconnect() }
+            }.navigationTitle("Family settings").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { settings = false } } }
+        }.tint(colors.accent).presentationDetents([.medium, .large])
     }
     private var notificationInbox: some View {
         NavigationStack {
@@ -380,21 +389,21 @@ struct FamilyView: View {
         }.presentationDetents([.height(380), .large]).presentationDragIndicator(.visible)
     }
     private func contactProfile(_ member: FamilyMemberRow) -> some View {
-        GeometryReader { _ in
+        GeometryReader { geometry in
         ScrollView {
             VStack(spacing: 0) {
                 ZStack(alignment: .bottomLeading) {
-                    colors.brand
-                    FamilyContactAvatar(jid: member.jid, size: 96).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).padding(.leading, 24).padding(.top, 48)
+                    LinearGradient(colors: [colors.brand, colors.accent.opacity(0.5), colors.brand], startPoint: .topLeading, endPoint: .bottomTrailing).background(colors.brand)
+                    FamilyContactAvatar(jid: member.jid, size: 160).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center).padding(.bottom, 32)
                     VStack(alignment: .leading, spacing: 8) {
                         Text(familyName(member.jid)).font(.system(size: 24, weight: .semibold)).foregroundStyle(.white)
                         Text(member.status == "accepted" ? (store.signedIn && store.serviceReady && store.members.first(where: { $0.jid == member.jid })?.presence == "online" ? "Online" : "Family member") : "Family invitation")
                             .font(.system(size: 12)).foregroundStyle(.white.opacity(0.8))
-                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).padding(.leading, 140).padding(.trailing, 24).padding(.top, 48)
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading).padding(24)
                     Button { selected = nil } label: {
                         Image(systemName: "arrow.left").font(.system(size: 20)).foregroundStyle(.white).frame(width: 44, height: 44)
                     }.accessibilityLabel("Back to family").frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(.top, 48).padding(.leading, 12)
-                }.frame(height: 240)
+                }.frame(height: min(420, max(260, geometry.size.height * 0.52)))
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("FAMILY ACCOUNT").font(.system(size: 10, weight: .medium)).tracking(1.5).foregroundStyle(colors.muted)
@@ -423,6 +432,14 @@ struct FamilyView: View {
                 }.padding(24)
             }
         }.background(colors.panel).ignoresSafeArea(edges: .top)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                FamilyFeatureBar(directory: true, unread: store.unreadCount,
+                    contacts: { selected = nil; directory = true },
+                    chats: { pendingProfileAction = { store.openChat(member.jid) }; selected = nil },
+                    invite: { pendingProfileAction = { inviting = true }; selected = nil },
+                    alerts: { pendingProfileAction = { inbox = true; store.acknowledgeNotifications() }; selected = nil },
+                    settings: { pendingProfileAction = { settings = true }; selected = nil })
+            }
         }.onAppear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: true) }
     }
 
@@ -676,43 +693,47 @@ private struct FamilyCallView: View {
                     VStack(spacing: 6) {
                         Text(familyName(call.peer(store.me))).font(.system(size: 23, weight: .semibold)).foregroundStyle(.white)
                         callStatus(incoming: false, stage: call.stage)
+                        Text(FamilyConnectionRoute().label(route: store.connectionRoute)).font(.system(size: 10)).foregroundStyle(.white.opacity(0.72))
                     }.padding(.top, 24)
                 }.clipShape(RoundedRectangle(cornerRadius: 30))
                 Spacer().frame(height: 116)
             }
-            VStack(spacing: 16) {
-                HStack {
-                    videoButton(store.muted ? "mic.slash" : "mic", title: store.muted ? "Unmute" : "Mute", selected: store.muted) { store.mute() }
-                    Spacer(minLength: 0)
-                    videoButton(store.cameraEnabled ? "video" : "video.slash", title: "Camera", selected: !store.cameraEnabled) { store.camera() }
-                    Spacer(minLength: 0)
-                    videoButton("arrow.triangle.2.circlepath.camera", title: "Flip", enabled: store.cameraEnabled) { store.switchCamera() }
-                    Spacer(minLength: 0)
-                    videoButton("speaker.wave.2", title: "Speaker", selected: store.speakerEnabled) { store.speaker() }
-                    Spacer(minLength: 0)
-                    Button { store.hangup() } label: {
-                        Image(systemName: "phone.down.fill").font(.system(size: 23)).foregroundStyle(colors.onError)
-                            .frame(width: 52, height: 52).background(colors.error, in: Circle())
-                    }.accessibilityLabel("End call")
-                }
-                HStack(spacing: 16) {
-                    ZStack(alignment: .bottomLeading) {
-                        colors.field
-                        if store.cameraEnabled { FamilyVideoRenderer(track: media.localVideo, mirror: true) }
-                        else { Image(systemName: "video.slash").foregroundStyle(colors.muted).frame(maxWidth: .infinity, maxHeight: .infinity) }
-                        Text("You").font(.system(size: 10)).foregroundStyle(.white).padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(.black.opacity(0.4), in: Capsule()).padding(8)
-                    }.frame(width: 90, height: 120).clipShape(RoundedRectangle(cornerRadius: 20))
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Family video call").font(.system(size: 15, weight: .semibold)).foregroundStyle(colors.ink)
-                        Text(store.mediaConnected ? "Connected" : "Connecting…").font(.system(size: 12)).foregroundStyle(colors.muted)
-                        Text(FamilyConnectionRoute().label(route: store.connectionRoute)).font(.system(size: 11)).foregroundStyle(colors.accent)
-                        if let message = store.callMessage { Text(message).font(.system(size: 11)).foregroundStyle(colors.error) }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }.padding(16).background(colors.panel.opacity(0.84)).background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 28)).shadow(color: .black.opacity(0.12), radius: 12, y: 5)
-                .padding(.horizontal, 12).padding(.bottom, 8)
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 10) {
+                    HStack {
+                        videoButton(store.muted ? "mic.slash" : "mic", title: store.muted ? "Unmute" : "Mute", selected: store.muted) { store.mute() }
+                        Spacer(minLength: 0)
+                        videoButton(store.cameraEnabled ? "video" : "video.slash", title: "Camera", selected: !store.cameraEnabled) { store.camera() }
+                        Spacer(minLength: 0)
+                        videoButton("arrow.triangle.2.circlepath.camera", title: "Flip", enabled: store.cameraEnabled) { store.switchCamera() }
+                        Spacer(minLength: 0)
+                        videoButton("speaker.wave.2", title: "Speaker", selected: store.speakerEnabled) { store.speaker() }
+                    }.padding(.trailing, 60)
+                    HStack(spacing: 14) {
+                        VStack(spacing: 6) {
+                            ZStack {
+                                colors.field
+                                if store.cameraEnabled { FamilyVideoRenderer(track: media.localVideo, mirror: true) }
+                                else { Image(systemName: "video.slash").foregroundStyle(colors.muted) }
+                            }.frame(width: 110, height: 106).clipShape(RoundedRectangle(cornerRadius: 16))
+                            Text("You").font(.system(size: 11)).foregroundStyle(colors.ink)
+                        }
+                        VStack(spacing: 6) {
+                            VStack(spacing: 8) {
+                                FamilyContactAvatar(jid: call.peer(store.me), size: 42)
+                                Text(store.mediaConnected ? "Connected" : "Connecting…").font(.system(size: 9)).foregroundStyle(.white.opacity(0.8))
+                            }.frame(width: 110, height: 106).background(colors.brand, in: RoundedRectangle(cornerRadius: 16))
+                            Text(familyName(call.peer(store.me)).components(separatedBy: " ")[0]).font(.system(size: 11)).foregroundStyle(colors.ink)
+                        }
+                    }.frame(maxWidth: .infinity)
+                    if let message = store.callMessage { Text(message).font(.system(size: 11)).foregroundStyle(colors.error) }
+                }.padding(12).background(colors.panel.opacity(0.65)).background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 26)).shadow(color: .black.opacity(0.1), radius: 8, y: 4).padding(.top, 28)
+                Button { store.hangup() } label: {
+                    Image(systemName: "phone.down.fill").font(.system(size: 23)).foregroundStyle(colors.onError)
+                        .frame(width: 56, height: 56).background(colors.error, in: Circle())
+                }.accessibilityLabel("End call").padding(.trailing, 10)
+            }.padding(.horizontal, 12).padding(.bottom, 8)
         }.padding(12)
     }
     private func videoButton(_ symbol: String, title: String, selected: Bool = false, enabled: Bool = true, action: @escaping () -> Void) -> some View {
@@ -856,6 +877,14 @@ private struct FamilyChatView: View {
                 }.padding(.horizontal, 18).padding(.vertical, 8).background(colors.panel)
             }
             HStack(alignment: .bottom, spacing: 10) {
+                Menu {
+                    Button("Voice call") { store.startCall(peer, video: false) }.disabled(!store.serviceReady || store.call != nil)
+                    Button("Video call") { store.startCall(peer, video: true) }.disabled(!store.serviceReady || store.call != nil)
+                    Button("Contact details") { details = true }
+                } label: {
+                    Image(systemName: "plus").font(.system(size: 16, weight: .medium)).foregroundStyle(colors.onTertiary)
+                        .frame(width: 28, height: 28).background(colors.tertiary, in: Circle()).frame(width: 36, height: 40)
+                }.accessibilityLabel("Conversation actions")
                 TextField("Message", text: $store.chatDraft, axis: .vertical).lineLimit(1...5)
                     .font(.system(size: 15)).padding(14).background(colors.field, in: RoundedRectangle(cornerRadius: 24))
                 Button { store.sendMessage() } label: {
@@ -875,7 +904,7 @@ private struct FamilyChatView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 8) {
-                    FamilyContactAvatar(jid: peer, size: 30)
+                    FamilyContactAvatar(jid: peer, size: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(familyName(peer)).font(.system(size: 15, weight: .semibold)).foregroundStyle(colors.ink).lineLimit(1)
                         Text(store.members.first(where: { $0.jid == peer })?.presence == "online" ? "Online" : "Family member")
@@ -908,7 +937,7 @@ private struct FamilyChatView: View {
             }
             HStack(alignment: .bottom, spacing: 7) {
                 if mine { Spacer(minLength: 48) }
-                else if newGroup { FamilyContactAvatar(jid: peer, size: 26) }
+                else if newGroup { FamilyContactAvatar(jid: peer, size: 26).padding(.bottom, 14) }
                 else { Color.clear.frame(width: 26, height: 1) }
                 VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
                     Text(message.text).font(.system(size: 14)).textSelection(.enabled).lineSpacing(3)
@@ -919,9 +948,46 @@ private struct FamilyChatView: View {
                         Text(date, style: .time).font(.system(size: 9)).foregroundStyle(colors.muted)
                         if mine { Image(systemName: "checkmark").font(.system(size: 9)).foregroundStyle(colors.accent).accessibilityLabel("Saved to server") }
                     }.padding(.horizontal, 4)
-                }
+                }.frame(maxWidth: 260, alignment: mine ? .trailing : .leading)
                 if !mine { Spacer(minLength: 48) }
             }.padding(.top, newGroup && !newDay ? 12 : 0)
         }.frame(maxWidth: .infinity)
+    }
+}
+
+private struct FamilyFeatureBar: View {
+    let directory: Bool
+    let unread: Int
+    let contacts: () -> Void
+    let chats: () -> Void
+    let invite: () -> Void
+    let alerts: () -> Void
+    let settings: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var appearance = FamilyAppearance.shared
+    private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
+    var body: some View {
+        ZStack(alignment: .top) {
+            HStack {
+                barButton("person.2", title: "Family contacts", active: directory, action: contacts)
+                Spacer(minLength: 0)
+                barButton("bubble.left", title: "Family chats", active: !directory, action: chats)
+                Spacer().frame(width: 80)
+                ZStack(alignment: .topTrailing) {
+                    barButton("bell", title: "Family notifications", active: false, action: alerts)
+                    if unread > 0 { Text("\(min(unread, 99))").font(.system(size: 9, weight: .bold)).foregroundStyle(colors.onButton).padding(3).background(colors.accent, in: Capsule()) }
+                }
+                Spacer(minLength: 0)
+                barButton("gearshape", title: "Family settings", active: false, action: settings)
+            }.padding(.horizontal, 24).padding(.top, 24).frame(height: 92)
+            Button(action: invite) {
+                Image(systemName: "plus").font(.system(size: 26, weight: .medium)).foregroundStyle(colors.onTertiary)
+                    .frame(width: 64, height: 64).background(colors.tertiary, in: Circle())
+            }.accessibilityLabel("Invite a member")
+        }.frame(maxWidth: .infinity).background(colors.panel.ignoresSafeArea(edges: .bottom))
+    }
+    private func barButton(_ symbol: String, title: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: symbol).font(.system(size: 22)).foregroundStyle(colors.accent.opacity(active ? 1 : 0.4)).frame(width: 44, height: 44) }
+            .accessibilityLabel(title)
     }
 }
