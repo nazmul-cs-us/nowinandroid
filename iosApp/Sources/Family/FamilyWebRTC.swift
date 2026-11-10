@@ -10,6 +10,7 @@ import Shared
     @Published private(set) var remoteVideo: RTCVideoTrack?
     var onSignal: (([String: Any]) -> Void)?
     var onConnected: ((Bool) -> Void)?
+    var onRoute: ((String) -> Void)?
     var onFailure: ((String) -> Void)?
     private static let factory: RTCPeerConnectionFactory = {
         RTCInitializeSSL()
@@ -23,6 +24,9 @@ import Shared
     private var pendingCandidates: [RTCIceCandidate] = []
     private var hasRemoteDescription = false
     private var epoch = 0
+    private var routeTask: Task<Void, Never>?
+    private var routeGeneration = 0
+    private let routeClassifier = FamilyConnectionRoute()
     private var ownsAudio = false
     private var ownsActivation = false
     private var previousCategory: AVAudioSession.Category?
@@ -189,6 +193,7 @@ import Shared
     func speaker(_ enabled: Bool) { try? AVAudioSession.sharedInstance().overrideOutputAudioPort(enabled ? .speaker : .none) }
     func close(preservePreview: Bool = false) {
         epoch += 1
+        stopRouteStats()
         if !preservePreview { capturer?.stopCapture(); capturer = nil; cameraDevice = nil; cameraStarted = false; localVideo = nil }
         peer?.close(); peer = nil; microphone = nil; remoteVideo = nil
         pendingCandidates.removeAll(); hasRemoteDescription = false
@@ -210,6 +215,38 @@ import Shared
         FamilyAudioSession.shared.setActive(active: false)
         onConnected?(false)
     }
+    private func stopRouteStats() {
+        routeGeneration += 1
+        routeTask?.cancel(); routeTask = nil
+        onRoute?("unknown")
+    }
+    private func startRouteStats(_ connection: RTCPeerConnection) {
+        guard routeTask == nil else { return }
+        let token = epoch, generation = routeGeneration
+        let fields = ["selectedCandidatePairId", "dtlsState", "state", "localCandidateId",
+                      "remoteCandidateId", "candidateType", "selected", "nominated"]
+        routeTask = Task { [weak self, weak connection] in
+            while !Task.isCancelled {
+                guard let self, let connection, self.peer === connection, self.epoch == token else { return }
+                connection.statistics { [weak self, weak connection] report in
+                    let rows: [[String: Any]] = report.statistics.values.compactMap { stat in
+                        guard ["transport", "candidate-pair", "local-candidate", "remote-candidate"].contains(stat.type) else { return nil }
+                        var row: [String: Any] = ["id": stat.id, "type": stat.type]
+                        for field in fields { if let value = stat.values[field] { row[field] = value } }
+                        return row
+                    }
+                    guard let data = try? JSONSerialization.data(withJSONObject: rows),
+                          let text = String(data: data, encoding: .utf8) else { return }
+                    Task { @MainActor [weak self, weak connection] in
+                        guard let self, let connection, self.peer === connection, self.epoch == token,
+                              self.routeGeneration == generation else { return }
+                        self.onRoute?(self.routeClassifier.classify(report: text))
+                    }
+                }
+                do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return }
+            }
+        }
+    }
     private enum MediaError: Error { case negotiation, camera }
 }
 
@@ -227,6 +264,8 @@ extension FamilyWebRTC: RTCPeerConnectionDelegate {
         Task { @MainActor in
             guard peerConnection === peer else { return }
             onConnected?(newState == .connected || newState == .completed)
+            if newState == .connected || newState == .completed { startRouteStats(peerConnection) }
+            else { stopRouteStats() }
             if newState == .failed { onFailure?("Could not connect media. Check your network and relay configuration.") }
         }
     }

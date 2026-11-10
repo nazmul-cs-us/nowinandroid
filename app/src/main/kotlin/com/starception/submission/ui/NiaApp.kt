@@ -249,6 +249,11 @@ fun NiaApp(
     familyClient: com.starception.submission.family.FamilyClient? = null,
 ) {
     if (familyClient != null) com.starception.submission.family.FamilyCallOverlay(familyClient)
+    val selectedDestination = appState.currentTopLevelDestination
+    LaunchedEffect(selectedDestination) {
+        if (selectedDestination == TopLevelDestination.FOR_YOU && !com.starception.submission.family.FamilyRollout.showForYou())
+            appState.navigateToTopLevelDestination(TopLevelDestination.HOME)
+    }
     val familyOwnsAudio by com.starception.submission.family.FamilyAudioSession.state.collectAsStateWithLifecycle()
     LaunchedEffect(familyOwnsAudio) {
         if (familyOwnsAudio && mainViewModel?.globalMedia?.controllerState?.value?.playback?.isPlaying == true) {
@@ -307,6 +312,8 @@ fun NiaApp(
                     windowAdaptiveInfo = windowAdaptiveInfo,
                     mainViewModel = mainViewModel,
                     deepLinkCourseId = deepLinkCourseId,
+                    familyUnreadCount = familyClient?.state?.collectAsStateWithLifecycle()?.value?.unreadCount ?: 0,
+                    familyChatOpen = familyClient?.state?.collectAsStateWithLifecycle()?.value?.chatPeer != null,
                 )
             }
 
@@ -350,9 +357,12 @@ internal fun NiaAppContent(
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
     mainViewModel: MainActivityViewModel? = null,
     deepLinkCourseId: String? = null,
+    familyUnreadCount: Int = 0,
+    familyChatOpen: Boolean = false,
 ) {
-    val unreadDestinations by appState.topLevelDestinationsWithUnreadResources
+    val contentUnreadDestinations by appState.topLevelDestinationsWithUnreadResources
         .collectAsStateWithLifecycle()
+    val unreadDestinations = contentUnreadDestinations + if (familyUnreadCount > 0) setOf(TopLevelDestination.FAMILY) else emptySet()
     val currentDestination = appState.currentDestination
     // Check if we're in landscape mode
     val configuration = LocalConfiguration.current
@@ -360,7 +370,8 @@ internal fun NiaAppContent(
 
     // Check if we should hide the bottom navigation bar (for detail screens)
     val insightImmersive by InsightImmersiveBus.immersive.collectAsStateWithLifecycle()
-    val shouldHideBottomBar = appState.shouldHideBottomBar || insightImmersive
+    val shouldHideBottomBar = appState.shouldHideBottomBar || insightImmersive ||
+        (familyChatOpen && appState.currentTopLevelDestination == TopLevelDestination.FAMILY)
 
     // Status bar visibility: show on parent tabs, hide on detail screens and Settings
     val view = LocalView.current

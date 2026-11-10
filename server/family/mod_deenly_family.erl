@@ -3,7 +3,7 @@
 -behaviour(gen_mod).
 -compile({no_auto_import, [put/2]}).
 -export([start/2, stop/1, supported_features/0, config_spec/0, process_iq/5,
-         hooks/1, filter_packet/3, sweep/1, presence_removed/3]).
+         hooks/1, filter_packet/3, sweep/1, presence_removed/3, remove_user/3]).
 -include("jlib.hrl").
 -include("mongoose_logger.hrl").
 -ifdef(TEST).
@@ -24,6 +24,7 @@ start(Host, _) ->
     end,
     ok = mnesia:wait_for_tables([?TABLE], 10000),
     ok = mod_deenly_family_presence:init(),
+    ok = mod_deenly_family_chat:init(),
     mod_deenly_family_signup:start(Host),
     {ok, Timer} = timer:apply_interval(5000, ?MODULE, sweep, [Host]),
     persistent_term:put({?MODULE, Host}, Timer),
@@ -36,6 +37,7 @@ stop(Host) ->
     gen_iq_handler:remove_iq_handler_for_domain(Host, ?NS, ejabberd_local).
 hooks(Host) -> [{c2s_stream_features, Host, fun mod_deenly_family_signup:features/3, #{}, 50},
                 {user_send_xmlel, Host, fun mod_deenly_family_signup:packet/3, #{}, 25},
+                {remove_user, Host, fun ?MODULE:remove_user/3, #{}, 60},
                 {filter_local_packet, Host, fun ?MODULE:filter_packet/3, #{}, 5},
                 {unset_presence, Host, fun ?MODULE:presence_removed/3, #{}, 60},
                 {sm_remove_connection, Host, fun ?MODULE:presence_removed/3, #{}, 60}].
@@ -44,6 +46,19 @@ presence_removed(Acc, #{jid := #jid{lserver = D} = J}, _) ->
     case mnesia:transaction(fun() ->
         mnesia:read(?TABLE, {lock, D}, write),
         mod_deenly_family_presence:remove(D, U, F)
+    end) of {atomic, Events} -> deliver(D, Events); _ -> ok end,
+    {ok, Acc}.
+
+remove_user(Acc, #{jid := #jid{lserver = D} = J}, _) ->
+    U = bare(jid:to_binary(J)),
+    case mnesia:transaction(fun() ->
+        mnesia:read(?TABLE, {lock, D}, write),
+        Peers = members(D, U),
+        [begin P = maps:get(<<"jid">>, M), mod_deenly_family_chat:revoke(D, U, P),
+            mnesia:delete({?TABLE, family_key(D, U, P)}), mod_deenly_family_presence:revoke(D, U, P)
+         end || M <- Peers],
+        mod_deenly_family_chat:purge(D, U),
+        [{maps:get(<<"jid">>, M), #{<<"event">> => <<"family">>, <<"members">> => members(D, maps:get(<<"jid">>, M))}} || M <- Peers]
     end) of {atomic, Events} -> deliver(D, Events); _ -> ok end,
     {ok, Acc}.
 
@@ -64,8 +79,9 @@ process_iq(Acc, From, #jid{lserver = Domain}, #iq{type = set, sub_el = El} = IQ,
         case mnesia:transaction(fun() ->
             %% Domain-wide lock serializes eligibility checks, answers and revocations.
             mnesia:read(?TABLE, {lock, Domain}, write),
-            expire(Domain),
-            execute(Domain, User, Full, Request)
+            Expired = expire(Domain),
+            {Reply0, Events0} = execute(Domain, User, Full, Request),
+            {Reply0, Expired ++ Events0}
         end) of
             {atomic, {Reply, Events}} ->
                 deliver(Domain, Events),
@@ -82,6 +98,11 @@ process_iq(Acc, From, #jid{lserver = Domain}, #iq{type = set, sub_el = El} = IQ,
 process_iq(Acc, _, _, IQ, _) ->
     {Acc, IQ#iq{type = error, sub_el = [mongoose_xmpp_errors:not_allowed()]}}.
 
+execute(D, U, _, #{<<"action">> := <<"ack_notifications">>}) ->
+    mod_deenly_family_chat:execute_ack(D, U);
+execute(D, U, _, #{<<"action">> := A, <<"peer">> := P} = R)
+  when A =:= <<"send_message">>; A =:= <<"chat_history">>; A =:= <<"read_messages">> ->
+    valid_peer(D, U, P), family(D, U, P), mod_deenly_family_chat:execute(D, U, P, R);
 execute(D, U, _, #{<<"action">> := <<"pair_web_helper">>} = R) ->
     mod_deenly_family_web:pair(D, U, R);
 execute(D, U, F, #{<<"action">> := <<"register_device">>} = R) ->
@@ -107,8 +128,9 @@ execute(D, U, F, #{<<"action">> := <<"snapshot">>} = Req) ->
     end, calls(D)),
     Calls = [view(C, F) || C <- calls(D), participant(C, U),
                           maps:get(<<"stage">>, C) =/= <<"ended">>],
-    {#{<<"members">> => members(D, U), <<"calls">> => Calls,
-       <<"presenceEpoch">> => mod_deenly_family_presence:epoch()}, PresenceEvents};
+    [mod_deenly_family_chat:invitation(D, U, maps:get(<<"jid">>, M)) || M <- members(D, U), maps:get(<<"status">>, M) =:= <<"incoming">>],
+    {maps:merge(mod_deenly_family_chat:inbox(D, U), #{<<"members">> => members(D, U), <<"calls">> => Calls,
+       <<"presenceEpoch">> => mod_deenly_family_presence:epoch()}), PresenceEvents};
 execute(D, U, _, #{<<"action">> := Action, <<"peer">> := Peer})
   when Action =:= <<"invite">>; Action =:= <<"accept_member">>;
        Action =:= <<"remove_member">> ->
@@ -118,7 +140,8 @@ execute(D, U, _, #{<<"action">> := Action, <<"peer">> := Peer})
             case Old of
                 undefined ->
                     true_or_deny(length(members(D, U)) < 100 andalso length(members(D, Peer)) < 100, <<"family_limit">>),
-                    put(K, #{a => U, b => Peer, by => U, status => <<"pending">>});
+                    put(K, #{a => U, b => Peer, by => U, status => <<"pending">>}),
+                    mod_deenly_family_chat:invitation(D, Peer, U);
                 #{status := <<"accepted">>} -> ok;
                 #{by := U} -> ok;
                 _ -> denied(<<"accept_invitation_first">>)
@@ -126,12 +149,14 @@ execute(D, U, _, #{<<"action">> := Action, <<"peer">> := Peer})
         <<"accept_member">> ->
             case Old of
                 #{by := Peer, status := <<"pending">>} -> put(K, Old#{status => <<"accepted">>}),
-                    mod_deenly_family_presence:accept(D, U, Peer);
+                    mod_deenly_family_presence:accept(D, U, Peer),
+                    mod_deenly_family_chat:clear_invitation(D, U, Peer);
                 #{status := <<"accepted">>} -> ok;
                 _ -> denied(<<"invitation_not_found">>)
             end;
         <<"remove_member">> ->
-            mnesia:delete({?TABLE, K}), mod_deenly_family_presence:revoke(D, U, Peer)
+            mnesia:delete({?TABLE, K}), mod_deenly_family_presence:revoke(D, U, Peer),
+            mod_deenly_family_chat:revoke(D, U, Peer)
     end,
     EndEvents = case Action of
         <<"remove_member">> -> lists:flatmap(fun(C) ->
@@ -143,7 +168,7 @@ execute(D, U, _, #{<<"action">> := Action, <<"peer">> := Peer})
     end,
     Events = [{U, #{<<"event">> => <<"family">>, <<"presenceEpoch">> => mod_deenly_family_presence:epoch(), <<"members">> => members(D, U)}},
               {Peer, #{<<"event">> => <<"family">>, <<"presenceEpoch">> => mod_deenly_family_presence:epoch(), <<"members">> => members(D, Peer)}}],
-    {#{<<"members">> => members(D, U), <<"presenceEpoch">> => mod_deenly_family_presence:epoch()}, Events ++ EndEvents};
+    {#{<<"members">> => members(D, U), <<"presenceEpoch">> => mod_deenly_family_presence:epoch()}, Events ++ EndEvents ++ [{X, (mod_deenly_family_chat:inbox(D, X))#{<<"event">> => <<"inbox">>}} || X <- [U, Peer]]};
 execute(D, U, F, #{<<"action">> := <<"invite_call">>, <<"peer">> := Peer,
                    <<"callId">> := Id, <<"kind">> := Kind}) ->
     valid_peer(D, U, Peer), family(D, U, Peer),
@@ -186,7 +211,9 @@ execute(D, U, F, #{<<"action">> := Action, <<"callId">> := Id} = Req) ->
         <<"end_call">> ->
             true_or_deny(selected(C, F) orelse maps:get(<<"stage">>, C) =:= <<"ringing">>, <<"answered_elsewhere">>),
             New = case live(C) of true -> ended(C, <<"hangup">>); false -> C end,
-            save_call(D, New), {#{<<"call">> => view(New, F)}, call_events(New)};
+            Missed = case live(C) andalso U =:= maps:get(<<"caller">>, C) of
+                true -> mod_deenly_family_chat:missed(D, C); false -> [] end,
+            save_call(D, New), {#{<<"call">> => view(New, F)}, call_events(New) ++ Missed};
         <<"turn">> ->
             true_or_deny(selected(C, F) andalso maps:get(<<"stage">>, C) =:= <<"active">>, <<"not_active">>),
             family(D, maps:get(<<"caller">>, C), maps:get(<<"callee">>, C)),
@@ -248,8 +275,10 @@ should_expire(C, Now) ->
     end.
 expire(D) ->
     Now = now_ms(),
-    lists:foreach(fun(C) ->
-        case should_expire(C, Now) of true -> save_call(D, ended(C, <<"expired">>)); false -> ok end
+    lists:flatmap(fun(C) ->
+        case should_expire(C, Now) of
+            true -> End = ended(C, <<"expired">>), save_call(D, End), call_events(End) ++ mod_deenly_family_chat:missed(D, C);
+            false -> [] end
     end, calls(D)).
 sweep(_Host) ->
     Now = now_ms(),
@@ -258,7 +287,7 @@ sweep(_Host) ->
             ({{call, D, Id}, C}) ->
                 mnesia:read(?TABLE, {lock, D}, write),
                 case should_expire(C, Now) of
-                    true -> End = ended(C, <<"expired">>), save_call(D, End), [{D, call_events(End)}];
+                    true -> End = ended(C, <<"expired">>), save_call(D, End), [{D, call_events(End) ++ mod_deenly_family_chat:missed(D, C)}];
                     false ->
                         case maps:get(<<"stage">>, C) =:= <<"ended">> andalso maps:get(<<"endedAt">>, C, Now) < Now - 86400000 of
                             true -> mnesia:delete({?TABLE, {call, D, Id}});
@@ -283,7 +312,7 @@ turn(U, Id) ->
 deliver(D, Events) ->
     From = jid:from_binary(D),
     lists:foreach(fun({Target, Body}) ->
-        IsPresence = maps:get(<<"event">>, Body, <<>>) =:= <<"presence">>,
+        IsPresence = lists:member(maps:get(<<"event">>, Body, <<>>), [<<"presence">>, <<"chat">>, <<"inbox">>]),
         Type = case IsPresence of true -> <<"headline">>; false -> <<"normal">> end,
         Hints = case IsPresence of
             true -> [#xmlel{name = <<"no-store">>, attrs = #{<<"xmlns">> => <<"urn:xmpp:hints">>}},

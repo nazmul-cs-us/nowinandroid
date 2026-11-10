@@ -59,7 +59,21 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     @Published private(set) var cameraEnabled = true
     @Published private(set) var speakerEnabled = false
     @Published private(set) var mediaConnected = false
+    @Published private(set) var connectionRoute = "unknown"
     @Published private(set) var connectedAt: Date?
+    @Published private(set) var conversations: [FamilyConversation] = []
+    @Published private(set) var notifications: [FamilyNotice] = []
+    @Published private(set) var unreadCount = 0
+    @Published private(set) var chatPeer: String?
+    @Published private(set) var messages: [FamilyChatMessage] = []
+    @Published private(set) var chatLoading = false
+    @Published private(set) var chatSending = false
+    @Published private(set) var nextBefore: Int64 = 0
+    @Published var chatDraft = ""
+    @Published private(set) var chatError: String?
+    private var retryMessage: (id: String, text: String)?
+    private var chatGeneration = 0
+    private var inboxVersion: Int64 = 0
     let media = FamilyWebRTC()
     private let logger = Logger(subsystem: "com.starception.submission", category: "FamilyCalls")
     private var stream: XMPPStream?
@@ -70,6 +84,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     private var terminal: Set<String> = []
     private let callReducer = FamilyCallReducer()
     private let presenceCache = FamilyPresenceCache()
+    private let restorePolicy = FamilySessionRestorePolicy()
     private var foreground = false
     private var activityVersion: Int64 = 0
     private var mediaCall: String?
@@ -92,13 +107,19 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             if connected && self?.connectedAt == nil { self?.connectedAt = Date() }
             if connected, let id = self?.call?.id { FamilySystemCalls.shared.connected(id) }
         }
+        media.onRoute = { [weak self] route in self?.connectionRoute = route }
         media.onFailure = { [weak self] message in Task { await self?.failCall(message) } }
     }
     func activityChanged(_ active: Bool) {
+        if active { restoreSavedSession() }
         guard foreground != active else { return }
         foreground = active; activityVersion += 1
         guard connected else { return }
         Task { _ = try? await request("presence") }
+    }
+    func restoreSavedSession() {
+        guard restorePolicy.canRestore(connected: connected, busy: busy), let saved = FamilyCredentials.load() else { return }
+        login(saved.0, password: saved.1, restoring: true)
     }
     func requestWebHelper() {
         message = nil
@@ -122,8 +143,9 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         guard let username = policy.username(input: input) else { return }
         login(username, password: password, createAccount: true)
     }
-    func login(_ input: String, password: String, createAccount: Bool = false) {
+    func login(_ input: String, password: String, createAccount: Bool = false, restoring: Bool = false) {
         guard !busy else { return }
+        if !restoring { restorePolicy.manualSignIn() }
         guard let jid = FamilyEndpoint().account(input: input),
               jid.hasSuffix("@" + Self.domain), !password.isEmpty else {
             message = "Enter your family account and password."; return
@@ -142,7 +164,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     func disconnect(clearSaved: Bool = true) {
         logger.info("Session reset; clearSaved=\(clearSaved); hadCall=\(self.call != nil)")
-        if clearSaved { unregisterPushToken(); FamilyCredentials.clear() }
+        if clearSaved { restorePolicy.explicitSignOut(); unregisterPushToken(); FamilyCredentials.clear() }
+        inboxVersion = 0; conversations = []; notifications = []; unreadCount = 0; closeChat()
         presenceCache.clear(); webPairing = nil
         callMessage = nil; pushRegistrationMessage = nil
         if let id = call?.id { FamilySystemCalls.shared.end(id) }
@@ -174,6 +197,63 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     private func rejectPending() {
         let waiting = Array(pending.values); pending.removeAll()
         waiting.forEach { $0.resume(throwing: FamilyError.disconnected) }
+    }
+    func openChat(_ peer: String) {
+        guard members.contains(where: { $0.jid == peer && $0.status == "accepted" }) else { return }
+        closeChat(); chatPeer = peer; loadMessages()
+    }
+    func closeChat() { chatGeneration += 1; chatPeer = nil; messages = []; chatDraft = ""; chatError = nil; chatLoading = false; chatSending = false; nextBefore = 0; retryMessage = nil }
+    func loadMessages(older: Bool = false) {
+        guard let peer = chatPeer, !chatLoading else { return }
+        let before: Int64 = older ? nextBefore : 9007199254740991
+        guard before > 0 else { return }
+        let chatToken = chatGeneration
+        chatLoading = true; chatError = nil
+        Task {
+            defer { if chatPeer == peer && chatGeneration == chatToken { chatLoading = false } }
+            do {
+                let reply = try await request("chat_history", ["peer": peer, "before": before])
+                guard chatPeer == peer, chatGeneration == chatToken else { return }
+                mergeMessages((reply["messages"] as? [[String: Any]] ?? []).compactMap(FamilyChatMessage.init))
+                nextBefore = (reply["nextBefore"] as? NSNumber)?.int64Value ?? 0
+            } catch { if chatPeer == peer && chatGeneration == chatToken { chatError = chatErrorText(error) } }
+        }
+    }
+    func sendMessage() {
+        guard let peer = chatPeer, !chatSending else { return }
+        guard FamilyChatPolicy().valid(text: chatDraft) else { chatError = FamilyChatPolicy().error(); return }
+        let chatToken = chatGeneration
+        let text = chatDraft
+        let id = retryMessage?.text == text ? retryMessage!.id : UUID().uuidString.lowercased()
+        retryMessage = (id, text); chatSending = true; chatError = nil
+        Task {
+            defer { if chatPeer == peer && chatGeneration == chatToken { chatSending = false } }
+            do {
+                let reply = try await request("send_message", ["peer": peer, "id": id, "text": text])
+                guard chatPeer == peer, chatGeneration == chatToken, let row = reply["message"] as? [String: Any], let message = FamilyChatMessage(row) else { return }
+                mergeMessages([message]); if chatDraft == text { chatDraft = "" }; retryMessage = nil
+            } catch { if chatPeer == peer && chatGeneration == chatToken { chatError = chatErrorText(error) } }
+        }
+    }
+    private func mergeMessages(_ rows: [FamilyChatMessage]) {
+        var byID = Dictionary(uniqueKeysWithValues: messages.map { ($0.id, $0) })
+        rows.forEach { byID[$0.id] = $0 }; messages = byID.values.sorted { $0.sequence < $1.sequence }
+    }
+    func markChatRead() {
+        guard foreground, let peer = chatPeer, let last = messages.last else { return }
+        Task { if let reply = try? await request("read_messages", ["peer": peer, "through": last.sequence]) { await apply(reply) } }
+    }
+    func acknowledgeNotifications() { perform { try await self.apply(self.request("ack_notifications")) } }
+    private func chatErrorText(_ error: Error) -> String {
+        if case FamilyError.rejected(let code) = error {
+            switch code {
+            case "not_family": return "This conversation is no longer available. Refresh your family list."
+            case "message_rate_limited": return "You’re sending messages too quickly. Please wait a moment."
+            case "chat_storage_full": return "Chat storage is full. Contact the server administrator."
+            default: break
+            }
+        }
+        return "Could not sync this conversation. Your draft is still here. Please retry."
     }
     func refresh() {
         let activeStream = stream
@@ -314,6 +394,28 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         return response
     }
     private func apply(_ body: [String: Any]) async {
+        if let revision = body["inboxVersion"] as? NSNumber, revision.int64Value > inboxVersion {
+            inboxVersion = revision.int64Value
+            if let rows = body["conversations"] as? [[String: Any]] {
+                conversations = rows.compactMap { o in
+                    guard let peer = o["peer"] as? String else { return nil }
+                    return FamilyConversation(peer: peer, unread: o["unread"] as? Int ?? 0,
+                        lastMessage: (o["lastMessage"] as? [String: Any]).flatMap(FamilyChatMessage.init))
+                }
+            }
+            if let rows = body["notifications"] as? [[String: Any]] {
+                notifications = rows.compactMap { o in
+                    guard let id = o["id"] as? String, let kind = o["kind"] as? String, let peer = o["peer"] as? String else { return nil }
+                    return FamilyNotice(id: id, kind: kind, peer: peer, count: o["count"] as? Int ?? 0,
+                        unread: o["unread"] as? Bool ?? false, createdAt: (o["createdAt"] as? NSNumber)?.int64Value ?? 0)
+                }.sorted { $0.createdAt > $1.createdAt }
+            }
+            unreadCount = body["unreadCount"] as? Int ?? 0
+        }
+        if body["event"] as? String == "chat", let row = body["message"] as? [String: Any],
+           let message = FamilyChatMessage(row), let peer = chatPeer,
+           Set([message.from, message.to]) == Set([peer, me]) { mergeMessages([message]) }
+
         presenceCache.beginEpoch(next: body["presenceEpoch"] as? String ?? "")
         if let rows = body["members"] as? [[String: Any]] {
             serviceReady = true
@@ -334,6 +436,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             }
             publishMembers(members)
         }
+        if body["members"] != nil, let peer = chatPeer, !members.contains(where: { $0.jid == peer && $0.status == "accepted" }) { closeChat() }
         if let current = body["call"] as? [String: Any] { await updateCall(current) }
         if let calls = body["calls"] as? [[String: Any]] {
             if let first = calls.first { await updateCall(first) }
@@ -474,7 +577,7 @@ extension FamilyStore: XMPPStreamDelegate {
         }
     }
     nonisolated func xmppStream(_ sender: XMPPStream, didNotAuthenticate error: DDXMLElement) {
-        Task { @MainActor in if sender === stream { lost(accountJustCreated ? "Account created. Sign in with your new username and password." : "Could not sign in. Check your family account and password.") } }
+        Task { @MainActor in if sender === stream { restorePolicy.authenticationRejected(); lost(accountJustCreated ? "Account created. Sign in with your new username and password." : "Could not sign in. Check your family account and password.") } }
     }
     nonisolated func xmppStreamDidDisconnect(_ sender: XMPPStream, withError error: Error?) {
         Task { @MainActor in if sender === stream { lost(connected ? "Family connection closed. Sign in again before calling." : "Could not connect securely to the family server. Check the device clock, certificate and firewall access on TCP 5222.") } }

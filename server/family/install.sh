@@ -77,6 +77,7 @@ install -o root -g mongooseim -m 0640 "$build/mod_deenly_family.beam" "$beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_push.beam" "$(dirname "$beam")/mod_deenly_family_push.beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_presence.beam" "$(dirname "$beam")/mod_deenly_family_presence.beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_web.beam" "$(dirname "$beam")/mod_deenly_family_web.beam"
+install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_chat.beam" "$(dirname "$beam")/mod_deenly_family_chat.beam"
 install -o root -g mongooseim -m 0640 "$build/mod_deenly_family_signup.beam" "$(dirname "$beam")/mod_deenly_family_signup.beam"
 systemctl reset-failed mongooseim
 systemctl restart mongooseim

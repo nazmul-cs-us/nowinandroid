@@ -230,3 +230,10 @@ The device workflow was Family sign-in on Android/iOS, invite, accept, then call
 - Confirm static external-IP reservation, certificate-renewal dry run/deployment for both daemons, native forced-relay media quality, monitoring and consistent backup/restore.
 
 Repository verification for `048dd850e`: Android demo-debug build, 8 shared tests, 20 Erlang policy/outbox tests and 7 push-bridge tests passed; Swift syntax checked on Linux. The new native iOS integration still needs Xcode compilation/device acceptance. These checks do not substitute for live provider setup or production readiness.
+
+
+### Video confirmed; Family chat update prepared
+
+The user subsequently confirmed the rebuilt video call worked after the Jiffy iodata fix. Local code verification is separate from this reported real-device result.
+
+The next app/server update adds accepted-family text chat and an in-app notification inbox, secure saved-login restoration, selected-ICE route labels, revised landing/video layouts and a temporary For You switch. Full deployment commands and operational limits are in [Family chat and inbox](FAMILY_CHAT.md). It has not been remotely deployed by the coding environment; run its VM installation and smoke check before testing the rebuilt apps.

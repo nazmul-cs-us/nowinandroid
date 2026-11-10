@@ -2,13 +2,13 @@
 
 For the actual completed VM/app setup, commands and reported live results, start with [Calling setup record](CALLING_SETUP_RECORD.md). Background push deployment is tracked separately below.
 
-This implements one-to-one voice/video calls on Android and iOS, with Family pages, invitation acceptance/removal, native WebRTC, and MongooseIM authorization. The call UI uses full-screen, stacked video feeds, caller initials, a timer, and circular controls inspired by the supplied incoming-call reference. Background call delivery adds Android FCM/Telecom and optional iOS PushKit/CallKit; see [background deployment and testing](BACKGROUND_CALLING.md). This is a private versioned XMPP protocol, not Jingle interoperability. Deployment and real-device acceptance are separate from code/build validation.
+This implements one-to-one voice/video calls on Android and iOS, with Family pages, invitation acceptance/removal, native WebRTC, and MongooseIM authorization. The call UI uses a large remote video view, a small local preview, caller initials, a timer, circular controls, and a selected-ICE route indicator. Background call delivery adds Android FCM/Telecom and optional iOS PushKit/CallKit; see [background deployment and testing](BACKGROUND_CALLING.md). This is a private versioned XMPP protocol, not Jingle interoperability. Deployment and real-device acceptance are separate from code/build validation.
 
 ## App workflow
 
 Android has a **Family** navigation destination. iOS 26+ has **More → Family**; earlier supported versions have a Family button opening the page.
 
-The contact screen uses the app's active theme containers, circular family shortcuts, a rounded full-height list panel, expandable account search and a compact Family/Invites control. Contact rows have one voice-call shortcut; tapping a row opens a sheet with both voice/video actions and full account details. The landing screen has a themed illustration and sign-in form. Names are derived from account IDs until profile integration is available; circles show initials; accepted contact rows now show live presence with a green Online dot. See [Family presence](FAMILY_PRESENCE.md) for privacy, lease behavior and deployment. Invitations are composed in a sheet, and removal requires confirmation. See [rendered UI review](FAMILY_UI_REVIEW.md).
+The contact screen uses the app's active theme containers, circular family shortcuts, a rounded full-height list panel, expandable account search and a compact Family/Invites control. Contact rows have one voice-call shortcut; tapping an accepted row opens text chat. Avatar shortcuts open the contact sheet with voice/video actions and account details. The landing screen has original family-home artwork and a sign-in form. See [Family chat and inbox](FAMILY_CHAT.md) for messages, notification badges, saved-login restoration, route labels, rollout commands, and limits. Names are derived from account IDs until profile integration is available; circles show initials; accepted contact rows now show live presence with a green Online dot. See [Family presence](FAMILY_PRESENCE.md) for privacy, lease behavior and deployment. Invitations are composed in a sheet, and removal requires confirmation. See [rendered UI review](FAMILY_UI_REVIEW.md).
 
 Android takes its colors directly from `MaterialTheme.colorScheme`. Native iOS consumes `FamilyThemePalette` from the same `iosColorScheme` used by the shared app, including saved custom seeds and light/dark settings; theme values are not duplicated in Swift. Theme changes invalidate the native views. Voice-call surfaces use these roles, video overlays retain readable scrims, and answer/end controls use primary/error roles with their matching foregrounds. Call controls adapt to compact landscape height.
 
@@ -41,7 +41,7 @@ Authenticated IQ `set` requests go to `xmpp.starception.com`, with JSON inside a
 
 | Action | Fields | Rule |
 | --- | --- | --- |
-| `snapshot` | — | Own members and current calls; refreshes selected installation's lease |
+| `snapshot` | — | Own members, current calls and versioned chat/inbox; refreshes selected installation's lease |
 | `invite` | `peer` | Different existing account on this domain |
 | `accept_member` | `peer` | Invitation recipient only |
 | `remove_member` | `peer` | Either participant; ends their current call |
@@ -57,7 +57,7 @@ Relationships and authoritative calls live in the Mnesia **disk** table `deenly_
 
 Ringing expires after 45 seconds. Clients reconcile every 20 seconds. Active installations have 75-second leases and a 55-minute maximum call duration, within one-hour TURN credentials. Ended calls are retained for one day, then pruned. Native clients reject terminal/stale call versions. Each user has at most 100 relationships, including invitations.
 
-Events are accepted only from the authenticated server domain. Direct user-to-user message/IQ routing is rejected on this private calling server, ensuring call signalling goes through policy-controlled IQs. This is not a general chat configuration.
+Events are accepted only from the authenticated server domain. Direct user-to-user message/IQ routing is rejected on this private calling server, ensuring call signalling goes through policy-controlled IQs. Text chat also goes through accepted-family IQ authorization; raw peer messaging remains blocked. See [Family chat and inbox](FAMILY_CHAT.md).
 
 Removing membership stops further authorized signalling and credential issuance. Normal clients release media on terminal events/reconciliation. A server cannot forcibly terminate a direct media connection between two modified peers that both ignore termination.
 

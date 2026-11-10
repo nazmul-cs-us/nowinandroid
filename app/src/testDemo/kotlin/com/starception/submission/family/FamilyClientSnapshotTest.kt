@@ -20,6 +20,19 @@ import kotlin.test.assertFalse
 @Config(application = HiltTestApplication::class)
 @LooperMode(LooperMode.Mode.PAUSED)
 class FamilyClientSnapshotTest {
+    @Test fun olderInboxSnapshotsCannotRestoreClearedBadges() = runBlocking {
+        val client = FamilyClient(ApplicationProvider.getApplicationContext())
+        fun inbox(revision: Int, count: Int) = JSONObject().put("inboxVersion", revision).put("unreadCount", count)
+            .put("conversations", JSONArray()).put("notifications", JSONArray())
+        try {
+            client.apply(inbox(2, 3)); assertEquals(3, client.state.value.unreadCount)
+            client.apply(inbox(3, 0)); client.apply(inbox(2, 3))
+            assertEquals(0, client.state.value.unreadCount)
+            client.disconnect(clearSaved = false)
+            client.apply(inbox(1, 1)); assertEquals(1, client.state.value.unreadCount)
+        } finally { client.disconnect(clearSaved = false) }
+    }
+
     @Test fun relayFetchFailureIdentifiesTheStepWithoutLoggingAccountOrCallData() = runBlocking {
         ShadowLog.clear()
         val client = FamilyClient(ApplicationProvider.getApplicationContext())

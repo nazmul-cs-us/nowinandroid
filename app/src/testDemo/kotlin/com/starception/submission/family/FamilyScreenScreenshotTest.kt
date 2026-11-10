@@ -182,19 +182,72 @@ class FamilyScreenScreenshotTest {
     @Test fun activeVoiceCallDark() {
         compose.setContent {
             NiaTheme(darkTheme = true) {
-                FamilyCallContent(FamilyUiState(me = "omar@xmpp.starception.com", mediaConnected = true,
+                FamilyCallContent(FamilyUiState(me = "omar@xmpp.starception.com", mediaConnected = true, connectionRoute = "direct",
                     call = FamilyCall("call-preview", "amina.khan@xmpp.starception.com", "omar@xmpp.starception.com", "voice", "active", 2, Long.MAX_VALUE, true)), elapsed = 94)
             }
         }
         compose.onNodeWithText("01:34").assertExists()
         capture("active-voice-dark")
     }
-    @Test fun contactActionsAreInSheet() {
+    @Test fun contactActionsAreAvailableFromTheAvatarStrip() {
         render(false, true)
-        compose.onNodeWithText("Amina Khan").performClick()
+        compose.onNodeWithText("Amina").performClick()
         compose.onNodeWithText("Video call").assertExists()
         compose.onNodeWithText("Voice call").assertExists()
         compose.onNodeWithText("amina.khan@xmpp.starception.com").assertExists()
+    }
+    @Test fun acceptedContactRowOpensChat() {
+        var opened: String? = null
+        compose.setContent { NiaTheme { FamilyScreenContent(
+            FamilyUiState(connected = true, serviceReady = true, members = members), FamilyActions(openChat = { opened = it })) } }
+        compose.onNodeWithText("Amina Khan").performClick()
+        compose.runOnIdle { kotlin.test.assertEquals(members.first().jid, opened) }
+    }
+    @Test fun chatLight() {
+        val me = "omar@xmpp.starception.com"; val peer = members.first().jid
+        compose.setContent { NiaTheme(themeBrand = ThemeBrand.COASTAL, disableDynamicTheming = true) {
+            FamilyScreenContent(FamilyUiState(me = me, connected = true, serviceReady = true, members = members, chatPeer = peer,
+                messages = listOf(FamilyChatMessage("one", peer, me, "Assalamu alaikum! How is everyone at home?", 1, 1000000),
+                    FamilyChatMessage("two", me, peer, "Wa alaikum assalam. All well, alhamdulillah 🌿", 2, 1060000)), chatDraft = "Shall we call after Maghrib?"))
+        } }
+        compose.onNodeWithText("Assalamu alaikum! How is everyone at home?").assertExists()
+        compose.onNodeWithContentDescription("Send message").assertExists()
+        capture("chat-light")
+    }
+    @Test fun conversationsDark() {
+        val peer = members[0].jid
+        compose.setContent { NiaTheme(darkTheme = true, themeBrand = ThemeBrand.COASTAL, disableDynamicTheming = true) {
+            FamilyScreenContent(FamilyUiState(me = "omar@xmpp.starception.com", connected = true, serviceReady = true, members = members,
+                unreadCount = 2, conversations = listOf(FamilyConversation(peer, 2,
+                    FamilyChatMessage("one", peer, "omar@xmpp.starception.com", "Assalamu alaikum! Are you free?", 1, 1000000)))))
+        } }
+        compose.onNodeWithText("Assalamu alaikum! Are you free?").assertExists()
+        capture("conversations-dark")
+    }
+    @Test fun notificationInboxIncludesAllThreeKinds() {
+        compose.setContent { NiaTheme {
+            FamilyScreenContent(FamilyUiState(connected = true, serviceReady = true, members = members, unreadCount = 3,
+                notifications = listOf(FamilyNotice("invite", "invitation", members[0].jid, 1, true, 1000000),
+                    FamilyNotice("chat", "message", members[1].jid, 1, true, 1000000), FamilyNotice("missed", "missed_call", members[2].jid, 1, true, 1000000))))
+        } }
+        compose.onNodeWithContentDescription("Family notifications").performClick()
+        compose.onNodeWithText("Invited you to join their family").assertExists()
+        compose.onNodeWithText("New message").assertExists()
+        compose.onNodeWithText("Missed call").assertExists()
+        capture("notifications-light")
+    }
+    @Test fun activeVideoShowsRouteAndBothFeeds() {
+        compose.setContent { NiaTheme(darkTheme = true) {
+            FamilyCallContent(FamilyUiState(me = "omar@xmpp.starception.com", mediaConnected = true, connectionRoute = "relay",
+                call = FamilyCall("video-fixture", "amina.khan@xmpp.starception.com", "omar@xmpp.starception.com", "video", "active", 2, Long.MAX_VALUE, true)),
+                remoteReady = true, localReady = true, remoteVideo = { androidx.compose.material3.Text("Remote video", color = androidx.compose.ui.graphics.Color.White) },
+                localVideo = { androidx.compose.material3.Text("Local video", color = androidx.compose.ui.graphics.Color.White) })
+        } }
+        compose.onNodeWithText("TURN relay").assertExists()
+        compose.onNodeWithText("Remote video").assertExists()
+        compose.onNodeWithText("Local video").assertExists()
+        compose.onNodeWithText("End call").assertExists()
+        capture("active-video-dark")
     }
     @Test fun searchCanBeOpenedAndClosed() {
         render(false, true)

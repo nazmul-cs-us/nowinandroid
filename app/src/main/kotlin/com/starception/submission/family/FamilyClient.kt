@@ -40,7 +40,13 @@ data class FamilyUiState(
     val members: List<FamilyMember> = emptyList(), val call: FamilyCall? = null,
     val error: String? = null, val muted: Boolean = false, val camera: Boolean = true,
     val speaker: Boolean = false, val mediaConnected: Boolean = false,
+    val connectionRoute: String = "unknown",
     val connectedAtElapsed: Long? = null,
+    val conversations: List<FamilyConversation> = emptyList(), val notifications: List<FamilyNotice> = emptyList(),
+    val unreadCount: Int = 0, val chatPeer: String? = null, val messages: List<FamilyChatMessage> = emptyList(),
+    val chatLoading: Boolean = false, val chatSending: Boolean = false, val nextBefore: Long = 0,
+    val chatDraft: String = "", val chatError: String? = null,
+
 )
 
 private class FamilyIq(val body: String) : IQ("family", FAMILY_NS) {
@@ -66,12 +72,17 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private var rtcCallId: String? = null
     private val callReducer = FamilyCallReducer()
     private val presenceCache = FamilyPresenceCache()
+    private val restorePolicy = FamilySessionRestorePolicy()
+    private var restoreJob: Job? = null
     private var foreground = false
     private var activityVersion = 0L
     private val terminal = LinkedHashSet<String>()
     private val queuedSignals = mutableListOf<Pair<String, JSONObject>>()
     private var ringingJob: Job? = null
     private var heartbeat: Job? = null
+    private var chatGeneration = 0
+    private var inboxVersion = 0L
+    private var retryMessage: Pair<String, String>? = null
     private val visibleActivities = mutableSetOf<android.app.Activity>()
     internal val hasForegroundActivity: Boolean get() = visibleActivities.isNotEmpty()
     init {
@@ -97,9 +108,19 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             })
     }
     private fun activityChanged(active: Boolean) {
+        if (active) restoreSavedSession()
         if (foreground == active) return
         foreground = active; activityVersion++
         if (mutable.value.connected) scope.launch { runCatching { request("presence") } }
+    }
+    internal fun restoreSavedSession() {
+        if (restoreJob?.isActive == true || !restorePolicy.canRestore(mutable.value.connected, mutable.value.busy)) return
+        val token = generation
+        restoreJob = scope.launch {
+            val saved = withContext(Dispatchers.IO) { credentials.load() } ?: return@launch
+            if (token != generation || !restorePolicy.canRestore(mutable.value.connected, mutable.value.busy)) return@launch
+            login(saved.first, saved.second, restoring = true).join()
+        }
     }
     private var mediaInstance: AndroidFamilyMedia? = null
     val media: AndroidFamilyMedia get() = mediaInstance ?: createMedia().also { mediaInstance = it }
@@ -117,6 +138,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         } },
         connected = { connected -> mutable.value = mutable.value.copy(mediaConnected = connected,
             connectedAtElapsed = mutable.value.connectedAtElapsed ?: if (connected) android.os.SystemClock.elapsedRealtime() else null) },
+        routeChanged = { route -> mutable.value = mutable.value.copy(connectionRoute = route) },
         failed = { message -> scope.launch { endWithError(message) } },
     )
 
@@ -160,8 +182,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
     }
 
-    fun login(jidInput: String, password: String) = scope.launch {
+    fun login(jidInput: String, password: String, restoring: Boolean = false) = scope.launch {
         if (mutable.value.busy) return@launch
+        if (!restoring) restorePolicy.manualSignIn()
         val jid = FamilyEndpoint().account(jidInput)
         if (jid == null || !jid.endsWith("@$FAMILY_DOMAIN") || password.isBlank()) {
             mutable.value = mutable.value.copy(error = "Enter your family account and password."); return@launch
@@ -224,6 +247,8 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             val types = generateSequence<Throwable>(e) { it.cause }.take(8).joinToString(" > ") { it.javaClass.simpleName }
             android.util.Log.w("FamilyConnection", "Sign-in failed at $signInPhase: $types")
             if (token == generation) {
+                if (generateSequence<Throwable>(e) { it.cause }.take(8).any { it is org.jivesoftware.smack.sasl.SASLErrorException })
+                    restorePolicy.authenticationRejected()
                 generation++
                 mutable.value = mutable.value.copy(busy = false, connected = false,
                     serviceReady = false, error = signInError(e))
@@ -235,8 +260,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
 
     fun disconnect(clearSaved: Boolean = true) {
         android.util.Log.i("FamilyCalls", "Session reset: clearSaved=$clearSaved; hadCall=${mutable.value.call != null}")
-        if (clearSaved) credentials.clear()
+        if (clearSaved) { restorePolicy.explicitSignOut(); credentials.clear() }
         generation++
+        inboxVersion = 0L
         presenceCache.clear()
         heartbeat?.cancel(); heartbeat = null
         val oldCall = mutable.value.call
@@ -324,6 +350,62 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         mutable.value = mutable.value.copy(webPairing = FamilyWebPairing(value.getString("code"), uri.toString(), value.getLong("expires")))
     }
     fun dismissWebHelper() { mutable.value = mutable.value.copy(webPairing = null) }
+    fun openChat(peer: String) {
+        if (!mutable.value.members.any { it.jid == peer && it.status == "accepted" }) return
+        chatGeneration++; retryMessage = null
+        mutable.value = mutable.value.copy(chatPeer = peer, messages = emptyList(), chatDraft = "", chatError = null, nextBefore = 0, chatLoading = false, chatSending = false)
+        loadMessages()
+    }
+    fun closeChat() { chatGeneration++; retryMessage = null; mutable.value = mutable.value.copy(chatPeer = null, chatDraft = "", messages = emptyList(), chatError = null, chatLoading = false, chatSending = false) }
+    fun chatDraft(text: String) { mutable.value = mutable.value.copy(chatDraft = text) }
+    fun loadMessages(older: Boolean = false) = scope.launch {
+        val peer = mutable.value.chatPeer ?: return@launch
+        val chatToken = chatGeneration
+        if (mutable.value.chatLoading) return@launch
+        val before = if (older) mutable.value.nextBefore else 9007199254740991L
+        if (before <= 0) return@launch
+        mutable.value = mutable.value.copy(chatLoading = true, chatError = null)
+        try {
+            val reply = request("chat_history", "peer" to peer, "before" to before)
+            if (mutable.value.chatPeer != peer || chatToken != chatGeneration) return@launch
+            val rows = reply.getJSONArray("messages")
+            val messages = (0 until rows.length()).map { FamilyChatMessage.parse(rows.getJSONObject(it)) }
+            mutable.value = mutable.value.copy(messages = (messages + mutable.value.messages).distinctBy { it.id }.sortedBy { it.sequence }, nextBefore = reply.optLong("nextBefore"))
+        } catch (e: Exception) { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatError = chatError(e)) }
+        finally { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatLoading = false) }
+    }
+    fun sendMessage() = scope.launch {
+        val start = mutable.value; val peer = start.chatPeer ?: return@launch
+        val chatToken = chatGeneration
+        if (start.chatSending) return@launch
+        if (!FamilyChatPolicy().valid(start.chatDraft)) { mutable.value = start.copy(chatError = FamilyChatPolicy().error()); return@launch }
+        val text = start.chatDraft
+        val id = retryMessage?.takeIf { it.second == text }?.first ?: UUID.randomUUID().toString()
+        retryMessage = id to text
+        mutable.value = start.copy(chatSending = true, chatError = null)
+        try {
+            val result = request("send_message", "peer" to peer, "id" to id, "text" to text)
+            if (mutable.value.chatPeer != peer || chatToken != chatGeneration) return@launch
+            val message = FamilyChatMessage.parse(result.getJSONObject("message"))
+            mutable.value = mutable.value.copy(messages = (mutable.value.messages + message).distinctBy { it.id }.sortedBy { it.sequence },
+                chatDraft = if (mutable.value.chatDraft == text) "" else mutable.value.chatDraft)
+            retryMessage = null
+        } catch (e: Exception) { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatError = chatError(e)) }
+        finally { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatSending = false) }
+    }
+    fun markChatRead() = scope.launch {
+        val s = mutable.value; val peer = s.chatPeer ?: return@launch
+        if (!foreground || s.messages.isEmpty()) return@launch
+        runCatching { apply(request("read_messages", "peer" to peer, "through" to s.messages.last().sequence)) }
+    }
+    fun acknowledgeNotifications() = perform { apply(request("ack_notifications")) }
+    private fun chatError(e: Exception): String = when (e.message) {
+        "not_family" -> "This conversation is no longer available. Refresh your family list."
+        "message_rate_limited" -> "You’re sending messages too quickly. Please wait a moment."
+        "chat_storage_full" -> "Chat storage is full. Contact the server administrator."
+        else -> "Could not sync this conversation. Your draft is still here. Please retry."
+    }
+
     fun refresh() = perform { apply(request("snapshot")) }
     fun invite(input: String) = perform {
         val peer = FamilyEndpoint().account(input) ?: error("invalid_member")
@@ -405,6 +487,22 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
     }
     internal suspend fun apply(body: JSONObject) {
+        val applyInbox = body.optLong("inboxVersion") > inboxVersion
+        if (applyInbox) inboxVersion = body.optLong("inboxVersion")
+        if (applyInbox) body.optJSONArray("conversations")?.let { rows ->
+            mutable.value = mutable.value.copy(conversations = (0 until rows.length()).map { i -> val o = rows.getJSONObject(i)
+                FamilyConversation(o.getString("peer"), o.optInt("unread"), o.optJSONObject("lastMessage")?.let(FamilyChatMessage::parse)) })
+        }
+        if (applyInbox) body.optJSONArray("notifications")?.let { rows ->
+            mutable.value = mutable.value.copy(notifications = (0 until rows.length()).map { i -> val o = rows.getJSONObject(i)
+                FamilyNotice(o.getString("id"), o.getString("kind"), o.getString("peer"), o.optInt("count"), o.optBoolean("unread"), o.getLong("createdAt")) }.sortedByDescending { it.createdAt }, unreadCount = body.optInt("unreadCount"))
+        }
+        if (body.optString("event") == "chat") body.optJSONObject("message")?.let { o ->
+            val message = FamilyChatMessage.parse(o); val peer = mutable.value.chatPeer
+            if (peer != null && setOf(message.from, message.to) == setOf(peer, mutable.value.me)) {
+                mutable.value = mutable.value.copy(messages = (mutable.value.messages + message).distinctBy { it.id }.sortedBy { it.sequence })
+            }
+        }
         presenceCache.beginEpoch(body.optString("presenceEpoch"))
         if (body.has("members")) {
             val rows = body.getJSONArray("members")
@@ -423,6 +521,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             }
             mutable.value = mutable.value.copy(members = mutable.value.members.map { it.copy(presence = presenceCache.status(it.jid)) })
         }
+        if (body.has("members") && mutable.value.chatPeer != null && mutable.value.members.none { it.jid == mutable.value.chatPeer && it.status == "accepted" }) closeChat()
         body.optJSONObject("call")?.let { updateCall(it) }
         body.optJSONArray("calls")?.let { calls ->
             if (calls.length() == 0) {
@@ -500,7 +599,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         terminal.add(id); while (terminal.size > 256) terminal.remove(terminal.first())
         if (mutable.value.call?.id == id) {
             android.util.Log.i("FamilyCalls", "Ending local call presentation: $reason")
-            mutable.value = mutable.value.copy(call = null, muted = false, camera = true, speaker = false, mediaConnected = false, connectedAtElapsed = null, callError = null)
+            mutable.value = mutable.value.copy(call = null, muted = false, camera = true, speaker = false, mediaConnected = false, connectionRoute = "unknown", connectedAtElapsed = null, callError = null)
             ringingJob?.cancel(); mediaInstance?.close(); rtcCallId = null; queuedSignals.clear()
         }
     }

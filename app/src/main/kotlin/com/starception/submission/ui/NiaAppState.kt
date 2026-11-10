@@ -150,7 +150,9 @@ class NiaAppState(
      * Map of top level destinations to be used in the TopBar, BottomBar and NavRail. The key is the
      * route.
      */
-    val topLevelDestinations: List<TopLevelDestination> = TopLevelDestination.entries
+    val topLevelDestinations: List<TopLevelDestination> = TopLevelDestination.entries.filter {
+        it != FOR_YOU || com.starception.submission.family.FamilyRollout.showForYou()
+    }
 
     /**
      * The top level destinations that have unread news resources.
@@ -184,6 +186,9 @@ class NiaAppState(
      * @param topLevelDestination: The destination the app needs to navigate to.
      */
     fun navigateToTopLevelDestination(topLevelDestination: TopLevelDestination) {
+        if (topLevelDestination == FOR_YOU && !com.starception.submission.family.FamilyRollout.showForYou()) {
+            navigateToTopLevelDestination(HOME); return
+        }
         trace("Navigation: ${topLevelDestination.name}") {
             // Skip navigation if already on this destination (prevents unnecessary recomposition)
             val currentDestination = navController.currentDestination

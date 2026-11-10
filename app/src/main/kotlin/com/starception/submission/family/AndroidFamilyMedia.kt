@@ -3,6 +3,9 @@ package com.starception.submission.family
 import android.content.Context
 import android.media.AudioManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +21,7 @@ class AndroidFamilyMedia(
     private val scope: CoroutineScope,
     private val signal: (JSONObject) -> Unit,
     private val connected: (Boolean) -> Unit,
+    private val routeChanged: (String) -> Unit,
     private val failed: (String) -> Unit,
 ) {
     init {
@@ -47,6 +51,8 @@ class AndroidFamilyMedia(
     private var remoteDescription = false
     private val candidates = mutableListOf<IceCandidate>()
     private var epoch = 0
+    private var routeJob: Job? = null
+    private val routeClassifier = FamilyConnectionRoute()
     val ready: Boolean get() = peer != null
     internal var startupStep: String = "idle"
         private set
@@ -94,6 +100,8 @@ class AndroidFamilyMedia(
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) { scope.launch {
                 if (token != epoch) return@launch
                 connected(state == PeerConnection.IceConnectionState.CONNECTED || state == PeerConnection.IceConnectionState.COMPLETED)
+                if (state == PeerConnection.IceConnectionState.CONNECTED || state == PeerConnection.IceConnectionState.COMPLETED) collectRoute(token)
+                else { routeJob?.cancel(); routeJob = null; routeChanged("unknown") }
                 if (state == PeerConnection.IceConnectionState.FAILED) failed("Could not connect media. Check the relay and network connection.")
             } }
             override fun onAddTrack(receiver: RtpReceiver?, streams: Array<out MediaStream>?) { scope.launch {
@@ -122,6 +130,32 @@ class AndroidFamilyMedia(
         }
         starting("ready")
     }
+    private fun collectRoute(token: Int) {
+        if (routeJob?.isActive == true) return
+        routeJob = scope.launch {
+            while (token == epoch) {
+                val connection = peer ?: return@launch
+                val report = withTimeoutOrNull(3000) {
+                    suspendCancellableCoroutine<RTCStatsReport> { continuation ->
+                        connection.getStats { value -> if (continuation.isActive) continuation.resume(value) }
+                    }
+                }
+                if (token != epoch || peer !== connection) return@launch
+                val rows = JSONArray()
+                report?.statsMap?.values?.filter { it.type in setOf("transport", "candidate-pair", "local-candidate", "remote-candidate") }?.forEach { stat ->
+                    val row = JSONObject().put("id", stat.id).put("type", stat.type)
+                    for (key in routeFields) stat.members[key]?.let { value ->
+                        if (value is String || value is Boolean) row.put(key, value)
+                    }
+                    rows.put(row)
+                }
+                routeChanged(routeClassifier.classify(rows.toString()))
+                delay(5000)
+            }
+        }
+    }
+    private val routeFields = listOf("selectedCandidatePairId", "dtlsState", "state", "localCandidateId",
+        "remoteCandidateId", "candidateType", "selected", "nominated")
     /** Local-only camera. No peer, microphone or signalling is created. */
     fun preview() {
         if (localVideo.value != null) return
@@ -186,6 +220,7 @@ class AndroidFamilyMedia(
     @Suppress("DEPRECATION") fun speaker(enabled: Boolean) { audio.isSpeakerphoneOn = enabled }
     fun close(preservePreview: Boolean = false) {
         epoch++; remoteDescription = false; candidates.clear()
+        routeJob?.cancel(); routeJob = null; routeChanged("unknown")
         if (!preservePreview) {
             runCatching { capturer?.stopCapture() }; capturer?.dispose(); capturer = null
             texture?.dispose(); texture = null

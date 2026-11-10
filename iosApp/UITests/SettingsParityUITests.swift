@@ -77,7 +77,7 @@ final class SettingsParityUITests: XCTestCase {
 
         let course = app.buttons["Course"]
         XCTAssertTrue(course.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["For you"].exists)
+        XCTAssertFalse(app.buttons["For you"].exists) // Temporarily hidden by FamilyRollout.
         course.tap()
         XCTAssertTrue(
             app.staticTexts["Small lessons. Meaningful progress."].waitForExistence(timeout: 20)

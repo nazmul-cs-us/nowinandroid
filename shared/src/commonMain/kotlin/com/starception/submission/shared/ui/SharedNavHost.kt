@@ -239,7 +239,8 @@ fun SharedNavHost(
     val openTopic: (Int) -> Unit = { id ->
         navController.navigate(TopicRoute(id)) { launchSingleTop = true }
     }
-    val selectBottom: (Int) -> Unit = { index ->
+    val selectBottom: (Int) -> Unit = { requested ->
+        val index = if (requested == 1 && !com.starception.submission.family.FamilyRollout.showForYou()) 0 else requested
         if (onSelectTopLevel != null) {
             onSelectTopLevel(index)
         } else when (index) {
@@ -329,7 +330,7 @@ fun SharedNavHost(
                 ?: when {
                     startInQibla -> QiblaRoute
                     startInSettings -> PrayerSettingsRoute
-                    startBottomIndex == 1 -> ForYouRoute
+                    startBottomIndex == 1 && com.starception.submission.family.FamilyRollout.showForYou() -> ForYouRoute
                     startBottomIndex == 2 -> SavedRoute
                     startBottomIndex == 3 -> CourseRoute
                     startBottomIndex == 4 -> InterestsRoute

@@ -67,6 +67,7 @@ struct iOSApp: App {
     }
 
     @State private var showingFamily = false
+    @ObservedObject private var familyStore = FamilyStore.shared
 
     var body: some Scene {
         WindowGroup {
@@ -93,7 +94,7 @@ struct iOSApp: App {
                     if #available(iOS 26.0, *) { EmptyView() }
                     else {
                         Button { showingFamily = true } label: {
-                            Label("Family", systemImage: "person.2.fill")
+                            Label(familyStore.unreadCount > 0 ? "Family (\(familyStore.unreadCount))" : "Family", systemImage: "person.2.fill")
                                 .padding(10).background(.regularMaterial, in: Capsule())
                         }.padding(.trailing, 12)
                     }

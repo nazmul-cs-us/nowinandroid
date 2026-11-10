@@ -83,6 +83,9 @@ internal fun permissionRequest(): (Boolean, () -> Unit) -> Unit {
 }
 
 internal data class FamilyActions(
+    val openChat: (String) -> Unit = {}, val closeChat: () -> Unit = {}, val chatDraft: (String) -> Unit = {},
+    val sendMessage: () -> Unit = {}, val olderMessages: () -> Unit = {}, val retryMessages: () -> Unit = {},
+    val readChat: () -> Unit = {}, val acknowledgeNotifications: () -> Unit = {},
     val signIn: (String, String) -> Unit = { _, _ -> },
     val signUp: (String, String, String) -> Unit = { _, _, _ -> },
     val webHelper: () -> Unit = {}, val dismissWebHelper: () -> Unit = {},
@@ -101,6 +104,9 @@ fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
     val permission = permissionRequest()
     val notification = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     FamilyScreenContent(state, FamilyActions(
+        openChat = client::openChat, closeChat = client::closeChat, chatDraft = client::chatDraft,
+        sendMessage = { client.sendMessage() }, olderMessages = { client.loadMessages(true) }, retryMessages = { client.loadMessages() },
+        readChat = { client.markChatRead() }, acknowledgeNotifications = { client.acknowledgeNotifications() },
         signUp = { username, secret, confirmation -> client.signUp(username, secret, confirmation) },
         signIn = { account, password ->
             if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
@@ -131,6 +137,7 @@ internal fun FamilyScreenContent(
     actions: FamilyActions = FamilyActions(),
     initialAccount: String = "", initialPassword: String = "", suggestedPeer: String = "",
 ) {
+    if (state.chatPeer != null) { FamilyChatContent(state, actions); return }
     val colors = familyPalette()
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
@@ -159,7 +166,8 @@ internal fun FamilyScreenContent(
     var selected by remember { mutableStateOf<FamilyMember?>(null) }
     var removing by remember { mutableStateOf<FamilyMember?>(null) }
     var menu by remember { mutableStateOf(false) }
-    val family = state.members.filter { it.status == "accepted" }
+    var inbox by remember { mutableStateOf(false) }
+    val family = state.members.filter { it.status == "accepted" }.sortedWith(compareByDescending<FamilyMember> { member -> state.conversations.find { it.peer == member.jid }?.lastMessage?.createdAt ?: 0L }.thenBy { callDisplayName(it.jid) })
     val requests = state.members.filter { it.status != "accepted" }
     val shown = (if (invitations) requests else family).filter { callDisplayName(it.jid).contains(search, true) || it.jid.contains(search, true) }
     val canCall = state.serviceReady && state.call == null
@@ -175,6 +183,11 @@ internal fun FamilyScreenContent(
             }
             Text("Family", Modifier.padding(start = 10.dp).weight(1f), color = colors.ink, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             if (state.connected) {
+                IconButton(onClick = { inbox = true; actions.acknowledgeNotifications() }) {
+                    BadgedBox(badge = { if (state.unreadCount > 0) Badge { Text(state.unreadCount.coerceAtMost(99).toString()) } }) {
+                        Icon(Icons.Default.NotificationsNone, "Family notifications", tint = colors.ink)
+                    }
+                }
                 IconButton(onClick = { searching = !searching; if (!searching) search = "" }) { Icon(Icons.Default.Search, "Search family", tint = colors.ink) }
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreHoriz, "Family settings", tint = colors.ink) }
@@ -205,7 +218,7 @@ internal fun FamilyScreenContent(
                 }
             }
         } else {
-            LandingIllustration(Modifier.fillMaxWidth().height(148.dp))
+            LandingIllustration(Modifier.fillMaxWidth().height(184.dp))
         }
         Surface(Modifier.weight(1f).fillMaxWidth(), color = colors.panel.copy(alpha = 0.78f), shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)) {
             LazyColumn(contentPadding = PaddingValues(top = 24.dp, bottom = 104.dp)) {
@@ -213,8 +226,8 @@ internal fun FamilyScreenContent(
                     item {
                         Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Your people.\nAlways closer.", fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold, color = colors.ink)
-                                Text("A little space for the people who matter most. Connect through voice and video.", fontSize = 14.sp, lineHeight = 21.sp, color = colors.muted)
+                                Text("Your family,\ncloser.", fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold, color = colors.ink)
+                                Text("A private space for your mahram family. Share a message, hear a familiar voice, and stay close.", fontSize = 14.sp, lineHeight = 21.sp, color = colors.muted)
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 FamilyField(account, { account = it }, if (creatingAccount) "Choose a username" else "Family account", colors, leading = Icons.Default.PersonOutline)
@@ -291,7 +304,7 @@ internal fun FamilyScreenContent(
                     }
                     items(shown, key = { it.jid }) { member ->
                         Column {
-                            Row(Modifier.fillMaxWidth().clickable(role = androidx.compose.ui.semantics.Role.Button) { selected = member }
+                            Row(Modifier.fillMaxWidth().clickable(role = androidx.compose.ui.semantics.Role.Button) { if (member.status == "accepted") actions.openChat(member.jid) else selected = member }
                                 .padding(start = 24.dp, end = 20.dp, top = 14.dp, bottom = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                                 ContactAvatar(member.jid, 50)
@@ -302,9 +315,16 @@ internal fun FamilyScreenContent(
                                         if (member.status == "accepted" && presence == "online") {
                                             Box(Modifier.size(6.dp).background(Color(0xFF2E9D65), CircleShape))
                                         }
-                                        Text(when (member.status) { "incoming" -> "Invited you to join"; "outgoing" -> "Waiting for acceptance"
+                                        val conversation = state.conversations.find { it.peer == member.jid }
+                                        Text(conversation?.lastMessage?.text ?: when (member.status) { "incoming" -> "Invited you to join"; "outgoing" -> "Waiting for acceptance"
                                             else -> when (presence) { "online" -> "Online"; "offline" -> "Offline"; else -> "Status unavailable" } },
                                             color = colors.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                                state.conversations.find { it.peer == member.jid }?.let { summary ->
+                                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        summary.lastMessage?.let { Text(familyTime(it.createdAt), fontSize = 10.sp, color = colors.muted) }
+                                        if (summary.unread > 0) Badge(containerColor = colors.accent, contentColor = colors.onButton) { Text(summary.unread.coerceAtMost(99).toString()) }
                                     }
                                 }
                                 if (member.status == "accepted") FilledTonalIconButton(onClick = { actions.voice(member.jid) }, enabled = canCall,
@@ -334,6 +354,27 @@ internal fun FamilyScreenContent(
             }
         }
     }
+    if (inbox) ModalBottomSheet(onDismissRequest = { inbox = false }, containerColor = colors.panel) {
+        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 600.dp), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item { Text("Family notifications", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = colors.ink) }
+            if (state.notifications.isEmpty()) item { Text("You’re all caught up.", color = colors.muted) }
+            items(state.notifications, key = { it.id }) { notice ->
+                Row(Modifier.fillMaxWidth().clickable {
+                    inbox = false
+                    if (notice.kind == "invitation") invitations = true
+                    else if (notice.kind == "message") actions.openChat(notice.peer)
+                    else selected = state.members.find { it.jid == notice.peer }
+                }.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ContactAvatar(notice.peer, 44)
+                    Column(Modifier.weight(1f)) {
+                        Text(callDisplayName(notice.peer), fontWeight = FontWeight.Medium, color = colors.ink)
+                        Text(familyNoticeText(notice.kind, notice.count), fontSize = 12.sp, color = colors.muted)
+                    }
+                    Text(familyTime(notice.createdAt), fontSize = 10.sp, color = colors.muted)
+                }
+            }
+        }
+    }
     if (inviting) ModalBottomSheet(onDismissRequest = { inviting = false }, containerColor = colors.panel) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp).padding(bottom = 28.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Box(Modifier.size(48.dp).background(colors.field, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.PersonAdd, null, tint = colors.accent) }
@@ -349,6 +390,7 @@ internal fun FamilyScreenContent(
             ContactAvatar(member.jid, 80)
             Text(callDisplayName(member.jid), fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = colors.ink)
             Text(member.jid, fontSize = 12.sp, color = colors.muted, textAlign = TextAlign.Center)
+            if (member.status == "accepted") TextButton(onClick = { selected = null; actions.openChat(member.jid) }) { Text("Message", color = colors.accent) }
             if (member.status == "accepted") Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ContactAction("Voice call", Icons.Default.Call, canCall, colors, Modifier.weight(1f)) { selected = null; actions.voice(member.jid) }
                 ContactAction("Video call", Icons.Default.Videocam, canCall, colors, Modifier.weight(1f)) { selected = null; actions.video(member.jid) }
@@ -359,7 +401,7 @@ internal fun FamilyScreenContent(
         }
     } }
     removing?.let { member -> AlertDialog(onDismissRequest = { removing = null }, title = { Text(if (member.status == "accepted") "Remove ${callDisplayName(member.jid)}?" else "Remove invitation?") },
-        text = { Text("You’ll need a new accepted invitation to call each other again.") },
+        text = { Text("Removing this member also deletes your shared chat history. You’ll need a new accepted invitation to connect again.") },
         confirmButton = { TextButton(onClick = { actions.remove(member.jid); removing = null }) { Text("Remove") } },
         dismissButton = { TextButton(onClick = { removing = null }) { Text("Keep") } }) }
 }
@@ -400,20 +442,10 @@ private fun FamilyField(value: String, changed: (String) -> Unit, placeholder: S
 
 @Composable
 private fun LandingIllustration(modifier: Modifier = Modifier) {
-    val colors = familyPalette()
-    val scheme = MaterialTheme.colorScheme
-    Box(modifier, contentAlignment = Alignment.Center) {
-        Box(Modifier.size(160.dp).background(colors.ink.copy(alpha = 0.05f), CircleShape))
-        Box(Modifier.offset(x = (-43).dp, y = 7.dp).size(76.dp).background(scheme.secondaryContainer, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Person, null, Modifier.size(42.dp), tint = scheme.onSecondaryContainer)
-        }
-        Box(Modifier.offset(x = 32.dp, y = (-8).dp).size(92.dp).border(5.dp, colors.header, CircleShape).background(scheme.tertiaryContainer, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Person, null, Modifier.size(52.dp), tint = scheme.onTertiaryContainer)
-        }
-        Box(Modifier.offset(x = 54.dp, y = 32.dp).size(34.dp).background(colors.panel, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Call, null, Modifier.size(17.dp), tint = colors.button)
-        }
-    }
+    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.family_landing),
+        contentDescription = "Three family homes sheltered by an arch and an olive branch", modifier = modifier,
+        contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+
 }
 
 @Composable
@@ -508,23 +540,11 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
     BoxWithConstraints(Modifier.fillMaxSize().background(colors.surface)) {
         val compact = maxHeight < 500.dp
         if (preview) Box(Modifier.fillMaxSize()) { localVideo() }
-        if (video) Column(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f).fillMaxWidth().background(colors.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-                remoteVideo()
-                if (!remoteReady) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ContactAvatar(call.peer(state.me), 72)
-                    Text("Waiting for video…", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                }
-            }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
-            Box(Modifier.weight(1f).fillMaxWidth().background(colors.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-                if (state.camera) localVideo()
-                else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.VideocamOff, null, Modifier.size(30.dp), tint = Color.White.copy(alpha = 0.6f))
-                    Text("Camera off", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
-                }
-                Text("You", Modifier.align(Alignment.TopStart).padding(16.dp).background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
-                    color = Color.White, fontSize = 11.sp)
+        if (video) Box(Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(28.dp)).background(colors.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+            remoteVideo()
+            if (!remoteReady) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                ContactAvatar(call.peer(state.me), 72)
+                Text("Waiting for video…", color = colors.onSurfaceVariant, fontSize = 12.sp)
             }
         }
         Box(Modifier.fillMaxSize().background(if (immersive) Brush.verticalGradient(
@@ -539,7 +559,18 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
                 if (video) Text(status, Modifier.background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(18.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
                     color = Color.White, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
+            if (call.stage == "active") Text(FamilyConnectionRoute().label(state.connectionRoute),
+                Modifier.padding(top = 4.dp).background(if (immersive) Color.Black.copy(alpha = .25f) else colors.surfaceContainerHigh,
+                    RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
+                color = muted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
             Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = if (preview) Arrangement.Top else Arrangement.Center) {
+                if (video) Box(Modifier.fillMaxSize().padding(bottom = 18.dp), contentAlignment = Alignment.BottomEnd) {
+                    Box(Modifier.width(104.dp).height(148.dp).clip(RoundedCornerShape(22.dp)).background(colors.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+                        if (state.camera && localReady) localVideo()
+                        else Icon(Icons.Default.VideocamOff, "Your camera is off", tint = colors.onSurfaceVariant)
+                        Text("You", Modifier.align(Alignment.BottomStart).padding(8.dp).background(Color.Black.copy(alpha = .4f), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 4.dp), color = Color.White, fontSize = 10.sp)
+                    }
+                }
                 if (!video) {
                     if (preview) Spacer(Modifier.height(28.dp))
                     ContactAvatar(call.peer(state.me), if (preview) 64 else if (compact) 48 else 128)
@@ -565,11 +596,11 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
                         CallControl(if (state.camera) Icons.Default.Videocam else Icons.Default.VideocamOff, "Camera", !state.camera, onVideo = video, action = actions.camera)
                         CallControl(Icons.Default.Cameraswitch, "Flip", enabled = state.camera, onVideo = video, action = actions.flip)
                     }
-                    if (compact) CallControl(Icons.Default.CallEnd, "End call", color = colors.error, onVideo = immersive, action = actions.hangup)
+                    if (compact || video) CallControl(Icons.Default.CallEnd, "End call", color = colors.error, onVideo = immersive, action = actions.hangup)
                 }
                 if (!compact) Spacer(Modifier.height(24.dp))
             }
-            if (!compact || call.stage != "active") Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            if ((!compact && !video) || call.stage != "active") Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 if (incoming) CallControl(if (call.kind == "video") Icons.Default.Videocam else Icons.Default.Call, "Accept", color = colors.primary, large = true, onVideo = video, action = actions.answer)
                 CallControl(Icons.Default.CallEnd, if (incoming) "Decline" else if (call.stage == "ringing") "Cancel" else "End call",
                     color = colors.error, large = incoming, onVideo = immersive, action = actions.hangup)
@@ -578,7 +609,7 @@ internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions:
     }
 }
 
-private fun callDisplayName(jid: String): String = jid.substringBefore('@').replace('.', ' ').replace('_', ' ').replace('-', ' ')
+internal fun callDisplayName(jid: String): String = jid.substringBefore('@').replace('.', ' ').replace('_', ' ').replace('-', ' ')
     .split(' ').filter { it.isNotBlank() }.joinToString(" ") { it.replaceFirstChar(Char::titlecase) }.ifBlank { "Family member" }
 
 @Composable

@@ -9,6 +9,10 @@
 -define(ID, <<"11111111-2222-3333-4444-555555555555">>).
 
 family_test_() -> {setup, fun setup/0, fun cleanup/1, [
+    ?_test(chat_persists_across_restart()),
+    ?_test(chat_requires_accepted_family()), ?_test(chat_is_idempotent()),
+    ?_test(chat_history_and_read_cursor()), ?_test(chat_validates_utf8_and_rate()),
+    ?_test(chat_removal_revokes_history()), ?_test(inbox_records_invitations_and_missed_calls()),
     ?_test(pending_cannot_call()), ?_test(only_invitee_accepts()),
     ?_test(mutual_family_can_call()), ?_test(only_one_device_answers()),
     ?_test(cancelled_cannot_accept()), ?_test(removal_ends_call()),
@@ -78,9 +82,11 @@ setup() ->
     mnesia:create_schema([node()]), application:start(mnesia),
     {atomic, ok} = mnesia:create_table(deenly_family, [{attributes, [key, value]}, {disc_copies, [node()]}]),
     ok = mnesia:wait_for_tables([deenly_family], 10000),
-    ok = mod_deenly_family_presence:init(), Dir.
+    ok = mod_deenly_family_presence:init(), ok = mod_deenly_family_chat:init(), Dir.
 cleanup(Dir) -> application:stop(mnesia), file:del_dir_r(Dir).
-reset() -> {atomic, ok} = mnesia:clear_table(deenly_family),
+reset() -> flush_routes(), {atomic, ok} = mnesia:clear_table(deenly_family_messages),
+    {atomic, ok} = mnesia:clear_table(deenly_family_inbox),
+    {atomic, ok} = mnesia:clear_table(deenly_family),
     {atomic, ok} = mnesia:clear_table(deenly_family_presence),
     ok = mod_deenly_family_presence:init().
 run(U, F, Req) -> mnesia:transaction(fun() ->
@@ -145,7 +151,7 @@ simultaneous_answers() -> reset(), family(), {atomic, _} = call(), Parent = self
     ?assertEqual(1, length([ok || {aborted, {denied, <<"answered_elsewhere">>}} <- Results])).
 restart_preserves_family() -> reset(), family(),
     {atomic, {#{<<"presenceEpoch">> := Epoch}, [_]}} = presence(?A, ?AF, true, 1),
-    stopped = mnesia:stop(), ok = mnesia:start(), ok = mnesia:wait_for_tables([deenly_family], 10000),
+    stopped = mnesia:stop(), ok = mnesia:start(), ok = mnesia:wait_for_tables([deenly_family, deenly_family_messages, deenly_family_inbox], 10000),
     ok = mod_deenly_family_presence:init(),
     {atomic, {#{<<"members">> := [Member], <<"presenceEpoch">> := NewEpoch}, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
     ?assertEqual(<<"accepted">>, maps:get(<<"status">>, Member)),
@@ -174,7 +180,7 @@ push_is_durable_and_idempotent() -> reset(), family(), {atomic, _} = register(?B
     {atomic, _} = call(), {atomic, _} = call(),
     ?assertEqual(1, length(push_rows())),
     mnesia:dump_log(), application:stop(mnesia), application:start(mnesia),
-    ok = mnesia:wait_for_tables([deenly_family], 10000),
+    ok = mnesia:wait_for_tables([deenly_family, deenly_family_messages, deenly_family_inbox], 10000),
     ?assertEqual(1, length(push_rows())).
 push_cancelled_is_pruned() -> reset(), family(), {atomic, _} = register(?B, ?BF, device(), token()),
     {atomic, _} = call(), {atomic, _} = act(?A, ?AF, <<"end_call">>, #{<<"callId">> => ?ID}),
@@ -281,3 +287,87 @@ web_call_outbox_is_idempotent() -> reset(), with_web(fun() ->
     ?assertEqual([], push_rows()),
     {atomic, false} = mnesia:transaction(fun() -> mod_deenly_family_web:current(?D, ?B, Registration) end)
 end).
+
+
+chat_send(U, F, P, N, Text) ->
+    Id = iolist_to_binary(io_lib:format("00000000-0000-0000-0000-~12.10.0b", [N])),
+    act(U, F, <<"send_message">>, #{<<"peer">> => P, <<"id">> => Id, <<"text">> => Text}).
+chat_history(U, F, P, Before) -> act(U, F, <<"chat_history">>, #{<<"peer">> => P, <<"before">> => Before}).
+chat_requires_accepted_family() ->
+    reset(), invite(),
+    ?assertEqual({aborted, {denied, <<"not_family">>}}, chat_send(?A, ?AF, ?B, 1, <<"hello">>)),
+    ?assertEqual({aborted, {denied, <<"not_family">>}}, chat_history(?B, ?BF, ?A, 999)),
+    ?assertEqual({atomic, set}, mnesia:transaction(fun() -> mnesia:table_info(deenly_family_inbox, type) end)),
+    ?assertEqual([node()], mnesia:table_info(deenly_family_messages, disc_copies)).
+chat_is_idempotent() ->
+    reset(), family(),
+    {atomic, {#{<<"message">> := M}, Events}} = chat_send(?A, ?AF, ?B, 1, <<"Salaam">>),
+    ?assertEqual(lists:sort([?A, ?B]), lists:sort([Target || {Target, _} <- Events])),
+    {atomic, {#{<<"message">> := M}, _}} = chat_send(?A, ?AF, ?B, 1, <<"Salaam">>),
+    ?assertEqual({aborted, {denied, <<"message_conflict">>}}, chat_send(?A, ?AF, ?B, 1, <<"changed">>)),
+    {atomic, {Inbox, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    [S] = maps:get(<<"conversations">>, Inbox), ?assertEqual(1, maps:get(<<"unread">>, S)),
+    ?assertEqual(1, maps:get(<<"unreadCount">>, Inbox)),
+    {atomic, {Other, _}} = act(<<"other@xmpp.test">>, <<"other@xmpp.test/device">>, <<"snapshot">>, #{}),
+    ?assertEqual([], maps:get(<<"conversations">>, Other)).
+chat_history_and_read_cursor() ->
+    reset(), family(),
+    [begin mnesia:dirty_delete(deenly_family_inbox, {rate, ?D, ?A}),
+        {atomic, _} = chat_send(?A, ?AF, ?B, N, <<"Salaam">>) end || N <- lists:seq(1, 12)],
+    {atomic, {Page, _}} = chat_history(?B, ?BF, ?A, 999),
+    ?assertEqual(lists:seq(3, 12), [maps:get(<<"sequence">>, M) || M <- maps:get(<<"messages">>, Page)]),
+    ?assertEqual(3, maps:get(<<"nextBefore">>, Page)),
+    {atomic, {First, _}} = chat_history(?B, ?BF, ?A, 3),
+    ?assertEqual([1, 2], [maps:get(<<"sequence">>, M) || M <- maps:get(<<"messages">>, First)]),
+    {atomic, {Read, _}} = act(?B, ?BF, <<"read_messages">>, #{<<"peer">> => ?A, <<"through">> => 10}),
+    ?assertEqual(2, maps:get(<<"unreadCount">>, Read)),
+    {atomic, {Old, _}} = act(?B, ?BF, <<"read_messages">>, #{<<"peer">> => ?A, <<"through">> => 2}),
+    ?assertEqual(2, maps:get(<<"unreadCount">>, Old)),
+    ?assert(maps:get(<<"inboxVersion">>, Old) > maps:get(<<"inboxVersion">>, Read)),
+    {atomic, {Ack, _}} = act(?B, ?BF, <<"ack_notifications">>, #{}),
+    ?assertEqual(2, maps:get(<<"unreadCount">>, Ack)).
+chat_validates_utf8_and_rate() ->
+    reset(), family(),
+    [ ?assertEqual({aborted, {denied, <<"invalid_message">>}}, chat_send(?A, ?AF, ?B, 1, Text))
+      || Text <- [<<>>, <<"   ">>, <<0>>, <<255>>, binary:copy(<<"a">>, 4097)] ],
+    Text = unicode:characters_to_binary([16#0633, 16#0644, 16#0627, 16#0645, 32, 16#1F44B]),
+    {atomic, {#{<<"message">> := Msg}, _}} = chat_send(?A, ?AF, ?B, 1, Text),
+    ?assertEqual(Text, maps:get(<<"text">>, Msg)),
+    Now = erlang:system_time(second),
+    mnesia:dirty_write({deenly_family_inbox, {rate, ?D, ?A}, {?D, ?A}, #{second => Now, seconds => 10, minute => Now div 60, minutes => 300}}),
+    ?assertEqual({aborted, {denied, <<"message_rate_limited">>}}, chat_send(?A, ?AF, ?B, 2, <<"hello">>)),
+    {atomic, _} = chat_send(?A, ?AF, ?B, 1, Text).
+chat_removal_revokes_history() ->
+    reset(), family(), {atomic, _} = chat_send(?A, ?AF, ?B, 1, <<"private">>),
+    {atomic, _} = act(?A, ?AF, <<"remove_member">>, #{<<"peer">> => ?B}),
+    ?assertEqual({aborted, {denied, <<"not_family">>}}, chat_history(?B, ?BF, ?A, 999)),
+    family(), {atomic, {Page, _}} = chat_history(?B, ?BF, ?A, 999),
+    ?assertEqual([], maps:get(<<"messages">>, Page)),
+    {ok, ok} = mod_deenly_family:remove_user(ok, #{jid => jid:from_binary(?A)}, #{}),
+    ?assertEqual({aborted, {denied, <<"not_family">>}}, chat_history(?B, ?BF, ?A, 999)).
+inbox_records_invitations_and_missed_calls() ->
+    reset(), invite(),
+    {atomic, {Inbox, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    ?assertEqual(1, maps:get(<<"unreadCount">>, Inbox)),
+    {atomic, {Ack, _}} = act(?B, ?BF, <<"ack_notifications">>, #{}),
+    ?assertEqual(0, maps:get(<<"unreadCount">>, Ack)),
+    {atomic, _} = act(?B, ?BF, <<"accept_member">>, #{<<"peer">> => ?A}),
+    {atomic, _} = call(), {atomic, _} = act(?A, ?AF, <<"end_call">>, #{<<"callId">> => ?ID}),
+    {atomic, {Missed, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    [N] = maps:get(<<"notifications">>, Missed),
+    ?assertEqual(<<"missed_call">>, maps:get(<<"kind">>, N)), ?assertEqual(1, maps:get(<<"count">>, N)),
+    {atomic, _} = act(?A, ?AF, <<"end_call">>, #{<<"callId">> => ?ID}),
+    {atomic, {Again, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    ?assertEqual(1, maps:get(<<"unreadCount">>, Again)).
+
+flush_routes() -> receive {family_test_route, _} -> flush_routes() after 0 -> ok end.
+
+chat_persists_across_restart() ->
+    reset(), family(), {atomic, _} = chat_send(?A, ?AF, ?B, 1, <<"durable">>),
+    stopped = mnesia:stop(), ok = mnesia:start(),
+    ok = mnesia:wait_for_tables([deenly_family, deenly_family_messages, deenly_family_inbox], 10000),
+    ok = mod_deenly_family_presence:init(),
+    {atomic, {#{<<"messages">> := [Message]}, _}} = chat_history(?B, ?BF, ?A, 999),
+    ?assertEqual(<<"durable">>, maps:get(<<"text">>, Message)),
+    {atomic, {Inbox, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    ?assertEqual(1, maps:get(<<"unreadCount">>, Inbox)).

@@ -65,6 +65,7 @@ data class BottomBarItem(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
     val enabled: Boolean = true,
+    val visible: Boolean = true,
 )
 
 /**
@@ -75,7 +76,8 @@ data class BottomBarItem(
  */
 val SharedBottomBarItems = listOf(
     BottomBarItem("Home", NiaIcons.Home, NiaIcons.HomeBorder),
-    BottomBarItem("For you", NiaIcons.Upcoming, NiaIcons.UpcomingBorder),
+    BottomBarItem("For you", NiaIcons.Upcoming, NiaIcons.UpcomingBorder,
+        visible = com.starception.submission.family.FamilyRollout.showForYou()),
     BottomBarItem("Saved", NiaIcons.Bookmarks, NiaIcons.BookmarksBorder),
     BottomBarItem("Course", NiaIcons.Course, NiaIcons.CourseBorder),
     BottomBarItem("Interests", NiaIcons.Grid3x3, NiaIcons.Grid3x3),
@@ -102,10 +104,11 @@ fun FloatingBottomBar(
     onNudgeAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val visible = items.withIndex().filter { it.value.visible }
     PlatformFloatingBottomBar(
-        items = items,
-        selectedIndex = selectedIndex,
-        onSelect = onSelect,
+        items = visible.map { it.value },
+        selectedIndex = visible.indexOfFirst { it.index == selectedIndex }.coerceAtLeast(0),
+        onSelect = { index -> onSelect(visible[index].index) },
         onVoiceTap = onVoiceTap,
         nudge = nudge,
         onNudgeAction = onNudgeAction,
@@ -260,7 +263,7 @@ fun FloatingSideBar(
             verticalArrangement = Arrangement.spacedBy(2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            items.forEachIndexed { index, item ->
+            items.withIndex().filter { it.value.visible }.forEach { (index, item) ->
                 val selected = index == selectedIndex
                 Box(
                     modifier = Modifier

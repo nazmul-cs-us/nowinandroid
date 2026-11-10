@@ -816,6 +816,7 @@ extension String {
 
 @available(iOS 26.0, *)
 struct NativePrayerTabsView: View {
+    @ObservedObject private var familyStore = FamilyStore.shared
     @State private var selectedTab = 0
     @State private var morePath: [Int] = []
     @State private var lastSelectedTab = 0
@@ -840,7 +841,7 @@ struct NativePrayerTabsView: View {
             }
             Tab("More", systemImage: "ellipsis", value: 5) {
                 MorePrayerTabsView(path: $morePath, onSelectTab: selectContentTab)
-            }
+            }.badge(familyStore.unreadCount)
             Tab(value: 6, role: .search) {
                 Color.clear
             } label: {
@@ -1090,20 +1091,23 @@ private let NowNudgeThinkingVerbs = [
 
 @available(iOS 26.0, *)
 private struct MorePrayerTabsView: View {
+    @ObservedObject private var familyStore = FamilyStore.shared
     @Binding var path: [Int]
     let onSelectTab: (Int) -> Void
 
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                NavigationLink(value: 1) {
-                    Label("For you", systemImage: "shippingbox")
+                if FamilyRollout.shared.showForYou() {
+                    NavigationLink(value: 1) {
+                        Label("For you", systemImage: "shippingbox")
+                    }
                 }
                 NavigationLink(value: 3) {
                     Label("Course", systemImage: "play.rectangle")
                 }
                 NavigationLink(value: 7) {
-                    Label("Family", systemImage: "person.2")
+                    Label("Family", systemImage: "person.2").badge(familyStore.unreadCount)
                 }
             }
             .navigationTitle("More")
