@@ -5,6 +5,7 @@ import XMPPFramework
 import KissXML
 import Shared
 import UIKit
+import Network
 
 struct FamilyWebPairing: Identifiable {
     let code: String
@@ -46,6 +47,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     static let domain = FamilyEndpoint().domain
     static let namespace = "urn:starception:family:1"
     @Published private(set) var connected = false
+    @Published private(set) var reconnecting = false
+    var signedIn: Bool { connected || reconnecting }
     @Published private(set) var busy = false
     @Published private(set) var serviceReady = false
     @Published private(set) var webPairing: FamilyWebPairing?
@@ -91,12 +94,28 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     private var queuedSignals: [(String, [String: Any])] = []
     private var ringingTask: Task<Void, Never>?
     private var heartbeat: Task<Void, Never>?
+    private var recovery: Task<Void, Never>?
+    private var recoveryEpoch = 0
+    private let networkMonitor = NWPathMonitor()
     private var pendingCredential: (String, String)?
 
     override private init() {
         super.init()
         logger.notice("Diagnostics v2 loaded")
         foreground = UIApplication.shared.applicationState == .active
+        networkMonitor.pathUpdateHandler = { [weak self] path in
+            guard path.status == .satisfied else { return }
+            Task { @MainActor in
+                guard let self, self.foreground else { return }
+                if !self.connected { self.restoreSavedSession() }
+                else {
+                    let current = self.stream
+                    do { await self.apply(try await self.request("snapshot")) }
+                    catch { if self.connected && current === self.stream { self.lost("Reconnecting to Family…") } }
+                }
+            }
+        }
+        networkMonitor.start(queue: DispatchQueue(label: "Deenly.FamilyNetwork"))
         media.onSignal = { [weak self] payload in
             guard let self, let id = self.call?.id else { return }
             Task { do { _ = try await self.request("signal", ["callId": id, "payload": payload]) }
@@ -111,15 +130,43 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         media.onFailure = { [weak self] message in Task { await self?.failCall(message) } }
     }
     func activityChanged(_ active: Bool) {
+        let changed = foreground != active
+        foreground = active
+        if changed { activityVersion += 1 }
         if active { restoreSavedSession() }
-        guard foreground != active else { return }
-        foreground = active; activityVersion += 1
-        guard connected else { return }
-        Task { _ = try? await request("presence") }
+        else { recoveryEpoch += 1; recovery?.cancel(); recovery = nil }
+        if changed && connected { Task {
+            let current = stream
+            if !active { _ = try? await request("presence") }
+            else {
+                do { await apply(try await request("snapshot")) }
+                catch { if connected && current === stream { lost("Reconnecting to Family…") } }
+            }
+        } }
     }
     func restoreSavedSession() {
-        guard restorePolicy.canRestore(connected: connected, busy: busy), let saved = FamilyCredentials.load() else { return }
-        login(saved.0, password: saved.1, restoring: true)
+        guard recovery == nil, foreground, restorePolicy.canRestore(connected: connected, busy: busy),
+              let saved = FamilyCredentials.load() else { return }
+        let epoch = recoveryEpoch
+        recovery = Task { [weak self] in
+            guard let self else { return }
+            var attempt: Int32 = 0
+            defer { if self.recoveryEpoch == epoch { self.recovery = nil } }
+            while !Task.isCancelled && self.foreground && self.recoveryEpoch == epoch && !self.connected {
+                guard self.restorePolicy.canRestore(connected: self.connected, busy: self.busy) else { return }
+                if attempt > 0 {
+                    do { try await Task.sleep(nanoseconds: UInt64(self.restorePolicy.retryDelayMillis(attempt: attempt - 1)) * 1_000_000) }
+                    catch { return }
+                }
+                guard !Task.isCancelled, self.foreground, self.recoveryEpoch == epoch,
+                      self.restorePolicy.canRestore(connected: self.connected, busy: self.busy) else { return }
+                self.login(saved.0, password: saved.1, restoring: true)
+                while self.busy && !Task.isCancelled && self.recoveryEpoch == epoch {
+                    do { try await Task.sleep(nanoseconds: 100_000_000) } catch { return }
+                }
+                attempt = min(attempt + 1, 6)
+            }
+        }
     }
     func requestWebHelper() {
         message = nil
@@ -145,12 +192,19 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     func login(_ input: String, password: String, createAccount: Bool = false, restoring: Bool = false) {
         guard !busy else { return }
-        if !restoring { restorePolicy.manualSignIn() }
+        if !restoring { recoveryEpoch += 1; recovery?.cancel(); recovery = nil; restorePolicy.manualSignIn() }
         guard let jid = FamilyEndpoint().account(input: input),
               jid.hasSuffix("@" + Self.domain), !password.isEmpty else {
             message = "Enter your family account and password."; return
         }
+        let previousMembers = members, previousConversations = conversations, previousNotifications = notifications
+        let previousUnread = unreadCount, previousPeer = chatPeer, previousDraft = chatDraft, previousMessages = messages
+        let previousRetry = retryMessage, previousBefore = nextBefore
         disconnect(clearSaved: false)
+        if restoring {
+            members = previousMembers; conversations = previousConversations; notifications = previousNotifications; unreadCount = previousUnread
+            chatPeer = previousPeer; chatDraft = previousDraft; messages = previousMessages; retryMessage = previousRetry; nextBefore = previousBefore; reconnecting = true
+        }
         me = jid; busy = true; self.password = password; registering = createAccount; message = nil
         pendingCredential = (jid, password)
         let socket = XMPPStream()
@@ -164,7 +218,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     func disconnect(clearSaved: Bool = true) {
         logger.info("Session reset; clearSaved=\(clearSaved); hadCall=\(self.call != nil)")
-        if clearSaved { restorePolicy.explicitSignOut(); unregisterPushToken(); FamilyCredentials.clear() }
+        if clearSaved { recoveryEpoch += 1; recovery?.cancel(); recovery = nil; restorePolicy.explicitSignOut(); unregisterPushToken(); FamilyCredentials.clear() }
         inboxVersion = 0; conversations = []; notifications = []; unreadCount = 0; closeChat()
         presenceCache.clear(); webPairing = nil
         callMessage = nil; pushRegistrationMessage = nil
@@ -177,6 +231,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             socket.send(XMPPIQ(type: "set", to: XMPPJID(string: Self.domain), elementID: UUID().uuidString, child: child))
         }
         stream = nil; socket?.removeDelegate(self); socket?.disconnectAfterSending()
+        reconnecting = false
         password = nil; registering = false; accountJustCreated = false; pendingCredential = nil; connected = false; serviceReady = false; busy = false; me = ""; members = []; connectedAt = nil
         media.close(); mediaCall = nil; call = nil; terminal.removeAll(); queuedSignals.removeAll(); callReducer.clear()
         ringingTask?.cancel(); heartbeat?.cancel(); heartbeat = nil
@@ -193,6 +248,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         call = nil; queuedSignals.removeAll(); ringingTask?.cancel(); heartbeat?.cancel()
         rejectPending(); message = text
         let failed = stream; stream = nil; failed?.removeDelegate(self); failed?.disconnect()
+        reconnecting = restorePolicy.canRestore(connected: false, busy: false) && FamilyCredentials.load() != nil
+        if reconnecting { message = "Reconnecting to Family…"; restoreSavedSession() }
     }
     private func rejectPending() {
         let waiting = Array(pending.values); pending.removeAll()
@@ -560,18 +617,23 @@ extension FamilyStore: XMPPStreamDelegate {
     nonisolated func xmppStreamDidAuthenticate(_ sender: XMPPStream) {
         Task { @MainActor in
             guard sender === stream else { return }
-            password = nil; registering = false; accountJustCreated = false; connected = true; busy = false
+            password = nil; registering = false; accountJustCreated = false; connected = true; busy = false; reconnecting = false; message = nil
             if let saved = pendingCredential { FamilyCredentials.save(jid: saved.0, password: saved.1) }
             pendingCredential = nil
             registerPushToken()
             sender.send(XMPPPresence())
             refresh()
             heartbeat?.cancel()
-            heartbeat = Task { [weak self] in
+            heartbeat = Task { [weak self, weak sender] in
+                var failures = 0
                 while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 20_000_000_000)
-                    guard !Task.isCancelled, let self, self.connected else { return }
-                    self.refresh()
+                    do { try await Task.sleep(nanoseconds: 20_000_000_000) } catch { return }
+                    guard !Task.isCancelled, let self, let sender, self.connected, sender === self.stream else { return }
+                    do { await self.apply(try await self.request("snapshot")); failures = 0 }
+                    catch {
+                        failures += 1
+                        if failures >= 2 && self.foreground && sender === self.stream { self.lost("Reconnecting to Family…"); return }
+                    }
                 }
             }
         }

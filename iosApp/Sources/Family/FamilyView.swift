@@ -43,6 +43,7 @@ private struct FamilyColors {
     var accent: Color { familyColor(raw.accent) }
     var header: Color { familyColor(raw.header) }
     var onHeader: Color { familyColor(raw.onHeader) }
+    var brand: Color { familyColor(raw.brandHeader) }
     var onButton: Color { familyColor(raw.onButton) }
     var error: Color { familyColor(raw.error) }
     var onError: Color { familyColor(raw.onError) }
@@ -56,6 +57,7 @@ struct FamilyView: View {
     @ObservedObject private var store = FamilyStore.shared
     @ObservedObject private var appearance = FamilyAppearance.shared
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
     #if DEBUG
     @State private var account = FamilyEndpoint().iosTestAccount
     @State private var password = "1234567812345678"
@@ -65,7 +67,6 @@ struct FamilyView: View {
     #endif
     @State private var invitation = ""
     @State private var search = ""
-    @State private var searching = false
     @State private var passwordVisible = false
     @State private var creatingAccount = false
     @State private var confirmation = ""
@@ -74,6 +75,7 @@ struct FamilyView: View {
     @State private var inbox = false
     @State private var removing: FamilyMemberRow?
     @State private var selected: FamilyMemberRow?
+    @State private var pendingProfileAction: (() -> Void)?
     private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
     private var family: [FamilyMemberRow] {
         store.members.filter { $0.status == "accepted" }.sorted { a, b in
@@ -91,16 +93,16 @@ struct FamilyView: View {
     }
     var body: some View {
         GeometryReader { geometry in
-            ScrollView {
-                VStack(spacing: 0) {
-                    if store.connected { contactHeader.frame(height: 128) }
-                    else { FamilyLandingIllustration().frame(height: 184) }
+            VStack(spacing: 0) {
+                if store.signedIn { contactHeader }
+                else { FamilyLandingIllustration().frame(height: 184) }
+                ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        if store.connected { contactList } else { loginFields }
-                        if store.connected, let message = store.pushRegistrationMessage {
+                        if store.signedIn { contactList } else { loginFields }
+                        if store.signedIn, let message = store.pushRegistrationMessage {
                             Text(message).font(.system(size: 12)).foregroundStyle(colors.muted).padding(.horizontal, 24).padding(.vertical, 12)
                         }
-                        if !creatingAccount || store.connected, let message = store.message {
+                        if !creatingAccount || store.signedIn, let message = store.message {
                             HStack(spacing: 10) {
                                 Image(systemName: "info.circle").foregroundStyle(colors.accent)
                                 Text(message).font(.system(size: 12)).foregroundStyle(colors.ink).frame(maxWidth: .infinity, alignment: .leading)
@@ -111,38 +113,28 @@ struct FamilyView: View {
                         }
                         Spacer(minLength: 32)
                     }
-                    .padding(.top, 24).padding(.bottom, 24)
-                    .frame(minHeight: max(0, geometry.size.height - (store.connected ? 128 : 184)), alignment: .top)
-                    .frame(maxWidth: .infinity).background(colors.panel.opacity(0.78))
-                    .clipShape(FamilyTopCorners(radius: 30))
+                    .padding(.top, store.signedIn ? 12 : 24).padding(.bottom, 100)
+                    .frame(minHeight: max(0, geometry.size.height - (store.signedIn ? 228 : 184)), alignment: .top)
+                    .frame(maxWidth: .infinity).background(store.signedIn ? colors.panel : colors.panel.opacity(0.78))
+                    .clipShape(FamilyTopCorners(radius: 32, topRight: store.signedIn ? 0 : 32))
                 }
-            }.background(LinearGradient(colors: colors.canvas, startPoint: .top, endPoint: .bottom).ignoresSafeArea())
-        }
-        .navigationTitle("Family").navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-
-        .toolbar {
-            if store.connected {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button { inbox = true; store.acknowledgeNotifications() } label: {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "bell")
-                            if store.unreadCount > 0 {
-                                Text("\(min(99, store.unreadCount))").font(.system(size: 9, weight: .bold)).foregroundStyle(colors.onButton)
-                                    .padding(3).background(colors.accent, in: Capsule()).offset(x: 9, y: -8)
-                            }
-                        }
-                    }.accessibilityLabel("Family notifications, \(store.unreadCount) unread")
-                    Button { searching.toggle(); if !searching { search = "" } } label: { Image(systemName: "magnifyingglass") }
-                        .accessibilityLabel("Search family")
-                    Menu {
-                        Button { store.requestWebHelper() } label: { Label("Temporary call alerts", systemImage: "bell.badge") }
-                        Button { store.refresh() } label: { Label("Refresh family", systemImage: "arrow.clockwise") }
-                        Button(role: .destructive) { store.disconnect() } label: { Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right") }
-                    } label: { Image(systemName: "ellipsis") }.accessibilityLabel("Family settings")
+            }.background {
+                if store.signedIn { colors.brand.ignoresSafeArea() }
+                else { LinearGradient(colors: colors.canvas, startPoint: .top, endPoint: .bottom).ignoresSafeArea() }
+            }
+            .overlay(alignment: .bottom) {
+                if store.signedIn {
+                    Button { inviting = true } label: {
+                        Image(systemName: "plus").font(.system(size: 24, weight: .medium)).foregroundStyle(colors.onTertiary)
+                            .frame(width: 56, height: 56).background(colors.tertiary, in: Circle()).shadow(color: .black.opacity(0.12), radius: 12, y: 5)
+                    }.accessibilityLabel("Invite a member").padding(.bottom, 24)
                 }
             }
         }
+        .navigationTitle(store.signedIn ? "" : "Family").navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+
+        .toolbar(store.signedIn ? .hidden : .visible, for: .navigationBar)
         .sheet(item: Binding(get: { store.webPairing }, set: { _ in store.dismissWebHelper() })) { pairing in
             FamilyCallAlertsSetup(pairing: pairing)
         }
@@ -151,52 +143,76 @@ struct FamilyView: View {
         }
         .sheet(isPresented: $inbox) { notificationInbox }
         .refreshable { store.refresh() }
-        .onAppear { suggestPeer() }
+        .onAppear { suggestPeer(); NativeAppearanceBridge.shared.setCallAppearance(lightIcons: store.signedIn || colorScheme == .dark) }
+        .onDisappear { if store.call == nil { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: nil) } }
         .onChange(of: store.me) { _ in suggestPeer() }
-        .onChange(of: store.connected) { connected in
+        .onChange(of: store.signedIn) { connected in
+            NativeAppearanceBridge.shared.setCallAppearance(lightIcons: connected || colorScheme == .dark)
             if connected { password = ""; confirmation = ""; creatingAccount = false }
         }
         .sheet(isPresented: $inviting) { invitationSheet }
-        .sheet(item: $selected) { member in contactSheet(member) }
+        .navigationDestination(isPresented: Binding(get: { selected != nil }, set: { if !$0 { selected = nil } })) {
+            if let member = selected {
+                contactProfile(member).toolbar(.hidden, for: .navigationBar)
+                    .onDisappear { let action = pendingProfileAction; pendingProfileAction = nil; action?() }
+            }
+        }
         .confirmationDialog("Remove from family?", isPresented: Binding(
             get: { removing != nil }, set: { if !$0 { removing = nil } })) {
             if let member = removing { Button("Remove", role: .destructive) { store.removeMember(member.jid); removing = nil } }
         } message: { Text("Removing this member also deletes your shared chat history. You’ll need a new accepted invitation to connect again.") }
     }
     private var contactHeader: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 20) {
-                Button { inviting = true } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: "plus").font(.system(size: 23, weight: .light)).frame(width: 60, height: 60)
-                            .overlay(Circle().strokeBorder(colors.ink.opacity(0.5), lineWidth: 1))
-                        Text("Invite").font(.system(size: 11))
-                    }.foregroundStyle(colors.ink.opacity(0.9))
-                }.disabled(!store.serviceReady)
-                ForEach(family) { member in
-                    Button { selected = member } label: {
-                        VStack(spacing: 8) {
-                            FamilyContactAvatar(jid: member.jid, size: 60, ring: true)
-                            Text(familyName(member.jid).components(separatedBy: " ")[0]).font(.system(size: 11)).foregroundStyle(colors.ink.opacity(0.9)).lineLimit(1)
-                        }.frame(width: 60)
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18)).frame(width: 24, height: 44) }.accessibilityLabel("Back")
+                Text("Family").font(.system(size: 26, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading)
+                Button { inbox = true; store.acknowledgeNotifications() } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "bell").frame(width: 40, height: 44)
+                        if store.unreadCount > 0 {
+                            Text("\(min(99, store.unreadCount))").font(.system(size: 9, weight: .bold)).foregroundStyle(colors.onButton)
+                                .padding(3).background(colors.accent, in: Capsule())
+                        }
                     }
-                }
-            }.padding(.horizontal, 24).padding(.top, 8).padding(.bottom, 24)
-        }.buttonStyle(.plain)
+                }.accessibilityLabel("Family notifications")
+                Menu {
+                    Button(requests.isEmpty ? "Invitations" : "Invitations · \(requests.count)") { invitations = true }
+                    Button { store.requestWebHelper() } label: { Label("Temporary call alerts", systemImage: "bell.badge") }
+                    Button { store.refresh() } label: { Label("Refresh family", systemImage: "arrow.clockwise") }
+                    Button(role: .destructive) { store.disconnect() } label: { Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right") }
+                } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)).frame(width: 32, height: 44) }.accessibilityLabel("Family settings")
+            }.foregroundStyle(.white).frame(height: 64).padding(.horizontal, 24)
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.white.opacity(0.7))
+                TextField("", text: $search, prompt: Text("Search your family").foregroundColor(.white.opacity(0.65)))
+                    .font(.system(size: 14)).foregroundStyle(.white).tint(.white).autocorrectionDisabled().accessibilityLabel("Search family")
+                if !search.isEmpty { Button { search = "" } label: { Image(systemName: "xmark").font(.system(size: 12)).foregroundStyle(.white).frame(width: 30, height: 30) }.accessibilityLabel("Close search") }
+            }.padding(.horizontal, 14).frame(height: 44).background(.white.opacity(0.1), in: Capsule()).padding(.horizontal, 24).padding(.bottom, 18)
+            if !family.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 18) {
+                        ForEach(family) { member in
+                            Button { selected = member } label: {
+                                VStack(spacing: 6) {
+                                    FamilyContactAvatar(jid: member.jid, size: 46, online: store.serviceReady && member.presence == "online")
+                                    Text(familyName(member.jid).components(separatedBy: " ")[0]).font(.system(size: 10)).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
+                                }.frame(width: 48)
+                            }
+                        }
+                    }.padding(.horizontal, 24).padding(.bottom, 20)
+                }.buttonStyle(.plain)
+            }
+        }.background(colors.brand)
     }
     private var contactList: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                segment("Family", active: !invitations) { invitations = false }
-                segment("Invites", active: invitations, count: requests.count) { invitations = true }
-            }.padding(4).frame(height: 44).background(colors.field, in: Capsule()).padding(.horizontal, 24).padding(.bottom, 16)
-            if searching {
-                HStack {
-                    Image(systemName: "magnifyingglass").foregroundStyle(colors.muted)
-                    TextField("Search your family", text: $search).autocorrectionDisabled().font(.system(size: 14))
-                    Button { search = ""; searching = false } label: { Image(systemName: "xmark").frame(width: 28, height: 28) }.accessibilityLabel("Close search")
-                }.padding(12).background(colors.field, in: RoundedRectangle(cornerRadius: 16)).padding(.horizontal, 24).padding(.bottom, 16)
-            }
+            if invitations { HStack {
+                Text("Invitations").font(.system(size: 16, weight: .semibold)).foregroundStyle(colors.ink)
+                Spacer()
+                Button(invitations ? "Back to chats" : requests.isEmpty ? "Invites" : "Invites · \(requests.count)") { invitations.toggle() }
+                    .font(.system(size: 12)).foregroundStyle(colors.accent)
+            }.frame(height: 44).padding(.horizontal, 24) }
             if !store.serviceReady {
                 HStack(spacing: 10) { ProgressView().controlSize(.small); Text("Connecting your family…").font(.system(size: 13)).foregroundStyle(colors.muted) }
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 28).padding(.vertical, 16)
@@ -210,32 +226,17 @@ struct FamilyView: View {
             }
         }
     }
-    private func segment(_ title: String, active: Bool, count: Int = 0, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Text(title).font(.system(size: 13, weight: active ? .semibold : .regular))
-                if count > 0 {
-                    Text("\(count)").font(.system(size: 10, weight: .semibold)).padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(colors.accent.opacity(0.12), in: Capsule()).foregroundStyle(colors.accent)
-                }
-            }.foregroundStyle(active ? colors.ink : colors.muted).frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(active ? colors.panel : .clear, in: Capsule())
-                .shadow(color: .black.opacity(active ? 0.04 : 0), radius: 2, y: 1)
-        }.buttonStyle(.plain).accessibilityAddTraits(active ? .isSelected : [])
-    }
+
     private func memberRow(_ member: FamilyMemberRow) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 14) {
                 Button { if member.status == "accepted" { store.openChat(member.jid) } else { selected = member } } label: {
                     HStack(spacing: 14) {
-                        FamilyContactAvatar(jid: member.jid, size: 50)
+                        FamilyContactAvatar(jid: member.jid, size: 46, online: member.status == "accepted" && store.serviceReady && member.presence == "online")
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(familyName(member.jid)).font(.system(size: 16, weight: .medium)).foregroundStyle(colors.ink).lineLimit(1)
-                            let presence = store.connected && store.serviceReady ? member.presence : "unknown"
+                            Text(familyName(member.jid)).font(.system(size: 15, weight: .medium)).foregroundStyle(colors.ink).lineLimit(1)
+                            let presence = store.signedIn && store.serviceReady ? member.presence : "unknown"
                             HStack(spacing: 6) {
-                                if member.status == "accepted" && presence == "online" {
-                                    Circle().fill(Color(red: 46 / 255, green: 157 / 255, blue: 101 / 255)).frame(width: 6, height: 6).accessibilityHidden(true)
-                                }
                                 Text(store.conversations.first(where: { $0.peer == member.jid })?.lastMessage?.text ?? (member.status == "incoming" ? "Invited you to join" : member.status == "outgoing" ? "Waiting for acceptance" : presence == "online" ? "Online" : presence == "offline" ? "Offline" : "Status unavailable"))
                                     .font(.system(size: 12)).foregroundStyle(colors.muted).lineLimit(1)
                             }
@@ -253,16 +254,11 @@ struct FamilyView: View {
                         }
                     }
                 }
-                if member.status == "accepted" {
-                    Button { store.startCall(member.jid, video: false) } label: {
-                        Image(systemName: "phone.fill").font(.system(size: 17)).foregroundStyle(colors.accent)
-                            .frame(width: 44, height: 44).background(colors.field, in: Circle())
-                    }.buttonStyle(.plain).disabled(!canCall).accessibilityLabel("Call \(familyName(member.jid))")
-                } else {
+                if member.status != "accepted" {
                     Button { selected = member } label: { Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(colors.muted).frame(width: 32, height: 44) }
                         .accessibilityLabel("View invitation")
                 }
-            }.padding(.leading, 24).padding(.trailing, 20).padding(.vertical, 14)
+            }.padding(.leading, 24).padding(.trailing, 24).padding(.vertical, 12)
             if member.status == "incoming" {
                 HStack(spacing: 14) {
                     Button("Accept") { store.acceptMember(member.jid) }.font(.system(size: 12, weight: .semibold))
@@ -370,49 +366,66 @@ struct FamilyView: View {
     private var invitationSheet: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 18) {
-                Image(systemName: "person.badge.plus").font(.title2).foregroundStyle(colors.accent)
-                    .frame(width: 48, height: 48).background(colors.field, in: RoundedRectangle(cornerRadius: 16))
-                Text("Bring your people closer").font(.system(size: 24, weight: .semibold)).foregroundStyle(colors.ink)
-                Text("Send an invitation. Calls become available when they accept.").font(.system(size: 14)).foregroundStyle(colors.muted)
+                Text("Invite a mahram family member. You can message and call after they accept.")
+                    .font(.system(size: 14)).foregroundStyle(colors.muted).lineSpacing(4)
                 accountField($invitation, title: "Family account", symbol: "person")
                 Button { store.invite(invitation); invitation = ""; inviting = false; invitations = true } label: {
                     Text("Send invitation").font(.system(size: 15, weight: .semibold)).foregroundStyle(colors.onButton)
                         .frame(maxWidth: .infinity).frame(height: 54).background(colors.accent, in: RoundedRectangle(cornerRadius: 18))
                 }.buttonStyle(.plain).disabled(!store.serviceReady || invitation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 Spacer(minLength: 0)
-            }.padding(28).background(colors.panel)
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { inviting = false }.tint(colors.accent) } }
-        }.presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+            }.padding(24).background(colors.panel)
+                .navigationTitle("Invite family").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button { inviting = false } label: { Image(systemName: "xmark").foregroundStyle(colors.muted) }.accessibilityLabel("Close invitation") } }
+        }.presentationDetents([.height(380), .large]).presentationDragIndicator(.visible)
     }
-    private func contactSheet(_ member: FamilyMemberRow) -> some View {
-        VStack(spacing: 14) {
-            FamilyContactAvatar(jid: member.jid, size: 80)
-            Text(familyName(member.jid)).font(.system(size: 24, weight: .semibold)).foregroundStyle(colors.ink)
-            Text(member.jid).font(.system(size: 12)).foregroundStyle(colors.muted)
-            if member.status == "accepted" {
-                Button("Message") { selected = nil; store.openChat(member.jid) }.buttonStyle(.borderedProminent).tint(colors.accent)
-                HStack(spacing: 12) {
-                    contactAction("Voice call", symbol: "phone.fill") { selected = nil; store.startCall(member.jid, video: false) }
-                    contactAction("Video call", symbol: "video.fill") { selected = nil; store.startCall(member.jid, video: true) }
-                }.padding(.vertical, 12)
-            } else {
-                Text(member.status == "incoming" ? "Accept this invitation to start calling." : "Your invitation is waiting for acceptance.")
-                    .font(.system(size: 14)).foregroundStyle(colors.muted).multilineTextAlignment(.center)
+    private func contactProfile(_ member: FamilyMemberRow) -> some View {
+        GeometryReader { _ in
+        ScrollView {
+            VStack(spacing: 0) {
+                ZStack(alignment: .bottomLeading) {
+                    colors.brand
+                    FamilyContactAvatar(jid: member.jid, size: 96).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).padding(.leading, 24).padding(.top, 48)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(familyName(member.jid)).font(.system(size: 24, weight: .semibold)).foregroundStyle(.white)
+                        Text(member.status == "accepted" ? (store.signedIn && store.serviceReady && store.members.first(where: { $0.jid == member.jid })?.presence == "online" ? "Online" : "Family member") : "Family invitation")
+                            .font(.system(size: 12)).foregroundStyle(.white.opacity(0.8))
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).padding(.leading, 140).padding(.trailing, 24).padding(.top, 48)
+                    Button { selected = nil } label: {
+                        Image(systemName: "arrow.left").font(.system(size: 20)).foregroundStyle(.white).frame(width: 44, height: 44)
+                    }.accessibilityLabel("Back to family").frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(.top, 48).padding(.leading, 12)
+                }.frame(height: 240)
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("FAMILY ACCOUNT").font(.system(size: 10, weight: .medium)).tracking(1.5).foregroundStyle(colors.muted)
+                        Text(member.jid).font(.system(size: 15)).foregroundStyle(colors.ink).textSelection(.enabled)
+                    }
+                    if member.status == "accepted" {
+                        HStack {
+                            Text("Keep in touch").font(.system(size: 13)).foregroundStyle(colors.muted)
+                            Spacer()
+                            Button { pendingProfileAction = { store.startCall(member.jid, video: false) }; selected = nil } label: { Image(systemName: "phone").frame(width: 44, height: 44) }.accessibilityLabel("Voice call").disabled(!canCall)
+                            Button { pendingProfileAction = { store.startCall(member.jid, video: true) }; selected = nil } label: { Image(systemName: "video").frame(width: 44, height: 44) }.accessibilityLabel("Video call").disabled(!canCall)
+                        }.foregroundStyle(colors.accent)
+                        Button { pendingProfileAction = { store.openChat(member.jid) }; selected = nil } label: {
+                            Label("Message", systemImage: "bubble.left").font(.system(size: 15, weight: .medium))
+                                .frame(maxWidth: .infinity).padding(16).foregroundStyle(.white).background(colors.brand, in: Capsule())
+                        }.buttonStyle(.plain)
+                    } else {
+                        Text(member.status == "incoming" ? "Accept this invitation to start calling and messaging." : "Your invitation is waiting for acceptance.")
+                            .font(.system(size: 14)).foregroundStyle(colors.muted)
+                    }
+                    if member.status == "incoming" { Button("Accept invitation") { store.acceptMember(member.jid); selected = nil }.buttonStyle(.borderedProminent).tint(colors.accent) }
+                    Button { pendingProfileAction = { removing = member }; selected = nil } label: {
+                        Text(member.status == "accepted" ? "Remove from family" : member.status == "incoming" ? "Decline invitation" : "Cancel invitation")
+                            .font(.system(size: 13)).foregroundStyle(colors.muted).frame(maxWidth: .infinity)
+                    }.padding(.vertical, 12)
+                }.padding(24)
             }
-            if member.status == "incoming" { Button("Accept invitation") { store.acceptMember(member.jid); selected = nil }.buttonStyle(.borderedProminent).tint(colors.accent) }
-            Button { selected = nil; removing = member } label: {
-                Text(member.status == "accepted" ? "Remove from family" : member.status == "incoming" ? "Decline invitation" : "Cancel invitation")
-                    .font(.system(size: 13)).foregroundStyle(colors.muted)
-            }.padding(.top, 6)
-        }.padding(28).frame(maxWidth: .infinity).background(colors.panel)
-            .presentationDetents([.medium]).presentationDragIndicator(.visible)
+        }.background(colors.panel).ignoresSafeArea(edges: .top)
+        }.onAppear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: true) }
     }
-    private func contactAction(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 8) { Image(systemName: symbol).font(.system(size: 23)).foregroundStyle(colors.accent); Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(colors.ink) }
-                .frame(maxWidth: .infinity).padding(.vertical, 20).background(colors.field, in: RoundedRectangle(cornerRadius: 20))
-        }.buttonStyle(.plain).disabled(!canCall)
-    }
+
     private func suggestPeer() {
         #if DEBUG
         if invitation.isEmpty { invitation = FamilyEndpoint().testPeer(input: store.me) }
@@ -422,8 +435,16 @@ struct FamilyView: View {
 
 private struct FamilyTopCorners: Shape {
     let radius: CGFloat
+    var topRight: CGFloat? = nil
     func path(in rect: CGRect) -> Path {
-        Path(UIBezierPath(roundedRect: rect, byRoundingCorners: [.topLeft, .topRight], cornerRadii: CGSize(width: radius, height: radius)).cgPath)
+        let left = min(radius, min(rect.width, rect.height) / 2)
+        let right = min(topRight ?? radius, min(rect.width, rect.height) / 2)
+        var p = Path()
+        p.move(to: CGPoint(x: 0, y: rect.height)); p.addLine(to: CGPoint(x: 0, y: left))
+        p.addQuadCurve(to: CGPoint(x: left, y: 0), control: .zero)
+        p.addLine(to: CGPoint(x: rect.width - right, y: 0))
+        p.addQuadCurve(to: CGPoint(x: rect.width, y: right), control: CGPoint(x: rect.width, y: 0))
+        p.addLine(to: CGPoint(x: rect.width, y: rect.height)); p.closeSubpath(); return p
     }
 }
 
@@ -445,6 +466,7 @@ private struct FamilyContactAvatar: View {
     let jid: String
     let size: CGFloat
     var ring = false
+    var online = false
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var appearance = FamilyAppearance.shared
     private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
@@ -457,6 +479,7 @@ private struct FamilyContactAvatar: View {
             .frame(width: ring ? size - 8 : size, height: ring ? size - 8 : size).background(shade, in: Circle())
             .padding(ring ? 4 : 0).overlay(Circle().strokeBorder(ring ? colors.accent : .clear, lineWidth: 1.5))
             .accessibilityHidden(true)
+            .overlay(alignment: .topTrailing) { if online { Circle().fill(colors.accent).frame(width: 9, height: 9).overlay(Circle().stroke(colors.panel, lineWidth: 2)) } }
     }
 }
 
@@ -544,12 +567,15 @@ private struct FamilyCallView: View {
     private var immersive: Bool { video || preview }
     private var ink: Color { immersive ? .white : colors.ink }
     private var muted: Color { immersive ? .white.opacity(0.75) : colors.muted }
+    private var lightStatusIcons: Bool { video && UIScreen.main.bounds.height >= 500 ? colorScheme == .dark : immersive || colorScheme == .dark }
     var body: some View {
         let call = self.call
         return Group {
             let incoming = call.stage == "ringing" && call.callee == store.me
             GeometryReader { geometry in
                 let compact = geometry.size.height < 500
+                if video && !compact { videoScene(call) }
+                else {
                 ZStack {
                     backdrop(call)
                     VStack(spacing: 0) {
@@ -616,6 +642,7 @@ private struct FamilyCallView: View {
                         }
                     }.padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 24)
                 }
+                }
             }
             .disabled(store.call?.id != presentedCall.id)
             .onChange(of: store.call?.version) { _ in
@@ -623,14 +650,76 @@ private struct FamilyCallView: View {
             }
             .task(id: call.id) { await store.previewCamera() }
             .task(id: scenePhase) { if scenePhase == .active { await store.previewCamera() } }
-            .onAppear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: immersive || colorScheme == .dark) }
-            .onChange(of: immersive) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: immersive || colorScheme == .dark) }
-            .onChange(of: colorScheme) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: immersive || colorScheme == .dark) }
+            .onAppear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: lightStatusIcons) }
+            .onChange(of: immersive) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: lightStatusIcons) }
+            .onChange(of: colorScheme) { _ in NativeAppearanceBridge.shared.setCallAppearance(lightIcons: lightStatusIcons) }
             .onDisappear {
                 if store.call?.id == call.id && store.call?.stage == "ringing" { media.close() }
                 NativeAppearanceBridge.shared.setCallAppearance(lightIcons: nil)
             }
         }
+    }
+    private func videoScene(_ call: FamilyCallInfo) -> some View {
+        ZStack(alignment: .bottom) {
+            LinearGradient(colors: colors.canvas, startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            VStack(spacing: 0) {
+                ZStack(alignment: .top) {
+                    colors.field
+                    FamilyVideoRenderer(track: media.remoteVideo, mirror: false)
+                    if media.remoteVideo == nil {
+                        VStack(spacing: 12) {
+                            FamilyContactAvatar(jid: call.peer(store.me), size: 80)
+                            Text("Waiting for video…").font(.system(size: 13)).foregroundStyle(colors.muted)
+                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    LinearGradient(colors: [.black.opacity(0.55), .clear], startPoint: .top, endPoint: .bottom).frame(height: 160)
+                    VStack(spacing: 6) {
+                        Text(familyName(call.peer(store.me))).font(.system(size: 23, weight: .semibold)).foregroundStyle(.white)
+                        callStatus(incoming: false, stage: call.stage)
+                    }.padding(.top, 24)
+                }.clipShape(RoundedRectangle(cornerRadius: 30))
+                Spacer().frame(height: 116)
+            }
+            VStack(spacing: 16) {
+                HStack {
+                    videoButton(store.muted ? "mic.slash" : "mic", title: store.muted ? "Unmute" : "Mute", selected: store.muted) { store.mute() }
+                    Spacer(minLength: 0)
+                    videoButton(store.cameraEnabled ? "video" : "video.slash", title: "Camera", selected: !store.cameraEnabled) { store.camera() }
+                    Spacer(minLength: 0)
+                    videoButton("arrow.triangle.2.circlepath.camera", title: "Flip", enabled: store.cameraEnabled) { store.switchCamera() }
+                    Spacer(minLength: 0)
+                    videoButton("speaker.wave.2", title: "Speaker", selected: store.speakerEnabled) { store.speaker() }
+                    Spacer(minLength: 0)
+                    Button { store.hangup() } label: {
+                        Image(systemName: "phone.down.fill").font(.system(size: 23)).foregroundStyle(colors.onError)
+                            .frame(width: 52, height: 52).background(colors.error, in: Circle())
+                    }.accessibilityLabel("End call")
+                }
+                HStack(spacing: 16) {
+                    ZStack(alignment: .bottomLeading) {
+                        colors.field
+                        if store.cameraEnabled { FamilyVideoRenderer(track: media.localVideo, mirror: true) }
+                        else { Image(systemName: "video.slash").foregroundStyle(colors.muted).frame(maxWidth: .infinity, maxHeight: .infinity) }
+                        Text("You").font(.system(size: 10)).foregroundStyle(.white).padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(.black.opacity(0.4), in: Capsule()).padding(8)
+                    }.frame(width: 90, height: 120).clipShape(RoundedRectangle(cornerRadius: 20))
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Family video call").font(.system(size: 15, weight: .semibold)).foregroundStyle(colors.ink)
+                        Text(store.mediaConnected ? "Connected" : "Connecting…").font(.system(size: 12)).foregroundStyle(colors.muted)
+                        Text(FamilyConnectionRoute().label(route: store.connectionRoute)).font(.system(size: 11)).foregroundStyle(colors.accent)
+                        if let message = store.callMessage { Text(message).font(.system(size: 11)).foregroundStyle(colors.error) }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }.padding(16).background(colors.panel.opacity(0.84)).background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 28)).shadow(color: .black.opacity(0.12), radius: 12, y: 5)
+                .padding(.horizontal, 12).padding(.bottom, 8)
+        }.padding(12)
+    }
+    private func videoButton(_ symbol: String, title: String, selected: Bool = false, enabled: Bool = true, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 22)).foregroundStyle(colors.accent.opacity(enabled ? 1 : 0.4))
+                .frame(width: 44, height: 44).background(selected ? colors.header : .clear, in: Circle())
+        }.disabled(!enabled).accessibilityLabel(title).accessibilityAddTraits(selected ? .isSelected : [])
     }
     private func callStatus(incoming: Bool, stage: String) -> some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -739,21 +828,21 @@ private struct FamilyChatView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
+    @State private var details = false
     private var peer: String { store.chatPeer ?? "" }
     var body: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 10) {
-                        Text("Your private family conversation").font(.system(size: 11)).foregroundStyle(colors.muted).padding(12)
+                    LazyVStack(spacing: 4) {
                         if store.chatLoading { ProgressView().padding(12) }
                         else if store.nextBefore > 0 { Button("Earlier messages") { store.loadMessages(older: true) }.font(.footnote) }
                         else if store.messages.isEmpty { Text("Say salaam to \(familyName(peer))").font(.footnote).foregroundStyle(colors.muted).padding(24) }
-                        ForEach(store.messages) { message in
-                            messageBubble(message).id(message.id)
+                        ForEach(Array(store.messages.enumerated()), id: \.element.id) { index, message in
+                            messageRow(message, index: index).id(message.id)
                         }
                     }.padding(18)
-                }.background(colors.panel.opacity(0.84), in: FamilyTopCorners(radius: 30))
+                }.background(colors.panel)
                     .onChange(of: store.messages.last?.id) { id in
                         if let id { withAnimation { proxy.scrollTo(id, anchor: .bottom) } }
                         readVisible()
@@ -772,38 +861,67 @@ private struct FamilyChatView: View {
                 Button { store.sendMessage() } label: {
                     Group {
                         if store.chatSending { ProgressView().tint(colors.onButton) }
-                        else { Image(systemName: "arrow.up").font(.system(size: 20, weight: .semibold)) }
-                    }.foregroundStyle(colors.onButton).frame(width: 48, height: 48).background(colors.accent, in: Circle())
+                        else { Image(systemName: "paperplane").font(.system(size: 21, weight: .medium)) }
+                    }.foregroundStyle(colors.accent).frame(width: 44, height: 48)
                 }.disabled(!store.connected || store.chatSending || store.chatDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityLabel("Send message")
             }.padding(16).background(colors.panel)
         }
-        .background(LinearGradient(colors: colors.canvas, startPoint: .top, endPoint: .bottom).ignoresSafeArea())
-        .navigationTitle(familyName(peer)).navigationBarTitleDisplayMode(.inline)
+        .background(colors.panel.ignoresSafeArea())
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(colors.panel, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar(.visible, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    FamilyContactAvatar(jid: peer, size: 30)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(familyName(peer)).font(.system(size: 15, weight: .semibold)).foregroundStyle(colors.ink).lineLimit(1)
+                        Text(store.members.first(where: { $0.jid == peer })?.presence == "online" ? "Online" : "Family member")
+                            .font(.system(size: 10)).foregroundStyle(colors.muted)
+                    }
+                }
+            }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Button { store.startCall(peer, video: false) } label: { Image(systemName: "phone") }.accessibilityLabel("Voice call")
                 Button { store.startCall(peer, video: true) } label: { Image(systemName: "video") }.accessibilityLabel("Video call")
+                Button { details = true } label: { Image(systemName: "info.circle") }.accessibilityLabel("Contact details")
             }
         }.tint(colors.accent)
+        .alert(familyName(peer), isPresented: $details) { Button("Done", role: .cancel) {} } message: { Text(peer) }
         .onAppear { readVisible() }
         .onChange(of: scenePhase) { _ in readVisible() }
         .onChange(of: store.call?.id) { _ in readVisible() }
     }
     private func readVisible() { if scenePhase == .active && store.call == nil { store.markChatRead() } }
-    private func messageBubble(_ message: FamilyChatMessage) -> some View {
+    private func messageRow(_ message: FamilyChatMessage, index: Int) -> some View {
+        let previous = index > 0 ? store.messages[index - 1] : nil
+        let date = Date(timeIntervalSince1970: Double(message.createdAt) / 1000)
+        let newDay = previous == nil || !Calendar.current.isDate(date, inSameDayAs: Date(timeIntervalSince1970: Double(previous!.createdAt) / 1000))
+        let newGroup = newDay || previous?.from != message.from || message.createdAt - (previous?.createdAt ?? 0) > 300000
         let mine = message.from == store.me
-        return HStack {
-            if mine { Spacer(minLength: 48) }
-            VStack(alignment: .trailing, spacing: 5) {
-                Text(message.text).font(.system(size: 15)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                Text(Date(timeIntervalSince1970: Double(message.createdAt) / 1000), style: .time)
-                    .font(.system(size: 10)).foregroundStyle(colors.muted)
-            }.padding(.horizontal, 14).padding(.vertical, 10)
-                .foregroundStyle(mine ? colors.onHeader : colors.ink)
-                .background(mine ? colors.header : colors.field, in: RoundedRectangle(cornerRadius: 20))
-            if !mine { Spacer(minLength: 48) }
-        }
+        return VStack(spacing: 4) {
+            if newDay {
+                Text(Calendar.current.isDateInToday(date) ? "Today" : Calendar.current.isDateInYesterday(date) ? "Yesterday" : date.formatted(date: .abbreviated, time: .omitted))
+                    .font(.system(size: 10)).foregroundStyle(colors.muted).padding(.vertical, 20)
+            }
+            HStack(alignment: .bottom, spacing: 7) {
+                if mine { Spacer(minLength: 48) }
+                else if newGroup { FamilyContactAvatar(jid: peer, size: 26) }
+                else { Color.clear.frame(width: 26, height: 1) }
+                VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
+                    Text(message.text).font(.system(size: 14)).textSelection(.enabled).lineSpacing(3)
+                        .padding(.horizontal, 13).padding(.vertical, 10)
+                        .foregroundStyle(mine ? .white : colors.onHeader)
+                        .background(mine ? colors.brand : colors.header, in: RoundedRectangle(cornerRadius: 18))
+                    HStack(spacing: 4) {
+                        Text(date, style: .time).font(.system(size: 9)).foregroundStyle(colors.muted)
+                        if mine { Image(systemName: "checkmark").font(.system(size: 9)).foregroundStyle(colors.accent).accessibilityLabel("Saved to server") }
+                    }.padding(.horizontal, 4)
+                }
+                if !mine { Spacer(minLength: 48) }
+            }.padding(.top, newGroup && !newDay ? 12 : 0)
+        }.frame(maxWidth: .infinity)
     }
 }

@@ -33,7 +33,7 @@ data class FamilyCall(
     val stage: String, val version: Long, val expires: Long, val selected: Boolean,
 ) { fun peer(me: String) = if (caller == me) callee else caller }
 data class FamilyUiState(
-    val me: String = "", val connected: Boolean = false, val busy: Boolean = false,
+    val me: String = "", val connected: Boolean = false, val busy: Boolean = false, val reconnecting: Boolean = false,
     val serviceReady: Boolean = false,
     val webPairing: FamilyWebPairing? = null,
     val callError: String? = null, val pushRegistrationError: String? = null,
@@ -74,6 +74,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private val presenceCache = FamilyPresenceCache()
     private val restorePolicy = FamilySessionRestorePolicy()
     private var restoreJob: Job? = null
+    private var restoreEpoch = 0
     private var foreground = false
     private var activityVersion = 0L
     private val terminal = LinkedHashSet<String>()
@@ -91,6 +92,22 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             override fun onStart(owner: androidx.lifecycle.LifecycleOwner) { activityChanged(true) }
             override fun onStop(owner: androidx.lifecycle.LifecycleOwner) { activityChanged(false) }
         })
+        // A fresh default route also probes a socket that may have become half-open
+        // during Wi-Fi/mobile handoff. Reconnect only if the authenticated probe fails.
+        runCatching {
+            context.getSystemService(android.net.ConnectivityManager::class.java).registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) { scope.launch {
+                    if (!foreground) return@launch
+                    if (!mutable.value.connected) restoreSavedSession()
+                    else {
+                        val token = generation
+                        try { apply(request("snapshot")) }
+                        catch (e: CancellationException) { throw e }
+                        catch (_: Exception) { if (token == generation && mutable.value.connected) lost(token) }
+                    }
+                } }
+            })
+        }
         (context.applicationContext as android.app.Application).registerActivityLifecycleCallbacks(
             object : android.app.Application.ActivityLifecycleCallbacks {
                 override fun onActivityStarted(activity: android.app.Activity) { visibleActivities.add(activity) }
@@ -108,18 +125,31 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             })
     }
     private fun activityChanged(active: Boolean) {
-        if (active) restoreSavedSession()
-        if (foreground == active) return
-        foreground = active; activityVersion++
-        if (mutable.value.connected) scope.launch { runCatching { request("presence") } }
+        val changed = foreground != active
+        foreground = active
+        if (changed) activityVersion++
+        if (active) restoreSavedSession() else restoreJob?.cancel()
+        if (changed && mutable.value.connected) scope.launch {
+            val token = generation
+            if (!active) runCatching { request("presence") }
+            else try { apply(request("snapshot")) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { if (token == generation && mutable.value.connected) lost(token) }
+        }
     }
     internal fun restoreSavedSession() {
-        if (restoreJob?.isActive == true || !restorePolicy.canRestore(mutable.value.connected, mutable.value.busy)) return
-        val token = generation
+        if (restoreJob?.isActive == true || !foreground || !restorePolicy.canRestore(mutable.value.connected, mutable.value.busy)) return
+        val epoch = restoreEpoch
         restoreJob = scope.launch {
-            val saved = withContext(Dispatchers.IO) { credentials.load() } ?: return@launch
-            if (token != generation || !restorePolicy.canRestore(mutable.value.connected, mutable.value.busy)) return@launch
-            login(saved.first, saved.second, restoring = true).join()
+            val saved = withContext(Dispatchers.IO) { credentials.load() }
+            if (saved == null) { mutable.value = mutable.value.copy(reconnecting = false); return@launch }
+            var attempt = 0
+            while (isActive && foreground && epoch == restoreEpoch && restorePolicy.canRestore(mutable.value.connected, mutable.value.busy)) {
+                if (attempt > 0) delay(restorePolicy.retryDelayMillis(attempt - 1))
+                if (!foreground || epoch != restoreEpoch || !restorePolicy.canRestore(mutable.value.connected, mutable.value.busy)) return@launch
+                login(saved.first, saved.second, restoring = true).join()
+                attempt++
+            }
         }
     }
     private var mediaInstance: AndroidFamilyMedia? = null
@@ -184,14 +214,17 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
 
     fun login(jidInput: String, password: String, restoring: Boolean = false) = scope.launch {
         if (mutable.value.busy) return@launch
-        if (!restoring) restorePolicy.manualSignIn()
+        if (!restoring) { restoreEpoch++; restoreJob?.cancel(); restorePolicy.manualSignIn() }
         val jid = FamilyEndpoint().account(jidInput)
         if (jid == null || !jid.endsWith("@$FAMILY_DOMAIN") || password.isBlank()) {
             mutable.value = mutable.value.copy(error = "Enter your family account and password."); return@launch
         }
+        val restoreToken = restoreEpoch
+        val previous = mutable.value
         disconnect(clearSaved = false)
         val token = generation
-        mutable.value = FamilyUiState(me = jid, busy = true)
+        mutable.value = if (restoring) previous.copy(me = jid, connected = false, busy = true, reconnecting = true, serviceReady = false, call = null, error = null)
+            else FamilyUiState(me = jid, busy = true)
         var attemptedSocket: XMPPTCPConnection? = null
         var signInPhase = "initialization"
         try {
@@ -233,14 +266,20 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             if (token != generation) { withContext(Dispatchers.IO) { socket.disconnect() }; return@launch }
             signInPhase = "local-session"
             connection = socket
-            mutable.value = mutable.value.copy(connected = true, busy = false)
+            mutable.value = mutable.value.copy(connected = true, busy = false, reconnecting = false, error = null)
             runCatching { credentials.save(jid, password) }.onFailure {
                 mutable.value = mutable.value.copy(error = "Could not securely save sign-in. Background calling is unavailable.")
             }
             registerPushToken()
             refresh()
             heartbeat = scope.launch {
-                while (isActive) { delay(20000); runCatching { apply(request("snapshot")) } }
+                var failures = 0
+                while (isActive) {
+                    delay(20000)
+                    try { apply(request("snapshot")); failures = 0 }
+                    catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { if (++failures >= 2 && token == generation && foreground) { lost(token); return@launch } }
+                }
             }
         } catch (e: Exception) {
             // Never log exception messages/stanzas: they can contain account or authentication data.
@@ -251,16 +290,17 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
                     restorePolicy.authenticationRejected()
                 generation++
                 mutable.value = mutable.value.copy(busy = false, connected = false,
-                    serviceReady = false, error = signInError(e))
+                    serviceReady = false, reconnecting = restoring && restorePolicy.canRestore(false, false), error = signInError(e))
             }
             withContext(Dispatchers.IO) { runCatching { attemptedSocket?.disconnect() } }
             if (e is CancellationException) throw e
+            if (restoring && restoreToken == restoreEpoch && foreground && restoreJob?.isActive != true) restoreSavedSession()
         }
     }
 
     fun disconnect(clearSaved: Boolean = true) {
         android.util.Log.i("FamilyCalls", "Session reset: clearSaved=$clearSaved; hadCall=${mutable.value.call != null}")
-        if (clearSaved) { restorePolicy.explicitSignOut(); credentials.clear() }
+        if (clearSaved) { restoreEpoch++; restoreJob?.cancel(); restorePolicy.explicitSignOut(); credentials.clear() }
         generation++
         inboxVersion = 0L
         presenceCache.clear()
@@ -289,12 +329,15 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         if (token != generation) return
         android.util.Log.w("FamilyCalls", "Session lost: hadCall=${mutable.value.call != null}")
         generation++
+        val failed = connection; connection = null
+        scope.launch(Dispatchers.IO) { runCatching { failed?.disconnect() } }
         presenceCache.clear()
         heartbeat?.cancel(); heartbeat = null
         mediaInstance?.close(); rtcCallId = null; queuedSignals.clear(); ringingJob?.cancel()
         mutable.value = mutable.value.copy(connected = false, serviceReady = false, busy = false, call = null,
             connectedAtElapsed = null, webPairing = null,
-            error = "Connection lost. Sign in again before calling.")
+            reconnecting = true, error = "Reconnecting to Family…")
+        restoreSavedSession()
     }
     fun dismissError() { mutable.value = mutable.value.copy(error = null) }
     fun registerPushToken() {

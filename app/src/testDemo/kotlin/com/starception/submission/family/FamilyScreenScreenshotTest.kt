@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -192,9 +193,12 @@ class FamilyScreenScreenshotTest {
     @Test fun contactActionsAreAvailableFromTheAvatarStrip() {
         render(false, true)
         compose.onNodeWithText("Amina").performClick()
-        compose.onNodeWithText("Video call").assertExists()
-        compose.onNodeWithText("Voice call").assertExists()
+        compose.onNodeWithContentDescription("Video call").assertExists()
+        compose.onNodeWithContentDescription("Voice call").assertExists()
         compose.onNodeWithText("amina.khan@xmpp.starception.com").assertExists()
+        capture("contact-profile-light")
+        compose.onNodeWithContentDescription("Back to family").performClick()
+        compose.onNodeWithText("FAMILY ACCOUNT").assertDoesNotExist()
     }
     @Test fun acceptedContactRowOpensChat() {
         var opened: String? = null
@@ -213,6 +217,24 @@ class FamilyScreenScreenshotTest {
         compose.onNodeWithText("Assalamu alaikum! How is everyone at home?").assertExists()
         compose.onNodeWithContentDescription("Send message").assertExists()
         capture("chat-light")
+    }
+    @Test fun invitationIsACompactDismissibleSheet() {
+        render(false, true)
+        compose.onNodeWithContentDescription("Invite a member").performClick()
+        compose.onNodeWithText("Invite family").assertExists()
+        capture("invitation-light")
+        compose.onNodeWithContentDescription("Close invitation").performClick()
+        compose.onNodeWithText("Invite family").assertDoesNotExist()
+    }
+    @Test fun transientReconnectKeepsTheFamilyPageInsteadOfTheLoginForm() {
+        compose.setContent { NiaTheme {
+            FamilyScreenContent(FamilyUiState(reconnecting = true, busy = true, members = members,
+                error = "Reconnecting to Family…"))
+        } }
+        compose.onNodeWithText("Connect with family").assertDoesNotExist()
+        compose.onNodeWithText("Amina Khan").assertExists()
+        compose.onNodeWithText("Online").assertDoesNotExist()
+        compose.onNodeWithText("Connecting your family…").assertExists()
     }
     @Test fun conversationsDark() {
         val peer = members[0].jid
@@ -240,20 +262,48 @@ class FamilyScreenScreenshotTest {
         compose.setContent { NiaTheme(darkTheme = true) {
             FamilyCallContent(FamilyUiState(me = "omar@xmpp.starception.com", mediaConnected = true, connectionRoute = "relay",
                 call = FamilyCall("video-fixture", "amina.khan@xmpp.starception.com", "omar@xmpp.starception.com", "video", "active", 2, Long.MAX_VALUE, true)),
-                remoteReady = true, localReady = true, remoteVideo = { androidx.compose.material3.Text("Remote video", color = androidx.compose.ui.graphics.Color.White) },
-                localVideo = { androidx.compose.material3.Text("Local video", color = androidx.compose.ui.graphics.Color.White) })
+                remoteReady = true, localReady = true, remoteVideo = { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) { androidx.compose.material3.Text("Remote video", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface) } },
+                localVideo = { androidx.compose.material3.Text("Local video", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface) })
         } }
         compose.onNodeWithText("TURN relay").assertExists()
         compose.onNodeWithText("Remote video").assertExists()
         compose.onNodeWithText("Local video").assertExists()
-        compose.onNodeWithText("End call").assertExists()
+        compose.onNodeWithContentDescription("End call").assertExists()
         capture("active-video-dark")
     }
-    @Test fun searchCanBeOpenedAndClosed() {
+    @Test fun videoControlsKeepTheirActionsAndDisableFlipWhenCameraIsOff() {
+        var muted = 0; var ended = 0; var camera = 0
+        compose.setContent { NiaTheme {
+            FamilyCallContent(FamilyUiState(me = "omar@xmpp.starception.com", camera = false,
+                call = FamilyCall("video-fixture", "amina@xmpp.starception.com", "omar@xmpp.starception.com", "video", "active", 2, Long.MAX_VALUE, true)),
+                actions = FamilyCallActions(mute = { muted++ }, camera = { camera++ }, hangup = { ended++ }))
+        } }
+        compose.onNodeWithContentDescription("Flip").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Mute").performClick()
+        compose.onNodeWithContentDescription("Camera").performClick()
+        compose.runOnIdle { kotlin.test.assertEquals(1, muted); kotlin.test.assertEquals(1, camera); kotlin.test.assertEquals(0, ended) }
+        compose.onNodeWithContentDescription("End call").performClick()
+        compose.runOnIdle { kotlin.test.assertEquals(1, ended) }
+    }
+    @Test fun activeVideoLight() {
+        compose.setContent { NiaTheme(darkTheme = false) {
+            FamilyCallContent(FamilyUiState(me = "omar@xmpp.starception.com", mediaConnected = true, connectionRoute = "relay",
+                call = FamilyCall("video-fixture", "amina.khan@xmpp.starception.com", "omar@xmpp.starception.com", "video", "active", 2, Long.MAX_VALUE, true)),
+                remoteReady = true, localReady = true, remoteVideo = { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) { androidx.compose.material3.Text("Remote video", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface) } },
+                localVideo = { androidx.compose.material3.Text("Local video", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface) })
+        } }
+        compose.onNodeWithText("TURN relay").assertExists()
+        compose.onNodeWithText("Remote video").assertExists()
+        compose.onNodeWithText("Local video").assertExists()
+        compose.onNodeWithContentDescription("End call").assertExists()
+        capture("active-video-light")
+    }
+    @Test fun persistentSearchFiltersAndCanBeCleared() {
         render(false, true)
-        compose.onNodeWithContentDescription("Search family").performClick()
-        compose.onNodeWithText("Search your family").assertExists()
+        compose.onNodeWithContentDescription("Search family").performTextInput("Amina")
+        compose.onNodeWithText("Amina Khan").assertExists()
+        compose.onNodeWithText("Omar Hassan").assertDoesNotExist()
         compose.onNodeWithContentDescription("Close search").performClick()
-        compose.onNodeWithText("Search your family").assertDoesNotExist()
+        compose.onNodeWithText("Omar Hassan").assertExists()
     }
 }

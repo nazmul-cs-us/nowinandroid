@@ -1595,6 +1595,7 @@ class FamilyThemePalette(dark: Boolean) {
     val accent: Int = colors.primary.toArgb()
     val header: Int = colors.primaryContainer.toArgb()
     val onHeader: Int = colors.onPrimaryContainer.toArgb()
+    val brandHeader: Int = androidx.compose.ui.graphics.lerp(colors.primary, androidx.compose.ui.graphics.Color.Black, if (dark) .76f else .42f).toArgb()
     val onButton: Int = colors.onPrimary.toArgb()
     val error: Int = colors.error.toArgb()
     val onError: Int = colors.onError.toArgb()

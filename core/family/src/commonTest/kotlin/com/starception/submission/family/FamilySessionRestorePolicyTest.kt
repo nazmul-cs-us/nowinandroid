@@ -9,6 +9,14 @@ class FamilySessionRestorePolicyTest {
         assertFalse(policy.canRestore(true, false))
         assertFalse(policy.canRestore(false, true))
     }
+    @Test fun transientRecoveryBacksOffWithoutEverExceedingThirtySeconds() {
+        val policy = FamilySessionRestorePolicy()
+        assertEquals(1000L, policy.retryDelayMillis(0))
+        assertEquals(4000L, policy.retryDelayMillis(2))
+        assertEquals(30000L, policy.retryDelayMillis(100))
+        policy.explicitSignOut()
+        repeat(10) { assertFalse(policy.canRestore(false, false)) }
+    }
     @Test fun signOutBlocksForegroundRestorationUntilManualSignIn() {
         val policy = FamilySessionRestorePolicy()
         policy.explicitSignOut()
