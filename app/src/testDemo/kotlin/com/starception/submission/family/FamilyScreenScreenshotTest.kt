@@ -181,9 +181,10 @@ class FamilyScreenScreenshotTest {
         }
         compose.onNodeWithText("Local preview fixture").assertExists()
         compose.onNodeWithText("Calling…").assertExists()
-        compose.onNodeWithText("Flip").assertExists()
+        compose.onNodeWithContentDescription("Flip").assertExists()
         compose.onNodeWithText("Cancel").assertExists()
-        compose.onNodeWithText("Mute").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Mute").assertExists()
+        compose.onNodeWithContentDescription("Camera").assertExists()
     }
     @Test fun activeVoiceCallDark() {
         compose.setContent {

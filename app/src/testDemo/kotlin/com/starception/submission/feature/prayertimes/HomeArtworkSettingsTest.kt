@@ -186,8 +186,11 @@ class HomeArtworkSettingsTest {
 @Composable
 private fun ArtworkSettingsScene(dark: Boolean = true, showHomeCollection: Boolean = false) {
     val scope = rememberCoroutineScope()
-    val repository = remember { HomeArtworkRepository(OnlineHomeArtworkTest.Platform(), scope,
-        ioDispatcher = Dispatchers.Main.immediate) }
+    val repository = remember {
+        val platform = OnlineHomeArtworkTest.Platform()
+        HomeArtworkRepository(platform, scope, chooseOffset = { 0 },
+            ioDispatcher = Dispatchers.Main.immediate, catalog = platform.catalog)
+    }
     CompositionLocalProvider(LocalInspectionMode provides true) {
         org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
     }

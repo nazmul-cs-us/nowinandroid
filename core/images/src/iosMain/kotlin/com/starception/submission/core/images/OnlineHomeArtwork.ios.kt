@@ -7,6 +7,7 @@ import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.suspendCancellableCoroutine
 import platform.Foundation.*
+import platform.CoreCrypto.CC_SHA256
 import platform.posix.memcpy
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -16,6 +17,15 @@ private val onlineRepository by lazy { HomeArtworkRepository(IosHomeArtworkPlatf
 @Composable
 actual fun rememberHomeArtworkRepository(): HomeArtworkRepository = onlineRepository
 
+internal actual fun artworkSha256(bytes: ByteArray): String {
+    require(bytes.isNotEmpty())
+    val digest = UByteArray(32)
+    bytes.usePinned { source -> digest.usePinned { target ->
+        CC_SHA256(source.addressOf(0), bytes.size.toUInt(), target.addressOf(0))
+    } }
+    return digest.joinToString("") { it.toString(16).padStart(2, '0') }
+}
+
 private class IosHomeArtworkPlatform : HomeArtworkPlatform {
     private val directory = NSHomeDirectory() + "/Library/Application Support/home-artwork-online"
     init {
@@ -24,15 +34,15 @@ private class IosHomeArtworkPlatform : HomeArtworkPlatform {
 
     override suspend fun download(url: String, maximumBytes: Int): ByteArray = suspendCancellableCoroutine { continuation ->
         val target = requireNotNull(NSURL.URLWithString(url))
-        require(target.scheme == "https" &&
-            ((target.host == "www.getty.edu" && target.path == "/art/collection/api/search") ||
-                (target.host == "media.getty.edu" && target.path?.startsWith("/iiif/image/") == true)))
+        require(target.scheme == "https" && target.user == null && target.password == null &&
+            (target.port == null || target.port?.intValue == 443) && target.host == "images.metmuseum.org" &&
+            target.path?.startsWith("/CRDImages/is/web-large/") == true)
         val configuration = NSURLSessionConfiguration.ephemeralSessionConfiguration
         configuration.timeoutIntervalForRequest = 20.0
         configuration.timeoutIntervalForResource = 30.0
         val session = NSURLSession.sessionWithConfiguration(configuration)
         val request = NSMutableURLRequest(uRL = target)
-        request.setValue(if (target.host == "media.getty.edu") "image/jpeg" else "application/json", "Accept")
+        request.setValue("image/jpeg", "Accept")
         val task = session.dataTaskWithRequest(request) { data, response, error ->
             if (continuation.isActive) {
                 val result = runCatching {

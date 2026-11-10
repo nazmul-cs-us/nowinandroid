@@ -24,6 +24,10 @@ actual fun rememberHomeArtworkRepository(): HomeArtworkRepository {
     }
 }
 
+internal actual fun artworkSha256(bytes: ByteArray): String =
+    java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+        .joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+
 internal class AndroidHomeArtworkPlatform(context: Context) : HomeArtworkPlatform {
     private val directory = File(context.filesDir, "home-artwork-online").apply { mkdirs() }
     private val metadata = File(directory, "collection.json")
@@ -31,15 +35,14 @@ internal class AndroidHomeArtworkPlatform(context: Context) : HomeArtworkPlatfor
     override suspend fun download(url: String, maximumBytes: Int): ByteArray = withContext(Dispatchers.IO) {
         val source = URL(url)
         require(source.protocol == "https" && source.userInfo == null && source.port in listOf(-1, 443))
-        require((source.host == "www.getty.edu" && source.path == "/art/collection/api/search") ||
-            (source.host == "media.getty.edu" && source.path.startsWith("/iiif/image/")))
+        require(source.host == "images.metmuseum.org" && source.path.startsWith("/CRDImages/is/web-large/"))
         val connection = source.openConnection() as HttpsURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 20_000
         connection.instanceFollowRedirects = false
-        connection.setRequestProperty("Accept", if (source.host == "media.getty.edu") "image/jpeg" else "application/json")
+        connection.setRequestProperty("Accept", "image/jpeg")
         try {
-            check(connection.responseCode == 200) { "Getty request failed" }
+            check(connection.responseCode == 200) { "Museum artwork request failed" }
             require(connection.contentLengthLong <= maximumBytes)
             connection.inputStream.use { input ->
                 val output = ByteArrayOutputStream()

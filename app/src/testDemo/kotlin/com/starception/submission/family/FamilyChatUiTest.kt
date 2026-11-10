@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -64,6 +65,28 @@ class FamilyChatUiTest {
         compose.setContent { NiaTheme { FamilyScreenContent(FamilyUiState(), FamilyActions(exit = { exits++ })) } }
         compose.onNodeWithContentDescription("Back to app").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, exits) }
+    }
+
+    @Test fun signedOutLandingShowsVoiceAndVideoAsIllustrationsNotAvailableCallActions() {
+        compose.setContent { NiaTheme { FamilyScreenContent(FamilyUiState()) } }
+        compose.onNodeWithTag("familyLandingVoiceIcon").assertIsDisplayed().assertHasNoClickAction()
+        compose.onNodeWithTag("familyLandingVideoIcon").assertIsDisplayed().assertHasNoClickAction()
+        compose.onNodeWithText("Connect with family").assertIsDisplayed()
+    }
+
+    @Test fun signedOutFormViewportEndsAboveTheFloatingNavigation() {
+        compose.setContent { NiaTheme {
+            Box(Modifier.fillMaxWidth().height(720.dp)) {
+                FamilyScreenContent(FamilyUiState())
+                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(72.dp).testTag("floatingNavigation"))
+            }
+        } }
+        val form = compose.onNodeWithTag("familyContentViewport").fetchSemanticsNode().boundsInRoot
+        val navigation = compose.onNodeWithTag("floatingNavigation").fetchSemanticsNode().boundsInRoot
+        assertTrue("The form must not extend behind app navigation", form.bottom <= navigation.top)
+        compose.onNodeWithText("Only people you invite and accept").performScrollTo().assertIsDisplayed()
+        val footer = compose.onNodeWithText("Only people you invite and accept").fetchSemanticsNode().boundsInRoot
+        assertTrue("The privacy footer must not be hidden by navigation", footer.bottom <= navigation.top)
     }
 
     @Test fun signedInFamilyHasAVisibleWorkingBackButton() {

@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import com.starception.submission.R
+import com.starception.submission.core.designsystem.R as DesignSystemR
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +19,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.filled.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.clickable
@@ -40,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -176,6 +180,7 @@ private fun FamilyScreenBody(
 ) {
     if (state.chatPeer != null) { FamilyChatContent(state, actions); return }
     val signedIn = state.connected || state.reconnecting
+    val portrait = androidx.compose.ui.platform.LocalConfiguration.current.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val colors = familyPalette()
     val brand = familyBrandColor()
     val headerInk = Color.White
@@ -219,7 +224,10 @@ private fun FamilyScreenBody(
         else { password = ""; confirmation = ""; creatingAccount = false }
     }
     Box(Modifier.fillMaxSize().background(colors.panel)) {
-    Column(Modifier.fillMaxSize().background(brand).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(colors.panel)) {
+        Column(Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(bottomEnd = if (signedIn) 40.dp else 0.dp))
+            .background(brand).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = if (signedIn) 16.dp else 0.dp).heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { focusManager.clearFocus(); actions.exit() }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to app", tint = headerInk)
@@ -241,7 +249,7 @@ private fun FamilyScreenBody(
             }
         }
         if (signedIn) {
-            Row(Modifier.padding(horizontal = 24.dp).padding(bottom = 18.dp).fillMaxWidth().height(44.dp)
+            Row(Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp).fillMaxWidth().height(42.dp)
                 .background(Color.White.copy(alpha = .10f), RoundedCornerShape(24.dp)).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Search, null, tint = Color.White.copy(alpha = .7f), modifier = Modifier.size(19.dp))
                 androidx.compose.foundation.text.BasicTextField(search, { search = it }, singleLine = true,
@@ -251,10 +259,10 @@ private fun FamilyScreenBody(
                     decorationBox = { field -> Box { if (search.isEmpty()) Text("Search your family", color = Color.White.copy(alpha = .65f), fontSize = 14.sp); field() } })
                 if (search.isNotEmpty()) IconButton(onClick = { search = "" }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Close, "Close search", tint = Color.White, modifier = Modifier.size(16.dp)) }
             }
-            if (family.isNotEmpty()) LazyRow(Modifier.fillMaxWidth().padding(bottom = 20.dp), contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (family.isNotEmpty()) LazyRow(Modifier.fillMaxWidth().padding(bottom = 20.dp), contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(family, key = { it.jid }) { member ->
-                    Column(Modifier.width(52.dp).heightIn(min = 52.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { selected = member }.semantics { contentDescription = "Contact details for ${callDisplayName(member.jid)}" }, horizontalAlignment = Alignment.CenterHorizontally) {
-                        ContactAvatar(member.jid, 52, ring = false, online = state.serviceReady && member.presence == "online")
+                    Column(Modifier.width(48.dp).heightIn(min = 48.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { selected = member }.semantics { contentDescription = "Contact details for ${callDisplayName(member.jid)}" }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        ContactAvatar(member.jid, 48, ring = false, online = state.serviceReady && member.presence == "online")
 
                     }
                 }
@@ -262,8 +270,16 @@ private fun FamilyScreenBody(
         } else {
             LandingIllustration(Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 24.dp).padding(bottom = 16.dp))
         }
-        Surface(Modifier.weight(1f).fillMaxWidth(), color = colors.panel, shape = RoundedCornerShape(topStart = if (signedIn) 40.dp else 32.dp, topEnd = if (signedIn) 0.dp else 32.dp)) {
-            LazyColumn(contentPadding = PaddingValues(top = if (signedIn) 16.dp else 24.dp, bottom = if (signedIn) 112.dp else 104.dp)) {
+        }
+        Surface(Modifier.weight(1f).fillMaxWidth().background(brand), color = colors.panel, shape = RoundedCornerShape(topStart = if (signedIn) 40.dp else 32.dp, topEnd = if (signedIn) 0.dp else 32.dp)) {
+            // The app-wide pill overlays signed-out Family in portrait. Reserve
+            // its viewport, rather than letting it obscure partially visible form content.
+            LazyColumn(
+                modifier = Modifier.then(if (!signedIn && portrait) {
+                    Modifier.padding(bottom = 72.dp).navigationBarsPadding()
+                } else Modifier).testTag("familyContentViewport"),
+                contentPadding = PaddingValues(top = if (signedIn) 16.dp else 24.dp, bottom = if (signedIn) 112.dp else 24.dp),
+            ) {
                 if (!signedIn) {
                     item {
                         Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -346,7 +362,7 @@ private fun FamilyScreenBody(
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                                 ContactAvatar(member.jid, 48, online = member.status == "accepted" && state.serviceReady && member.presence == "online")
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(callDisplayName(member.jid), color = colors.ink, fontSize = 16.sp, letterSpacing = 0.sp, fontWeight = if (state.conversations.any { it.peer == member.jid && it.unread > 0 }) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(callDisplayName(member.jid), color = colors.ink, fontSize = 17.sp, letterSpacing = 0.sp, fontWeight = if (state.conversations.any { it.peer == member.jid && it.unread > 0 }) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     val presence = if (signedIn && state.serviceReady) member.presence else "unknown"
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         val conversation = state.conversations.find { it.peer == member.jid }
@@ -359,7 +375,7 @@ private fun FamilyScreenBody(
                                 }
                                 if (!directory) state.conversations.find { it.peer == member.jid }?.let { summary ->
                                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        summary.lastMessage?.let { Text(familyTime(it.createdAt), fontSize = 10.sp, color = colors.muted) }
+                                        summary.lastMessage?.let { Text(familyTime(it.createdAt), fontSize = 11.sp, color = colors.muted) }
                                         if (summary.unread > 0) Surface(
                                             color = FamilyVisuals.peach, contentColor = FamilyVisuals.forest, shape = CircleShape,
                                             modifier = Modifier.semantics { contentDescription = "${summary.unread} unread messages" },
@@ -402,19 +418,8 @@ private fun FamilyScreenBody(
         invite = { inviting = true }, alerts = { inbox = true; actions.acknowledgeNotifications() }, settings = { settings = true },
         modifier = Modifier.align(Alignment.BottomCenter))
     }
-    if (settings) ModalBottomSheet(onDismissRequest = { settings = false }, containerColor = colors.panel, dragHandle = null) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Family settings", Modifier.weight(1f), color = colors.ink, fontSize = 22.sp, fontWeight = FontWeight.Medium)
-                IconButton(onClick = { settings = false }) { Icon(Icons.Default.Close, "Close settings", tint = colors.muted) }
-            }
-            Text(state.me, color = colors.muted, fontSize = 13.sp)
-            TextButton(onClick = { settings = false; invitations = true }) { Text("Invitations") }
-            TextButton(onClick = { settings = false; actions.webHelper() }) { Text("Temporary call alerts") }
-            TextButton(onClick = { settings = false; actions.refresh() }) { Text("Refresh family") }
-            TextButton(onClick = { settings = false; actions.exit() }) { Text("Back to app") }
-            TextButton(onClick = { settings = false; actions.signOut() }) { Text("Sign out", color = MaterialTheme.colorScheme.error) }
-        }
+    if (settings) {
+        FamilySettingsSheet(state, onDismiss = { settings = false }, onInvitations = { invitations = true }, actions = actions)
     }
     if (inbox) ModalBottomSheet(onDismissRequest = { inbox = false }, containerColor = colors.panel, dragHandle = null, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 600.dp), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -498,10 +503,26 @@ private fun FamilyField(value: String, changed: (String) -> Unit, placeholder: S
 
 @Composable
 private fun LandingIllustration(modifier: Modifier = Modifier) {
-    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.family_landing_hero),
-        contentDescription = null, modifier = modifier.clip(RoundedCornerShape(24.dp)),
-        contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Box(Modifier.width(220.dp).fillMaxHeight()) {
+            androidx.compose.foundation.Image(
+                androidx.compose.ui.res.painterResource(DesignSystemR.drawable.topic_family_marriage),
+                contentDescription = null, modifier = Modifier.size(176.dp).align(Alignment.Center),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            )
+            // Feature illustrations, not call buttons: sign-in is still required.
+            Box(Modifier.align(Alignment.CenterStart).offset(x = (-8).dp, y = (-12).dp).size(56.dp)
+                .testTag("familyLandingVoiceIcon").background(FamilyVisuals.mint, CircleShape)
+                .border(4.dp, FamilyVisuals.forest, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.Call, null, Modifier.size(25.dp), tint = FamilyVisuals.forest)
+            }
+            Box(Modifier.align(Alignment.TopEnd).padding(top = 8.dp).size(56.dp)
+                .testTag("familyLandingVideoIcon").background(FamilyVisuals.peach, CircleShape)
+                .border(4.dp, FamilyVisuals.forest, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.Videocam, null, Modifier.size(26.dp), tint = FamilyVisuals.forest)
+            }
+        }
+    }
 }
 
 @Composable
@@ -560,13 +581,17 @@ fun FamilyCallOverlay(client: FamilyClient) {
         dismissOnBackPress = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
         val view = androidx.compose.ui.platform.LocalView.current
         val video = call.kind == "video" && (call.stage == "active" || (call.caller == state.me && local != null && state.camera))
-        val framedVideo = call.kind == "video" && call.stage == "active" && androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp >= 500
+        val framedVideo = call.kind == "video" &&
+            (call.stage == "active" || (call.stage == "ringing" && call.caller == state.me)) &&
+            androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp >= 500
         val lightStatusBar = if (framedVideo) MaterialTheme.colorScheme.background.luminance() > .5f else !video && MaterialTheme.colorScheme.primaryContainer.luminance() > .5f
         val lightNavigationBar = (framedVideo || !video) && MaterialTheme.colorScheme.surface.luminance() > .5f
-        DisposableEffect(view, lightStatusBar, lightNavigationBar) {
+        val voice = call.kind == "voice"
+        DisposableEffect(view, lightStatusBar, lightNavigationBar, voice) {
             (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.let { window ->
+                if (voice && android.os.Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
                 androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
-                    isAppearanceLightStatusBars = lightStatusBar
+                    isAppearanceLightStatusBars = if (voice) lightNavigationBar else lightStatusBar
                     isAppearanceLightNavigationBars = lightNavigationBar
                 }
             }
@@ -606,9 +631,13 @@ private fun FamilyCallBody(state: FamilyUiState, elapsed: Long = 0, actions: Fam
         state.connectedAtElapsed != null -> "Reconnecting…"
         else -> "Connecting…"
     }
+    if (call.kind == "voice") {
+        FamilyVoiceCallLayout(state, status, actions)
+        return
+    }
     BoxWithConstraints(Modifier.fillMaxSize().background(colors.surface)) {
         val compact = maxHeight < 500.dp
-        if (video && !compact) {
+        if ((video || (call.kind == "video" && call.stage == "ringing" && !incoming)) && !compact) {
             FamilyVideoCallLayout(state, status, actions, remoteReady, localReady, remoteVideo, localVideo)
             return@BoxWithConstraints
         }

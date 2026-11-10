@@ -4,13 +4,15 @@ import android.app.Application
 import android.graphics.Bitmap
 import com.starception.submission.core.images.HomeArtworkPlatform
 import com.starception.submission.core.images.HomeArtworkRepository
+import com.starception.submission.core.images.OnlineHomeArtwork
+import com.starception.submission.core.images.ReviewedHomeArtwork
+import com.starception.submission.core.images.ArtworkCrop
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -34,6 +36,7 @@ class OnlineHomeArtworkTest {
         var failAfterImages = Int.MAX_VALUE
         var imageRequests = 0
         var commitFails = false
+        var corruptImages = false
         var pauseImages: CompletableDeferred<Unit>? = null
         private val imageBytes = ByteArrayOutputStream().use { output ->
             val image = Bitmap.createBitmap(128, 192, Bitmap.Config.ARGB_8888)
@@ -42,21 +45,19 @@ class OnlineHomeArtworkTest {
             image.recycle()
             output.toByteArray()
         }
+        val catalog by lazy {
+            val hash = java.security.MessageDigest.getInstance("SHA-256").digest(imageBytes)
+                .joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+            (1..40).map { i -> ReviewedHomeArtwork(OnlineHomeArtwork("test$i", "Quiet Valley $i", "Test artist",
+                "https://www.metmuseum.org/art/collection/search/$i",
+                "https://images.metmuseum.org/CRDImages/is/web-large/test$i.jpg"), hash) }
+        }
         override suspend fun download(url: String, maximumBytes: Int): ByteArray {
             requests += url
             if (offline) throw IOException("Offline")
-            if (url.contains("/api/search")) {
-                val rows = JSONArray()
-                for (i in 1..40) rows.put(JSONObject().put("id_manager_slug", "test$i")
-                    .put("primary_name", "Quiet Valley $i").put("is_parent", false)
-                    .put("manifest", JSONObject().put("license", "http://creativecommons.org/publicdomain/zero/1.0/")
-                        .put("thumbUuid", "image-$i").put("altText", "Landscape"))
-                    .put("producers", JSONArray().put(JSONObject().put("primary_name", "Test artist"))))
-                return JSONObject().put("total", 40).put("data", rows).toString().encodeToByteArray()
-            }
             pauseImages?.await()
             if (++imageRequests > failAfterImages) throw IOException("Image download failed")
-            return imageBytes
+            return if (corruptImages) imageBytes + byteArrayOf(0) else imageBytes
         }
         override fun readMetadata() = metadata
         override fun writeMetadata(value: String) {
@@ -70,7 +71,7 @@ class OnlineHomeArtworkTest {
 
     @Test fun refreshDownloadsFiveUnseenImagesInsteadOfShufflingTheBundledGallery() = runTest {
         val platform = Platform()
-        val repository = HomeArtworkRepository(platform, this, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = StandardTestDispatcher(testScheduler), catalog = platform.catalog)
         repository.update(0, frozen = false)
         advanceUntilIdle()
         val first = repository.state.value.artworks.map { it.id }
@@ -87,7 +88,7 @@ class OnlineHomeArtworkTest {
 
     @Test fun multipleHomeAndSettingsConsumersCannotStartDuplicateDownloads() = runTest {
         val platform = Platform()
-        val repository = HomeArtworkRepository(platform, this, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = StandardTestDispatcher(testScheduler), catalog = platform.catalog)
         repeat(10) { repository.update(0, frozen = false) }
         advanceUntilIdle()
         repeat(10) { repository.update(0, frozen = false) }
@@ -98,13 +99,13 @@ class OnlineHomeArtworkTest {
     @Test fun keepCurrentMakesNoNetworkRequestsAndRestoresCachedArtOffline() = runTest {
         val platform = Platform()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val first = HomeArtworkRepository(platform, this, ioDispatcher = dispatcher)
+        val first = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = dispatcher, catalog = platform.catalog)
         first.update(0, frozen = false)
         advanceUntilIdle()
         val ids = first.state.value.artworks.map { it.id }
         platform.offline = true
         val requests = platform.requests.size
-        val restored = HomeArtworkRepository(platform, this, ioDispatcher = dispatcher)
+        val restored = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = dispatcher, catalog = platform.catalog)
         restored.update(50, frozen = true)
         advanceUntilIdle()
         assertEquals(ids, restored.state.value.artworks.map { it.id })
@@ -114,7 +115,7 @@ class OnlineHomeArtworkTest {
 
     @Test fun scheduledChangeFetchesANewSetButAFailedDownloadPreservesTheWholeOldSet() = runTest {
         val platform = Platform()
-        val repository = HomeArtworkRepository(platform, this, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = StandardTestDispatcher(testScheduler), catalog = platform.catalog)
         repository.update(0, frozen = false)
         advanceUntilIdle()
         val old = repository.state.value.artworks.map { it.id }
@@ -131,7 +132,7 @@ class OnlineHomeArtworkTest {
 
     @Test fun freezingDuringAnAutomaticDownloadDoesNotSwitchTheArtworkOrRemainLoading() = runTest {
         val platform = Platform()
-        val repository = HomeArtworkRepository(platform, this, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = StandardTestDispatcher(testScheduler), catalog = platform.catalog)
         repository.update(0, frozen = false)
         advanceUntilIdle()
         val old = repository.state.value.artworks.map { it.id }
@@ -147,7 +148,7 @@ class OnlineHomeArtworkTest {
 
     @Test fun aFailedDiskCommitCannotPublishHalfACachedCollection() = runTest {
         val platform = Platform()
-        val repository = HomeArtworkRepository(platform, this, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = StandardTestDispatcher(testScheduler), catalog = platform.catalog)
         repository.update(0, frozen = false)
         advanceUntilIdle()
         val old = repository.state.value.artworks.map { it.id }
@@ -157,5 +158,84 @@ class OnlineHomeArtworkTest {
         assertEquals(old, repository.state.value.artworks.map { it.id })
         assertEquals(old.toSet(), platform.images.keys)
         assertNotNull(repository.state.value.error)
+    }
+
+    @Test fun changedImageBytesCannotBypassTheVisualReviewOrReplaceTheCurrentSet() = runTest {
+        val platform = Platform()
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
+            ioDispatcher = StandardTestDispatcher(testScheduler), catalog = platform.catalog)
+        repository.update(0, frozen = false)
+        advanceUntilIdle()
+        val old = repository.state.value.artworks.map { it.id }
+        platform.corruptImages = true
+        repository.update(1, frozen = false)
+        advanceUntilIdle()
+        assertEquals(old, repository.state.value.artworks.map { it.id })
+        assertEquals(old.toSet(), platform.images.keys)
+        assertNotNull(repository.state.value.error)
+    }
+
+    @Test fun exhaustingReviewedArtNeverRepeatsImagesOrFallsBackToLiveSearch() = runTest {
+        val platform = Platform()
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
+            ioDispatcher = StandardTestDispatcher(testScheduler), catalog = platform.catalog.take(5))
+        repository.update(0, frozen = false)
+        advanceUntilIdle()
+        val old = repository.state.value.artworks.map { it.id }
+        val requests = platform.requests.size
+        repository.update(1, frozen = true, manualRevision = 1)
+        advanceUntilIdle()
+        assertEquals(old, repository.state.value.artworks.map { it.id })
+        assertEquals(requests, platform.requests.size)
+        assertTrue(repository.state.value.error.orEmpty().contains("all available reviewed Islamic artwork"))
+        assertTrue(platform.requests.all { it.startsWith("https://images.metmuseum.org/") })
+    }
+
+    @Test fun legacyGettySearchCachesAreNotDisplayedEvenInKeepCurrentMode() = runTest {
+        val platform = Platform()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val first = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = dispatcher, catalog = platform.catalog)
+        first.update(0, frozen = false)
+        advanceUntilIdle()
+        val legacy = JSONObject(requireNotNull(platform.metadata))
+        legacy.getJSONArray("artworks").getJSONObject(0).put("id", "107JW5")
+            .put("source", "https://www.getty.edu/art/collection/object/107JW5")
+        platform.metadata = legacy.toString()
+        val requests = platform.requests.size
+        val restored = HomeArtworkRepository(platform, this, ioDispatcher = dispatcher, catalog = platform.catalog)
+        restored.update(0, frozen = true)
+        advanceUntilIdle()
+        assertTrue(restored.state.value.artworks.isEmpty())
+        assertEquals(requests, platform.requests.size)
+    }
+
+    @Test fun restoringAlsoVerifiesPinnedImageBytes() = runTest {
+        val platform = Platform()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val first = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = dispatcher, catalog = platform.catalog)
+        first.update(0, frozen = false)
+        advanceUntilIdle()
+        val id = first.state.value.artworks.first().id
+        platform.images[id] = requireNotNull(platform.images[id]) + byteArrayOf(0)
+        val restored = HomeArtworkRepository(platform, this, ioDispatcher = dispatcher, catalog = platform.catalog)
+        restored.update(0, frozen = true)
+        advanceUntilIdle()
+        assertTrue(restored.state.value.artworks.isEmpty())
+    }
+
+    @Test fun reviewedCropIsAppliedOnceForDownloadsAndRestoredCaches() = runTest {
+        val platform = Platform()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val catalog = platform.catalog.map { it.copy(crop = ArtworkCrop(.25f, .25f, .75f, .75f)) }
+        val first = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = dispatcher, catalog = catalog)
+        first.update(0, frozen = false)
+        advanceUntilIdle()
+        assertEquals(64, first.state.value.artworks.first().bitmap?.width)
+        assertEquals(96, first.state.value.artworks.first().bitmap?.height)
+        val restored = HomeArtworkRepository(platform, this, ioDispatcher = dispatcher, catalog = catalog)
+        restored.update(0, frozen = true)
+        advanceUntilIdle()
+        assertEquals(64, restored.state.value.artworks.first().bitmap?.width)
+        assertEquals(96, restored.state.value.artworks.first().bitmap?.height)
     }
 }

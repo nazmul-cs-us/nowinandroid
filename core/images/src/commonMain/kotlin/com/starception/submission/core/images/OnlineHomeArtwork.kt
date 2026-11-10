@@ -48,39 +48,7 @@ interface HomeArtworkPlatform {
     fun retainImages(ids: Set<String>)
 }
 
-private const val GETTY_SEARCH = "https://www.getty.edu/art/collection/api/search"
-private const val GETTY_MEDIA = "https://media.getty.edu/iiif/image/"
-private val queries = listOf("landscape", "clouds", "mountain", "seascape", "geometric")
-private val excludedSubjects = listOf("portrait", "figure", "woman", "women", " man ", " men ", "child",
-    "people", "person", "family", "animal", "bird", "horse", "cattle", "sheep", "dog", "cat ",
-    "nude", "hunting", "battle", "christ", "saint", "madonna", "angel")
-
-/** Search metadata filters are best-effort; they are not a visual review of the downloaded image. */
-internal fun parseGettyArtworkSearch(json: String): Pair<Int, List<OnlineHomeArtwork>> {
-    val root = Json.parseToJsonElement(json).jsonObject
-    val entries = root["data"]?.jsonArray.orEmpty().mapNotNull { element ->
-        runCatching {
-            val item = element.jsonObject
-            if (item["is_parent"]?.jsonPrimitive?.booleanOrNull == true) return@runCatching null
-            val manifest = item["manifest"]?.jsonObject ?: return@runCatching null
-            val license = manifest["license"]?.jsonPrimitive?.content.orEmpty().replace("http:", "https:")
-            if (license != "https://creativecommons.org/publicdomain/zero/1.0/") return@runCatching null
-            val title = item["primary_name"]?.jsonPrimitive?.content?.trim('[', ']') ?: return@runCatching null
-            val description = " $title ${manifest["altText"]?.jsonPrimitive?.content.orEmpty()} ".lowercase()
-            if (excludedSubjects.any { it in description }) return@runCatching null
-            val id = item["id_manager_slug"]?.jsonPrimitive?.content ?: return@runCatching null
-            val imageId = manifest["thumbUuid"]?.jsonPrimitive?.content ?: return@runCatching null
-            if (!id.matches(Regex("[A-Za-z0-9_-]{1,80}")) ||
-                !imageId.matches(Regex("[A-Za-z0-9-]{1,80}"))) return@runCatching null
-            val artist = item["producers"]?.jsonArray.orEmpty().mapNotNull {
-                it.jsonObject["primary_name"]?.jsonPrimitive?.content
-            }.distinct().joinToString(", ").ifBlank { "Unknown artist" }
-            OnlineHomeArtwork(id, title, artist, "https://www.getty.edu/art/collection/object/$id",
-                "$GETTY_MEDIA$imageId/full/!1440,1440/0/default.jpg")
-        }.getOrNull()
-    }.distinctBy { it.id }
-    return (root["total"]?.jsonPrimitive?.intOrNull ?: 0) to entries
-}
+private class ReviewedArtworkExhausted : Exception()
 
 /** Owns a persistent last-good collection. Never rotates bundled resources as a pretend download. */
 class HomeArtworkRepository(
@@ -89,6 +57,7 @@ class HomeArtworkRepository(
     private val clock: Clock = Clock.System,
     private val chooseOffset: (Int) -> Int = { Random.nextInt(it) },
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val catalog: List<ReviewedHomeArtwork> = reviewedIslamicArtwork,
 ) {
     private val mutable = MutableStateFlow(HomeArtworkCollectionState())
     val state = mutable.asStateFlow()
@@ -127,7 +96,7 @@ class HomeArtworkRepository(
                 val previous = mutable.value
                 mutable.value = previous.copy(loading = true, error = null)
                 try {
-                    val downloaded = withContext(ioDispatcher) { fetchUnseen(rotation) }
+                    val downloaded = withContext(ioDispatcher) { fetchUnseen() }
                     ensureActive()
                     if (version != generation) return@withLock
                     val updated = clock.now()
@@ -141,11 +110,13 @@ class HomeArtworkRepository(
                 } catch (cancelled: CancellationException) {
                     if (version == generation) mutable.value = previous.copy(loading = false)
                     throw cancelled
-                } catch (_: Exception) {
+                } catch (failure: Exception) {
                     if (version == generation) {
                         lastFailure = clock.now()
                         mutable.value = previous.copy(loading = false,
-                            error = "Couldn't download new artwork. Your current collection is unchanged. Try Refresh now when you're online.")
+                            error = if (failure is ReviewedArtworkExhausted) {
+                                "You've seen all available reviewed Islamic artwork. Your current collection stays until more reviewed artwork is added."
+                            } else "Couldn't download reviewed artwork. Your current collection is unchanged. Try Refresh now when you're online.")
                     }
                 } finally {
                     withContext(NonCancellable + ioDispatcher) {
@@ -158,35 +129,29 @@ class HomeArtworkRepository(
     }
 
     @OptIn(ExperimentalResourceApi::class)
-    private suspend fun fetchUnseen(rotation: Int): List<OnlineHomeArtwork> {
+    private suspend fun fetchUnseen(): List<OnlineHomeArtwork> {
         val chosen = linkedMapOf<String, OnlineHomeArtwork>()
-        var downloads = 0
-        for (attempt in 0 until 6) {
-            val query = queries[(rotation.toLong() + attempt).mod(queries.size.toLong()).toInt()]
-            val base = "$GETTY_SEARCH?q=$query&open_content=true&images=true&is_standalone=true"
-            val first = parseGettyArtworkSearch(platform.download("$base&from=0&size=48", 2_000_000).decodeToString())
-            val candidates = if (first.first > 48) {
-                val offset = chooseOffset(first.first.coerceAtMost(2000).coerceAtLeast(1))
-                parseGettyArtworkSearch(platform.download("$base&from=$offset&size=48", 2_000_000).decodeToString()).second + first.second
-            } else first.second
-            for (artwork in candidates) {
-                if (artwork.id in seen || artwork.id in chosen) continue
-                check(downloads++ < 15) { "Too many failed artwork downloads" }
-                val result = runCatching {
-                    val bytes = platform.download(artwork.imageUrl, 8_000_000)
-                    val image = bytes.decodeToImageBitmap()
-                    require(image.width in 100..1800 && image.height in 100..1800)
-                    platform.writeImage(artwork.id, bytes)
-                    artwork.copy(bitmap = image)
-                }.getOrElse {
-                    if (it is CancellationException) throw it
-                    null
-                }
-                if (result != null) chosen[result.id] = result
-                if (chosen.size == 5) return chosen.values.toList()
+        val unseen = catalog.distinctBy { it.artwork.id }.filter { it.artwork.id !in seen }
+        if (unseen.size < 5) throw ReviewedArtworkExhausted()
+        val offset = chooseOffset(unseen.size).mod(unseen.size)
+        val candidates = unseen.drop(offset) + unseen.take(offset)
+        for (reviewed in candidates.take(15)) {
+            val artwork = reviewed.artwork
+            val result = runCatching {
+                val bytes = platform.download(artwork.imageUrl, 8_000_000)
+                require(artworkSha256(bytes) == reviewed.sha256) { "Artwork changed since visual review" }
+                val image = bytes.decodeToImageBitmap()
+                require(image.width in 100..1800 && image.height in 100..1800)
+                platform.writeImage(artwork.id, bytes)
+                artwork.copy(bitmap = cropArtwork(image, reviewed.crop))
+            }.getOrElse {
+                if (it is CancellationException) throw it
+                null
             }
+            if (result != null) chosen[result.id] = result
+            if (chosen.size == 5) return chosen.values.toList()
         }
-        error("Getty did not provide five new eligible artworks")
+        error("Five reviewed artwork downloads did not succeed")
     }
 
     @OptIn(ExperimentalResourceApi::class)
@@ -197,15 +162,19 @@ class HomeArtworkRepository(
             val artworks = root.getValue("artworks").jsonArray.map { value ->
                 val item = value.jsonObject
                 val id = item.getValue("id").jsonPrimitive.content
-                val bitmap = requireNotNull(platform.readImage(id)).decodeToImageBitmap()
-                OnlineHomeArtwork(id, item.getValue("title").jsonPrimitive.content,
-                    item.getValue("artist").jsonPrimitive.content, item.getValue("source").jsonPrimitive.content,
-                    item.getValue("image").jsonPrimitive.content, bitmap)
+                // Reject all legacy search results and reconstruct credits from
+                // the reviewed registry, never from untrusted cache metadata.
+                val reviewed = requireNotNull(catalog.find { it.artwork.id == id })
+                val bytes = requireNotNull(platform.readImage(id))
+                require(artworkSha256(bytes) == reviewed.sha256)
+                val bitmap = bytes.decodeToImageBitmap()
+                require(bitmap.width in 100..1800 && bitmap.height in 100..1800)
+                reviewed.artwork.copy(bitmap = cropArtwork(bitmap, reviewed.crop))
             }
-            require(artworks.size == 5)
+            require(artworks.size == 5 && artworks.distinctBy { it.id }.size == 5)
+            val updatedAt = Instant.parse(root.getValue("updated").jsonPrimitive.content)
             activeRotation = root.getValue("rotation").jsonPrimitive.int
-            mutable.value = HomeArtworkCollectionState(artworks,
-                updatedAt = Instant.parse(root.getValue("updated").jsonPrimitive.content))
+            mutable.value = HomeArtworkCollectionState(artworks, updatedAt = updatedAt)
         }
     }
 }

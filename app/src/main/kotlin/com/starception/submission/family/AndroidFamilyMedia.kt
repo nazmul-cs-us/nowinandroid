@@ -61,7 +61,8 @@ class AndroidFamilyMedia(
         android.util.Log.i("FamilyCalls", "Media startup: step=$step")
     }
 
-    suspend fun start(servers: JSONArray, video: Boolean, caller: Boolean, callId: String) {
+    suspend fun start(servers: JSONArray, video: Boolean, caller: Boolean, callId: String,
+        isMuted: () -> Boolean = { false }, isCameraEnabled: () -> Boolean = { true }) {
         starting("audio-focus")
         close(preservePreview = video && caller && peer == null && localVideo.value != null)
         val token = epoch
@@ -114,10 +115,13 @@ class AndroidFamilyMedia(
         starting("microphone")
         audioSource = factory.createAudioSource(MediaConstraints())
         microphone = factory.createAudioTrack("family-audio", audioSource)
+        // Apply the latest pre-call choice before the track can send any audio.
+        microphone!!.setEnabled(!isMuted())
         peer!!.addTrack(microphone, listOf("family"))
         if (video) {
             starting("camera")
-            preview()
+            if (isCameraEnabled()) preview() else prepareCameraTrack()
+            localVideo.value?.setEnabled(isCameraEnabled())
             peer!!.addTrack(localVideo.value, listOf("family"))
         }
         if (caller) {
@@ -158,15 +162,19 @@ class AndroidFamilyMedia(
         "remoteCandidateId", "candidateType", "selected", "nominated")
     /** Local-only camera. No peer, microphone or signalling is created. */
     fun preview() {
-        if (localVideo.value != null) return
+        if (capturer != null) return
         val enumerator: CameraEnumerator = if (Camera2Enumerator.isSupported(context)) Camera2Enumerator(context) else Camera1Enumerator(false)
         val name = enumerator.deviceNames.firstOrNull { enumerator.isFrontFacing(it) } ?: enumerator.deviceNames.first()
         capturer = enumerator.createCapturer(name, null) ?: error("Camera unavailable")
-        cameraSource = factory.createVideoSource(false)
+        prepareCameraTrack()
         texture = SurfaceTextureHelper.create("FamilyCamera", egl.eglBaseContext)
         capturer!!.initialize(texture, context, cameraSource!!.capturerObserver)
-        localVideo.value = factory.createVideoTrack("family-video", cameraSource)
         capturer!!.startCapture(640, 480, 24)
+    }
+    /** A disabled outgoing video track can negotiate without opening the camera. */
+    private fun prepareCameraTrack() {
+        if (cameraSource == null) cameraSource = factory.createVideoSource(false)
+        if (localVideo.value == null) localVideo.value = factory.createVideoTrack("family-video", cameraSource)
     }
     suspend fun receive(payload: JSONObject) {
         val token = epoch
@@ -215,7 +223,10 @@ class AndroidFamilyMedia(
         if (local) peer!!.setLocalDescription(observer, sdp) else peer!!.setRemoteDescription(observer, sdp)
     }
     fun mute(muted: Boolean) { microphone?.setEnabled(!muted) }
-    fun camera(enabled: Boolean) { localVideo.value?.setEnabled(enabled) }
+    fun camera(enabled: Boolean) {
+        if (enabled && capturer == null) preview()
+        localVideo.value?.setEnabled(enabled)
+    }
     fun switchCamera() { capturer?.switchCamera(null) }
     @Suppress("DEPRECATION") fun speaker(enabled: Boolean) { audio.isSpeakerphoneOn = enabled }
     fun close(preservePreview: Boolean = false) {

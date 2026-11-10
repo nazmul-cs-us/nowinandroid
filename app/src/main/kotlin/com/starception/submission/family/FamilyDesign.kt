@@ -11,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -81,8 +83,18 @@ internal fun FamilyBottomBar(directory: Boolean, unread: Int, contacts: () -> Un
             color = colors.surface, shadowElevation = 6.dp) {
         Row(Modifier.fillMaxWidth().windowInsetsPadding(navigationInsets).height(72.dp).padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = contacts) { Icon(Icons.Outlined.People, "Family contacts", tint = if (directory) colors.primary else colors.primary.copy(alpha = .35f)) }
-            IconButton(onClick = chats) { Icon(Icons.Outlined.ChatBubbleOutline, "Family chats", tint = if (!directory) colors.primary else colors.primary.copy(alpha = .35f)) }
+            IconButton(onClick = contacts, modifier = Modifier.semantics { selected = directory }) {
+                Box(Modifier.size(36.dp).background(if (directory) colors.primaryContainer else Color.Transparent, CircleShape),
+                    contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.People, "Family contacts", tint = if (directory) colors.primary else colors.primary.copy(alpha = .35f))
+                }
+            }
+            IconButton(onClick = chats, modifier = Modifier.semantics { selected = !directory }) {
+                Box(Modifier.size(36.dp).background(if (!directory) colors.primaryContainer else Color.Transparent, CircleShape),
+                    contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.ChatBubbleOutline, "Family chats", tint = if (!directory) colors.primary else colors.primary.copy(alpha = .35f))
+                }
+            }
             Spacer(Modifier.width(64.dp))
             IconButton(onClick = alerts) { BadgedBox(badge = { if (unread > 0) Badge { Text(unread.coerceAtMost(99).toString()) } }) {
                 Icon(Icons.Outlined.NotificationsNone, "Family notifications", tint = colors.primary.copy(alpha = .55f))

@@ -138,7 +138,7 @@ fun HomeArtworkSettingsSection() {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Your home collection", style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium)
-                    Text("Download new public-domain artwork from Getty's live collection.",
+                    Text("Reviewed Islamic patterns and tilework from The Met. No people or animals.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     ArtworkAvailability(collection, frequency, settings.onlineEnabled)
@@ -287,7 +287,9 @@ private fun ArtworkDetailsDialog(artworks: List<HomeArtwork>, onDismiss: () -> U
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("Digital image courtesy of Getty’s Open Content Program.",
+                Text(if (artworks.any { "metmuseum.org" in it.sourceUrl })
+                    "Public-domain images courtesy of The Metropolitan Museum of Art, Open Access (CC0)."
+                    else "Digital image courtesy of Getty’s Open Content Program. Reviewed Islamic architecture.",
                     style = MaterialTheme.typography.bodySmall)
                 artworks.forEachIndexed { page, artwork ->
                     Row(
@@ -306,7 +308,7 @@ private fun ArtworkDetailsDialog(artworks: List<HomeArtwork>, onDismiss: () -> U
                             Text(artwork.artist, style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Icon(Icons.Outlined.OpenInNew, contentDescription = "Open Getty record",
+                        Icon(Icons.Outlined.OpenInNew, contentDescription = "Open museum record",
                             modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
