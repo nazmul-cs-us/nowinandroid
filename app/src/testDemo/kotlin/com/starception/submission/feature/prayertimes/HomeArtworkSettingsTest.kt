@@ -29,6 +29,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -53,6 +55,10 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import com.starception.submission.core.images.ArtworkFrequency
 import com.starception.submission.core.images.HomeArtworkSchedule
 import com.starception.submission.core.images.HomeArtworkSettings
+import com.starception.submission.core.images.HomeArtworkRepository
+import com.starception.submission.core.images.LocalHomeArtworkRepository
+import com.starception.submission.core.images.rememberHomeArtworkCollection
+import kotlinx.coroutines.Dispatchers
 import com.starception.submission.settings.components.HomeArtworkSettingsSection
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
@@ -107,6 +113,19 @@ class HomeArtworkSettingsTest {
         compose.onNodeWithText("Next update at", substring = true).assertIsDisplayed()
         compose.onNodeWithTag("homeArtworkFrequency").performClick()
         compose.onNodeWithText("Every day").performClick()
+    }
+
+    @Test fun refreshSettingsAndHomeShareTheSameDownloadedCollection() {
+        compose.setContent { ArtworkSettingsScene(showHomeCollection = true) }
+        compose.onNodeWithTag("homeArtworkFrequency").performClick()
+        compose.onNodeWithText("Every day").performClick()
+        compose.onNodeWithText("Home shows Quiet Valley 1").assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkFrequency").performClick()
+        compose.onNodeWithText("Keep current").performClick()
+        compose.onNodeWithTag("homeArtworkRefreshNow").performClick()
+        compose.onNodeWithText("Home shows Quiet Valley 6").assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkDetails").performClick()
+        compose.onNodeWithText("Quiet Valley 6").assertIsDisplayed()
     }
 
     @Test fun resumingAndroidImmediatelyCatchesUpMissedHourlyChanges() {
@@ -165,14 +184,22 @@ class HomeArtworkSettingsTest {
 
 @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 @Composable
-private fun ArtworkSettingsScene(dark: Boolean = true) {
+private fun ArtworkSettingsScene(dark: Boolean = true, showHomeCollection: Boolean = false) {
+    val scope = rememberCoroutineScope()
+    val repository = remember { HomeArtworkRepository(OnlineHomeArtworkTest.Platform(), scope,
+        ioDispatcher = Dispatchers.Main.immediate) }
     CompositionLocalProvider(LocalInspectionMode provides true) {
         org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
     }
+    CompositionLocalProvider(LocalHomeArtworkRepository provides repository) {
     MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
             .verticalScroll(rememberScrollState()).padding(16.dp)) {
             HomeArtworkSettingsSection()
+            if (showHomeCollection) {
+                Text("Home shows ${rememberHomeArtworkCollection().artworks.firstOrNull()?.title.orEmpty()}")
+            }
         }
+    }
     }
 }

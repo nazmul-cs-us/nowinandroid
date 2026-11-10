@@ -426,7 +426,7 @@ internal fun NiaAppContent(
         Box(modifier = Modifier.fillMaxSize()) {
             // Record only the page, never the navigation itself (which would
             // feed its previous frame back into the glass).
-            Box(Modifier.fillMaxSize().layerBackdrop(navigationBackdrop).background(mainPageBackgroundBrush())) {
+            Box(Modifier.fillMaxSize().layerBackdrop(navigationBackdrop).background(appPageBackgroundBrush(appState))) {
                 NiaMainContent(
                     appState = appState,
                     snackbarHostState = snackbarHostState,
@@ -2257,6 +2257,13 @@ internal fun VoiceNudgeSparkles(
     }
 }
 
+@Composable
+private fun appPageBackgroundBrush(appState: NiaAppState): Brush {
+    if (appState.currentTopLevelDestination != TopLevelDestination.FAMILY) return mainPageBackgroundBrush()
+    val canvas = com.starception.submission.family.FamilyVisuals.canvas(LocalDarkTheme.current)
+    return Brush.verticalGradient(listOf(canvas, canvas))
+}
+
 /**
  * Custom landscape layout: the content fills the screen and the vertical
  * floating pill bar (the same reference design used at the bottom in portrait)
@@ -2281,7 +2288,7 @@ private fun NiaLandscapeLayout(
         // padding, itself shifted right by the safe-area start inset (camera cutout
         // sits on the left edge in landscape), so the content must reserve that same
         // inset PLUS 76.dp to clear the compact landscape pill.
-        Box(Modifier.fillMaxSize().layerBackdrop(navigationBackdrop).background(mainPageBackgroundBrush())) {
+        Box(Modifier.fillMaxSize().layerBackdrop(navigationBackdrop).background(appPageBackgroundBrush(appState))) {
             NiaMainContent(
                 appState = appState,
                 snackbarHostState = snackbarHostState,

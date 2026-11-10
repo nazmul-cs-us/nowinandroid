@@ -160,6 +160,38 @@ class HomeArtworkScheduleTest {
     }
 
     @Test
+    fun invalidPreferencesNeverOptIntoOnlineDownloads() {
+        for (value in listOf(null, "", "WEEKLY|bad|1", "UNKNOWN|0|0", "DAILY|0|-1", "DAILY|0|0|unknown", "UNKNOWN|0|0|online")) {
+            var persisted = ""
+            val settings = HomeArtworkSettings(value) { persisted = it }
+            assertEquals(false, settings.onlineEnabled)
+            assertTrue(persisted.endsWith("|offline"))
+            assertEquals(false, HomeArtworkSettings(persisted) {}.onlineEnabled)
+        }
+    }
+
+    @Test
+    fun legacyCadencesMigrateAndExplicitOptInSurvivesRelaunch() {
+        val legacy = HomeArtworkSchedule(anchor = anchor).encode()
+        var persisted = ""
+        val migrated = HomeArtworkSettings(legacy) { persisted = it }
+        assertTrue(migrated.onlineEnabled)
+        assertEquals("$legacy|online", persisted)
+        assertTrue(HomeArtworkSettings(persisted) {}.onlineEnabled)
+
+        val fresh = HomeArtworkSettings(null) { persisted = it }
+        assertEquals(false, fresh.onlineEnabled)
+        fresh.setFrequency(ArtworkFrequency.DAILY)
+        assertTrue(HomeArtworkSettings(persisted) {}.onlineEnabled)
+        fresh.setFrequency(ArtworkFrequency.FIXED)
+        fresh.refreshNow()
+        val restored = HomeArtworkSettings(persisted) {}
+        assertTrue(restored.onlineEnabled)
+        assertEquals(ArtworkFrequency.FIXED, restored.schedule.frequency)
+        assertEquals(fresh.schedule.encode(), restored.schedule.encode())
+    }
+
+    @Test
     fun clockMovingBackDoesNotProduceInvalidArtwork() {
         val schedule = HomeArtworkSchedule(anchor = anchor, rotation = 2)
         assertEquals(2, schedule.rotationAt(Instant.parse("2025-01-01T00:00:00Z"), dubai))

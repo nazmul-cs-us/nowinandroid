@@ -108,10 +108,22 @@ fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
     DisposableEffect(state.connected, state.reconnecting, state.chatPeer, light, view) {
         val activity = generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }
             .filterIsInstance<android.app.Activity>().firstOrNull()
-        val controller = activity?.window?.let { androidx.core.view.WindowCompat.getInsetsController(it, view) }
+        val window = activity?.window
+        val controller = window?.let { androidx.core.view.WindowCompat.getInsetsController(it, view) }
         val previous = controller?.isAppearanceLightStatusBars
+        val previousContrast = if (android.os.Build.VERSION.SDK_INT >= 29) window?.isNavigationBarContrastEnforced else null
+        // Family owns the surface beneath navigation on both the chats list
+        // and individual conversations, not just while a conversation is open.
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            window?.isNavigationBarContrastEnforced = false
+        }
         controller?.isAppearanceLightStatusBars = (!(state.connected || state.reconnecting) || state.chatPeer != null) && light
-        onDispose { if (previous != null) controller?.isAppearanceLightStatusBars = previous }
+        onDispose {
+            if (previous != null) controller?.isAppearanceLightStatusBars = previous
+            if (android.os.Build.VERSION.SDK_INT >= 29 && previousContrast != null) {
+                window?.isNavigationBarContrastEnforced = previousContrast
+            }
+        }
     }
     val backDispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val debug = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
@@ -145,13 +157,14 @@ private fun familyPalette(): FamilyPalette {
 }
 
 @Composable
-internal fun familyBrandColor(): Color = androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.primary, Color.Black,
-    if (com.starception.submission.core.designsystem.theme.LocalDarkTheme.current) .76f else .42f)
+internal fun familyBrandColor(): Color = FamilyVisuals.forest
 
 @Composable
 internal fun FamilyScreenContent(state: FamilyUiState, actions: FamilyActions = FamilyActions(),
     initialAccount: String = "", initialPassword: String = "", suggestedPeer: String = "") {
-    FamilyDesign { FamilyScreenBody(state, actions, initialAccount, initialPassword, suggestedPeer) }
+    FamilyDesign {
+        FamilyScreenBody(state, actions, initialAccount, initialPassword, suggestedPeer)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -165,7 +178,7 @@ private fun FamilyScreenBody(
     val signedIn = state.connected || state.reconnecting
     val colors = familyPalette()
     val brand = familyBrandColor()
-    val headerInk = if (signedIn) Color.White else colors.ink
+    val headerInk = Color.White
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -205,10 +218,15 @@ private fun FamilyScreenBody(
         if (!signedIn) { selected = null; inviting = false }
         else { password = ""; confirmation = ""; creatingAccount = false }
     }
-    Box(Modifier.fillMaxSize().background(mainPageBackgroundBrush())) {
-    Column(Modifier.fillMaxSize().background(if (signedIn) brand else Color.Transparent).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = if (signedIn) 24.dp else 0.dp).height(64.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (!signedIn) "Family" else if (directory) "Contacts" else "Chats", Modifier.weight(1f), color = headerInk, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+    Box(Modifier.fillMaxSize().background(colors.panel)) {
+    Column(Modifier.fillMaxSize().background(brand).statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = if (signedIn) 16.dp else 0.dp).heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { focusManager.clearFocus(); actions.exit() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to app", tint = headerInk)
+            }
+            Text(if (!signedIn) "Family" else if (directory) "Contacts" else "Chats", Modifier.weight(1f),
+                color = headerInk, fontSize = if (signedIn) 26.sp else 24.sp,
+                fontWeight = if (signedIn) FontWeight.SemiBold else FontWeight.Medium)
             if (signedIn) {
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Family menu", tint = headerInk) }
@@ -233,18 +251,18 @@ private fun FamilyScreenBody(
                     decorationBox = { field -> Box { if (search.isEmpty()) Text("Search your family", color = Color.White.copy(alpha = .65f), fontSize = 14.sp); field() } })
                 if (search.isNotEmpty()) IconButton(onClick = { search = "" }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Close, "Close search", tint = Color.White, modifier = Modifier.size(16.dp)) }
             }
-            if (family.isNotEmpty()) LazyRow(Modifier.fillMaxWidth().padding(bottom = 24.dp), contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            if (family.isNotEmpty()) LazyRow(Modifier.fillMaxWidth().padding(bottom = 20.dp), contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 items(family, key = { it.jid }) { member ->
-                    Column(Modifier.width(44.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { selected = member }.semantics { contentDescription = "Contact details for ${callDisplayName(member.jid)}" }, horizontalAlignment = Alignment.CenterHorizontally) {
-                        ContactAvatar(member.jid, 44, ring = false, online = state.serviceReady && member.presence == "online")
+                    Column(Modifier.width(52.dp).heightIn(min = 52.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { selected = member }.semantics { contentDescription = "Contact details for ${callDisplayName(member.jid)}" }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        ContactAvatar(member.jid, 52, ring = false, online = state.serviceReady && member.presence == "online")
 
                     }
                 }
             }
         } else {
-            LandingIllustration(Modifier.fillMaxWidth().height(184.dp))
+            LandingIllustration(Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 24.dp).padding(bottom = 16.dp))
         }
-        Surface(Modifier.weight(1f).fillMaxWidth(), color = if (signedIn) colors.panel else colors.panel.copy(alpha = .78f), shape = RoundedCornerShape(topStart = 32.dp, topEnd = if (signedIn) 0.dp else 32.dp)) {
+        Surface(Modifier.weight(1f).fillMaxWidth(), color = colors.panel, shape = RoundedCornerShape(topStart = if (signedIn) 40.dp else 32.dp, topEnd = if (signedIn) 0.dp else 32.dp)) {
             LazyColumn(contentPadding = PaddingValues(top = if (signedIn) 16.dp else 24.dp, bottom = if (signedIn) 112.dp else 104.dp)) {
                 if (!signedIn) {
                     item {
@@ -326,21 +344,30 @@ private fun FamilyScreenBody(
                             Row(Modifier.fillMaxWidth().clickable(role = androidx.compose.ui.semantics.Role.Button) { if (member.status == "accepted" && !directory) actions.openChat(member.jid) else selected = member }
                                 .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                ContactAvatar(member.jid, 46, online = member.status == "accepted" && state.serviceReady && member.presence == "online")
+                                ContactAvatar(member.jid, 48, online = member.status == "accepted" && state.serviceReady && member.presence == "online")
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(callDisplayName(member.jid), color = colors.ink, fontSize = 15.sp, letterSpacing = 0.sp, fontWeight = if (state.conversations.any { it.peer == member.jid && it.unread > 0 }) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(callDisplayName(member.jid), color = colors.ink, fontSize = 16.sp, letterSpacing = 0.sp, fontWeight = if (state.conversations.any { it.peer == member.jid && it.unread > 0 }) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     val presence = if (signedIn && state.serviceReady) member.presence else "unknown"
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         val conversation = state.conversations.find { it.peer == member.jid }
                                         Text((if (!directory) conversation?.lastMessage?.text else null) ?: when (member.status) { "incoming" -> "Invited you to join"; "outgoing" -> "Waiting for acceptance"
                                             else -> when (presence) { "online" -> "Online"; "offline" -> "Offline"; else -> "Status unavailable" } },
-                                            color = colors.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            color = if ((conversation?.unread ?: 0) > 0) colors.ink else colors.muted,
+                                            fontWeight = if ((conversation?.unread ?: 0) > 0) FontWeight.Medium else FontWeight.Normal,
+                                            fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                                 if (!directory) state.conversations.find { it.peer == member.jid }?.let { summary ->
                                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         summary.lastMessage?.let { Text(familyTime(it.createdAt), fontSize = 10.sp, color = colors.muted) }
-                                        if (summary.unread > 0) Badge(containerColor = colors.accent, contentColor = colors.onButton) { Text(summary.unread.coerceAtMost(99).toString()) }
+                                        if (summary.unread > 0) Surface(
+                                            color = FamilyVisuals.peach, contentColor = FamilyVisuals.forest, shape = CircleShape,
+                                            modifier = Modifier.semantics { contentDescription = "${summary.unread} unread messages" },
+                                        ) {
+                                            Text(summary.unread.coerceAtMost(99).toString(),
+                                                Modifier.padding(horizontal = 9.dp, vertical = 2.dp), fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold)
+                                        }
                                     }
                                 }
                                 if (directory && member.status == "accepted") IconButton(onClick = { actions.voice(member.jid) }, enabled = canCall) {
@@ -426,8 +453,7 @@ private fun FamilyScreenBody(
         }
     }
     selected?.let { member -> Dialog(onDismissRequest = { selected = null }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        BoxWithConstraints(Modifier.fillMaxSize().background(colors.panel)) {
-        val heroHeight = (maxHeight * .52f).coerceIn(260.dp, 420.dp)
+        Box(Modifier.fillMaxSize().background(colors.panel)) {
         val profileView = androidx.compose.ui.platform.LocalView.current
         val lightNavigation = colors.panel.luminance() > .5f
         DisposableEffect(profileView, lightNavigation) {
@@ -439,39 +465,13 @@ private fun FamilyScreenBody(
             }
             onDispose { }
         }
-        Column(Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(bottom = 112.dp)) {
-            Box(Modifier.fillMaxWidth().height(heroHeight).background(Brush.verticalGradient(listOf(brand, androidx.compose.ui.graphics.lerp(brand, colors.accent, .35f), brand))).statusBarsPadding()) {
-                IconButton(onClick = { selected = null }, modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 8.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to family", Modifier.size(24.dp), tint = Color.White)
-                }
-                Box(Modifier.align(Alignment.Center).padding(bottom = 32.dp)) { ContactAvatar(member.jid, 160) }
-                Column(Modifier.align(Alignment.BottomStart).padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(callDisplayName(member.jid), fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                    Text(if (member.status == "accepted") { if (signedIn && state.serviceReady && state.members.find { it.jid == member.jid }?.presence == "online") "Online" else "Family member" } else "Family invitation",
-                        fontSize = 12.sp, color = Color.White.copy(alpha = .8f))
-                }
-            }
-            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("FAMILY ACCOUNT", fontSize = 10.sp, letterSpacing = 1.5.sp, color = colors.muted)
-                    androidx.compose.foundation.text.selection.SelectionContainer { Text(member.jid, fontSize = 15.sp, color = colors.ink) }
-                }
-                if (member.status == "accepted") {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Keep in touch", Modifier.weight(1f), color = colors.muted, fontSize = 13.sp)
-                        IconButton(onClick = { selected = null; actions.voice(member.jid) }, enabled = canCall) { Icon(Icons.Default.Call, "Voice call", tint = colors.accent) }
-                        IconButton(onClick = { selected = null; actions.video(member.jid) }, enabled = canCall) { Icon(Icons.Default.Videocam, "Video call", tint = colors.accent) }
-                    }
-                    Button(onClick = { selected = null; actions.openChat(member.jid) }, modifier = Modifier.fillMaxWidth().height(52.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = brand, contentColor = Color.White), shape = CircleShape) {
-                        Icon(Icons.Default.ChatBubbleOutline, null, Modifier.size(20.dp)); Text("Message", Modifier.padding(start = 8.dp))
-                    }
-                } else Text(if (member.status == "incoming") "Accept this invitation to start calling and messaging." else "Your invitation is waiting for acceptance.", fontSize = 14.sp, color = colors.muted)
-                if (member.status == "incoming") Button(onClick = { actions.accept(member.jid); selected = null }, enabled = state.serviceReady,
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.button, contentColor = colors.onButton)) { Text("Accept invitation") }
-                TextButton(onClick = { selected = null; removing = member }, modifier = Modifier.fillMaxWidth()) { Text(if (member.status == "accepted") "Remove from family" else if (member.status == "incoming") "Decline invitation" else "Cancel invitation", color = colors.muted, fontSize = 13.sp) }
-            }
-        }
+        FamilyContactProfile(
+            member = member, state = state, actions = actions,
+            onBack = { selected = null },
+            onMessage = { selected = null; actions.openChat(member.jid) },
+            onRemove = { selected = null; removing = member },
+            bottomClearance = 112.dp,
+        )
         FamilyBottomBar(directory = true, unread = state.unreadCount,
             contacts = { selected = null; directory = true }, chats = { selected = null; if (member.status == "accepted") actions.openChat(member.jid) },
             invite = { selected = null; inviting = true }, alerts = { selected = null; inbox = true; actions.acknowledgeNotifications() },
@@ -498,9 +498,9 @@ private fun FamilyField(value: String, changed: (String) -> Unit, placeholder: S
 
 @Composable
 private fun LandingIllustration(modifier: Modifier = Modifier) {
-    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.family_landing),
-        contentDescription = "Three family homes sheltered by an arch and an olive branch", modifier = modifier,
-        contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.family_landing_hero),
+        contentDescription = null, modifier = modifier.clip(RoundedCornerShape(24.dp)),
+        contentScale = androidx.compose.ui.layout.ContentScale.Crop)
 
 }
 
@@ -508,14 +508,17 @@ private fun LandingIllustration(modifier: Modifier = Modifier) {
 internal fun ContactAvatar(jid: String, size: Int, ring: Boolean = false, online: Boolean = false) {
     val scheme = MaterialTheme.colorScheme
     val initials = callDisplayName(jid).split(' ').take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
-    val shades = listOf(scheme.primaryContainer, scheme.secondaryContainer, scheme.tertiaryContainer, scheme.surfaceContainerHigh)
+    val shades = listOf(scheme.primaryContainer to scheme.onPrimaryContainer,
+        scheme.secondaryContainer to scheme.onSecondaryContainer,
+        scheme.tertiaryContainer to scheme.onTertiaryContainer,
+        scheme.surfaceContainerHigh to scheme.onSurface)
     val shade = shades[(jid.hashCode() and Int.MAX_VALUE) % shades.size]
     Box(Modifier.size(size.dp)) {
     Box(Modifier.fillMaxSize().clearAndSetSemantics { }.then(if (ring) Modifier.border(1.5.dp, scheme.primary, CircleShape).padding(4.dp) else Modifier)
-        .background(shade, CircleShape), contentAlignment = Alignment.Center) {
-        Text(initials, color = scheme.onSurface, fontSize = (size * 0.30f).sp, fontWeight = FontWeight.Medium)
+        .background(shade.first, CircleShape), contentAlignment = Alignment.Center) {
+        Text(initials, color = shade.second, fontSize = (size * 0.30f).sp, fontWeight = FontWeight.Medium)
     }
-    if (online) Box(Modifier.align(Alignment.TopEnd).size(11.dp).border(2.dp, scheme.surface, CircleShape).background(scheme.primary, CircleShape))
+    if (online) Box(Modifier.align(Alignment.TopEnd).size(11.dp).border(2.dp, scheme.surface, CircleShape).background(FamilyVisuals.online, CircleShape))
     }
 }
 

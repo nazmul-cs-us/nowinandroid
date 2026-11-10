@@ -794,6 +794,7 @@ fun InsightPager(
                             fluidFullBleed = immersiveHome,
                             backgroundPageOffset = { pageOffset },
                             artwork = if (immersiveHome) homeCoverArtwork(1, false) else Res.drawable.insight_prayer_background,
+                            onlinePage = if (immersiveHome) 1 else null,
                             foreground = if (immersiveHome) null else Res.drawable.insight_prayer_foreground,
                             foregroundScale = 0.84f,
                             foregroundOffsetYFraction = 0.08f,
@@ -863,6 +864,7 @@ fun InsightPager(
                                 backgroundPageOffset = { pageOffset },
                                 expandedArtworkBlurRadius = 6.dp,
                                 artwork = if (immersiveHome) homeCoverArtwork(2, false) else Res.drawable.insight_quran_background,
+                                onlinePage = if (immersiveHome) 2 else null,
                                 foreground = if (immersiveHome) null else Res.drawable.insight_quran_foreground_v2,
                                 foregroundScale = 0.74f,
                                 foregroundOffsetYFraction = 0.09f,
@@ -980,6 +982,7 @@ fun InsightPager(
                                 fluidFullBleed = immersiveHome,
                                 backgroundPageOffset = { pageOffset },
                                 artwork = if (immersiveHome) homeCoverArtwork(3, false) else Res.drawable.insight_qibla_background,
+                                onlinePage = if (immersiveHome) 3 else null,
                                 // The compact card already has a live heading
                                 // arrow. Omitting the decorative compass avoids
                                 // a static-compass-to-radar swap on expansion.
@@ -1063,6 +1066,7 @@ fun InsightPager(
                                 fluidFullBleed = immersiveHome,
                                 backgroundPageOffset = { pageOffset },
                                 artwork = if (immersiveHome) homeCoverArtwork(4, false) else Res.drawable.insight_suggestion,
+                                onlinePage = if (immersiveHome) 4 else null,
                                 isExpanded = isExpanded,
                                 minimumExpandedContentHeight = stageHeightHints[4] ?: 180.dp,
                                 onPreferredHeightChange = { measuredHeight: Dp ->
@@ -2632,6 +2636,7 @@ private fun MissingModelDownloadCard(
 @Composable
 private fun ArtworkTile(
     artwork: DrawableResource,
+    onlinePage: Int? = null,
     fluidFullBleed: Boolean = false,
     expandedArtworkBlurRadius: Dp = 1.8.dp,
     foreground: DrawableResource? = null,
@@ -2709,7 +2714,8 @@ private fun ArtworkTile(
                 ),
         ) {
             Image(
-                painter = painterResource(artwork),
+                painter = if (onlinePage != null) com.starception.submission.core.images.currentHomeArtworkPainter(onlinePage)
+                    else painterResource(artwork),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

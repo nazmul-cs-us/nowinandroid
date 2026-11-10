@@ -133,7 +133,7 @@ private fun HomeCoverArtworkImages(lowerPage: Int, swipeProgress: Float, useNigh
         if (layer == 1 && swipeProgress <= .001f) continue
         val page = if (layer == 0) lowerPage else nextPage
         Image(
-            painter = painterResource(homeCoverArtwork(page, useNightArtwork)),
+            painter = com.starception.submission.core.images.currentHomeArtworkPainter(page, useNightArtwork),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             alignment = Alignment.Center,

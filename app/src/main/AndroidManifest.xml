@@ -179,6 +179,7 @@
         <activity
             android:name=".MainActivity"
             android:configChanges="uiMode"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:theme="@style/Theme.Nia">
             <!-- Deep link for app content -->

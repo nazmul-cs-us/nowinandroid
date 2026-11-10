@@ -177,9 +177,9 @@ fun PrayerNowTile(
                 },
         ) {
         Image(
-            painter = painterResource(
-                if (fluidFullBleed) homeCoverArtwork(0, isNight)
-                else if (isNight) Res.drawable.prayer_now_insight_night
+            painter = if (fluidFullBleed) com.starception.submission.core.images.currentHomeArtworkPainter(0, isNight)
+            else painterResource(
+                if (isNight) Res.drawable.prayer_now_insight_night
                 else Res.drawable.prayer_now_insight_day,
             ),
             contentDescription = null,

@@ -2236,6 +2236,7 @@ internal fun SwipeableBigTiles(
                             },
                             backgroundPainterRes = if (immersiveHome) homeCoverArtwork(1, false)
                                 else ImageRes.drawable.insight_prayer_background,
+                            backgroundBitmap = if (immersiveHome) com.starception.submission.core.images.currentHomeArtworkBitmap(1) else null,
                             foregroundPainterRes = if (immersiveHome) null
                                 else ImageRes.drawable.insight_prayer_foreground,
                             foregroundBaseScale = 0.84f,
@@ -2357,6 +2358,7 @@ internal fun SwipeableBigTiles(
                             },
                             backgroundPainterRes = if (immersiveHome) homeCoverArtwork(2, false)
                                 else ImageRes.drawable.insight_quran_background,
+                            backgroundBitmap = if (immersiveHome) com.starception.submission.core.images.currentHomeArtworkBitmap(2) else null,
                             foregroundPainterRes = if (immersiveHome) null
                                 else ImageRes.drawable.insight_quran_foreground_v2,
                             // Let more of the reading scene breathe around the Quran.
@@ -2466,6 +2468,7 @@ internal fun SwipeableBigTiles(
                             },
                             backgroundPainterRes = if (immersiveHome) homeCoverArtwork(3, false)
                                 else ImageRes.drawable.insight_qibla_background,
+                            backgroundBitmap = if (immersiveHome) com.starception.submission.core.images.currentHomeArtworkBitmap(3) else null,
                             // The compact scene uses the antique compass as its
                             // subject. Expanded mode supplies a live direction
                             // instrument, so retaining both creates two competing
@@ -2559,6 +2562,7 @@ internal fun SwipeableBigTiles(
                             },
                             backgroundPainterRes = if (immersiveHome) homeCoverArtwork(4, false)
                                 else ImageRes.drawable.insight_suggestion,
+                            backgroundBitmap = if (immersiveHome) com.starception.submission.core.images.currentHomeArtworkBitmap(4) else null,
                             backgroundBaseScale = if (immersiveHome) 1f else 1.28f,
                             backgroundHorizontalBias = if (immersiveHome) 0f else 0.13f,
                             skyTintTop = livePrayerSkyPalette.top,
@@ -3237,6 +3241,7 @@ private fun PrayerPosterInsightCard(
                 ImageRes.drawable.prayer_now_insight_day
             },
             animateWater = !fluidFullBleed && !effectiveIsNight,
+            backgroundBitmap = if (fluidFullBleed) com.starception.submission.core.images.currentHomeArtworkBitmap(0) else null,
             // The artwork drifts up to 4dp vertically. Keep a little overscan
             // even in portrait so the light Surface cannot peek through at top.
             backgroundBaseScale = PRAYER_POSTER_ARTWORK_SCALE,

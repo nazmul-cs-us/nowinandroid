@@ -147,9 +147,11 @@ private fun homeArtworkCards(): List<HomeArtworkCard> {
 @Composable
 internal fun HomeArtworkScene(card: HomeArtworkCard, modifier: Modifier = Modifier, copyAlpha: Float = 1f) {
     val dark = LocalDarkTheme.current
+    val bitmap = com.starception.submission.core.images.currentHomeArtworkBitmap(card.page)
     Box(modifier) {
         Image(
-            painter = painterResource(card.background),
+            painter = if (bitmap != null) remember(bitmap) { androidx.compose.ui.graphics.painter.BitmapPainter(bitmap) }
+                else painterResource(card.background),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.matchParentSize(),

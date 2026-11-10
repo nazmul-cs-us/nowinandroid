@@ -37,6 +37,7 @@ kotlin {
             api(compose.components.resources)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.compose.lifecycle.runtimeCompose)
         }
         commonTest.dependencies {

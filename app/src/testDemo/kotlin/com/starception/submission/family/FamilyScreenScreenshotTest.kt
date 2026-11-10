@@ -17,6 +17,8 @@ import com.starception.submission.core.model.data.ThemeBrand
 import dagger.hilt.android.testing.HiltTestApplication
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Before
+import org.junit.After
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -31,6 +33,9 @@ import java.io.File
 @LooperMode(LooperMode.Mode.PAUSED)
 class FamilyScreenScreenshotTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private val originalTimeZone = java.util.TimeZone.getDefault()
+    @Before fun useStableScreenshotTimeZone() { java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC")) }
+    @After fun restoreTimeZone() { java.util.TimeZone.setDefault(originalTimeZone) }
     private val members = listOf("Amina Khan", "Omar Hassan", "Maryam Ali", "Yusuf Ahmed", "Sara Malik")
         .mapIndexed { index, name -> FamilyMember(name.lowercase().replace(' ', '.') + "@xmpp.starception.com", "accepted",
             when (index) { 0 -> "online"; 1 -> "offline"; else -> "unknown" }) }
@@ -207,21 +212,42 @@ class FamilyScreenScreenshotTest {
         compose.onNodeWithText("Amina Khan").performClick()
         compose.runOnIdle { kotlin.test.assertEquals(members.first().jid, opened) }
     }
-    @Test fun chatLight() {
+    private fun chatPreviewState(): FamilyUiState {
         val me = "omar@xmpp.starception.com"; val peer = members.first().jid
-        compose.setContent { NiaTheme(themeBrand = ThemeBrand.COASTAL, disableDynamicTheming = true) {
-            FamilyScreenContent(FamilyUiState(me = me, connected = true, serviceReady = true, members = members, chatPeer = peer,
+        return FamilyUiState(me = me, connected = true, serviceReady = true, members = members, chatPeer = peer,
                 messages = listOf(FamilyChatMessage("intro", me, peer, "Thanks, Amina.", 1, 1000000),
                     FamilyChatMessage("one", peer, me, "Assalamu alaikum! How is everyone at home?", 2, 1060000),
                     FamilyChatMessage("plan", peer, me, "We’re getting the family together tomorrow evening. Mum and Dad would love to see you. Can you come over after Maghrib?", 3, 1120000),
                     FamilyChatMessage("two", me, peer, "Wa alaikum assalam. All well, alhamdulillah 🌿", 4, 1180000),
                     FamilyChatMessage("three", me, peer, "We’d love to come. What time?", 5, 1190000),
                     FamilyChatMessage("four", peer, me, "After Maghrib, insha’Allah.", 6, 4000000),
-                    FamilyChatMessage("five", me, peer, "I’ll call you when we leave.", 7, 4050000)), chatDraft = ""))
+                     FamilyChatMessage("five", me, peer, "I’ll call you when we leave.", 7, 4050000)), chatDraft = "")
+    }
+    @Test fun chatLight() {
+        compose.setContent { NiaTheme(themeBrand = ThemeBrand.COASTAL, disableDynamicTheming = true) {
+            FamilyScreenContent(chatPreviewState())
         } }
         compose.onNodeWithText("Assalamu alaikum! How is everyone at home?").assertExists()
         compose.onNodeWithContentDescription("Send message").assertExists()
         capture("chat-light")
+    }
+    @Test fun chatDark() {
+        compose.setContent { NiaTheme(darkTheme = true, disableDynamicTheming = true) {
+            FamilyScreenContent(chatPreviewState())
+        } }
+        compose.onNodeWithContentDescription("Send message").assertExists()
+        capture("chat-dark")
+    }
+    @Test fun chatProfileDarkUsesTheFullContactScreen() {
+        val peer = members.first().jid
+        compose.setContent { NiaTheme(darkTheme = true) {
+            FamilyScreenContent(FamilyUiState(me = "omar@xmpp.starception.com", connected = true,
+                serviceReady = true, members = members, chatPeer = peer))
+        } }
+        compose.onNodeWithContentDescription("Contact details").performClick()
+        compose.onNodeWithText("FAMILY ACCOUNT").assertExists()
+        compose.onNodeWithText(peer).assertExists()
+        capture("chat-contact-profile-dark")
     }
     @Test fun familyNavigationSwitchesBetweenChatsAndContactDetails() {
         render(false, true)

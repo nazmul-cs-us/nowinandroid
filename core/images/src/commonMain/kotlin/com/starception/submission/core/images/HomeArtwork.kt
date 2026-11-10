@@ -39,6 +39,7 @@ fun homeArtworkIndex(page: Int, rotation: Int): Int =
 
 @Composable
 fun currentHomeArtwork(page: Int, useNightArtwork: Boolean = false): DrawableResource {
-    val artwork = homeArtworkGallery[homeArtworkIndex(page, rememberHomeArtworkRotation())]
+    // Bundled images are a stable fallback, not a pretend online refresh.
+    val artwork = homeArtworkGallery[homeArtworkIndex(page, 0)]
     return if (useNightArtwork) artwork.night else artwork.day
 }

@@ -19,6 +19,7 @@ package com.starception.submission.core.images
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
@@ -89,7 +90,8 @@ data class HomeArtworkSchedule(
     companion object {
         fun decode(value: String?, now: Instant = Clock.System.now()): HomeArtworkSchedule = runCatching {
             val parts = requireNotNull(value).split('|')
-            require(parts.size == 3)
+            require(parts.size in 3..4)
+            if (parts.size == 4) require(parts[3] in setOf("online", "offline"))
             val rotation = parts[2].toInt()
             require(rotation >= 0)
             HomeArtworkSchedule(ArtworkFrequency.valueOf(parts[0]), Instant.fromEpochSeconds(parts[1].toLong()), rotation)
@@ -101,22 +103,39 @@ data class HomeArtworkSchedule(
 class HomeArtworkSettings(saved: String?, private val save: (String) -> Unit) {
     var schedule by mutableStateOf(HomeArtworkSchedule.decode(saved))
         private set
+    // Existing cadence choices migrate to online updates. A fresh install waits
+    // for an explicit refresh/cadence selection before spending mobile data.
+    var onlineEnabled by mutableStateOf(
+        saved == schedule.encode() || saved == schedule.encode() + "|online",
+    )
+        private set
+    var refreshRevision by mutableIntStateOf(0)
+        private set
 
     init {
-        if (saved != schedule.encode()) save(schedule.encode())
+        if (saved != encodedSettings()) save(encodedSettings())
     }
 
     fun setFrequency(frequency: ArtworkFrequency) {
-        if (frequency == schedule.frequency) return
+        if (frequency == schedule.frequency) {
+            onlineEnabled = true
+            save(encodedSettings())
+            return
+        }
+        onlineEnabled = true
         schedule = schedule.withFrequency(frequency, Clock.System.now())
-        save(schedule.encode())
+        save(encodedSettings())
     }
 
     /** Advance immediately, including in Keep current mode, without moving the next scheduled change. */
     fun refreshNow() {
+        onlineEnabled = true
         schedule = schedule.copy(rotation = ((schedule.rotation.toLong() + 1) % Int.MAX_VALUE).toInt())
-        save(schedule.encode())
+        save(encodedSettings())
+        refreshRevision++
     }
+
+    private fun encodedSettings() = schedule.encode() + if (onlineEnabled) "|online" else "|offline"
 }
 
 @Composable

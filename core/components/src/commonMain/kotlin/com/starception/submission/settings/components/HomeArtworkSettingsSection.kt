@@ -75,15 +75,23 @@ import com.starception.submission.core.images.rememberHomeArtworkState
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import com.starception.submission.core.images.rememberHomeArtworkSettings
+import com.starception.submission.core.images.rememberHomeArtworkCollection
+import com.starception.submission.core.images.currentHomeArtworkPainter
+import com.starception.submission.core.images.HomeArtworkCollectionState
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun HomeArtworkSettingsSection() {
     val settings = rememberHomeArtworkSettings()
     val artworkState = rememberHomeArtworkState()
-    val rotation = artworkState.rotation
+    val collection = rememberHomeArtworkCollection(settings)
     val frequency = settings.schedule.frequency
-    val artworks = (0..4).map { homeArtworkGallery[homeArtworkIndex(it, rotation)] }
+    val artworks = (0..4).map { page ->
+        val fallback = homeArtworkGallery[page]
+        collection.artworks.getOrNull(page)?.let {
+            fallback.copy(title = it.title, artist = it.artist, sourceUrl = it.sourceUrl)
+        } ?: fallback
+    }
     val nextUpdateLabel = if (frequency == ArtworkFrequency.HOURLY) {
         artworkState.nextUpdateAt?.toLocalDateTime(TimeZone.currentSystemDefault())?.let {
             "Next update at ${it.hour.toString().padStart(2, '0')}:${it.minute.toString().padStart(2, '0')}"
@@ -117,9 +125,9 @@ fun HomeArtworkSettingsSection() {
                         .testTag("homeArtworkPreview"),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    artworks.forEach { artwork ->
+                    artworks.forEachIndexed { page, _ ->
                         Image(
-                            painter = painterResource(artwork.day),
+                            painter = currentHomeArtworkPainter(page),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
@@ -130,10 +138,13 @@ fun HomeArtworkSettingsSection() {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Your home collection", style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium)
-                    Text("Islamic architecture, patterns and quiet nature.",
+                    Text("Download new public-domain artwork from Getty's live collection.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    ArtworkAvailability()
+                    ArtworkAvailability(collection, frequency, settings.onlineEnabled)
+                    collection.error?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
                 }
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val stackControls = maxWidth < 280.dp || LocalDensity.current.fontScale > 1.2f
@@ -154,7 +165,7 @@ fun HomeArtworkSettingsSection() {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     if (maxWidth < 280.dp || LocalDensity.current.fontScale > 1.2f) {
                         Column {
-                            ArtworkRefreshButton(settings::refreshNow, Modifier.fillMaxWidth())
+                            ArtworkRefreshButton(settings::refreshNow, Modifier.fillMaxWidth(), collection.loading)
                             TextButton(onClick = { showDetails = true },
                                 modifier = Modifier.align(Alignment.End).testTag("homeArtworkDetails")) {
                                 Text("About the artwork", style = MaterialTheme.typography.labelMedium)
@@ -163,7 +174,7 @@ fun HomeArtworkSettingsSection() {
                     } else {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween) {
-                            ArtworkRefreshButton(settings::refreshNow)
+                            ArtworkRefreshButton(settings::refreshNow, loading = collection.loading)
                             TextButton(onClick = { showDetails = true }, modifier = Modifier.testTag("homeArtworkDetails")) {
                                 Text("About the artwork", style = MaterialTheme.typography.labelMedium)
                             }
@@ -221,22 +232,29 @@ private fun ArtworkFrequencyPicker(
 }
 
 @Composable
-private fun ArtworkAvailability() {
-    Text("${homeArtworkGallery.size} artworks · Offline",
+private fun ArtworkAvailability(collection: HomeArtworkCollectionState, frequency: ArtworkFrequency, onlineEnabled: Boolean) {
+    Text(when {
+        collection.loading -> "Downloading five new artworks…"
+        collection.artworks.size == 5 -> "5 downloaded artworks · Available offline"
+        !onlineEnabled -> "Tap Refresh now to download your first collection"
+        frequency == ArtworkFrequency.FIXED -> "Bundled fallback · Automatic updates paused"
+        else -> "Bundled fallback · Online updates enabled"
+    },
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
-private fun ArtworkRefreshButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ArtworkRefreshButton(onClick: () -> Unit, modifier: Modifier = Modifier, loading: Boolean = false) {
     FilledTonalButton(
         onClick = onClick,
         modifier = modifier.testTag("homeArtworkRefreshNow"),
+        enabled = !loading,
         shape = RoundedCornerShape(12.dp),
     ) {
         Icon(Icons.Outlined.Refresh, contentDescription = null,
             modifier = Modifier.padding(end = 6.dp).size(16.dp))
-        Text("Refresh now", style = MaterialTheme.typography.labelMedium)
+        Text(if (loading) "Downloading…" else "Refresh now", style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -271,7 +289,7 @@ private fun ArtworkDetailsDialog(artworks: List<HomeArtwork>, onDismiss: () -> U
             ) {
                 Text("Digital image courtesy of Getty’s Open Content Program.",
                     style = MaterialTheme.typography.bodySmall)
-                artworks.forEach { artwork ->
+                artworks.forEachIndexed { page, artwork ->
                     Row(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
                             .clickable(role = Role.Button) { uriHandler.openUri(artwork.sourceUrl) }
@@ -279,7 +297,7 @@ private fun ArtworkDetailsDialog(artworks: List<HomeArtwork>, onDismiss: () -> U
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Image(painterResource(artwork.day), contentDescription = null,
+                        Image(currentHomeArtworkPainter(page), contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.width(40.dp).height(56.dp).clip(RoundedCornerShape(6.dp)))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
