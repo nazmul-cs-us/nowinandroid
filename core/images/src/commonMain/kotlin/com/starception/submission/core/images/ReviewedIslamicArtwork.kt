@@ -77,4 +77,4 @@ val reviewedIslamicArtwork: List<ReviewedHomeArtwork> = listOf(
         "70c53b1a37d50c4493a3c87493dfdcd1e57b395dd920f790dae6ee0ba173d8f0", ArtworkCrop(.16f, .06f, .84f, .94f)),
     met(444704, "Turquoise ornamental tile", "DP-33639-001.jpg",
         "f707e3006a62e56d5fb38c1687a4144721a1d5d87b67a2d0c5624b3d41c21a82", ArtworkCrop(.12f, .12f, .88f, .88f)),
-)
+) + reviewedClevelandArtwork

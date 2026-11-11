@@ -25,7 +25,23 @@ monochrome crescent for the small notification icon and the full app icon for th
 large image and CallStyle avatar fallback. They no longer reference the legacy
 calligraphy notification logo. Rebuild and install Android to receive this change.
 
-Outgoing video calls now show a local-only camera preview while ringing, with compact caller identity and a Flip control over the full-screen feed. The caller already granted camera permission when starting the video call. This preview does not create a microphone or peer connection; it is released on cancel/backgrounding and reused after acceptance. Incoming calls do not open the recipient's camera before answering. Remote media still requires server acceptance. Android ongoing-call notifications use a separate low-importance channel and show Calling/Connecting accurately; incoming notifications retain their high-priority channel. Retest preview, cancel, background/resume and answer on signed devices after updating the apps.
+Outgoing video calls use the same rounded card, frosted control/thumbnail panel,
+and live self-thumbnail as connected calls. Camera, mute, flip and cancel controls
+are available before answer; camera and microphone choices apply before outgoing
+tracks can transmit. The caller already granted camera permission when starting
+the video call. The local preview does not create a microphone or peer connection;
+it is released on cancel/backgrounding and reused after acceptance. Incoming calls
+do not open the recipient's camera before answering. Remote media requires acceptance.
+
+The frosted panel uses a small, low-rate renderer frame in memory because native
+SurfaceView pixels cannot be captured by a Compose backdrop layer. Sampling stops
+when paused/disposed, frames clear when the camera stops, and no frame is written
+to disk or uploaded. This is a display effect, not call recording. Participant
+tiles represent only the two actual accounts; unavailable remote video uses initials.
+
+Android ongoing-call notifications use a separate low-importance channel and show
+Calling/Connecting accurately; incoming notifications retain their high-priority
+channel. Retest preview, cancel, background/resume and answer on signed devices.
 
 Preview startup follows the actual resumed UI lifecycle and handles screens that were already resumed when the call arrived. It no longer depends on the process's manually counted activities. Background-registration errors are displayed on the Family page separately from call errors; an older server that cannot register push devices must not turn a foreground call into a generic error banner. Camera-preview failures have a specific call message. Android logs only the camera exception type under `FamilyCalls`, without account credentials, to assist device diagnosis.
 

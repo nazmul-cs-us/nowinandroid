@@ -10,6 +10,33 @@ These are **in-app alerts and badges**, synchronized immediately over the signed
 
 ## Storage and limits
 
+### Call-history entries
+
+Newly ended calls create one server-authored `type: "call"` entry in the same
+conversation stream as text messages. Android and iOS show voice/video type,
+incoming/outgoing direction, outcome, timestamp, and duration when available.
+This records **call metadata only**, never audio or video.
+
+- Caller cancellation is displayed as Cancelled to the caller and Missed to the recipient.
+- Recipient rejection is Declined, ring expiry is No answer/Missed, and an expired
+  accepted session is Interrupted. Answered sessions are labelled Answered.
+- Duration is the server's elapsed time from acceptance to termination, not a
+  measurement of how long audio flowed. Legacy calls without an acceptance timestamp
+  have no invented duration.
+- IDs use the reserved `call:` prefix; ordinary message sends cannot forge them.
+  Repeated termination requests and expiry sweeps do not duplicate records.
+- Entries survive reconnects and server restarts and use normal chat pagination,
+  authorization, and relationship-removal deletion. They do not add message-unread
+  counts on top of missed-call alerts.
+- Missed-call inbox items open that user's conversation. Reading through the
+  corresponding call entry acknowledges that peer's missed-call alert without
+  clearing newer or unrelated alerts.
+- If chat storage is full, ending a call still succeeds and the server logs a
+  content-free storage warning; that record cannot be saved.
+- Existing ended calls are not backfilled. Deploy the updated server module and
+  rebuild clients; a client APK alone cannot create authoritative history or recover
+  calls it never received. Older clients retain a readable text fallback.
+
 - Messages and UUID references: disk-backed Mnesia `deenly_family_messages`, with a conversation index and ordered sequence keys. History returns ten messages per page, with `nextBefore` as an exclusive cursor (zero means no further page).
 - Conversation summaries, read cursors, notification records and monotonically increasing inbox versions: disk-backed `deenly_family_inbox`, indexed by account. Old inbox replies cannot restore already-cleared unread counts.
 - Messages accept valid UTF-8 text, up to 4,096 bytes, including Arabic, emoji, and line breaks. Empty/blank text and unsupported control characters are rejected.

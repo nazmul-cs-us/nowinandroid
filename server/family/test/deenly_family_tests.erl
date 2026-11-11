@@ -10,6 +10,11 @@
 
 family_test_() -> {setup, fun setup/0, fun cleanup/1, [
     ?_test(chat_persists_across_restart()),
+    ?_test(call_history_answered_is_durable_and_idempotent()),
+    ?_test(call_history_cancel_decline_and_expiry()),
+    ?_test(call_history_is_private_and_removed_with_membership()),
+    ?_test(call_history_cannot_be_forged_by_text_messages()),
+    ?_test(reading_call_history_clears_its_missed_alert()),
     ?_test(chat_requires_accepted_family()), ?_test(chat_is_idempotent()),
     ?_test(chat_history_and_read_cursor()), ?_test(chat_validates_utf8_and_rate()),
     ?_test(chat_removal_revokes_history()), ?_test(inbox_records_invitations_and_missed_calls()),
@@ -371,3 +376,59 @@ chat_persists_across_restart() ->
     ?assertEqual(<<"durable">>, maps:get(<<"text">>, Message)),
     {atomic, {Inbox, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
     ?assertEqual(1, maps:get(<<"unreadCount">>, Inbox)).
+
+call_history_answered_is_durable_and_idempotent() ->
+    reset(), active(),
+    [{deenly_family, Key, C}] = mnesia:dirty_read(deenly_family, {call, ?D, ?ID}),
+    Now = erlang:system_time(millisecond),
+    mnesia:dirty_write({deenly_family, Key, C#{<<"answeredAt">> => Now - 94000, <<"startedAt">> => Now - 99000}}),
+    {atomic, {_, Events}} = act(?A, ?AF, <<"end_call">>, #{<<"callId">> => ?ID}),
+    ?assertEqual(2, length([E || {_, E} <- Events, maps:get(<<"event">>, E) =:= <<"chat">>])),
+    {atomic, {#{<<"messages">> := [Message]}, _}} = chat_history(?A, ?AF, ?B, 999),
+    ?assertEqual(<<"call:", ?ID/binary>>, maps:get(<<"id">>, Message)),
+    ?assertEqual(<<"call">>, maps:get(<<"type">>, Message)),
+    Detail = maps:get(<<"call">>, Message),
+    ?assertEqual(<<"answered">>, maps:get(<<"outcome">>, Detail)),
+    ?assert(maps:get(<<"durationSeconds">>, Detail) >= 94),
+    ?assert(maps:get(<<"durationSeconds">>, Detail) =< 95),
+    {atomic, _} = act(?A, ?AF, <<"end_call">>, #{<<"callId">> => ?ID}),
+    stopped = mnesia:stop(), ok = mnesia:start(),
+    ok = mnesia:wait_for_tables([deenly_family, deenly_family_messages, deenly_family_inbox], 10000),
+    ok = mod_deenly_family_presence:init(),
+    {atomic, {#{<<"messages">> := [Message]}, _}} = chat_history(?B, ?BF, ?A, 999),
+    {atomic, {Inbox, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    ?assertEqual(0, maps:get(<<"unreadCount">>, Inbox)).
+
+call_history_cancel_decline_and_expiry() ->
+    reset(), family(), {atomic, _} = call(),
+    {atomic, _} = act(?A, ?AF, <<"end_call">>, #{<<"callId">> => ?ID}),
+    ?assertEqual(<<"cancelled">>, history_outcome()),
+    reset(), family(), {atomic, _} = call(),
+    {atomic, _} = act(?B, ?BF, <<"end_call">>, #{<<"callId">> => ?ID}),
+    ?assertEqual(<<"declined">>, history_outcome()),
+    reset(), family(), {atomic, _} = call(),
+    [{deenly_family, Key, C}] = mnesia:dirty_read(deenly_family, {call, ?D, ?ID}),
+    mnesia:dirty_write({deenly_family, Key, C#{<<"expires">> => 0}}),
+    ?assertEqual(<<"missed">>, history_outcome()).
+
+history_outcome() ->
+    {atomic, {#{<<"messages">> := [Message]}, _}} = chat_history(?B, ?BF, ?A, 999),
+    maps:get(<<"outcome">>, maps:get(<<"call">>, Message)).
+
+call_history_is_private_and_removed_with_membership() ->
+    reset(), active(), {atomic, _} = act(?A, ?AF, <<"end_call">>, #{<<"callId">> => ?ID}),
+    ?assertEqual({aborted, {denied, <<"not_family">>}}, chat_history(<<"other@xmpp.test">>, <<"other@xmpp.test/device">>, ?A, 999)),
+    {atomic, _} = act(?A, ?AF, <<"remove_member">>, #{<<"peer">> => ?B}),
+    family(), {atomic, {#{<<"messages">> := []}, _}} = chat_history(?B, ?BF, ?A, 999).
+
+call_history_cannot_be_forged_by_text_messages() ->
+    reset(), family(),
+    ?assertEqual({aborted, {denied, <<"invalid_message">>}}, act(?A, ?AF, <<"send_message">>,
+        #{<<"peer">> => ?B, <<"id">> => <<"call:", ?ID/binary>>, <<"text">> => <<"fake call">>})).
+
+reading_call_history_clears_its_missed_alert() ->
+    reset(), family(), {atomic, _} = call(),
+    {atomic, _} = act(?A, ?AF, <<"end_call">>, #{<<"callId">> => ?ID}),
+    {atomic, {#{<<"messages">> := [Message]}, _}} = chat_history(?B, ?BF, ?A, 999),
+    {atomic, {Inbox, _}} = act(?B, ?BF, <<"read_messages">>, #{<<"peer">> => ?A, <<"through">> => maps:get(<<"sequence">>, Message)}),
+    ?assertEqual(0, maps:get(<<"unreadCount">>, Inbox)).

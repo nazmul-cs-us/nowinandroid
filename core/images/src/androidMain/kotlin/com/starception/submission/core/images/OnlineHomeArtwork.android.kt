@@ -34,8 +34,10 @@ internal class AndroidHomeArtworkPlatform(context: Context) : HomeArtworkPlatfor
 
     override suspend fun download(url: String, maximumBytes: Int): ByteArray = withContext(Dispatchers.IO) {
         val source = URL(url)
+        require(reviewedIslamicArtwork.any { it.artwork.imageUrl == url })
         require(source.protocol == "https" && source.userInfo == null && source.port in listOf(-1, 443))
-        require(source.host == "images.metmuseum.org" && source.path.startsWith("/CRDImages/is/web-large/"))
+        require((source.host == "images.metmuseum.org" && source.path.startsWith("/CRDImages/is/web-large/")) ||
+            (source.host == "www.clevelandart.org" && source.path == "/_next/image"))
         val connection = source.openConnection() as HttpsURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 20_000

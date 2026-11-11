@@ -19,6 +19,9 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -60,7 +63,8 @@ class FamilyOutgoingVideoUiTest {
         } }
         val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
         val card = compose.onNodeWithTag("familyVideoMainCard").fetchSemanticsNode().boundsInRoot
-        val preview = compose.onNodeWithTag("localVideoFixture").fetchSemanticsNode().boundsInRoot
+        val preview = compose.onAllNodesWithTag("localVideoFixture")[0].fetchSemanticsNode().boundsInRoot
+        compose.onAllNodesWithTag("localVideoFixture").assertCountEquals(2)
         assertTrue("Preview must not be full bleed", card.left > root.left && card.right < root.right)
         assertTrue(preview.left >= card.left && preview.right <= card.right && preview.bottom <= card.bottom)
         compose.onNodeWithTag("familyVideoShelf").assertIsDisplayed()
@@ -100,7 +104,7 @@ class FamilyOutgoingVideoUiTest {
             FamilyCallContent(ui.value, elapsed = 94, localReady = true, remoteReady = true,
                 localVideo = { Text("Local camera fixture") }, remoteVideo = { Text("Remote camera fixture") })
         } }
-        compose.onNodeWithText("Local camera fixture").assertExists()
+        compose.onAllNodesWithText("Local camera fixture").assertCountEquals(2)
         compose.onNodeWithText("Remote camera fixture").assertDoesNotExist()
         compose.runOnIdle { ui.value = ui.value.copy(call = ui.value.call?.copy(stage = "active"), mediaConnected = true) }
         compose.onNodeWithTag("familyVideoMainCard").assertIsDisplayed()
@@ -128,6 +132,32 @@ class FamilyOutgoingVideoUiTest {
         compose.onNodeWithContentDescription("Camera").assertIsSelected()
         compose.onNodeWithContentDescription("Unmute").assertIsSelected()
         compose.onNodeWithContentDescription("Flip").assertIsNotEnabled()
+    }
+
+    @Test
+    @Config(qualifiers = "w640dp-h360dp-mdpi")
+    fun landscapeUsesFramedVideoAndKeepsTheShelfBesideIt() {
+        compose.setContent { NiaTheme { FamilyCallContent(state(), localReady = false) } }
+        val card = compose.onNodeWithTag("familyVideoMainCard").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val shelf = compose.onNodeWithTag("familyVideoShelf").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue("Landscape shelf must sit beside video", shelf.left >= card.right)
+        compose.onNodeWithContentDescription("Cancel").assertIsDisplayed()
+    }
+
+    @Test fun incomingVideoDoesNotRenderCameraFramesBeforeAcceptance() {
+        var answers = 0
+        val incoming = state().copy(me = "amina.khan@xmpp.starception.com")
+        compose.setContent { NiaTheme {
+            FamilyCallContent(incoming, localReady = true, remoteReady = true,
+                actions = FamilyCallActions(answer = { answers++ }),
+                localVideo = { Text("Private local camera") }, remoteVideo = { Text("Private remote camera") })
+        } }
+        compose.onNodeWithText("Private local camera").assertDoesNotExist()
+        compose.onNodeWithText("Private remote camera").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Camera").assertDoesNotExist()
+        compose.onNodeWithText("Accept").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, answers) }
+        compose.onNodeWithContentDescription("Decline").assertIsDisplayed()
     }
 
     @Test

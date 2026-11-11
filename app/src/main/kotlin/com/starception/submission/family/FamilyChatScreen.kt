@@ -128,15 +128,17 @@ internal fun FamilyChatContent(
             itemsIndexed(state.messages, key = { _, message -> message.id }) { index, message ->
                 val previous = state.messages.getOrNull(index - 1)
                 val newDay = previous == null || familyDay(previous.createdAt) != familyDay(message.createdAt)
-                val newGroup = newDay || previous?.from != message.from || message.createdAt - (previous?.createdAt ?: 0L) > 300000
+                val newGroup = newDay || previous?.call != null || message.call != null || previous?.from != message.from || message.createdAt - (previous?.createdAt ?: 0L) > 300000
                 val mine = message.from == state.me
                 val next = state.messages.getOrNull(index + 1)
-                val groupEnds = next == null || next.from != message.from ||
+                val groupEnds = next == null || next.call != null || next.from != message.from ||
                     familyDay(next.createdAt) != familyDay(message.createdAt) ||
                     next.createdAt - message.createdAt > 300000
                 if (newDay) Text(familyDayLabel(message.createdAt), modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = colors.onSurfaceVariant, fontSize = 11.sp)
-                Row(Modifier.fillMaxWidth().padding(top = if (newGroup && !newDay) 14.dp else 4.dp), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
+                if (message.call != null) {
+                    FamilyCallHistoryCard(message, outgoing = mine)
+                } else Row(Modifier.fillMaxWidth().padding(top = if (newGroup && !newDay) 14.dp else 4.dp), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
                     verticalAlignment = Alignment.Bottom) {
                     if (!mine) {
                         if (newGroup) Box(Modifier.padding(bottom = 18.dp)) { ContactAvatar(peer, 28, online = online) } else Spacer(Modifier.width(28.dp))

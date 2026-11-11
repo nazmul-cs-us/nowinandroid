@@ -7,6 +7,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performTextInput
@@ -179,7 +181,7 @@ class FamilyScreenScreenshotTest {
                     })
             }
         }
-        compose.onNodeWithText("Local preview fixture").assertExists()
+        compose.onAllNodesWithText("Local preview fixture").assertCountEquals(2)
         compose.onNodeWithText("Calling…").assertExists()
         compose.onNodeWithContentDescription("Flip").assertExists()
         compose.onNodeWithText("Cancel").assertExists()

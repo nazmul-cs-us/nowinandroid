@@ -138,7 +138,7 @@ fun HomeArtworkSettingsSection() {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Your home collection", style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium)
-                    Text("Reviewed Islamic patterns and tilework from The Met. No people or animals.",
+                    Text("Reviewed Islamic patterns from The Met and Cleveland. No people or animals.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     ArtworkAvailability(collection, frequency, settings.onlineEnabled)
@@ -287,9 +287,12 @@ private fun ArtworkDetailsDialog(artworks: List<HomeArtwork>, onDismiss: () -> U
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(if (artworks.any { "metmuseum.org" in it.sourceUrl })
-                    "Public-domain images courtesy of The Metropolitan Museum of Art, Open Access (CC0)."
-                    else "Digital image courtesy of Getty’s Open Content Program. Reviewed Islamic architecture.",
+                val museums = artworks.map { when {
+                    "metmuseum.org" in it.sourceUrl -> "The Metropolitan Museum of Art"
+                    "clevelandart.org" in it.sourceUrl -> "Cleveland Museum of Art"
+                    else -> "Getty’s Open Content Program"
+                } }.distinct().joinToString("; ")
+                Text("Public-domain images (CC0). Courtesy of $museums.",
                     style = MaterialTheme.typography.bodySmall)
                 artworks.forEachIndexed { page, artwork ->
                     Row(

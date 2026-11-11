@@ -229,7 +229,7 @@ struct FamilyView: View {
                             Text(familyName(member.jid)).font(.system(size: 15, weight: .medium)).foregroundStyle(colors.ink).lineLimit(1)
                             let presence = store.signedIn && store.serviceReady ? member.presence : "unknown"
                             HStack(spacing: 6) {
-                                Text((directory ? nil : store.conversations.first(where: { $0.peer == member.jid })?.lastMessage?.text) ?? (member.status == "incoming" ? "Invited you to join" : member.status == "outgoing" ? "Waiting for acceptance" : presence == "online" ? "Online" : presence == "offline" ? "Offline" : "Status unavailable"))
+                                Text((directory ? nil : store.conversations.first(where: { $0.peer == member.jid })?.lastMessage?.preview(me: store.me)) ?? (member.status == "incoming" ? "Invited you to join" : member.status == "outgoing" ? "Waiting for acceptance" : presence == "online" ? "Online" : presence == "offline" ? "Offline" : "Status unavailable"))
                                     .font(.system(size: 12)).foregroundStyle(colors.muted).lineLimit(1)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading)
@@ -286,7 +286,7 @@ struct FamilyView: View {
                         Button {
                             inbox = false
                             if notice.kind == "invitation" { invitations = true }
-                            else if notice.kind == "message" { store.openChat(notice.peer) }
+                            else if notice.kind == "message" || notice.kind == "missed_call" { store.openChat(notice.peer) }
                             else { selected = store.members.first { $0.jid == notice.peer } }
                         } label: {
                             HStack(spacing: 12) {
@@ -928,13 +928,16 @@ private struct FamilyChatView: View {
         let previous = index > 0 ? store.messages[index - 1] : nil
         let date = Date(timeIntervalSince1970: Double(message.createdAt) / 1000)
         let newDay = previous == nil || !Calendar.current.isDate(date, inSameDayAs: Date(timeIntervalSince1970: Double(previous!.createdAt) / 1000))
-        let newGroup = newDay || previous?.from != message.from || message.createdAt - (previous?.createdAt ?? 0) > 300000
+        let newGroup = newDay || previous?.call != nil || message.call != nil || previous?.from != message.from || message.createdAt - (previous?.createdAt ?? 0) > 300000
         let mine = message.from == store.me
         return VStack(spacing: 4) {
             if newDay {
                 Text(Calendar.current.isDateInToday(date) ? "Today" : Calendar.current.isDateInYesterday(date) ? "Yesterday" : date.formatted(date: .abbreviated, time: .omitted))
                     .font(.system(size: 10)).foregroundStyle(colors.muted).padding(.vertical, 20)
             }
+            if let call = message.call {
+                callHistoryRow(message, call: call, date: date)
+            } else {
             HStack(alignment: .bottom, spacing: 7) {
                 if mine { Spacer(minLength: 48) }
                 else if newGroup { FamilyContactAvatar(jid: peer, size: 26).padding(.bottom, 14) }
@@ -951,7 +954,31 @@ private struct FamilyChatView: View {
                 }.frame(maxWidth: 260, alignment: mine ? .trailing : .leading)
                 if !mine { Spacer(minLength: 48) }
             }.padding(.top, newGroup && !newDay ? 12 : 0)
+            }
         }.frame(maxWidth: .infinity)
+    }
+    private func callHistoryRow(_ message: FamilyChatMessage, call: FamilyChatCall, date: Date) -> some View {
+        let policy = FamilyCallHistoryPolicy()
+        let outgoing = message.from == store.me
+        let missed = policy.missed(outcome: call.outcome, outgoing: outgoing)
+        return HStack(spacing: 12) {
+            Image(systemName: call.kind == "video" ? "video" : "phone")
+                .foregroundStyle(missed ? colors.error : colors.accent)
+                .frame(width: 44, height: 44).background(colors.header, in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(policy.title(kind: call.kind)).font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(missed ? colors.error : colors.ink)
+                Text("\(policy.direction(outgoing: outgoing)) · \(policy.status(outcome: call.outcome, outgoing: outgoing))")
+                    .font(.system(size: 12)).foregroundStyle(colors.muted)
+                HStack(spacing: 4) {
+                    Text(date, style: .time)
+                    if let seconds = call.durationSeconds { Text("· \(policy.duration(seconds: seconds))") }
+                }.font(.system(size: 11)).foregroundStyle(colors.muted)
+            }
+            Spacer(minLength: 0)
+        }.padding(16).frame(maxWidth: 320, alignment: .leading)
+            .background(colors.field, in: RoundedRectangle(cornerRadius: 16))
+            .frame(maxWidth: .infinity).padding(.vertical, 10).accessibilityElement(children: .combine)
     }
 }
 

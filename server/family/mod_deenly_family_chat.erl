@@ -3,7 +3,7 @@
 -module(mod_deenly_family_chat).
 -compile({no_auto_import, [now/0]}).
 -export([init/0, execute/4, inbox/2, invitation/3, clear_invitation/3,
-         missed/2, revoke/3, purge/2, execute_ack/2]).
+         missed/2, call_ended/3, revoke/3, purge/2, execute_ack/2]).
 -define(M, deenly_family_messages).
 -define(I, deenly_family_inbox).
 init() ->
@@ -58,6 +58,16 @@ execute(D, U, P, #{<<"action">> := <<"read_messages">>, <<"through">> := Through
         undefined -> ok;
         N -> put_i({notification, D, U, <<"message">>, P}, {D, U}, N#{<<"unread">> => Unread > 0, <<"count">> => Unread})
     end,
+    MissedKey = {notification, D, U, <<"missed_call">>, P},
+    case get(?I, MissedKey) of
+        #{<<"reference">> := CallId} = Missed ->
+            case get(?M, {pair(D, U, P), <<"call:", CallId/binary>>}) of
+                Seq when is_integer(Seq), Seq =< Through ->
+                    put_i(MissedKey, {D, U}, Missed#{<<"unread">> => false});
+                _ -> ok
+            end;
+        _ -> ok
+    end,
     {inbox(D, U), [{U, (inbox(D, U))#{<<"event">> => <<"inbox">>}}]};
 execute(_, _, _, _) -> mnesia:abort({denied, <<"invalid_request">>}).
 inbox(D, U) ->
@@ -80,6 +90,44 @@ missed(D, #{<<"stage">> := <<"ringing">>, <<"caller">> := A, <<"callee">> := B, 
              notice(D, B, <<"missed_call">>, A, Count, Id), [{B, (inbox(D, B))#{<<"event">> => <<"inbox">>}}]
     end;
 missed(_, _) -> [].
+%% Terminal calls are authoritative system entries in the same paginated timeline.
+%% They do not add message-unread counts on top of the existing missed-call notice.
+call_ended(D, Before, End) ->
+    A = maps:get(<<"caller">>, End), B = maps:get(<<"callee">>, End),
+    Pair = pair(D, A, B), Id = <<"call:", (maps:get(<<"id">>, End))/binary>>,
+    case get(?M, {Pair, Id}) of
+        undefined ->
+            case mnesia:table_info(?M, size) < 200000 of
+                false -> logger:warning("Family call-history storage limit reached"), [];
+                true ->
+                    Ended = maps:get(<<"endedAt">>, End),
+                    Answered = maps:get(<<"answeredAt">>, End, undefined),
+                    Outcome = case {maps:get(<<"stage">>, Before), maps:get(<<"reason">>, End)} of
+                        {<<"active">>, <<"expired">>} -> <<"interrupted">>;
+                        {<<"active">>, _} -> <<"answered">>;
+                        {_, <<"expired">>} -> <<"missed">>;
+                        _ -> case maps:get(<<"endedBy">>, End, A) of B -> <<"declined">>; _ -> <<"cancelled">> end
+                    end,
+                    Kind = maps:get(<<"kind">>, End),
+                    Details = #{<<"id">> => maps:get(<<"id">>, End), <<"kind">> => Kind,
+                        <<"outcome">> => Outcome, <<"startedAt">> => maps:get(<<"startedAt">>, End, Ended), <<"endedAt">> => Ended},
+                    Call = case Answered of
+                        T when is_integer(T) -> Details#{<<"answeredAt">> => T, <<"durationSeconds">> => max(0, (Ended - T) div 1000)};
+                        _ -> Details
+                    end,
+                    Seq = counter({sequence, Pair}, Pair), SA = summary(D, A, B), SB = summary(D, B, A),
+                    Type = case Kind of <<"video">> -> <<"Video call">>; _ -> <<"Voice call">> end,
+                    Text = <<Type/binary, " - ", Outcome/binary>>,
+                    Public = #{<<"id">> => Id, <<"from">> => A, <<"to">> => B, <<"text">> => Text,
+                        <<"sequence">> => Seq, <<"createdAt">> => Ended, <<"type">> => <<"call">>, <<"call">> => Call},
+                    mnesia:write({?M, {Pair, Seq}, Pair, Public#{ordinals => #{A => maps:get(total, SA), B => maps:get(total, SB)}}}),
+                    mnesia:write({?M, {Pair, Id}, Pair, Seq}),
+                    save_summary(D, A, B, SA#{<<"lastMessage">> => preview(Public)}),
+                    save_summary(D, B, A, SB#{<<"lastMessage">> => preview(Public)}),
+                    [{U, (inbox(D, U))#{<<"event">> => <<"chat">>, <<"message">> => Public}} || U <- [A, B]]
+            end;
+        _ -> []
+    end.
 revoke(D, U, P) ->
     [begin
         mnesia:delete({?I, {conversation, D, A, B}}),

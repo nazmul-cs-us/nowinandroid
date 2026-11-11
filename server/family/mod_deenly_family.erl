@@ -184,7 +184,7 @@ execute(D, U, F, #{<<"action">> := <<"invite_call">>, <<"peer">> := Peer,
                     <<"callerFull">> => F, <<"calleeFull">> => <<>>,
                     <<"kind">> => Kind, <<"stage">> => <<"ringing">>,
                     <<"version">> => 1, <<"expires">> => now_ms() + 45000,
-                    <<"reason">> => <<>>},
+                    <<"reason">> => <<>>, <<"startedAt">> => now_ms()},
             save_call(D, New), mod_deenly_family_push:enqueue(D, New), New;
         Existing ->
             true_or_deny(maps:get(<<"callerFull">>, Existing) =:= F andalso
@@ -203,17 +203,18 @@ execute(D, U, F, #{<<"action">> := Action, <<"callId">> := Id} = Req) ->
                                     <<"version">> => maps:get(<<"version">>, C) + 1,
                                     <<"callerLease">> => now_ms() + 75000,
                                     <<"calleeLease">> => now_ms() + 75000,
-                                    <<"hardExpires">> => now_ms() + 3300000};
+                                    <<"hardExpires">> => now_ms() + 3300000, <<"answeredAt">> => now_ms()};
                 <<"active">> -> true_or_deny(F =:= maps:get(<<"calleeFull">>, C), <<"answered_elsewhere">>), C;
                 _ -> denied(<<"call_ended">>)
             end,
             save_call(D, New), {#{<<"call">> => view(New, F)}, call_events(New)};
         <<"end_call">> ->
             true_or_deny(selected(C, F) orelse maps:get(<<"stage">>, C) =:= <<"ringing">>, <<"answered_elsewhere">>),
-            New = case live(C) of true -> ended(C, <<"hangup">>); false -> C end,
+            New = case live(C) of true -> (ended(C, <<"hangup">>))#{<<"endedBy">> => U}; false -> C end,
             Missed = case live(C) andalso U =:= maps:get(<<"caller">>, C) of
                 true -> mod_deenly_family_chat:missed(D, C); false -> [] end,
-            save_call(D, New), {#{<<"call">> => view(New, F)}, call_events(New) ++ Missed};
+            History = case live(C) of true -> mod_deenly_family_chat:call_ended(D, C, New); false -> [] end,
+            save_call(D, New), {#{<<"call">> => view(New, F)}, call_events(New) ++ Missed ++ History};
         <<"turn">> ->
             true_or_deny(selected(C, F) andalso maps:get(<<"stage">>, C) =:= <<"active">>, <<"not_active">>),
             family(D, maps:get(<<"caller">>, C), maps:get(<<"callee">>, C)),
@@ -277,7 +278,7 @@ expire(D) ->
     Now = now_ms(),
     lists:flatmap(fun(C) ->
         case should_expire(C, Now) of
-            true -> End = ended(C, <<"expired">>), save_call(D, End), call_events(End) ++ mod_deenly_family_chat:missed(D, C);
+            true -> End = ended(C, <<"expired">>), save_call(D, End), call_events(End) ++ mod_deenly_family_chat:missed(D, C) ++ mod_deenly_family_chat:call_ended(D, C, End);
             false -> [] end
     end, calls(D)).
 sweep(_Host) ->
@@ -287,7 +288,7 @@ sweep(_Host) ->
             ({{call, D, Id}, C}) ->
                 mnesia:read(?TABLE, {lock, D}, write),
                 case should_expire(C, Now) of
-                    true -> End = ended(C, <<"expired">>), save_call(D, End), [{D, call_events(End) ++ mod_deenly_family_chat:missed(D, C)}];
+                    true -> End = ended(C, <<"expired">>), save_call(D, End), [{D, call_events(End) ++ mod_deenly_family_chat:missed(D, C) ++ mod_deenly_family_chat:call_ended(D, C, End)}];
                     false ->
                         case maps:get(<<"stage">>, C) =:= <<"ended">> andalso maps:get(<<"endedAt">>, C, Now) < Now - 86400000 of
                             true -> mnesia:delete({?TABLE, {call, D, Id}});

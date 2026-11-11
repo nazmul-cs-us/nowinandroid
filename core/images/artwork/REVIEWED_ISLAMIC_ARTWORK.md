@@ -1,19 +1,27 @@
 # Reviewed online Home artwork
 
 Home no longer uses live Getty search. Its online collection is an allowlist of
-20 photographs from **The Metropolitan Museum of Art, Islamic Art department**.
-Each object was checked through the museum API for `isPublicDomain: true`, and
-each full source photograph was visually reviewed on 2026-11-10 for geometric
+25 photographs: 20 from **The Metropolitan Museum of Art, Islamic Art department**
+and five from **Cleveland Museum of Art** (Ottoman floral tiles, lotus tilework,
+and geometric and floral carpets).
+The Met's `isPublicDomain: true` and Cleveland's `share_license_status: CC0` were
+checked through the museum APIs. The Met photographs were reviewed on 2026-11-10 for geometric
 or botanical decoration without human or animal figures. Museum object titles
 are usually "Tile" or "Tile Panel"; the app uses descriptive display labels.
 
 Registry: `src/commonMain/kotlin/com/starception/submission/core/images/ReviewedIslamicArtwork.kt`.
+The Cleveland additions are in `ReviewedClevelandArtwork.kt`, visually reviewed on
+2026-11-11. Public-domain status was checked against the museum API and object pages.
+The official website image proxy is used because direct Open Access CDN downloads
+returned HTTP 403 from the local client. Only exact pinned proxy URLs are allowed;
+all source bytes still pass the same hash review gate. No remote proxy input is accepted.
 Licensing: https://www.metmuseum.org/about-the-met/policies-and-documents/open-access
 API documentation: https://metmuseum.github.io/
 
 ## Review gate
 
-1. Verify the object is in Islamic Art and explicitly public domain. Do not treat
+1. Verify Islamic artistic/cultural provenance and explicit public-domain status. Cleveland
+   classifies some carpets under Textiles rather than Islamic Art. Do not treat
    a keyword, department, or metadata tag as proof that no figures are present.
 2. Inspect the complete photograph at full size, including small border motifs.
    Reject humans, animals, figurative scenes, and uncertain imagery.

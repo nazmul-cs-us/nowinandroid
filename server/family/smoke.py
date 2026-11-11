@@ -228,6 +228,29 @@ def main():
                   payload={"type": "offer", "sdp": "x" * 35000})
         outsider.request("signal", "call_not_found", callId=call_id, payload=payload)
         print("PASS: video-sized offer/answer signalling, size limit and participant authorization.", flush=True)
+        a.request("end_call", callId=call_id)
+        a.request("end_call", callId=call_id)
+        for client, peer in ((a, b), (b, a)):
+            records = [m for m in client.request("chat_history", peer=peer.jid)["messages"] if m.get("type") == "call"]
+            require(len(records) == 1 and records[0]["id"] == "call:" + call_id, "Call history missing or duplicated.")
+            require(records[0]["call"]["kind"] == "video" and records[0]["call"]["outcome"] == "answered",
+                    "Answered video call history is incorrect.")
+            require(records[0]["call"].get("durationSeconds", -1) >= 0, "Answered call duration missing.")
+        cancelled_id = str(uuid.uuid4())
+        a.request("invite_call", peer=b.jid, callId=cancelled_id, kind="voice")
+        a.request("end_call", callId=cancelled_id)
+        records = b.request("chat_history", peer=a.jid)["messages"]
+        latest = records[-1]
+        require(latest["id"] == "call:" + cancelled_id and latest["call"]["outcome"] == "cancelled",
+                "Cancelled voice call history is incorrect.")
+        require(b.request("snapshot")["unreadCount"] == 1, "Missed-call alert missing or counted twice.")
+        b.request("read_messages", peer=a.jid, through=latest["sequence"])
+        require(b.request("snapshot")["unreadCount"] == 0, "Reading call history did not acknowledge its alert.")
+        print("PASS: authoritative call history for both users, duplicate protection, duration and missed-call acknowledgement.", flush=True)
+        # Restore an active call so the existing membership-removal check remains meaningful.
+        call_id = str(uuid.uuid4())
+        a.request("invite_call", peer=b.jid, callId=call_id, kind="video")
+        b.request("accept_call", callId=call_id)
         b.request("remove_member", peer=a.jid)
         require(a.request("snapshot")["calls"] == [], "Removed family call remained active.")
         a.request("turn", "not_active", callId=call_id)

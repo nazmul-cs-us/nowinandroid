@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -57,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import org.webrtc.SurfaceViewRenderer
 import javax.inject.Inject
 
@@ -366,7 +368,7 @@ private fun FamilyScreenBody(
                                     val presence = if (signedIn && state.serviceReady) member.presence else "unknown"
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         val conversation = state.conversations.find { it.peer == member.jid }
-                                        Text((if (!directory) conversation?.lastMessage?.text else null) ?: when (member.status) { "incoming" -> "Invited you to join"; "outgoing" -> "Waiting for acceptance"
+                                        Text((if (!directory) conversation?.lastMessage?.preview(state.me) else null) ?: when (member.status) { "incoming" -> "Invited you to join"; "outgoing" -> "Waiting for acceptance"
                                             else -> when (presence) { "online" -> "Online"; "offline" -> "Offline"; else -> "Status unavailable" } },
                                             color = if ((conversation?.unread ?: 0) > 0) colors.ink else colors.muted,
                                             fontWeight = if ((conversation?.unread ?: 0) > 0) FontWeight.Medium else FontWeight.Normal,
@@ -432,7 +434,7 @@ private fun FamilyScreenBody(
                 Row(Modifier.fillMaxWidth().clickable {
                     inbox = false
                     if (notice.kind == "invitation") invitations = true
-                    else if (notice.kind == "message") actions.openChat(notice.peer)
+                    else if (notice.kind == "message" || notice.kind == "missed_call") actions.openChat(notice.peer)
                     else selected = state.members.find { it.jid == notice.peer }
                 }.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     ContactAvatar(notice.peer, 44)
@@ -569,6 +571,10 @@ fun FamilyCallOverlay(client: FamilyClient) {
     val permission = permissionRequest()
     val remote by client.media.remoteVideo.collectAsStateWithLifecycle()
     val local by client.media.localVideo.collectAsStateWithLifecycle()
+    var localGlassFrame by remember(call.id) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var remoteGlassFrame by remember(call.id) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(local, state.camera) { if (local == null || !state.camera) localGlassFrame = null }
+    LaunchedEffect(remote) { if (remote == null) remoteGlassFrame = null }
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     FamilyCameraPreviewEffect(call.id, lifecycle,
         onStart = { client.previewCamera(call.id) }, onStop = { client.stopPreview(call.id) })
@@ -581,9 +587,7 @@ fun FamilyCallOverlay(client: FamilyClient) {
         dismissOnBackPress = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
         val view = androidx.compose.ui.platform.LocalView.current
         val video = call.kind == "video" && (call.stage == "active" || (call.caller == state.me && local != null && state.camera))
-        val framedVideo = call.kind == "video" &&
-            (call.stage == "active" || (call.stage == "ringing" && call.caller == state.me)) &&
-            androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp >= 500
+        val framedVideo = call.kind == "video"
         val lightStatusBar = if (framedVideo) MaterialTheme.colorScheme.background.luminance() > .5f else !video && MaterialTheme.colorScheme.primaryContainer.luminance() > .5f
         val lightNavigationBar = (framedVideo || !video) && MaterialTheme.colorScheme.surface.luminance() > .5f
         val voice = call.kind == "voice"
@@ -601,20 +605,24 @@ fun FamilyCallOverlay(client: FamilyClient) {
             answer = { permission(call.kind == "video") { client.acceptCall() } }, hangup = { client.hangup() },
             mute = { client.mute() }, speaker = { client.speaker() }, camera = { client.toggleCamera(); client.previewCamera() }, flip = { client.switchCamera() }),
             remoteReady = remote != null, localReady = local != null,
-            remoteVideo = { VideoSurface(client.media, false, Modifier.fillMaxSize()) },
-            localVideo = { VideoSurface(client.media, true, Modifier.fillMaxSize()) })
+            remoteVideo = { VideoSurface(client.media, false, Modifier.fillMaxSize(), onGlassFrame = { remoteGlassFrame = it }) },
+            localVideo = { VideoSurface(client.media, true, Modifier.fillMaxSize(), onGlassFrame = { localGlassFrame = it }) },
+            localThumbnail = { VideoSurface(client.media, true, Modifier.fillMaxSize()) },
+            glassFrame = if (call.stage == "ringing" && state.camera) localGlassFrame else remoteGlassFrame)
     }
 }
 
 @Composable
 internal fun FamilyCallContent(state: FamilyUiState, elapsed: Long = 0, actions: FamilyCallActions = FamilyCallActions(),
-    remoteReady: Boolean = false, localReady: Boolean = false, remoteVideo: @Composable () -> Unit = {}, localVideo: @Composable () -> Unit = {}) {
-    FamilyDesign { FamilyCallBody(state, elapsed, actions, remoteReady, localReady, remoteVideo, localVideo) }
+    remoteReady: Boolean = false, localReady: Boolean = false, remoteVideo: @Composable () -> Unit = {}, localVideo: @Composable () -> Unit = {},
+    localThumbnail: @Composable () -> Unit = localVideo, glassFrame: androidx.compose.ui.graphics.ImageBitmap? = null) {
+    FamilyDesign { FamilyCallBody(state, elapsed, actions, remoteReady, localReady, remoteVideo, localVideo, localThumbnail, glassFrame) }
 }
 
 @Composable
 private fun FamilyCallBody(state: FamilyUiState, elapsed: Long = 0, actions: FamilyCallActions = FamilyCallActions(),
-    remoteReady: Boolean = false, localReady: Boolean = false, remoteVideo: @Composable () -> Unit = {}, localVideo: @Composable () -> Unit = {}) {
+    remoteReady: Boolean = false, localReady: Boolean = false, remoteVideo: @Composable () -> Unit = {}, localVideo: @Composable () -> Unit = {},
+    localThumbnail: @Composable () -> Unit = localVideo, glassFrame: androidx.compose.ui.graphics.ImageBitmap? = null) {
     val colors = MaterialTheme.colorScheme
     val call = state.call ?: return
     val incoming = call.callee == state.me && call.stage == "ringing"
@@ -637,8 +645,8 @@ private fun FamilyCallBody(state: FamilyUiState, elapsed: Long = 0, actions: Fam
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(colors.surface)) {
         val compact = maxHeight < 500.dp
-        if ((video || (call.kind == "video" && call.stage == "ringing" && !incoming)) && !compact) {
-            FamilyVideoCallLayout(state, status, actions, remoteReady, localReady, remoteVideo, localVideo)
+        if (call.kind == "video") {
+            FamilyVideoCallLayout(state, status, actions, remoteReady, localReady, remoteVideo, localVideo, localThumbnail, glassFrame)
             return@BoxWithConstraints
         }
         if (preview) Box(Modifier.fillMaxSize()) { localVideo() }
@@ -733,9 +741,12 @@ private fun CallControl(icon: ImageVector, label: String, active: Boolean = fals
 }
 
 @Composable
-private fun VideoSurface(media: AndroidFamilyMedia, local: Boolean, modifier: Modifier) {
+private fun VideoSurface(media: AndroidFamilyMedia, local: Boolean, modifier: Modifier,
+    onGlassFrame: ((androidx.compose.ui.graphics.ImageBitmap?) -> Unit)? = null) {
     val track by (if (local) media.localVideo else media.remoteVideo).collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val latestFrameConsumer by rememberUpdatedState(onGlassFrame)
     val renderer = remember { SurfaceViewRenderer(context).apply {
         init(media.egl.eglBaseContext, null); setMirror(local); setZOrderMediaOverlay(local)
         setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
@@ -744,6 +755,26 @@ private fun VideoSurface(media: AndroidFamilyMedia, local: Boolean, modifier: Mo
     DisposableEffect(track, renderer) {
         runCatching { track?.addSink(renderer) }
         onDispose { runCatching { track?.removeSink(renderer) } }
+    }
+    LaunchedEffect(renderer, track, onGlassFrame != null, lifecycle) {
+        if (track == null || onGlassFrame == null) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            try {
+                while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                    val frame = kotlinx.coroutines.withTimeoutOrNull(2000) {
+                        kotlinx.coroutines.suspendCancellableCoroutine<android.graphics.Bitmap> { continuation ->
+                            val listener = org.webrtc.EglRenderer.FrameListener { bitmap ->
+                                if (continuation.isActive) continuation.resumeWith(Result.success(bitmap)) else bitmap.recycle()
+                            }
+                            renderer.addFrameListener(listener, .2f)
+                            continuation.invokeOnCancellation { runCatching { renderer.removeFrameListener(listener) } }
+                        }
+                    }
+                    if (frame != null) latestFrameConsumer?.invoke(frame.asImageBitmap())
+                    kotlinx.coroutines.delay(250)
+                }
+            } finally { latestFrameConsumer?.invoke(null) }
+        }
     }
     DisposableEffect(renderer) { onDispose { renderer.release() } }
     AndroidView(factory = { renderer }, modifier = modifier)
