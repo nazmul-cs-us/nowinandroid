@@ -10,14 +10,14 @@ class FamilyRegistrationPolicy {
 
     fun validate(input: String, password: String, confirmation: String): String? = when {
         username(input) == null -> "invalid_username"
-        password.length !in 12..128 || password.isBlank() || password.any { it.code < 32 || it.code == 127 } -> "invalid_password"
+        password.length !in 8..128 || password.isBlank() || password.any { it.code < 32 || it.code == 127 } -> "invalid_password"
         password != confirmation -> "password_mismatch"
         else -> null
     }
 
     fun message(code: String): String = when (code) {
         "invalid_username", "bad-request", "jid-malformed" -> "Choose an available username with 3–32 letters, numbers, dots, underscores or hyphens. Start with a letter or number."
-        "invalid_password", "not-acceptable" -> "Use a password with 12–128 characters, without line breaks or control characters."
+        "invalid_password", "not-acceptable" -> "Use a password with 8–128 characters, without line breaks or control characters."
         "password_mismatch" -> "The passwords do not match."
         "conflict" -> "That username is already taken. Choose another or sign in."
         "resource-constraint" -> "Too many signup attempts. Wait a minute and try again."

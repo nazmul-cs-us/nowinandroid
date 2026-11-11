@@ -4,6 +4,11 @@ import UIKit
 import Shared
 import WebRTC
 
+private func familyPresenceText(_ member: FamilyMemberRow?, available: Bool) -> String {
+    FamilyLastSeenPolicy().shortLabel(presence: member?.presence ?? "unknown", lastSeenAt: member?.lastSeenAt ?? 0,
+        now: Int64(Date().timeIntervalSince1970 * 1000), available: available)
+}
+
 private func familyColor(_ argb: Int32) -> Color {
     let value = UInt32(bitPattern: argb)
     return Color(red: Double((value >> 16) & 255) / 255, green: Double((value >> 8) & 255) / 255,
@@ -229,7 +234,7 @@ struct FamilyView: View {
                             Text(familyName(member.jid)).font(.system(size: 15, weight: .medium)).foregroundStyle(colors.ink).lineLimit(1)
                             let presence = store.signedIn && store.serviceReady ? member.presence : "unknown"
                             HStack(spacing: 6) {
-                                Text((directory ? nil : store.conversations.first(where: { $0.peer == member.jid })?.lastMessage?.preview(me: store.me)) ?? (member.status == "incoming" ? "Invited you to join" : member.status == "outgoing" ? "Waiting for acceptance" : presence == "online" ? "Online" : presence == "offline" ? "Offline" : "Status unavailable"))
+                                Text((directory ? nil : store.conversations.first(where: { $0.peer == member.jid })?.lastMessage?.preview(me: store.me)) ?? (member.status == "incoming" ? "Invited you to join" : member.status == "outgoing" ? "Waiting for acceptance" : familyPresenceText(member, available: store.serviceReady)))
                                     .font(.system(size: 12)).foregroundStyle(colors.muted).lineLimit(1)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading)
@@ -339,7 +344,7 @@ struct FamilyView: View {
                         .accessibilityLabel(passwordVisible ? "Hide password" : "Show password")
                 }.padding(14).background(colors.field, in: RoundedRectangle(cornerRadius: 16))
                 if creatingAccount {
-                    Text("Use a password with 12–128 characters.").font(.footnote).foregroundStyle(colors.muted)
+                    Text("Use a password with 8–128 characters.").font(.footnote).foregroundStyle(colors.muted)
                     Group {
                         if passwordVisible { TextField("Confirm password", text: $confirmation) }
                         else { SecureField("Confirm password", text: $confirmation) }
@@ -397,7 +402,7 @@ struct FamilyView: View {
                     FamilyContactAvatar(jid: member.jid, size: 160).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center).padding(.bottom, 32)
                     VStack(alignment: .leading, spacing: 8) {
                         Text(familyName(member.jid)).font(.system(size: 24, weight: .semibold)).foregroundStyle(.white)
-                        Text(member.status == "accepted" ? (store.signedIn && store.serviceReady && store.members.first(where: { $0.jid == member.jid })?.presence == "online" ? "Online" : "Family member") : "Family invitation")
+                        Text(member.status == "accepted" ? familyPresenceText(store.members.first(where: { $0.jid == member.jid }), available: store.signedIn && store.serviceReady) : "Family invitation")
                             .font(.system(size: 12)).foregroundStyle(.white.opacity(0.8))
                     }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading).padding(24)
                     Button { selected = nil } label: {
@@ -907,7 +912,7 @@ private struct FamilyChatView: View {
                     FamilyContactAvatar(jid: peer, size: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(familyName(peer)).font(.system(size: 15, weight: .semibold)).foregroundStyle(colors.ink).lineLimit(1)
-                        Text(store.members.first(where: { $0.jid == peer })?.presence == "online" ? "Online" : "Family member")
+                        Text(familyPresenceText(store.members.first(where: { $0.jid == peer }), available: store.serviceReady))
                             .font(.system(size: 10)).foregroundStyle(colors.muted)
                     }
                 }

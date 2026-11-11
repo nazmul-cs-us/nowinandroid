@@ -27,7 +27,7 @@ internal val FAMILY_DOMAIN = FamilyEndpoint().domain
 internal const val FAMILY_NS = "urn:starception:family:1"
 
 data class FamilyWebPairing(val code: String, val url: String, val expires: Long)
-data class FamilyMember(val jid: String, val status: String, val presence: String = "unknown")
+data class FamilyMember(val jid: String, val status: String, val presence: String = "unknown", val lastSeenAt: Long = 0)
 data class FamilyCall(
     val id: String, val caller: String, val callee: String, val kind: String,
     val stage: String, val version: Long, val expires: Long, val selected: Boolean,
@@ -413,6 +413,9 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             if (mutable.value.chatPeer != peer || chatToken != chatGeneration) return@launch
             val rows = reply.getJSONArray("messages")
             val messages = (0 until rows.length()).map { FamilyChatMessage.parse(rows.getJSONObject(it)) }
+            messages.mapNotNull { it.call?.kind }.distinct().forEach {
+                android.util.Log.i("FamilyCalls", "Call history loaded: kind=$it")
+            }
             mutable.value = mutable.value.copy(messages = (messages + mutable.value.messages).distinctBy { it.id }.sortedBy { it.sequence }, nextBefore = reply.optLong("nextBefore"))
         } catch (e: Exception) { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatError = chatError(e)) }
         finally { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatLoading = false) }
@@ -460,8 +463,11 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         mutable.value = mutable.value.copy(error = null, callError = null)
         check(mutable.value.call == null)
         check(mutable.value.members.any { it.jid == peer && FamilyPolicy().canCall(it.status) })
-        apply(request("invite_call", "peer" to peer, "kind" to if (video) "video" else "voice",
-            "callId" to UUID.randomUUID().toString()))
+        val kind = if (video) "video" else "voice"
+        android.util.Log.i("FamilyCalls", "Outgoing call requested: kind=$kind")
+        val response = request("invite_call", "peer" to peer, "kind" to kind, "callId" to UUID.randomUUID().toString())
+        check(response.getJSONObject("call").optString("kind") == kind) { "call_kind_mismatch" }
+        apply(response)
     }
     fun acceptCall() = perform(callAction = true) {
         mutable.value.call?.let { apply(request("accept_call", "callId" to it.id)) }
@@ -542,6 +548,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
         if (body.optString("event") == "chat") body.optJSONObject("message")?.let { o ->
             val message = FamilyChatMessage.parse(o); val peer = mutable.value.chatPeer
+            message.call?.let { android.util.Log.i("FamilyCalls", "Call history event: kind=${it.kind}") }
             if (peer != null && setOf(message.from, message.to) == setOf(peer, mutable.value.me)) {
                 mutable.value = mutable.value.copy(messages = (mutable.value.messages + message).distinctBy { it.id }.sortedBy { it.sequence })
             }
@@ -552,17 +559,17 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             val members = (0 until rows.length()).map { i ->
                 val row = rows.getJSONObject(i)
                 val jid = row.getString("jid"); val status = row.getString("status")
-                if (status == "accepted") presenceCache.apply(jid, row.optString("presence"), row.optLong("presenceVersion"))
+                if (status == "accepted") presenceCache.apply(jid, row.optString("presence"), row.optLong("presenceVersion"), row.optLong("lastSeenAt"))
                 FamilyMember(jid, status)
             }
             presenceCache.retain(members.filter { it.status == "accepted" }.map { it.jid })
-            mutable.value = mutable.value.copy(serviceReady = true, members = members.map { it.copy(presence = presenceCache.status(it.jid)) })
+            mutable.value = mutable.value.copy(serviceReady = true, members = members.map { it.copy(presence = presenceCache.status(it.jid), lastSeenAt = presenceCache.lastSeenAt(it.jid)) })
         } else if (body.optString("event") == "presence") {
             val jid = body.optString("jid")
             if (mutable.value.members.any { it.jid == jid && it.status == "accepted" }) {
-                presenceCache.apply(jid, body.optString("presence"), body.optLong("presenceVersion"))
+                presenceCache.apply(jid, body.optString("presence"), body.optLong("presenceVersion"), body.optLong("lastSeenAt"))
             }
-            mutable.value = mutable.value.copy(members = mutable.value.members.map { it.copy(presence = presenceCache.status(it.jid)) })
+            mutable.value = mutable.value.copy(members = mutable.value.members.map { it.copy(presence = presenceCache.status(it.jid), lastSeenAt = presenceCache.lastSeenAt(it.jid)) })
         }
         if (body.has("members") && mutable.value.chatPeer != null && mutable.value.members.none { it.jid == mutable.value.chatPeer && it.status == "accepted" }) closeChat()
         body.optJSONObject("call")?.let { updateCall(it) }
@@ -664,6 +671,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
     }
     private fun friendly(code: String?) = when (code) {
+        "call_kind_mismatch" -> "The server returned a different call type. Refresh Family and try again."
         "web_helper_unavailable" -> "Temporary call alerts are not enabled on the server yet."
         "family_unavailable" -> "Signed in, but the Family service did not respond. Tap Refresh to retry."
 

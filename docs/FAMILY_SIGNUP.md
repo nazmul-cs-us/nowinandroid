@@ -21,7 +21,7 @@ new signup validation rules.
   hyphens; first character must be a letter or number. The administrative names
   `admin`, `administrator`, `root`, `support`, `postmaster` and the existing pilot
   names `android`, `ios` cannot be claimed through signup.
-- Password: 12–128 UTF-16 code units, nonblank, with no C0 control characters or
+- Password: 8–128 UTF-16 code units, nonblank, with no C0 control characters or
   DEL; confirmation must match exactly. Passwords are not trimmed or lowercased.
   Shared Kotlin policy and server validation use the same bounds.
 - Registration uses create-only XEP-0077 `jabber:iq:register` on the existing

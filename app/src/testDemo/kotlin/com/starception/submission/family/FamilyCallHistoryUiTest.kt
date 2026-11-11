@@ -60,6 +60,18 @@ class FamilyCallHistoryUiTest {
         compose.onRoot().captureFamilyPreview("chat-missed-voice-call")
     }
 
+    @Test fun answeredAudioCallWithDurationNeverDisplaysAVideoLabel() {
+        val value = json("answered", "voice")
+        value.getJSONObject("call").put("durationSeconds", 94)
+        val message = FamilyChatMessage.parse(value)
+        assertEquals("voice", message.call?.kind)
+        assertEquals("Voice call · Answered", message.preview(me))
+        render(message)
+        compose.onNodeWithText("Voice call").assertIsDisplayed()
+        compose.onNodeWithText("Video call").assertDoesNotExist()
+        compose.onNodeWithText("1m 34s", substring = true).assertIsDisplayed()
+    }
+
     @Test fun sameRecordHasParticipantSpecificConversationPreviews() {
         val message = FamilyChatMessage.parse(json("cancelled"))
         assertEquals("Voice call · Cancelled", message.preview(me))

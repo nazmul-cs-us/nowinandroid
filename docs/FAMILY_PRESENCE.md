@@ -3,8 +3,9 @@
 Accepted Family contacts show **Online**, **Offline**, or **Status unavailable**
 on Android and iOS. A green dot accompanies Online. Calling stays available for
 accepted members regardless of presence: background incoming-call push is separate
-from foreground availability. Invitations never expose availability. No last-seen
-timestamps are collected or displayed.
+from foreground availability. Invitations never expose availability. Offline
+accepted contacts now show server-backed relative last-seen times in the directory,
+chat header and profile; no timestamp is invented for a never-observed account.
 
 Both clients publish foreground/background changes over their authenticated Family
 XMPP connection. iOS uses the SwiftUI scene phase, including its initial state,
@@ -20,6 +21,19 @@ RAM-only Mnesia table. Status lookup is keyed by account; an update reads only t
 account's devices and accepted recipients. The server emits an event only when the
 aggregate status changes. Headline events carry no-store/no-copy hints. Raw
 peer-to-peer presence/probes are blocked by the private Family module.
+
+Last-confirmed activity is stored separately in the existing durable Family table.
+Active timestamps are persisted at most once per 20 seconds; observed foreground-to-
+background/disconnect transitions persist immediately. Expired leases use the last
+confirmed active timestamp, not the later time when the sweep noticed the expiry.
+Multiple-device aggregation must become offline before an offline timestamp is shown.
+Inactive heartbeats do not keep moving last seen forward. Restarting the server restores
+known last-seen times as Offline until fresh activity arrives. Account deletion removes
+the stored timestamp; removing membership immediately removes access to it. This
+intentionally adds activity-timestamp collection for accepted family visibility.
+
+This requires deploying the new presence module and rebuilding both clients. Restarting
+an older module does not enable the field. Existing clients ignore the new optional field.
 
 The existing 20-second snapshot heartbeat renews a 75-second device lease, without
 adding a separate presence polling loop. Normal foreground/background updates and

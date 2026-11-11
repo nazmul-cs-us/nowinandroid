@@ -182,6 +182,7 @@ private fun FamilyScreenBody(
 ) {
     if (state.chatPeer != null) { FamilyChatContent(state, actions); return }
     val signedIn = state.connected || state.reconnecting
+    val presenceTime = rememberFamilyPresenceTime()
     val portrait = androidx.compose.ui.platform.LocalConfiguration.current.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val colors = familyPalette()
     val brand = familyBrandColor()
@@ -300,7 +301,7 @@ private fun FamilyScreenBody(
                                         }
                                     })
                                 if (creatingAccount) {
-                                    Text("Use a password with 12–128 characters.", fontSize = 12.sp, color = colors.muted)
+                                    Text("Use a password with 8–128 characters.", fontSize = 12.sp, color = colors.muted)
                                     FamilyField(confirmation, { confirmation = it }, "Confirm password", colors,
                                         leading = Icons.Default.Lock, password = !passwordVisible)
                                 }
@@ -369,7 +370,7 @@ private fun FamilyScreenBody(
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         val conversation = state.conversations.find { it.peer == member.jid }
                                         Text((if (!directory) conversation?.lastMessage?.preview(state.me) else null) ?: when (member.status) { "incoming" -> "Invited you to join"; "outgoing" -> "Waiting for acceptance"
-                                            else -> when (presence) { "online" -> "Online"; "offline" -> "Offline"; else -> "Status unavailable" } },
+                                            else -> familyPresenceText(member, state.serviceReady, presenceTime) },
                                             color = if ((conversation?.unread ?: 0) > 0) colors.ink else colors.muted,
                                             fontWeight = if ((conversation?.unread ?: 0) > 0) FontWeight.Medium else FontWeight.Normal,
                                             fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

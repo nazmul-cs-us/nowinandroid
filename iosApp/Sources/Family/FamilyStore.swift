@@ -17,6 +17,7 @@ struct FamilyMemberRow: Identifiable, Equatable {
     let jid: String
     let status: String
     var presence: String = "unknown"
+    var lastSeenAt: Int64 = 0
     var id: String { jid }
 }
 struct FamilyCallInfo: Identifiable {
@@ -337,7 +338,12 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             guard await FamilyWebRTC.permissions(video: video) else {
                 self.message = "Allow microphone access, and camera access for video calls, in Settings."; return
             }
-            try await self.apply(self.request("invite_call", ["peer": peer, "kind": video ? "video" : "voice", "callId": UUID().uuidString]))
+            let kind = video ? "video" : "voice"
+            let reply = try await self.request("invite_call", ["peer": peer, "kind": kind, "callId": UUID().uuidString])
+            guard let returned = reply["call"] as? [String: Any], returned["kind"] as? String == kind else {
+                throw FamilyError.rejected("call_kind_mismatch")
+            }
+            await self.apply(reply)
         }
     }
     func answer() {
@@ -480,7 +486,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
                 guard let jid = row["jid"] as? String, let status = row["status"] as? String else { return nil }
                 if status == "accepted" {
                     _ = presenceCache.apply(jid: jid, status: row["presence"] as? String ?? "unknown",
-                        revision: (row["presenceVersion"] as? NSNumber)?.int64Value ?? 0)
+                        revision: (row["presenceVersion"] as? NSNumber)?.int64Value ?? 0,
+                        lastSeenAt: (row["lastSeenAt"] as? NSNumber)?.int64Value ?? 0)
                 }
                 return FamilyMemberRow(jid: jid, status: status)
             }
@@ -489,7 +496,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         } else if body["event"] as? String == "presence" {
             if let jid = body["jid"] as? String, members.contains(where: { $0.jid == jid && $0.status == "accepted" }) {
                 _ = presenceCache.apply(jid: jid, status: body["presence"] as? String ?? "unknown",
-                    revision: (body["presenceVersion"] as? NSNumber)?.int64Value ?? 0)
+                    revision: (body["presenceVersion"] as? NSNumber)?.int64Value ?? 0,
+                    lastSeenAt: (body["lastSeenAt"] as? NSNumber)?.int64Value ?? 0)
             }
             publishMembers(members)
         }
@@ -503,7 +511,10 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     private func publishMembers(_ rows: [FamilyMemberRow]) {
         let next = rows.map { row -> FamilyMemberRow in
-            var member = row; member.presence = presenceCache.status(jid: row.jid); return member
+            var member = row
+            member.presence = presenceCache.status(jid: row.jid)
+            member.lastSeenAt = presenceCache.lastSeenAt(jid: row.jid)
+            return member
         }
         if next != members { members = next }
     }
@@ -567,6 +578,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         message = text
     }
     private static func friendly(_ code: String) -> String {
+        if code == "call_kind_mismatch" { return "The server returned a different call type. Refresh Family and try again." }
         switch code {
         case "not_family": return "Only accepted family members can call each other."
         case "busy": return "One of you is already in a call."

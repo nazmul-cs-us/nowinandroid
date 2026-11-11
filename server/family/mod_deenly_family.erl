@@ -58,6 +58,7 @@ remove_user(Acc, #{jid := #jid{lserver = D} = J}, _) ->
             mnesia:delete({?TABLE, family_key(D, U, P)}), mod_deenly_family_presence:revoke(D, U, P)
          end || M <- Peers],
         mod_deenly_family_chat:purge(D, U),
+        mod_deenly_family_presence:purge(D, U),
         [{maps:get(<<"jid">>, M), #{<<"event">> => <<"family">>, <<"members">> => members(D, maps:get(<<"jid">>, M))}} || M <- Peers]
     end) of {atomic, Events} -> deliver(D, Events); _ -> ok end,
     {ok, Acc}.
@@ -188,7 +189,8 @@ execute(D, U, F, #{<<"action">> := <<"invite_call">>, <<"peer">> := Peer,
             save_call(D, New), mod_deenly_family_push:enqueue(D, New), New;
         Existing ->
             true_or_deny(maps:get(<<"callerFull">>, Existing) =:= F andalso
-                         maps:get(<<"callee">>, Existing) =:= Peer, <<"invalid_call">>), Existing
+                         maps:get(<<"callee">>, Existing) =:= Peer andalso
+                         maps:get(<<"kind">>, Existing) =:= Kind, <<"invalid_call">>), Existing
     end,
     {#{<<"call">> => view(C, F)}, call_events(C)};
 execute(D, U, F, #{<<"action">> := Action, <<"callId">> := Id} = Req) ->

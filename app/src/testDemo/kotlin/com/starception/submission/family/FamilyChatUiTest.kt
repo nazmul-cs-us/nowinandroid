@@ -60,6 +60,24 @@ class FamilyChatUiTest {
         chatDraft = "Assalamu alaikum",
     )
 
+    @Test fun offlineContactShowsLastSeenInChatAndProfile() {
+        val member = FamilyMember(peer, "accepted", "offline", System.currentTimeMillis() - 150000)
+        compose.setContent { NiaTheme { FamilyScreenContent(state().copy(members = listOf(member))) } }
+        compose.onNodeWithText("Last seen 2m ago").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Contact details").performClick()
+        compose.onNodeWithText("Last seen 2 minutes ago").assertIsDisplayed()
+    }
+
+    @Test fun offlineDirectoryShowsLastSeenButUnavailableServiceDoesNotExposeStaleTimes() {
+        val member = FamilyMember(peer, "accepted", "offline", System.currentTimeMillis() - 150000)
+        val ui = mutableStateOf(state().copy(chatPeer = null, members = listOf(member)))
+        compose.setContent { NiaTheme { FamilyScreenContent(ui.value) } }
+        compose.onNodeWithContentDescription("Family contacts").performClick()
+        compose.onNodeWithText("Last seen 2m ago").assertIsDisplayed()
+        compose.runOnIdle { ui.value = ui.value.copy(serviceReady = false) }
+        compose.onNodeWithText("Last seen 2m ago").assertDoesNotExist()
+    }
+
     @Test fun signedOutLandingHasAVisibleWorkingBackButton() {
         var exits = 0
         compose.setContent { NiaTheme { FamilyScreenContent(FamilyUiState(), FamilyActions(exit = { exits++ })) } }

@@ -33,6 +33,8 @@ custom_module_toml_schema_is_empty() ->
 reset() -> ets:delete_all_objects(deenly_family_signup_rate), ets:delete_all_objects(signup_test_accounts).
 password() -> <<"Signup password 123!">>.
 validation() ->
+    ?assertEqual({ok, <<"alice">>}, mod_deenly_family_signup:validate(<<"alice">>, <<"abcdefgh">>)),
+    ?assertEqual({error, <<"not-acceptable">>}, mod_deenly_family_signup:validate(<<"alice">>, <<"abcdefg">>)),
     ?assertEqual({ok, <<"alice-1">>}, mod_deenly_family_signup:validate(<<"Alice-1">>, password())),
     ?assertEqual({error, <<"forbidden">>}, mod_deenly_family_signup:validate(<<"admin">>, password())),
     ?assertEqual({error, <<"bad-request">>}, mod_deenly_family_signup:validate(<<"someone@foreign.test">>, password())),

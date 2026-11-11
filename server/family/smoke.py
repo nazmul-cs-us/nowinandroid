@@ -199,7 +199,9 @@ def main():
         require(update.get("jid") == a.jid and update.get("presence") == "online", "Live family presence was not delivered.")
         require(update.get("presenceVersion", 0) > 0 and update.get("presenceEpoch"), "Presence revision missing.")
         a.request("presence", active=False, activityVersion=2)
-        require(b.event("presence").get("presence") == "offline", "Background presence was not delivered.")
+        offline_event = b.event("presence")
+        require(offline_event.get("presence") == "offline", "Background presence was not delivered.")
+        require(offline_event.get("lastSeenAt", 0) > 0, "Offline presence is missing last seen.")
         a.request("presence", active=True, activityVersion=1)
         member = next(x for x in b.request("snapshot")["members"] if x["jid"] == a.jid)
         require(member.get("presence") == "offline", "An old foreground update restored online status.")
@@ -241,7 +243,7 @@ def main():
         a.request("end_call", callId=cancelled_id)
         records = b.request("chat_history", peer=a.jid)["messages"]
         latest = records[-1]
-        require(latest["id"] == "call:" + cancelled_id and latest["call"]["outcome"] == "cancelled",
+        require(latest["id"] == "call:" + cancelled_id and latest["call"]["outcome"] == "cancelled" and latest["call"]["kind"] == "voice",
                 "Cancelled voice call history is incorrect.")
         require(b.request("snapshot")["unreadCount"] == 1, "Missed-call alert missing or counted twice.")
         b.request("read_messages", peer=a.jid, through=latest["sequence"])

@@ -95,7 +95,7 @@ validate(User, Password) when is_binary(User), is_binary(Password), byte_size(Us
         match when Reserved -> {error, <<"forbidden">>};
         match ->
             case unicode:characters_to_binary(Password, utf8, {utf16, big}) of
-                UTF16 when is_binary(UTF16), byte_size(UTF16) >= 24, byte_size(UTF16) =< 256 ->
+                UTF16 when is_binary(UTF16), byte_size(UTF16) >= 16, byte_size(UTF16) =< 256 ->
                     case re:run(Password, <<"[\\x00-\\x1f\\x7f]">>, [{capture, none}]) =:= nomatch
                          andalso string:trim(Password) =/= <<>> of
                         true -> {ok, Name}; false -> {error, <<"not-acceptable">>}

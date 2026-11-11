@@ -11,6 +11,8 @@ class FamilyRegistrationPolicyTest {
     }
     @Test fun validatesConfirmationAndPasswordWithoutChangingItsContents() {
         assertNull(policy.validate("amina", "a secure password", "a secure password"))
+        assertNull(policy.validate("amina", "a".repeat(8), "a".repeat(8)))
+        assertEquals("invalid_password", policy.validate("amina", "a".repeat(7), "a".repeat(7)))
         assertEquals("password_mismatch", policy.validate("amina", "a secure password", "other password"))
         listOf("short", " ".repeat(12), "x".repeat(129), "line-break\npassword", "control\u0000password")
             .forEach { assertEquals("invalid_password", policy.validate("amina", it, it)) }

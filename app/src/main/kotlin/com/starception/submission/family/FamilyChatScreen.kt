@@ -65,6 +65,7 @@ internal fun FamilyChatContent(
     val brand = familyBrandColor()
     val member = state.members.find { it.jid == peer } ?: FamilyMember(peer, "accepted")
     val online = state.serviceReady && member.presence == "online"
+    val presenceTime = rememberFamilyPresenceTime()
     val canCall = state.serviceReady && state.call == null
     val canSend = state.connected && !state.chatSending && state.chatDraft.isNotBlank()
     val focus = LocalFocusManager.current
@@ -102,12 +103,8 @@ internal fun FamilyChatContent(
                 Column(Modifier.weight(1f).padding(start = 10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(callDisplayName(peer), fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
                         color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(when {
-                        !state.serviceReady -> "Status unavailable"
-                        online -> "Online"
-                        member.presence == "offline" -> "Offline"
-                        else -> "Family member"
-                    }, fontSize = 11.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(familyPresenceText(member, state.serviceReady, presenceTime), fontSize = 11.sp,
+                        color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             IconButton(onClick = { actions.voice(peer) }, enabled = canCall,

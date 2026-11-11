@@ -14,6 +14,7 @@ family_test_() -> {setup, fun setup/0, fun cleanup/1, [
     ?_test(call_history_cancel_decline_and_expiry()),
     ?_test(call_history_is_private_and_removed_with_membership()),
     ?_test(call_history_cannot_be_forged_by_text_messages()),
+    ?_test(call_id_cannot_silently_change_voice_or_video_kind()),
     ?_test(reading_call_history_clears_its_missed_alert()),
     ?_test(chat_requires_accepted_family()), ?_test(chat_is_idempotent()),
     ?_test(chat_history_and_read_cursor()), ?_test(chat_validates_utf8_and_rate()),
@@ -29,6 +30,7 @@ family_test_() -> {setup, fun setup/0, fun cleanup/1, [
     ?_test(push_is_durable_and_idempotent()), ?_test(push_cancelled_is_pruned()),
     ?_test(push_invalid_device_rejected()), ?_test(call_id_requires_uuid()),
     ?_test(presence_is_family_private()), ?_test(presence_combines_devices()),
+    ?_test(last_seen_is_server_timed_stable_and_durable()),
     ?_test(stale_activity_cannot_restore_online()), ?_test(presence_disconnect_and_expiry()),
     ?_test(presence_removal_revokes_updates()), ?_test(presence_heartbeats_are_coalesced()),
     ?_test(raw_peer_presence_is_rejected()), ?_test(web_pairing_and_logout_are_scoped()),
@@ -160,7 +162,8 @@ restart_preserves_family() -> reset(), family(),
     ok = mod_deenly_family_presence:init(),
     {atomic, {#{<<"members">> := [Member], <<"presenceEpoch">> := NewEpoch}, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
     ?assertEqual(<<"accepted">>, maps:get(<<"status">>, Member)),
-    ?assertEqual(<<"unknown">>, maps:get(<<"presence">>, Member)),
+    ?assertEqual(<<"offline">>, maps:get(<<"presence">>, Member)),
+    ?assert(maps:get(<<"lastSeenAt">>, Member) > 0),
     ?assertNotEqual(Epoch, NewEpoch),
     %% The RAM subscription index is rebuilt from durable accepted relationships.
     {atomic, {_, [{?B, _}]}} = presence(?A, ?AF, true, 1).
@@ -199,6 +202,22 @@ call_id_requires_uuid() -> reset(), family(),
 
 presence(U, F, Active, Sequence) -> act(U, F, <<"presence">>, #{<<"active">> => Active, <<"activityVersion">> => Sequence}).
 presence_state(U) -> {atomic, S} = mnesia:transaction(fun() -> mod_deenly_family_presence:state(?D, U) end), S.
+last_seen_is_server_timed_stable_and_durable() ->
+    reset(), family(), Now = erlang:system_time(millisecond),
+    {atomic, _} = act(?A, ?AF, <<"presence">>, #{<<"active">> => true, <<"activityVersion">> => 1, <<"lastSeenAt">> => 1}),
+    {atomic, _} = act(?A, ?AF, <<"presence">>, #{<<"active">> => false, <<"activityVersion">> => 2}),
+    {atomic, {Inbox, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    [Member] = maps:get(<<"members">>, Inbox), Seen = maps:get(<<"lastSeenAt">>, Member),
+    ?assert(Seen >= Now), ?assertEqual(<<"offline">>, maps:get(<<"presence">>, Member)),
+    {atomic, _} = act(?A, ?AF, <<"presence">>, #{<<"active">> => false, <<"activityVersion">> => 3}),
+    {atomic, {Again, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    [Same] = maps:get(<<"members">>, Again), ?assertEqual(Seen, maps:get(<<"lastSeenAt">>, Same)),
+    {atomic, ok} = mnesia:clear_table(deenly_family_presence), ok = mod_deenly_family_presence:init(),
+    {atomic, {Restored, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    [Saved] = maps:get(<<"members">>, Restored), ?assertEqual(Seen, maps:get(<<"lastSeenAt">>, Saved)),
+    {ok, ok} = mod_deenly_family:remove_user(ok, #{jid => jid:from_binary(?A)}, #{}),
+    ?assertEqual([], mnesia:dirty_read(deenly_family, {last_seen, ?D, ?A})).
+
 presence_is_family_private() ->
     reset(), invite(),
     {atomic, {_, []}} = presence(?A, ?AF, true, 1),
@@ -388,6 +407,8 @@ call_history_answered_is_durable_and_idempotent() ->
     ?assertEqual(<<"call:", ?ID/binary>>, maps:get(<<"id">>, Message)),
     ?assertEqual(<<"call">>, maps:get(<<"type">>, Message)),
     Detail = maps:get(<<"call">>, Message),
+    ?assertEqual(<<"voice">>, maps:get(<<"kind">>, Detail)),
+    ?assertMatch(<<"Voice call", _/binary>>, maps:get(<<"text">>, Message)),
     ?assertEqual(<<"answered">>, maps:get(<<"outcome">>, Detail)),
     ?assert(maps:get(<<"durationSeconds">>, Detail) >= 94),
     ?assert(maps:get(<<"durationSeconds">>, Detail) =< 95),
@@ -432,3 +453,11 @@ reading_call_history_clears_its_missed_alert() ->
     {atomic, {#{<<"messages">> := [Message]}, _}} = chat_history(?B, ?BF, ?A, 999),
     {atomic, {Inbox, _}} = act(?B, ?BF, <<"read_messages">>, #{<<"peer">> => ?A, <<"through">> => maps:get(<<"sequence">>, Message)}),
     ?assertEqual(0, maps:get(<<"unreadCount">>, Inbox)).
+
+call_id_cannot_silently_change_voice_or_video_kind() ->
+    reset(), family(),
+    {atomic, _} = act(?A, ?AF, <<"invite_call">>, #{<<"peer">> => ?B, <<"callId">> => ?ID, <<"kind">> => <<"video">>}),
+    ?assertEqual({aborted, {denied, <<"invalid_call">>}}, call()),
+    reset(), family(), {atomic, _} = call(),
+    ?assertEqual({aborted, {denied, <<"invalid_call">>}}, act(?A, ?AF, <<"invite_call">>,
+        #{<<"peer">> => ?B, <<"callId">> => ?ID, <<"kind">> => <<"video">>})).

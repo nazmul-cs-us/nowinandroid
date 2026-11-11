@@ -45,6 +45,7 @@ internal fun FamilyContactProfile(
     val colors = MaterialTheme.colorScheme
     val brand = familyBrandColor()
     val online = state.serviceReady && member.presence == "online"
+    val presenceTime = rememberFamilyPresenceTime()
     val accepted = member.status == "accepted"
     val canCall = accepted && state.serviceReady && state.call == null
     val view = LocalView.current
@@ -98,10 +99,7 @@ internal fun FamilyContactProfile(
                         Text(
                             when {
                                 !accepted -> "Family invitation"
-                                online -> "Online"
-                                !state.serviceReady -> "Status unavailable"
-                                member.presence == "offline" -> "Offline"
-                                else -> "Family member"
+                                 else -> familyPresenceText(member, state.serviceReady, presenceTime, compact = false)
                             },
                             color = Color.White.copy(alpha = .84f), style = MaterialTheme.typography.bodySmall,
                         )
