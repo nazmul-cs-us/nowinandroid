@@ -71,8 +71,9 @@ class TodayQuranMushafTest {
         annotations: Map<Int, List<TajweedAnnotation>> = emptyMap(),
         fontSize: Float = 41f,
         height: Int = 404,
+        font: String = "uthmani_script",
     ) {
-        TodayQuranMushaf(verses, translations, "uthmani_script", fontSize, showTranslation,
+        TodayQuranMushaf(verses, translations, font, fontSize, showTranslation,
             annotations.isNotEmpty(), annotations, "justify", "en", {},
             Modifier.size(360.dp, height.dp).background(Color(0xFF0B1827)))
     }
@@ -85,24 +86,28 @@ class TodayQuranMushafTest {
     }
 
     @Test fun embeddedAndSurahReadersUseTheSameArabicShapingSizeAndLineBreaking() {
+        val font = mutableStateOf("uthmani_script")
         compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
             Row(Modifier.background(Color.Black)) {
                 Box(Modifier.size(360.dp, 380.dp)) {
-                    MushafPagerView(ayahs = verses, arabicFont = "uthmani_script", arabicFontSize = 41f,
+                    MushafPagerView(ayahs = verses, arabicFont = font.value, arabicFontSize = 41f,
                         showTranslation = false, showTajweed = false, tajweedAnnotations = emptyMap(),
                         showBismillah = true, textAlignment = "justify", translationCode = "en", onAyahLongPress = {})
                 }
-                Reader()
+                Reader(font = font.value)
             }
         } }
-        val full = arabicLayout(0)
-        val embedded = arabicLayout(1)
-        assertEquals(full.layoutInput.style.fontFamily, embedded.layoutInput.style.fontFamily)
-        assertEquals(mushafReadingFontSize(41f).sp, embedded.layoutInput.style.fontSize)
-        assertEquals(full.layoutInput.style.fontSize, embedded.layoutInput.style.fontSize)
-        assertEquals(full.layoutInput.style.textAlign, embedded.layoutInput.style.textAlign)
-        assertEquals(full.layoutInput.text.text, embedded.layoutInput.text.text)
-        assertEquals(full.lineCount, embedded.lineCount)
+        for (selection in listOf("uthmani_script", "indopak_script", "pdms_saleem")) {
+            compose.runOnIdle { font.value = selection }
+            val full = arabicLayout(0)
+            val embedded = arabicLayout(1)
+            assertEquals(full.layoutInput.style.fontFamily, embedded.layoutInput.style.fontFamily)
+            assertEquals(mushafReadingFontSize(41f).sp, embedded.layoutInput.style.fontSize)
+            assertEquals(full.layoutInput.style.fontSize, embedded.layoutInput.style.fontSize)
+            assertEquals(full.layoutInput.style.textAlign, embedded.layoutInput.style.textAlign)
+            assertEquals(full.layoutInput.text.text, embedded.layoutInput.text.text)
+            assertEquals(full.lineCount, embedded.lineCount)
+        }
     }
 
     @OptIn(ExperimentalRoborazziApi::class)

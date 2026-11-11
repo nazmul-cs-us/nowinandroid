@@ -153,6 +153,7 @@ fun HomeArtworkSettingsSection() {
                     }
                 }
                 ArtworkThemePicker(settings.theme, settings::selectTheme)
+                HomeArtworkReviewControls(settings.theme)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val stackControls = maxWidth < 280.dp || LocalDensity.current.fontScale > 1.2f
                     if (stackControls) {
