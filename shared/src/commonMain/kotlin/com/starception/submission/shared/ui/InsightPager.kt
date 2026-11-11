@@ -242,6 +242,7 @@ fun InsightPager(
     maxTileHeight: Dp = tileHeight + 104.dp,
     fullWidthPage: Boolean = false,
     immersiveHome: Boolean = false,
+    useHomeArtwork: Boolean = immersiveHome,
     maxPageWidth: Dp? = null,
     initialExpandedPage: Int? = null,
     expansionExtent: Float = if (initialExpandedPage != null) 1f else 0f,
@@ -750,6 +751,7 @@ fun InsightPager(
                     when (animatedLogicalPage) {
                         0 -> PrayerNowTile(
                             fluidFullBleed = immersiveHome,
+                            useHomeArtwork = useHomeArtwork,
                             backgroundPageOffset = { pageOffset },
                             phase = day.skyPhase,
                             weather = day.skyWeather,
@@ -793,9 +795,9 @@ fun InsightPager(
                         1 -> ArtworkTile(
                             fluidFullBleed = immersiveHome,
                             backgroundPageOffset = { pageOffset },
-                            artwork = if (immersiveHome) homeCoverArtwork(1, false) else Res.drawable.insight_prayer_background,
-                            onlinePage = if (immersiveHome) 1 else null,
-                            foreground = if (immersiveHome) null else Res.drawable.insight_prayer_foreground,
+                            artwork = if (useHomeArtwork) homeCoverArtwork(1, false) else Res.drawable.insight_prayer_background,
+                            onlinePage = if (useHomeArtwork) 1 else null,
+                            foreground = if (useHomeArtwork) null else Res.drawable.insight_prayer_foreground,
                             foregroundScale = 0.84f,
                             foregroundOffsetYFraction = 0.08f,
                             isExpanded = isExpanded,
@@ -863,9 +865,9 @@ fun InsightPager(
                                 fluidFullBleed = immersiveHome,
                                 backgroundPageOffset = { pageOffset },
                                 expandedArtworkBlurRadius = 6.dp,
-                                artwork = if (immersiveHome) homeCoverArtwork(2, false) else Res.drawable.insight_quran_background,
-                                onlinePage = if (immersiveHome) 2 else null,
-                                foreground = if (immersiveHome) null else Res.drawable.insight_quran_foreground_v2,
+                                artwork = if (useHomeArtwork) homeCoverArtwork(2, false) else Res.drawable.insight_quran_background,
+                                onlinePage = if (useHomeArtwork) 2 else null,
+                                foreground = if (useHomeArtwork) null else Res.drawable.insight_quran_foreground_v2,
                                 foregroundScale = 0.74f,
                                 foregroundOffsetYFraction = 0.09f,
                                 isExpanded = isExpanded,
@@ -981,8 +983,8 @@ fun InsightPager(
                             ArtworkTile(
                                 fluidFullBleed = immersiveHome,
                                 backgroundPageOffset = { pageOffset },
-                                artwork = if (immersiveHome) homeCoverArtwork(3, false) else Res.drawable.insight_qibla_background,
-                                onlinePage = if (immersiveHome) 3 else null,
+                                artwork = if (useHomeArtwork) homeCoverArtwork(3, false) else Res.drawable.insight_qibla_background,
+                                onlinePage = if (useHomeArtwork) 3 else null,
                                 // The compact card already has a live heading
                                 // arrow. Omitting the decorative compass avoids
                                 // a static-compass-to-radar swap on expansion.
@@ -1065,8 +1067,8 @@ fun InsightPager(
                             ArtworkTile(
                                 fluidFullBleed = immersiveHome,
                                 backgroundPageOffset = { pageOffset },
-                                artwork = if (immersiveHome) homeCoverArtwork(4, false) else Res.drawable.insight_suggestion,
-                                onlinePage = if (immersiveHome) 4 else null,
+                                artwork = if (useHomeArtwork) homeCoverArtwork(4, false) else Res.drawable.insight_suggestion,
+                                onlinePage = if (useHomeArtwork) 4 else null,
                                 isExpanded = isExpanded,
                                 minimumExpandedContentHeight = stageHeightHints[4] ?: 180.dp,
                                 onPreferredHeightChange = { measuredHeight: Dp ->

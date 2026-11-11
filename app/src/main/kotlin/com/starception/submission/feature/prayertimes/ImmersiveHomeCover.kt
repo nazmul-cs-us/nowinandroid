@@ -102,7 +102,7 @@ internal fun homeCoverCopy(
     else -> HomeCoverCopy("AI SUGGESTED", "A verified reading", "Quran, Hadith or dua for this moment")
 }
 
-/** All Getty covers have a dark upper scrim protecting the greeting and system icons. */
+/** White header ink uses local text shadows, never a tint across the artwork. */
 @Suppress("UNUSED_PARAMETER")
 internal fun homeCoverHeaderUsesLightText(page: Int, useNightArtwork: Boolean): Boolean = true
 
@@ -113,16 +113,16 @@ internal fun homeCoverCopyUsesLightText(
     isDarkTheme: Boolean,
 ): Boolean = true
 
-/** Keep the cover title readable while the artwork fades into the reflection. */
+/** Leave the focal artwork untouched; shade only the lower copy and feed transition. */
 internal fun homeCoverScrim(
     prayerVisibility: Float,
     feedBackground: Color,
     isExpanded: Boolean = false,
 ): Brush = Brush.verticalGradient(
-    0f to feedBackground.copy(alpha = .12f),
-    (.48f + .03f * prayerVisibility) to feedBackground.copy(alpha = .22f),
-    (.72f + .03f * prayerVisibility) to feedBackground.copy(alpha = if (isExpanded) .18f else .55f),
-    .91f to feedBackground.copy(alpha = if (isExpanded) .22f else .98f),
+    0f to Color.Transparent,
+    (.62f + .03f * prayerVisibility) to Color.Transparent,
+    (.80f + .02f * prayerVisibility) to feedBackground.copy(alpha = if (isExpanded) .18f else .65f),
+    .94f to feedBackground.copy(alpha = if (isExpanded) .22f else .96f),
     1f to feedBackground.copy(alpha = if (isExpanded) .28f else 1f),
 )
 
@@ -169,15 +169,8 @@ internal fun HomeCoverArtworkBackdrop(
         else -> 0f
     }
     HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
-    // Protect white header ink on every rotating artwork, in either app theme.
-    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-        0f to Color.Black.copy(alpha = .66f),
-        .20f to Color.Black.copy(alpha = .60f),
-        .48f to Color.Transparent,
-    )))
-    // The lower scrim already protects the cover copy. A second full-screen
-    // blurred scene kept Home rendering continuously even at rest (~50% of a
-    // core on Samsung); the single image and scrim settle near idle instead.
+    // The top and middle stay unfiltered. Header text supplies its own shadow;
+    // only the lower copy fades into the feed.
     Box(Modifier.fillMaxSize().background(
         homeCoverScrim(prayerVisibility, feedBackground, isExpanded)
     ))

@@ -612,8 +612,9 @@ fun PrayerTimesScreen(
                      expandRequest: Pair<Int, Int>? = null,
                      initialPage: Int? = initialExpandedInsight,
                  ) {
-                     InsightPager(
-                         immersiveHome = isPhoneHome,
+                      InsightPager(
+                          immersiveHome = isPhoneHome,
+                          useHomeArtwork = true,
                          expandRequest = expandRequest,
                          initialExpandedPage = initialPage,
                          forceMoonForTesting = forceMoonForTesting,
@@ -1269,8 +1270,12 @@ private fun PrayerHomeHeader(
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 val ink = if (lightHeaderInk) Color.White else Color(0xFF101827)
-                Text(greeting, style = HomeTypography.greeting, color = ink, maxLines = 1)
-                HomeRotatingHeaderText(supportingTexts, style = HomeTypography.caption, color = ink.copy(alpha = .82f))
+                val headerShadow = androidx.compose.ui.graphics.Shadow(
+                    color = Color.Black.copy(alpha = if (lightHeaderInk) .78f else .06f),
+                    offset = androidx.compose.ui.geometry.Offset(0f, 1f), blurRadius = 6f,
+                )
+                Text(greeting, style = HomeTypography.greeting.copy(shadow = headerShadow), color = ink, maxLines = 1)
+                HomeRotatingHeaderText(supportingTexts, style = HomeTypography.caption.copy(shadow = headerShadow), color = ink.copy(alpha = .82f))
             }
             AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings)
         }

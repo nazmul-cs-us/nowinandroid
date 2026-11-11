@@ -101,6 +101,7 @@ fun PrayerNowTile(
     tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
     isExpanded: Boolean = false,
     fluidFullBleed: Boolean = false,
+    useHomeArtwork: Boolean = fluidFullBleed,
     forceMoonForTesting: Boolean = false,
     forceSunForTesting: Boolean = false,
     modifier: Modifier = Modifier,
@@ -177,7 +178,7 @@ fun PrayerNowTile(
                 },
         ) {
         Image(
-            painter = if (fluidFullBleed) com.starception.submission.core.images.currentHomeArtworkPainter(0, isNight)
+            painter = if (useHomeArtwork) com.starception.submission.core.images.currentHomeArtworkPainter(0, isNight)
             else painterResource(
                 if (isNight) Res.drawable.prayer_now_insight_night
                 else Res.drawable.prayer_now_insight_day,
@@ -187,7 +188,7 @@ fun PrayerNowTile(
             alignment = sceneAlignment,
             modifier = Modifier.fillMaxSize(),
         )
-        PrayerSkyCelestialLayer(
+        if (!useHomeArtwork) PrayerSkyCelestialLayer(
             epochSeconds = epochSeconds,
             latitude = latitude,
             longitude = longitude,

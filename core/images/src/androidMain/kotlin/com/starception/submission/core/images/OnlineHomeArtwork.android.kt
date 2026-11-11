@@ -46,10 +46,10 @@ internal class AndroidHomeArtworkPlatform(context: Context) : HomeArtworkPlatfor
         connection.readTimeout = 20_000
         connection.instanceFollowRedirects = false
         connection.setRequestProperty("Accept", if (url == HOME_ARTWORK_FEED_URL) "application/json" else "image/jpeg")
-        if (url == HOME_ARTWORK_FEED_URL) {
-            connection.useCaches = false
-            connection.setRequestProperty("Cache-Control", "no-cache")
-        }
+        // Refresh now must re-fetch image bytes as well as the feed, not read an
+        // HTTP cache entry. The app's validated offline collection is separate.
+        connection.useCaches = false
+        connection.setRequestProperty("Cache-Control", "no-cache")
         try {
             check(connection.responseCode == 200) { "Museum artwork request failed" }
             require(connection.contentLengthLong <= maximumBytes)

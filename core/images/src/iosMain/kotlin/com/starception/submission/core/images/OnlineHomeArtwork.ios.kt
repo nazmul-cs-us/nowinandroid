@@ -48,7 +48,7 @@ private class IosHomeArtworkPlatform : HomeArtworkPlatform {
         val session = NSURLSession.sessionWithConfiguration(configuration)
         val request = NSMutableURLRequest(uRL = target)
         request.setValue(if (url == HOME_ARTWORK_FEED_URL) "application/json" else "image/jpeg", "Accept")
-        if (url == HOME_ARTWORK_FEED_URL) request.setValue("no-cache", "Cache-Control")
+        request.setValue("no-cache", "Cache-Control")
         val task = session.dataTaskWithRequest(request) { data, response, error ->
             if (continuation.isActive) {
                 val result = runCatching {

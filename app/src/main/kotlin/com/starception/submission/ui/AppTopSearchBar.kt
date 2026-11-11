@@ -192,9 +192,9 @@ internal fun HomeEngravedGreeting(
             text = text,
             style = style.copy(
                 shadow = Shadow(
-                    color = ComposeColor.Black.copy(alpha = if (onDarkArtwork) .12f else .06f),
-                    offset = Offset(0f, .8f),
-                    blurRadius = 1f,
+                    color = ComposeColor.Black.copy(alpha = if (onDarkArtwork) .78f else .06f),
+                    offset = Offset(0f, 1f),
+                    blurRadius = if (onDarkArtwork) 6f else 1f,
                 ),
             ),
             color = color,
@@ -922,7 +922,12 @@ fun AppTopSearchBar(
                     if (homeSupportingTexts.any(String::isNotBlank)) {
                         HomeRotatingHeaderText(
                             texts = homeSupportingTexts,
-                            style = com.starception.submission.feature.prayertimes.HomeTypography.caption,
+                            style = com.starception.submission.feature.prayertimes.HomeTypography.caption.copy(
+                                shadow = Shadow(
+                                    color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .78f else .06f),
+                                    offset = Offset(0f, 1f), blurRadius = 6f,
+                                ),
+                            ),
                             color = greetingColor.copy(alpha = .82f),
                             fontWeight = FontWeight.Normal,
                         )

@@ -148,6 +148,9 @@ fun HomeArtworkSettingsSection() {
                     collection.error?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
+                    collection.notice?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 ArtworkThemePicker(settings.theme, settings::selectTheme)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -257,7 +260,7 @@ private fun ArtworkFrequencyPicker(
 @Composable
 private fun ArtworkAvailability(collection: HomeArtworkCollectionState, frequency: ArtworkFrequency, onlineEnabled: Boolean) {
     Text(when {
-        collection.loading -> "Downloading five new artworks…"
+        collection.loading -> "Fetching reviewed artwork…"
         collection.artworks.size == 5 -> "5 downloaded artworks · Available offline"
         !onlineEnabled -> "Tap Refresh now to download your first collection"
         frequency == ArtworkFrequency.FIXED -> "Bundled fallback · Automatic updates paused"

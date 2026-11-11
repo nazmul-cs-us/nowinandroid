@@ -128,6 +128,18 @@ class HomeArtworkSettingsTest {
         compose.onNodeWithText("Quiet Valley 6").assertIsDisplayed()
     }
 
+    @Test fun refreshNowExplainsWhenApprovedImagesAreFetchedAgain() {
+        compose.setContent { ArtworkSettingsScene(showHomeCollection = true, approvedCount = 5) }
+        compose.onNodeWithTag("homeArtworkFrequency").performClick()
+        compose.onNodeWithText("Every day").performClick()
+        compose.onNodeWithText("Home shows Quiet Valley 1").assertExists()
+        compose.onNodeWithTag("homeArtworkFrequency").performClick()
+        compose.onNodeWithText("Keep current").performClick()
+        compose.onNodeWithTag("homeArtworkRefreshNow").performClick()
+        compose.onNodeWithText("previously viewed", substring = true).assertExists()
+        compose.onNodeWithText("Home shows Quiet Valley 1").assertExists()
+    }
+
     @Test fun resumingAndroidImmediatelyCatchesUpMissedHourlyChanges() {
         var wallTime = Instant.parse("2026-11-09T08:12:17Z")
         val clock = object : Clock { override fun now() = wallTime }
@@ -184,12 +196,12 @@ class HomeArtworkSettingsTest {
 
 @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 @Composable
-private fun ArtworkSettingsScene(dark: Boolean = true, showHomeCollection: Boolean = false) {
+private fun ArtworkSettingsScene(dark: Boolean = true, showHomeCollection: Boolean = false, approvedCount: Int = 40) {
     val scope = rememberCoroutineScope()
     val repository = remember {
         val platform = OnlineHomeArtworkTest.Platform()
         HomeArtworkRepository(platform, scope, chooseOffset = { 0 },
-            ioDispatcher = Dispatchers.Main.immediate, catalog = platform.catalog)
+            ioDispatcher = Dispatchers.Main.immediate, catalog = platform.catalog.take(approvedCount))
     }
     CompositionLocalProvider(LocalInspectionMode provides true) {
         org.jetbrains.compose.resources.PreviewContextConfigurationEffect()

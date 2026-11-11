@@ -38,6 +38,7 @@ data class HomeArtworkCollectionState(
     val loading: Boolean = false,
     val error: String? = null,
     val updatedAt: Instant? = null,
+    val notice: String? = null,
 )
 
 /** Platform IO stays separate from selection/scheduling, so failures can be tested without a network. */
@@ -98,7 +99,7 @@ class HomeArtworkRepository(
                 restored.await()
                 if (!manual && activeRotation == rotation) return@withLock
                 var previous = mutable.value
-                mutable.value = previous.copy(loading = true, error = null)
+                mutable.value = previous.copy(loading = true, error = null, notice = null)
                 try {
                     val reviewed = withContext(ioDispatcher) {
                         catalog ?: parseReviewedArtworkFeed(platform.download(HOME_ARTWORK_FEED_URL, 2_000_000).decodeToString())
@@ -113,17 +114,21 @@ class HomeArtworkRepository(
                         mutable.value = previous
                         return@withLock
                     }
-                    val downloaded = withContext(ioDispatcher) { fetchUnseen(theme) }
+                    val downloaded = withContext(ioDispatcher) { fetchReviewed(theme, allowPreviouslySeen = manual) }
                     ensureActive()
                     if (version != generation) return@withLock
                     val updated = clock.now()
+                    val reusedImages = downloaded.count { it.id in seen }
                     val updatedSeen = (seen + downloaded.map { it.id }).toList().takeLast(2000)
                     // The small atomic metadata commit is the collection's publication point.
                     platform.writeMetadata(encodeCollection(downloaded, rotation, updated, updatedSeen, reviewed))
                     seen.addAll(downloaded.map { it.id })
                     activeRotation = rotation
                     lastFailure = null
-                    mutable.value = HomeArtworkCollectionState(downloaded, updatedAt = updated)
+                    mutable.value = HomeArtworkCollectionState(downloaded, updatedAt = updated,
+                        notice = if (reusedImages > 0) {
+                            "Collection fetched again · Includes previously viewed artwork because fewer than five new images were available."
+                        } else null)
                 } catch (cancelled: CancellationException) {
                     if (version == generation) mutable.value = previous.copy(loading = false)
                     throw cancelled
@@ -132,7 +137,7 @@ class HomeArtworkRepository(
                         lastFailure = clock.now()
                         mutable.value = previous.copy(loading = false,
                             error = if (failure is ReviewedArtworkExhausted) {
-                                "You've seen all available reviewed ${theme.label} artwork. Your current collection stays until more reviewed artwork is added."
+                                "No new reviewed ${theme.label} artwork is available. Use Refresh now to fetch approved images again."
                             } else "Couldn't download reviewed artwork. Your current collection is unchanged. Try Refresh now when you're online.")
                     }
                 } finally {
@@ -146,12 +151,24 @@ class HomeArtworkRepository(
     }
 
     @OptIn(ExperimentalResourceApi::class)
-    private suspend fun fetchUnseen(theme: ArtworkTheme): List<OnlineHomeArtwork> {
+    private suspend fun fetchReviewed(theme: ArtworkTheme, allowPreviouslySeen: Boolean): List<OnlineHomeArtwork> {
         val chosen = linkedMapOf<String, OnlineHomeArtwork>()
-        val unseen = activeCatalog.distinctBy { it.artwork.id }.filter { it.theme == theme && it.artwork.id !in seen }
-        if (unseen.size < 5) throw ReviewedArtworkExhausted()
-        val offset = chooseOffset(unseen.size).mod(unseen.size)
-        val candidates = unseen.drop(offset) + unseen.take(offset)
+        val approved = activeCatalog.distinctBy { it.artwork.id }.filter { it.theme == theme }
+        val unseen = approved.filter { it.artwork.id !in seen }
+        if ((if (allowPreviouslySeen) approved.size else unseen.size) < 5) throw ReviewedArtworkExhausted()
+        fun rotate(entries: List<ReviewedHomeArtwork>): List<ReviewedHomeArtwork> {
+            if (entries.isEmpty()) return entries
+            val offset = chooseOffset(entries.size).mod(entries.size)
+            return entries.drop(offset) + entries.take(offset)
+        }
+        // Explicit refresh always fetches the remote feed and image bytes. Prefer
+        // unseen images, then older reviewed images, and the current set last.
+        // Scheduled updates keep their no-repeat policy. Never use live search.
+        val currentIds = mutable.value.artworks.map { it.id }.toSet()
+        val candidates = rotate(unseen) + if (allowPreviouslySeen) {
+            rotate(approved.filter { it.artwork.id in seen && it.artwork.id !in currentIds }) +
+                rotate(approved.filter { it.artwork.id in seen && it.artwork.id in currentIds })
+        } else emptyList()
         for (reviewed in candidates.take(15)) {
             val artwork = reviewed.artwork
             val result = runCatching {
