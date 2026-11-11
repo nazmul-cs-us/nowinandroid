@@ -132,7 +132,7 @@ class OnlineHomeArtworkTest {
         assertEquals(5, repository.state.value.artworks.size)
     }
 
-    @Test fun legacyCacheIsRevalidatedByTheFeedAndKeptWhenNoNewApprovedImagesExist() = runTest {
+    @Test fun legacyCacheIsRevalidatedAndCanBeForceFetchedWhenNoNewApprovedImagesExist() = runTest {
         val platform = Platform()
         val dispatcher = StandardTestDispatcher(testScheduler)
         val first = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = dispatcher, catalog = platform.catalog.take(5))
@@ -145,9 +145,10 @@ class OnlineHomeArtworkTest {
         val restored = HomeArtworkRepository(platform, this, ioDispatcher = dispatcher)
         restored.update(1, frozen = true, manualRevision = 1)
         advanceUntilIdle()
-        assertEquals(ids, restored.state.value.artworks.map { it.id })
-        assertNotNull(restored.state.value.error)
-        assertEquals(5, platform.imageRequests)
+        assertEquals(ids.toSet(), restored.state.value.artworks.map { it.id }.toSet())
+        assertNull(restored.state.value.error)
+        assertNotNull(restored.state.value.notice)
+        assertEquals(10, platform.imageRequests)
     }
 
     @Test fun multipleHomeAndSettingsConsumersCannotStartDuplicateDownloads() = runTest {
@@ -239,7 +240,7 @@ class OnlineHomeArtworkTest {
         assertNotNull(repository.state.value.error)
     }
 
-    @Test fun exhaustingReviewedArtNeverRepeatsImagesOrFallsBackToLiveSearch() = runTest {
+    @Test fun automaticUpdatesNeverRepeatImagesOrFallBackToLiveSearch() = runTest {
         val platform = Platform()
         val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
             ioDispatcher = StandardTestDispatcher(testScheduler), catalog = platform.catalog.take(5))
@@ -247,12 +248,108 @@ class OnlineHomeArtworkTest {
         advanceUntilIdle()
         val old = repository.state.value.artworks.map { it.id }
         val requests = platform.requests.size
-        repository.update(1, frozen = true, manualRevision = 1)
+        repository.update(1, frozen = false)
         advanceUntilIdle()
         assertEquals(old, repository.state.value.artworks.map { it.id })
         assertEquals(requests, platform.requests.size)
-        assertTrue(repository.state.value.error.orEmpty().contains("all available reviewed Islamic artwork"))
+        assertTrue(repository.state.value.error.orEmpty().contains("No new reviewed Islamic artwork"))
         assertTrue(platform.requests.all { it.startsWith("https://images.metmuseum.org/") })
+    }
+
+    @Test fun forceRefreshRefetchesTheFeedAndSeenImagesInsteadOfOnlyShufflingTheCache() = runTest {
+        val platform = Platform()
+        platform.remoteCatalog = platform.catalog.take(5)
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
+            ioDispatcher = StandardTestDispatcher(testScheduler))
+        repository.update(0, frozen = false)
+        advanceUntilIdle()
+        val original = repository.state.value.artworks.map { it.id }
+        repository.update(1, frozen = true, manualRevision = 1)
+        advanceUntilIdle()
+        assertEquals(original, repository.state.value.artworks.map { it.id })
+        assertEquals(2, platform.requests.count { it == HOME_ARTWORK_FEED_URL })
+        assertEquals(10, platform.imageRequests)
+        assertNull(repository.state.value.error)
+        assertTrue(repository.state.value.notice.orEmpty().contains("previously viewed"))
+    }
+
+    @Test fun forceRefreshCanSwitchBackToAPreviouslyViewedTheme() = runTest {
+        val platform = Platform()
+        platform.remoteCatalog = platform.catalog.take(5).map { it.copy(theme = ArtworkTheme.SPACE) } +
+            platform.catalog.drop(5).take(5).map { it.copy(theme = ArtworkTheme.NATURE) }
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
+            ioDispatcher = StandardTestDispatcher(testScheduler))
+        repository.update(0, frozen = false, theme = ArtworkTheme.SPACE)
+        advanceUntilIdle()
+        val space = repository.state.value.artworks.map { it.id }
+        repository.update(1, frozen = true, manualRevision = 1, theme = ArtworkTheme.NATURE)
+        advanceUntilIdle()
+        assertTrue(space.toSet().intersect(repository.state.value.artworks.map { it.id }.toSet()).isEmpty())
+        repository.update(2, frozen = true, manualRevision = 2, theme = ArtworkTheme.SPACE)
+        advanceUntilIdle()
+        assertEquals(space, repository.state.value.artworks.map { it.id })
+        assertEquals(15, platform.imageRequests)
+        assertNull(repository.state.value.error)
+    }
+
+    @Test fun forceRefreshUsesRemainingNewImagesBeforeRepeatingOlderApprovedImages() = runTest {
+        val platform = Platform()
+        platform.remoteCatalog = platform.catalog.take(12)
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
+            ioDispatcher = StandardTestDispatcher(testScheduler))
+        repository.update(0, frozen = false)
+        advanceUntilIdle()
+        val first = repository.state.value.artworks.map { it.id }.toSet()
+        repository.update(1, frozen = false)
+        advanceUntilIdle()
+        val current = repository.state.value.artworks.map { it.id }.toSet()
+        repository.update(2, frozen = true, manualRevision = 1)
+        advanceUntilIdle()
+        val refreshed = repository.state.value.artworks.map { it.id }
+        assertEquals(listOf("test11", "test12"), refreshed.take(2))
+        assertTrue(refreshed.drop(2).all { it in first })
+        assertTrue(refreshed.none { it in current })
+        assertNotNull(repository.state.value.notice)
+    }
+
+    @Test fun forceRefreshStillRejectsChangedImageBytes() = runTest {
+        val platform = Platform()
+        platform.remoteCatalog = platform.catalog.take(5)
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
+            ioDispatcher = StandardTestDispatcher(testScheduler))
+        repository.update(0, frozen = false)
+        advanceUntilIdle()
+        val original = repository.state.value.artworks.map { it.id }
+        val saved = platform.metadata
+        platform.corruptImages = true
+        repository.update(1, frozen = true, manualRevision = 1)
+        advanceUntilIdle()
+        assertEquals(original, repository.state.value.artworks.map { it.id })
+        assertEquals(saved, platform.metadata)
+        assertNotNull(repository.state.value.error)
+    }
+
+    @Test fun failedForceFetchKeepsTheLastGoodCollectionAndAllowsRetry() = runTest {
+        val platform = Platform()
+        platform.remoteCatalog = platform.catalog.take(5)
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
+            ioDispatcher = StandardTestDispatcher(testScheduler))
+        repository.update(0, frozen = false)
+        advanceUntilIdle()
+        val original = repository.state.value.artworks.map { it.id }
+        val saved = platform.metadata
+        platform.offline = true
+        repository.update(1, frozen = true, manualRevision = 1)
+        advanceUntilIdle()
+        assertEquals(original, repository.state.value.artworks.map { it.id })
+        assertEquals(saved, platform.metadata)
+        assertNotNull(repository.state.value.error)
+        assertFalse(repository.state.value.loading)
+        platform.offline = false
+        repository.update(2, frozen = true, manualRevision = 2)
+        advanceUntilIdle()
+        assertNull(repository.state.value.error)
+        assertEquals(10, platform.imageRequests)
     }
 
     @Test fun legacyGettySearchCachesAreNotDisplayedEvenInKeepCurrentMode() = runTest {
