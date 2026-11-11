@@ -78,6 +78,8 @@ import com.starception.submission.core.images.rememberHomeArtworkSettings
 import com.starception.submission.core.images.rememberHomeArtworkCollection
 import com.starception.submission.core.images.currentHomeArtworkPainter
 import com.starception.submission.core.images.HomeArtworkCollectionState
+import com.starception.submission.core.images.ArtworkTheme
+import com.starception.submission.core.images.artworkServices
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
@@ -89,7 +91,8 @@ fun HomeArtworkSettingsSection() {
     val artworks = (0..4).map { page ->
         val fallback = homeArtworkGallery[page]
         collection.artworks.getOrNull(page)?.let {
-            fallback.copy(title = it.title, artist = it.artist, sourceUrl = it.sourceUrl)
+            fallback.copy(title = it.title, artist = it.artist, sourceUrl = it.sourceUrl,
+                licenseName = it.licenseName, licenseUrl = it.licenseUrl)
         } ?: fallback
     }
     val nextUpdateLabel = if (frequency == ArtworkFrequency.HOURLY) {
@@ -138,7 +141,7 @@ fun HomeArtworkSettingsSection() {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Your home collection", style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium)
-                    Text("Reviewed Islamic patterns from The Met and Cleveland. No people or animals.",
+                    Text("Reviewed ${settings.theme.label.lowercase()} artwork. No people or animals. Downloads are cached offline.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     ArtworkAvailability(collection, frequency, settings.onlineEnabled)
@@ -146,6 +149,7 @@ fun HomeArtworkSettingsSection() {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
                 }
+                ArtworkThemePicker(settings.theme, settings::selectTheme)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val stackControls = maxWidth < 280.dp || LocalDensity.current.fontScale > 1.2f
                     if (stackControls) {
@@ -185,6 +189,25 @@ fun HomeArtworkSettingsSection() {
         }
     }
     if (showDetails) ArtworkDetailsDialog(artworks, onDismiss = { showDetails = false })
+}
+
+@Composable
+private fun ArtworkThemePicker(theme: ArtworkTheme, onSelected: (ArtworkTheme) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Artwork theme", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Box {
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.testTag("homeArtworkTheme")) {
+                Text(theme.label)
+                Icon(Icons.Outlined.ExpandMore, null, Modifier.padding(start = 6.dp).size(16.dp))
+            }
+            DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
+                ArtworkTheme.entries.forEach { item ->
+                    DropdownMenuItem(text = { Text(item.label) }, onClick = { expanded = false; onSelected(item) })
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -287,12 +310,7 @@ private fun ArtworkDetailsDialog(artworks: List<HomeArtwork>, onDismiss: () -> U
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                val museums = artworks.map { when {
-                    "metmuseum.org" in it.sourceUrl -> "The Metropolitan Museum of Art"
-                    "clevelandart.org" in it.sourceUrl -> "Cleveland Museum of Art"
-                    else -> "Getty’s Open Content Program"
-                } }.distinct().joinToString("; ")
-                Text("Public-domain images (CC0). Courtesy of $museums.",
+                Text("Credits and reuse terms belong to each image's source; not every provider uses CC0.",
                     style = MaterialTheme.typography.bodySmall)
                 artworks.forEachIndexed { page, artwork ->
                     Row(
@@ -309,10 +327,22 @@ private fun ArtworkDetailsDialog(artworks: List<HomeArtwork>, onDismiss: () -> U
                             Text(artwork.title, style = MaterialTheme.typography.labelLarge,
                                 maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Text(artwork.artist, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            TextButton(onClick = { uriHandler.openUri(artwork.licenseUrl) }) {
+                                Text(artwork.licenseName, style = MaterialTheme.typography.labelSmall)
+                            }
                         }
-                        Icon(Icons.Outlined.OpenInNew, contentDescription = "Open museum record",
+                        Icon(Icons.Outlined.OpenInNew, contentDescription = "Open image source",
                             modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                HorizontalDivider()
+                Text("Artwork services", style = MaterialTheme.typography.titleSmall)
+                artworkServices.forEach { service ->
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(service.name, style = MaterialTheme.typography.labelMedium)
+                        Text(service.status, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

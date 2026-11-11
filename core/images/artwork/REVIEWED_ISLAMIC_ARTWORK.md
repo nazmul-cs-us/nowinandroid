@@ -1,43 +1,71 @@
-# Reviewed online Home artwork
+# Home artwork pull and sync
 
-Home no longer uses live Getty search. Its online collection is an allowlist of
-25 photographs: 20 from **The Metropolitan Museum of Art, Islamic Art department**
-and five from **Cleveland Museum of Art** (Ottoman floral tiles, lotus tilework,
-and geometric and floral carpets).
-The Met's `isPublicDomain: true` and Cleveland's `share_license_status: CC0` were
-checked through the museum APIs. The Met photographs were reviewed on 2026-11-10 for geometric
-or botanical decoration without human or animal figures. Museum object titles
-are usually "Tile" or "Tile Panel"; the app uses descriptive display labels.
+## Runtime contract
 
-Registry: `src/commonMain/kotlin/com/starception/submission/core/images/ReviewedIslamicArtwork.kt`.
-The Cleveland additions are in `ReviewedClevelandArtwork.kt`, visually reviewed on
-2026-11-11. Public-domain status was checked against the museum API and object pages.
-The official website image proxy is used because direct Open Access CDN downloads
-returned HTTP 403 from the local client. Only exact pinned proxy URLs are allowed;
-all source bytes still pass the same hash review gate. No remote proxy input is accepted.
-Licensing: https://www.metmuseum.org/about-the-met/policies-and-documents/open-access
-API documentation: https://metmuseum.github.io/
+Settings control the actual network sync, not rotation over Kotlin image constants.
+The app pulls `home-artwork-feed.json` from the published repository's `main` branch
+when its selected cadence is due or **Refresh now** is pressed. Resuming catches up
+missed deadlines; UI scheduling does not promise background execution at an exact
+time while Android/iOS has suspended the app. **Keep current** pauses automatic pulls.
 
-## Review gate
+The online image catalog is remote data, not compiled into the APK/framework.
+Only service endpoints, supported themes, and security constraints are configuration.
+Changing/publishing the approved feed can add new images without an app release.
+The bundled, reviewed Alhambra artwork remains a stable offline fallback.
 
-1. Verify Islamic artistic/cultural provenance and explicit public-domain status. Cleveland
-   classifies some carpets under Textiles rather than Islamic Art. Do not treat
-   a keyword, department, or metadata tag as proof that no figures are present.
-2. Inspect the complete photograph at full size, including small border motifs.
-   Reject humans, animals, figurative scenes, and uncertain imagery.
-3. Select a crop that removes museum mounts, frames, and photographic backgrounds.
-   Avoid cropped sacred inscriptions; prefer geometric and botanical patterns.
-4. Record its object link, exact HTTPS image URL, and SHA-256 of the reviewed bytes.
-   Downloads and restored caches must match that hash. Changed photos require review.
-5. Extend the catalog tests and verify both Android and iOS builds.
+Each sync fetches the remote feed, selects five unseen entries for the chosen
+Islamic/Space/Nature theme, downloads and verifies the exact approved image bytes,
+and atomically publishes the set only after every image succeeds. Feed/network/disk
+failures retain the last-good set. Successfully downloaded images and their approved
+catalog are stored privately for offline use. Legacy cached images require validation
+against the new feed before reuse. No new approved entries means a clear error and
+the current set stays; there is no silent shuffle or unrestricted random-photo fallback.
 
-## Runtime behaviour
+## Providers and rights
 
-- Refresh downloads five unseen reviewed images; it never silently repeats them.
-- A complete collection is published only after all five verified downloads succeed.
-- When fewer than five unseen reviewed entries remain, the current collection stays
-  and Settings explains that the reviewed collection is exhausted. More entries
-  require review and an app update; there is no unrestricted search fallback.
-- Legacy Getty search caches are not displayed. The existing reviewed, bundled
-  Alhambra architecture remains the offline fallback until a new set downloads.
-- Review images and contact sheets are temporary working files, not repository assets.
+The initial remote feed contains 25 reviewed Islamic images (The Met/Cleveland),
+five NASA Image Library images, and five fixed-ID Picsum nature photographs.
+Exact images were visually reviewed, including borders, for people/animal figures.
+Picsum image 37 was excluded because a distant object could not be confidently ruled out.
+Only selected, reviewed image bytes are pinned; metadata keyword filters are not proof
+of image content. The seed catalog is intentionally finite, but it can now expand remotely.
+
+The Met/Cleveland use CC0 for the selected images. NASA images retain original
+institutional credits and link to NASA's media usage guidelines; they are **not**
+labelled CC0 and no NASA endorsement is implied. NASA-branded/third-party-marked
+posters were not selected. Picsum photographs retain the creator, original Unsplash
+record and Unsplash License. This does not use the Unsplash developer API.
+
+APOD/Unsplash/Pexels/Pixabay require configured credentials and API-terms compliance.
+They are disabled, not represented as working integrations. No demo or private keys
+are embedded. ESA/Hubble/Webb require per-image licensing review before connection.
+Openverse discovery supports CC0/Public Domain Mark candidates, which still require
+rights/content review. Placehold.co is a development utility, not a production feed.
+
+## Discover, review, publish
+
+`tools/artwork_feed.py` discovers candidates from NASA Image Library, Picsum, The Met,
+and Openverse. Example (use temporary output, not repository screenshots):
+
+```bash
+python tools/artwork_feed.py discover --source nasa --query nebula --limit 10 \
+  --output "$TMPDIR/artwork-review/nasa.json" --download-previews
+```
+
+Discovery **never** sets `approved: true`. Inspect the full image and source rights.
+Reject figures, uncertain imagery, misleading branding and unresolved copyright.
+Choose a suitable crop that avoids photographic frames and sacred inscriptions.
+Then explicitly approve the exact reviewed file:
+
+```bash
+python tools/artwork_feed.py approve --candidates "$TMPDIR/artwork-review/nasa.json" \
+  --id nasa-REVIEWED_ID --reviewed-image "$TMPDIR/artwork-review/previews/nasa-REVIEWED_ID.jpg" \
+  --feed core/images/artwork/home-artwork-feed.json --reviewer YOUR_NAME \
+  --confirm-no-people-or-animals --confirm-reuse-rights
+```
+
+Approval checks that the source still matches the reviewed bytes. Review/commit/publish
+the feed normally. The daily GitHub workflow discovers NASA metadata into a temporary
+review artifact only; it does not auto-approve images or commit new screenshots.
+Feed publication is required before a new app can use this endpoint. No Family VM
+module deployment or restart is needed for artwork updates.

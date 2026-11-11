@@ -34,17 +34,21 @@ private class IosHomeArtworkPlatform : HomeArtworkPlatform {
 
     override suspend fun download(url: String, maximumBytes: Int): ByteArray = suspendCancellableCoroutine { continuation ->
         val target = requireNotNull(NSURL.URLWithString(url))
-        require(reviewedIslamicArtwork.any { it.artwork.imageUrl == url })
+        require(allowedArtworkDownload(url))
         require(target.scheme == "https" && target.user == null && target.password == null &&
             (target.port == null || target.port?.intValue == 443) &&
-            ((target.host == "images.metmuseum.org" && target.path?.startsWith("/CRDImages/is/web-large/") == true) ||
-                (target.host == "www.clevelandart.org" && target.path == "/_next/image")))
+            (url == HOME_ARTWORK_FEED_URL || (target.host == "images.metmuseum.org" && target.path?.startsWith("/CRDImages/is/web-large/") == true) ||
+                (target.host == "www.clevelandart.org" && target.path == "/_next/image") ||
+                (target.host == "images-assets.nasa.gov" && target.path?.startsWith("/image/") == true) ||
+                (target.host == "fastly.picsum.photos" && target.path?.startsWith("/id/") == true) ||
+                target.host in setOf("api.openverse.org", "live.staticflickr.com", "upload.wikimedia.org")))
         val configuration = NSURLSessionConfiguration.ephemeralSessionConfiguration
         configuration.timeoutIntervalForRequest = 20.0
         configuration.timeoutIntervalForResource = 30.0
         val session = NSURLSession.sessionWithConfiguration(configuration)
         val request = NSMutableURLRequest(uRL = target)
-        request.setValue("image/jpeg", "Accept")
+        request.setValue(if (url == HOME_ARTWORK_FEED_URL) "application/json" else "image/jpeg", "Accept")
+        if (url == HOME_ARTWORK_FEED_URL) request.setValue("no-cache", "Cache-Control")
         val task = session.dataTaskWithRequest(request) { data, response, error ->
             if (continuation.isActive) {
                 val result = runCatching {

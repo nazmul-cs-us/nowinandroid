@@ -90,8 +90,9 @@ data class HomeArtworkSchedule(
     companion object {
         fun decode(value: String?, now: Instant = Clock.System.now()): HomeArtworkSchedule = runCatching {
             val parts = requireNotNull(value).split('|')
-            require(parts.size in 3..4)
-            if (parts.size == 4) require(parts[3] in setOf("online", "offline"))
+            require(parts.size in 3..5)
+            if (parts.size >= 4) require(parts[3] in setOf("online", "offline"))
+            if (parts.size == 5) ArtworkTheme.valueOf(parts[4])
             val rotation = parts[2].toInt()
             require(rotation >= 0)
             HomeArtworkSchedule(ArtworkFrequency.valueOf(parts[0]), Instant.fromEpochSeconds(parts[1].toLong()), rotation)
@@ -103,10 +104,12 @@ data class HomeArtworkSchedule(
 class HomeArtworkSettings(saved: String?, private val save: (String) -> Unit) {
     var schedule by mutableStateOf(HomeArtworkSchedule.decode(saved))
         private set
+    var theme by mutableStateOf(runCatching { ArtworkTheme.valueOf(saved.orEmpty().split('|')[4]) }.getOrDefault(ArtworkTheme.ISLAMIC))
+        private set
     // Existing cadence choices migrate to online updates. A fresh install waits
     // for an explicit refresh/cadence selection before spending mobile data.
     var onlineEnabled by mutableStateOf(
-        saved == schedule.encode() || saved == schedule.encode() + "|online",
+        saved == schedule.encode() || saved == schedule.encode() + "|online" || saved == schedule.encode() + "|online|${theme.name}",
     )
         private set
     var refreshRevision by mutableIntStateOf(0)
@@ -135,7 +138,13 @@ class HomeArtworkSettings(saved: String?, private val save: (String) -> Unit) {
         refreshRevision++
     }
 
-    private fun encodedSettings() = schedule.encode() + if (onlineEnabled) "|online" else "|offline"
+    fun selectTheme(theme: ArtworkTheme) {
+        if (theme == this.theme) return
+        this.theme = theme
+        refreshNow()
+    }
+
+    private fun encodedSettings() = schedule.encode() + (if (onlineEnabled) "|online" else "|offline") + "|${theme.name}"
 }
 
 @Composable

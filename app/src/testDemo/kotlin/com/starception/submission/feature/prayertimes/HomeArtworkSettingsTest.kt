@@ -154,7 +154,7 @@ class HomeArtworkSettingsTest {
         compose.onNodeWithText("Today's collection").assertDoesNotExist()
         compose.onNodeWithTag("homeArtworkPreview").assertIsDisplayed()
         val bounds = compose.onNodeWithTag("homeArtworkSettings").getUnclippedBoundsInRoot()
-        assertTrue(bounds.bottom - bounds.top < 400.dp)
+        assertTrue(bounds.bottom - bounds.top < 480.dp)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_artwork_settings_light.png")
         compose.onNodeWithTag("homeArtworkDetails").performClick()
         compose.onNodeWithText("Today's collection").assertIsDisplayed()

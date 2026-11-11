@@ -1,0 +1,636 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-11",
+  "artworks": [
+    {
+      "id": "met-447013",
+      "title": "Blue floral arabesque tile panel",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447013",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/DT11978.jpg",
+      "sha256": "a3c1e422250bd4c4ce0072d2699854ce146f189a9a9376af62f2101ebb854fc1",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-447015",
+      "title": "Red-bordered floral tile panel",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447015",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/LC-17_190_2085.jpg",
+      "sha256": "bc8a914f0cebfd06fcd6c106f64ef1e125b31266d858f6d294a366af847ff7f6",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-445001",
+      "title": "Blue and green floral medallions",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/445001",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/07.190.20%20a.jpg",
+      "sha256": "aba789c646aa8c3cd79a4e0c5f3330767b0079334e6fe35fb400422cab465a27",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-447604",
+      "title": "Blue garden tile panel",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447604",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/sf22-185-11a-d.jpg",
+      "sha256": "c131344a99ef8bea107a44ce9ce4242f57b0108c232df77900130e1ce8a866f4",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-447625",
+      "title": "Hexagonal floral tile panel",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447625",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/LC-23_12_3.jpg",
+      "sha256": "8366738f3b31128d7c86e7aef82743b5cbfeeeaa52a5d8a01a320912b24d5c16",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.28,
+        0.2,
+        0.72,
+        0.78
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-447014",
+      "title": "Blue floral lattice tile panel",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447014",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/DP-30633-001.jpg",
+      "sha256": "83d879254fea4e27b11d6c0fdc898a9bca852cc79ba9601ac69da93864ab9b47",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.16,
+        0.15,
+        0.84,
+        0.86
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-447016",
+      "title": "Blue and turquoise floral tile panel",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447016",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/DP238754.jpg",
+      "sha256": "bea91d8f5e4f535d2eaa4160f8a4adc4931cf513ded854ec1fb3e7b1759d38d8",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.16,
+        0.15,
+        0.84,
+        0.86
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-447017",
+      "title": "Warm floral arabesque tile panel",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447017",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/LC-17_190_2087.jpg",
+      "sha256": "98fe6a194eecf5898dd93648b112b8b6eec5ced22313f022fcf0e7553142225d",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-447609",
+      "title": "Blue and green botanical tiles",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447609",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/22.185.15%20and%2007.190.15.jpg",
+      "sha256": "e33816785b50a01339aabda1791d8294ad390e451407b6c3e7d27ea03d40fc89",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-447623",
+      "title": "Flowers in a vase tile panel",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447623",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/sf23-12-2a-f.jpg",
+      "sha256": "17aafe128e92c83ad4f1fbf301d67466e177cd956fea73af140aab7340bc6c73",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-449137",
+      "title": "Turquoise star and hexagonal tiles",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/449137",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/wb-37.40.26.JPG",
+      "sha256": "b1ad794d30568d8171cb21402ee3d052b4e00d65b05dd3b75babf5ced3d0c165",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-452791",
+      "title": "Turquoise and cobalt star geometry",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/452791",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/1975.350.4.jpg",
+      "sha256": "89a43dea4f5caf1dbdd80d7eead21f7785abe63abfd3963095fef69976c0acca",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.25,
+        0.22,
+        0.75,
+        0.78
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-444457",
+      "title": "Cobalt floral tile",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/444457",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/DP-34213-001.jpg",
+      "sha256": "3997b58054c00b243daf6fd04e73aa7711f899573f7d2c1959cb1183512f96d2",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.15,
+        0.15,
+        0.85,
+        0.85
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-444447",
+      "title": "Flowers and leaves tile",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/444447",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/DP-34226-001.jpg",
+      "sha256": "610238d8c640973a5c85546ec97f83d18c8f1986eb1b410bc78af398b5bf4ba6",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.2,
+        0.15,
+        0.8,
+        0.85
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-446688",
+      "title": "Cypress and blue flowers tile",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/446688",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/sf15-76-1.jpg",
+      "sha256": "0028c2fa7d7d602040df1a63753e25500d29dbf623b969d6457e5348e7a4a5ba",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-447251",
+      "title": "Blue floral scrollwork tile",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/447251",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/sf20-120-184.jpg",
+      "sha256": "1df6ef5f023a7862cc5b888684e0ffb17aea4bc8aa33d9cd572651cf8e0a6d55",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-452005",
+      "title": "Turquoise floral scrollwork tile",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/452005",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/sf68-215-12.jpg",
+      "sha256": "902f6a6f134fce2a41440103fd520dda63135a942daac91930ce9649b8446919",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-452070",
+      "title": "Grapevine and leaves tile",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/452070",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/sf1970-14.jpg",
+      "sha256": "a9c7b2ca6d6cd29a096ebb38f025db24defa7cba6f8b7809e127e4053adb0093",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-453326",
+      "title": "Blue botanical tile",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/453326",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/sf1991-224-2.jpg",
+      "sha256": "70c53b1a37d50c4493a3c87493dfdcd1e57b395dd920f790dae6ee0ba173d8f0",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.16,
+        0.06,
+        0.84,
+        0.94
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "met-444704",
+      "title": "Turquoise ornamental tile",
+      "credit": "Unknown artist · The Met",
+      "sourceUrl": "https://www.metmuseum.org/art/collection/search/444704",
+      "imageUrl": "https://images.metmuseum.org/CRDImages/is/web-large/DP-33639-001.jpg",
+      "sha256": "f707e3006a62e56d5fb38c1687a4144721a1d5d87b67a2d0c5624b3d41c21a82",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.12,
+        0.12,
+        0.88,
+        0.88
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "cma-1915-651",
+      "title": "Ottoman floral wall tiles",
+      "credit": "Unknown artist · Cleveland Museum of Art",
+      "sourceUrl": "https://www.clevelandart.org/art/1915.651",
+      "imageUrl": "https://www.clevelandart.org/_next/image?url=https%3A%2F%2Fpiction.clevelandart.org%2Fcma%2Fump.di%3Fe%3D1AAC948B54F1DB9CF9074165BE8173060F11988DF1765497A140F99F27ECC204%26s%3D24247294%26se%3D399313166%26v%3D1%26f%3D%5Cd6640%5Cu237466402%5C1915.651_o5.jpg&w=1080&q=75",
+      "sha256": "260f71fb85a9fae4d2e5906e8c66fefb35ecbe8530179b98a76c9385f19d7ae2",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.08,
+        0.08,
+        0.92,
+        0.92
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "cma-1915-645",
+      "title": "Lotus blossom tile",
+      "credit": "Unknown artist · Cleveland Museum of Art",
+      "sourceUrl": "https://www.clevelandart.org/art/1915.645",
+      "imageUrl": "https://www.clevelandart.org/_next/image?url=https%3A%2F%2Fpiction.clevelandart.org%2Fcma%2Fump.di%3Fe%3D9B38E22710B16DB40554AAD717FC6A15C32ED391CB7F1D7CFFC4E41FB932D6D8%26s%3D24247294%26se%3D399313166%26v%3D0%26f%3D1915.645_o5.jpg&w=1080&q=75",
+      "sha256": "cc4751cfe4d393a17b0c668b9560c8a3a8b59efe13be321aa394c113cfe1a709",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.25,
+        0.25,
+        0.75,
+        0.75
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "cma-2015-61",
+      "title": "Classical Turkish carpet with the Lotto pattern",
+      "credit": "Unknown artist · Cleveland Museum of Art",
+      "sourceUrl": "https://www.clevelandart.org/art/2015.61",
+      "imageUrl": "https://www.clevelandart.org/_next/image?url=https%3A%2F%2Fpiction.clevelandart.org%2Fcma%2Fump.di%3Fe%3DCB577B48E1DB4283802DEF2555A4DAAA4A18A641093E13707BD441BB186933CE%26s%3D24247294%26se%3D399313166%26v%3D0%26f%3D2015.61_o5.jpg&w=1080&q=75",
+      "sha256": "1bc38648a92c7307a895ac07383cf1d08c7c1c63f24b0747b000bd551cd4c465",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.09,
+        0.06,
+        0.91,
+        0.94
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "cma-1926-533",
+      "title": "Royal floral carpet with silk and metal thread",
+      "credit": "Unknown artist · Cleveland Museum of Art",
+      "sourceUrl": "https://www.clevelandart.org/art/1926.533",
+      "imageUrl": "https://www.clevelandart.org/_next/image?url=https%3A%2F%2Fpiction.clevelandart.org%2Fcma%2Fump.di%3Fe%3D3E5FD0622CD4F929F91D69333BEAB2F82E5B833D3F225D26FEB62D44A89B4540%26s%3D24247294%26se%3D399313166%26v%3D1%26f%3D1926.533_o5.jpg&w=1080&q=75",
+      "sha256": "76ea57ef07180efb80ed32a0e6a5eef5fe4a7a6db27721beda898ee316ed2424",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.13,
+        0.09,
+        0.87,
+        0.8
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "cma-2010-190",
+      "title": "Turkmen geometric carpet",
+      "credit": "Unknown artist · Cleveland Museum of Art",
+      "sourceUrl": "https://www.clevelandart.org/art/2010.190",
+      "imageUrl": "https://www.clevelandart.org/_next/image?url=https%3A%2F%2Fpiction.clevelandart.org%2Fcma%2Fump.di%3Fe%3DEB77C01E220A3F948F466C5021DF687295A472EA06FE1F1BA656CFD3D61EDB71%26s%3D24247294%26se%3D399313166%26v%3D0%26f%3D2010.190_o5.jpg&w=1080&q=75",
+      "sha256": "4f7acd956e1e6653f2f18239b604f7102cf4c52049dc40ede387183f2a218543",
+      "theme": "ISLAMIC",
+      "crop": [
+        0.13,
+        0.11,
+        0.87,
+        0.89
+      ],
+      "approved": true,
+      "licenseName": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "nasa-PIA14417",
+      "title": "Dumbbell Nebula",
+      "credit": "NASA/JPL-Caltech/Harvard-Smithsonian CfA",
+      "sourceUrl": "https://images.nasa.gov/details/PIA14417",
+      "imageUrl": "https://images-assets.nasa.gov/image/PIA14417/PIA14417~medium.jpg",
+      "sha256": "2b735a127c500815a63f947fd5d675a2441803bc6e2897765a21ae7894f8d864",
+      "theme": "SPACE",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "approved": true,
+      "licenseName": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    },
+    {
+      "id": "nasa-PIA04216",
+      "title": "Ant Nebula",
+      "credit": "NASA/Space Telescope Science Institute",
+      "sourceUrl": "https://images.nasa.gov/details/PIA04216",
+      "imageUrl": "https://images-assets.nasa.gov/image/PIA04216/PIA04216~orig.jpg",
+      "sha256": "67b44141fdfc4733b8f8f3e8978ccd90b0305b1ab3ef799bac4077f0812616e7",
+      "theme": "SPACE",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "approved": true,
+      "licenseName": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    },
+    {
+      "id": "nasa-GSFC_20171208_Archive_e001465",
+      "title": "Ring Nebula",
+      "credit": "NASA/Hubble Heritage Team",
+      "sourceUrl": "https://images.nasa.gov/details/GSFC_20171208_Archive_e001465",
+      "imageUrl": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001465/GSFC_20171208_Archive_e001465~small.jpg",
+      "sha256": "16b99817fbedc6e968856c25bb7f56756dcfe6809b55be3d3abb68d22dec15d4",
+      "theme": "SPACE",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "approved": true,
+      "licenseName": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    },
+    {
+      "id": "nasa-PIA00407",
+      "title": "Global Color View of Mars",
+      "credit": "NASA/JPL/USGS",
+      "sourceUrl": "https://images.nasa.gov/details/PIA00407",
+      "imageUrl": "https://images-assets.nasa.gov/image/PIA00407/PIA00407~medium.jpg",
+      "sha256": "b97cb7e1fe54a68f0dc1949015752875c86ee18921b91c43046e5fe20f195a4e",
+      "theme": "SPACE",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "approved": true,
+      "licenseName": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    },
+    {
+      "id": "nasa-PIA04225",
+      "title": "N44C Nebula",
+      "credit": "NASA and the Hubble Heritage Team (STScI/AURA); acknowledgment: D. Garnett, University of Arizona",
+      "sourceUrl": "https://images.nasa.gov/details/PIA04225",
+      "imageUrl": "https://images-assets.nasa.gov/image/PIA04225/PIA04225~orig.jpg",
+      "sha256": "6ef54d0a8f43b4d7c1696503bb041cc0ea72492776feba1c5904740912de2881",
+      "theme": "SPACE",
+      "crop": [
+        0.51,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "approved": true,
+      "licenseName": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    },
+    {
+      "id": "picsum-10",
+      "title": "Forest and distant water",
+      "credit": "Paul Jarvis · via Lorem Picsum",
+      "sourceUrl": "https://unsplash.com/photos/6J--NXulQCs",
+      "imageUrl": "https://fastly.picsum.photos/id/10/1000/1400.jpg?hmac=NozeXUC6PxdGQ8foCNyTkFvY-oltivfhzkKGCC0MC1U",
+      "sha256": "6596a0344d1d88cbc60486cb7e003bffc8b299a357c42db6379bb2dba9d1cf5c",
+      "theme": "NATURE",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "approved": true,
+      "licenseName": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    },
+    {
+      "id": "picsum-15",
+      "title": "Woodland waterfall",
+      "credit": "Paul Jarvis · via Lorem Picsum",
+      "sourceUrl": "https://unsplash.com/photos/NYDo21ssGao",
+      "imageUrl": "https://fastly.picsum.photos/id/15/1000/1400.jpg?hmac=6JrlJW5up07HN3ynbI0lz-wdW-7EDkchfulOmBc8jkc",
+      "sha256": "d69c693eca83ef92eb55a46ce427bc7a9b8afb776ad0db90a817ecc7e4edac54",
+      "theme": "NATURE",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "approved": true,
+      "licenseName": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    },
+    {
+      "id": "picsum-19",
+      "title": "Sunlit moss",
+      "credit": "Paul Jarvis · via Lorem Picsum",
+      "sourceUrl": "https://unsplash.com/photos/P7Lh0usGcuk",
+      "imageUrl": "https://fastly.picsum.photos/id/19/1000/1400.jpg?hmac=UJjJx5yq-bzqY6I9WQMYoJNMzrmkXvYUdzqD0McUNnM",
+      "sha256": "707b537de97c1f3f2f739c2c79ad7ac45b455733c4b9febbb2816cbc60f8b4a3",
+      "theme": "NATURE",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "approved": true,
+      "licenseName": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    },
+    {
+      "id": "picsum-28",
+      "title": "Green valley",
+      "credit": "Jerry Adney · via Lorem Picsum",
+      "sourceUrl": "https://unsplash.com/photos/_WiFMBRT7Aw",
+      "imageUrl": "https://fastly.picsum.photos/id/28/1000/1400.jpg?hmac=6jhuiowKynL8sAOD3yCs8g582sdethW7KGTOJKFCh10",
+      "sha256": "6ce81200b6a089552991fb5a3b08614e773c04dab017707f68fd0acbb488f6b4",
+      "theme": "NATURE",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "approved": true,
+      "licenseName": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    },
+    {
+      "id": "picsum-29",
+      "title": "Snow-covered mountains",
+      "credit": "Go Wild · via Lorem Picsum",
+      "sourceUrl": "https://unsplash.com/photos/V0yAek6BgGk",
+      "imageUrl": "https://fastly.picsum.photos/id/29/1000/1400.jpg?hmac=6sv4z-BNawGp7SIEMTJzJErhH3wok_U4Xfeafd63jOw",
+      "sha256": "a1c04d5fb232acb70fb79d40cbfdd31d3c5614fa761e49a5f4b43039fbb4699f",
+      "theme": "NATURE",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "approved": true,
+      "licenseName": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    }
+  ]
+}

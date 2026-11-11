@@ -32,6 +32,16 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class HomeArtworkScheduleTest {
+    @Test fun selectingAThemeOptsInAndPersistsAnImmediateSyncRequest() {
+        var saved = ""
+        val settings = HomeArtworkSettings(null) { saved = it }
+        assertEquals(ArtworkTheme.ISLAMIC, settings.theme)
+        settings.selectTheme(ArtworkTheme.SPACE)
+        assertTrue(settings.onlineEnabled)
+        assertEquals(1, settings.refreshRevision)
+        assertEquals(ArtworkTheme.SPACE, HomeArtworkSettings(saved) {}.theme)
+        assertTrue(HomeArtworkSettings(saved) {}.onlineEnabled)
+    }
     private val dubai = TimeZone.of("Asia/Dubai")
     private val anchor = Instant.parse("2026-11-07T19:30:00Z") // 23:30 locally
 
@@ -165,7 +175,7 @@ class HomeArtworkScheduleTest {
             var persisted = ""
             val settings = HomeArtworkSettings(value) { persisted = it }
             assertEquals(false, settings.onlineEnabled)
-            assertTrue(persisted.endsWith("|offline"))
+            assertTrue(persisted.contains("|offline|"))
             assertEquals(false, HomeArtworkSettings(persisted) {}.onlineEnabled)
         }
     }
@@ -176,7 +186,7 @@ class HomeArtworkScheduleTest {
         var persisted = ""
         val migrated = HomeArtworkSettings(legacy) { persisted = it }
         assertTrue(migrated.onlineEnabled)
-        assertEquals("$legacy|online", persisted)
+        assertEquals("$legacy|online|ISLAMIC", persisted)
         assertTrue(HomeArtworkSettings(persisted) {}.onlineEnabled)
 
         val fresh = HomeArtworkSettings(null) { persisted = it }

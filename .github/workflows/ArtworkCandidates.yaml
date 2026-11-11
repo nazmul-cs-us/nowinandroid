@@ -1,0 +1,22 @@
+name: Discover artwork candidates
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+permissions:
+  contents: read
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Discover NASA candidates without publishing them
+        run: python tools/artwork_feed.py discover --source nasa --query nebula --limit 10 --output "${{ runner.temp }}/artwork/nasa.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artwork-review-candidates
+          path: ${{ runner.temp }}/artwork
+          retention-days: 7

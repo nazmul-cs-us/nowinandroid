@@ -32,6 +32,8 @@ data class HomeArtwork(
     val day: DrawableResource,
     val night: DrawableResource,
     val subject: HomeArtworkSubject,
+    val licenseName: String = "CC0",
+    val licenseUrl: String = "https://creativecommons.org/publicdomain/zero/1.0/",
 )
 
 fun homeArtworkIndex(page: Int, rotation: Int): Int =

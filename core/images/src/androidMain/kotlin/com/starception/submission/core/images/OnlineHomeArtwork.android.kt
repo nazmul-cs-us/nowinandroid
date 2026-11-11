@@ -34,15 +34,22 @@ internal class AndroidHomeArtworkPlatform(context: Context) : HomeArtworkPlatfor
 
     override suspend fun download(url: String, maximumBytes: Int): ByteArray = withContext(Dispatchers.IO) {
         val source = URL(url)
-        require(reviewedIslamicArtwork.any { it.artwork.imageUrl == url })
+        require(allowedArtworkDownload(url))
         require(source.protocol == "https" && source.userInfo == null && source.port in listOf(-1, 443))
-        require((source.host == "images.metmuseum.org" && source.path.startsWith("/CRDImages/is/web-large/")) ||
-            (source.host == "www.clevelandart.org" && source.path == "/_next/image"))
+        require(url == HOME_ARTWORK_FEED_URL || (source.host == "images.metmuseum.org" && source.path.startsWith("/CRDImages/is/web-large/")) ||
+            (source.host == "www.clevelandart.org" && source.path == "/_next/image") ||
+            (source.host == "images-assets.nasa.gov" && source.path.startsWith("/image/")) ||
+            (source.host == "fastly.picsum.photos" && source.path.startsWith("/id/")) ||
+            source.host in setOf("api.openverse.org", "live.staticflickr.com", "upload.wikimedia.org"))
         val connection = source.openConnection() as HttpsURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 20_000
         connection.instanceFollowRedirects = false
-        connection.setRequestProperty("Accept", "image/jpeg")
+        connection.setRequestProperty("Accept", if (url == HOME_ARTWORK_FEED_URL) "application/json" else "image/jpeg")
+        if (url == HOME_ARTWORK_FEED_URL) {
+            connection.useCaches = false
+            connection.setRequestProperty("Cache-Control", "no-cache")
+        }
         try {
             check(connection.responseCode == 200) { "Museum artwork request failed" }
             require(connection.contentLengthLong <= maximumBytes)

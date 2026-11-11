@@ -29,6 +29,8 @@ data class OnlineHomeArtwork(
     val sourceUrl: String,
     val imageUrl: String,
     val bitmap: ImageBitmap? = null,
+    val licenseName: String = "CC0",
+    val licenseUrl: String = "https://creativecommons.org/publicdomain/zero/1.0/",
 )
 
 data class HomeArtworkCollectionState(
@@ -57,7 +59,7 @@ class HomeArtworkRepository(
     private val clock: Clock = Clock.System,
     private val chooseOffset: (Int) -> Int = { Random.nextInt(it) },
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
-    private val catalog: List<ReviewedHomeArtwork> = reviewedIslamicArtwork,
+    private val catalog: List<ReviewedHomeArtwork>? = null,
 ) {
     private val mutable = MutableStateFlow(HomeArtworkCollectionState())
     val state = mutable.asStateFlow()
@@ -69,11 +71,13 @@ class HomeArtworkRepository(
     private var manualRequest = false
     private var generation = 0
     private var lastFailure: Instant? = null
+    private var activeCatalog: List<ReviewedHomeArtwork> = catalog.orEmpty()
+    private var legacyMetadata: JsonObject? = null
     private val seen = homeArtworkGallery.map { it.sourceUrl.substringAfterLast('/') }.toMutableSet()
     private val restored = scope.async { restore() }
 
     /** Manual revisions are consumed once across Home, Settings, previews and expanded tiles. */
-    fun update(rotation: Int, frozen: Boolean, manualRevision: Int = 0) {
+    fun update(rotation: Int, frozen: Boolean, manualRevision: Int = 0, theme: ArtworkTheme = ArtworkTheme.ISLAMIC) {
         val manual = manualRevision > lastManualRevision
         if (manual) lastManualRevision = manualRevision
         if (frozen && !manual) {
@@ -93,16 +97,29 @@ class HomeArtworkRepository(
             mutex.withLock {
                 restored.await()
                 if (!manual && activeRotation == rotation) return@withLock
-                val previous = mutable.value
+                var previous = mutable.value
                 mutable.value = previous.copy(loading = true, error = null)
                 try {
-                    val downloaded = withContext(ioDispatcher) { fetchUnseen() }
+                    val reviewed = withContext(ioDispatcher) {
+                        catalog ?: parseReviewedArtworkFeed(platform.download(HOME_ARTWORK_FEED_URL, 2_000_000).decodeToString())
+                    }
+                    activeCatalog = reviewed
+                    legacyMetadata?.let { old ->
+                        withContext(ioDispatcher) { runCatching { restoreCollection(old, reviewed) } }
+                        legacyMetadata = null
+                        previous = mutable.value.copy(loading = false)
+                    }
+                    if (!manual && activeRotation == rotation) {
+                        mutable.value = previous
+                        return@withLock
+                    }
+                    val downloaded = withContext(ioDispatcher) { fetchUnseen(theme) }
                     ensureActive()
                     if (version != generation) return@withLock
                     val updated = clock.now()
                     val updatedSeen = (seen + downloaded.map { it.id }).toList().takeLast(2000)
                     // The small atomic metadata commit is the collection's publication point.
-                    platform.writeMetadata(encodeCollection(downloaded, rotation, updated, updatedSeen))
+                    platform.writeMetadata(encodeCollection(downloaded, rotation, updated, updatedSeen, reviewed))
                     seen.addAll(downloaded.map { it.id })
                     activeRotation = rotation
                     lastFailure = null
@@ -115,7 +132,7 @@ class HomeArtworkRepository(
                         lastFailure = clock.now()
                         mutable.value = previous.copy(loading = false,
                             error = if (failure is ReviewedArtworkExhausted) {
-                                "You've seen all available reviewed Islamic artwork. Your current collection stays until more reviewed artwork is added."
+                                "You've seen all available reviewed ${theme.label} artwork. Your current collection stays until more reviewed artwork is added."
                             } else "Couldn't download reviewed artwork. Your current collection is unchanged. Try Refresh now when you're online.")
                     }
                 } finally {
@@ -129,9 +146,9 @@ class HomeArtworkRepository(
     }
 
     @OptIn(ExperimentalResourceApi::class)
-    private suspend fun fetchUnseen(): List<OnlineHomeArtwork> {
+    private suspend fun fetchUnseen(theme: ArtworkTheme): List<OnlineHomeArtwork> {
         val chosen = linkedMapOf<String, OnlineHomeArtwork>()
-        val unseen = catalog.distinctBy { it.artwork.id }.filter { it.artwork.id !in seen }
+        val unseen = activeCatalog.distinctBy { it.artwork.id }.filter { it.theme == theme && it.artwork.id !in seen }
         if (unseen.size < 5) throw ReviewedArtworkExhausted()
         val offset = chooseOffset(unseen.size).mod(unseen.size)
         val candidates = unseen.drop(offset) + unseen.take(offset)
@@ -159,29 +176,38 @@ class HomeArtworkRepository(
         runCatching {
             val root = Json.parseToJsonElement(platform.readMetadata() ?: return@runCatching).jsonObject
             seen.addAll(root["seen"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content })
+            val reviewed = catalog ?: root["reviewedCatalog"]?.let { parseReviewedArtworkFeed(it.toString()) }
+            if (reviewed == null) { legacyMetadata = root; return@runCatching }
+            activeCatalog = reviewed
+            restoreCollection(root, reviewed)
+        }
+    }
+
+    @OptIn(ExperimentalResourceApi::class)
+    private fun restoreCollection(root: JsonObject, reviewed: List<ReviewedHomeArtwork>) {
             val artworks = root.getValue("artworks").jsonArray.map { value ->
                 val item = value.jsonObject
                 val id = item.getValue("id").jsonPrimitive.content
                 // Reject all legacy search results and reconstruct credits from
                 // the reviewed registry, never from untrusted cache metadata.
-                val reviewed = requireNotNull(catalog.find { it.artwork.id == id })
+                val approved = requireNotNull(reviewed.find { it.artwork.id == id })
                 val bytes = requireNotNull(platform.readImage(id))
-                require(artworkSha256(bytes) == reviewed.sha256)
+                require(artworkSha256(bytes) == approved.sha256)
                 val bitmap = bytes.decodeToImageBitmap()
                 require(bitmap.width in 100..1800 && bitmap.height in 100..1800)
-                reviewed.artwork.copy(bitmap = cropArtwork(bitmap, reviewed.crop))
+                approved.artwork.copy(bitmap = cropArtwork(bitmap, approved.crop))
             }
             require(artworks.size == 5 && artworks.distinctBy { it.id }.size == 5)
             val updatedAt = Instant.parse(root.getValue("updated").jsonPrimitive.content)
             activeRotation = root.getValue("rotation").jsonPrimitive.int
             mutable.value = HomeArtworkCollectionState(artworks, updatedAt = updatedAt)
-        }
     }
 }
 
-private fun encodeCollection(artworks: List<OnlineHomeArtwork>, rotation: Int, updated: Instant, seen: List<String>): String =
+private fun encodeCollection(artworks: List<OnlineHomeArtwork>, rotation: Int, updated: Instant, seen: List<String>, reviewed: List<ReviewedHomeArtwork>): String =
     buildJsonObject {
         put("rotation", rotation); put("updated", updated.toString())
+        put("reviewedCatalog", encodeReviewedArtworkFeed(reviewed))
         putJsonArray("seen") { seen.forEach { add(it) } }
         putJsonArray("artworks") {
             artworks.forEach { artwork -> add(buildJsonObject {
@@ -209,10 +235,10 @@ fun rememberHomeArtworkCollection(
     val revision = settings.refreshRevision
     val onlineEnabled = settings.onlineEnabled
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(repository, lifecycle, scheduled.rotation, schedule.frequency, revision, onlineEnabled) {
+    LaunchedEffect(repository, lifecycle, scheduled.rotation, schedule.frequency, revision, onlineEnabled, settings.theme) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             repository.update(settings.schedule.rotationAt(clock.now()),
-                settings.schedule.frequency == ArtworkFrequency.FIXED || !settings.onlineEnabled, settings.refreshRevision)
+                settings.schedule.frequency == ArtworkFrequency.FIXED || !settings.onlineEnabled, settings.refreshRevision, settings.theme)
             awaitCancellation()
         }
     }
