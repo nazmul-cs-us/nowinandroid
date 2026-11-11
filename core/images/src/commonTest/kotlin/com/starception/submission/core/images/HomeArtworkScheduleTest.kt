@@ -160,6 +160,16 @@ class HomeArtworkScheduleTest {
     }
 
     @Test
+    fun onlyThemeSelectionCanReusePreviouslyViewedReviewedImages() {
+        val settings = HomeArtworkSettings(null) {}
+        assertEquals(false, settings.reuseReviewedOnRefresh)
+        settings.selectTheme(ArtworkTheme.SPACE)
+        assertEquals(true, settings.reuseReviewedOnRefresh)
+        settings.refreshNow()
+        assertEquals(false, settings.reuseReviewedOnRefresh)
+    }
+
+    @Test
     fun missingOrCorruptPreferenceDefaultsToDailyWithoutCrashing() {
         for (saved in listOf(null, "", "WEEKLY|bad|1", "UNKNOWN|0|0", "DAILY|0|-1")) {
             val schedule = HomeArtworkSchedule.decode(saved, anchor)

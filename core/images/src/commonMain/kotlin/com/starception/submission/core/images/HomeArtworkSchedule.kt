@@ -114,6 +114,8 @@ class HomeArtworkSettings(saved: String?, private val save: (String) -> Unit) {
         private set
     var refreshRevision by mutableIntStateOf(0)
         private set
+    var reuseReviewedOnRefresh by mutableStateOf(false)
+        private set
 
     init {
         if (saved != encodedSettings()) save(encodedSettings())
@@ -132,6 +134,7 @@ class HomeArtworkSettings(saved: String?, private val save: (String) -> Unit) {
 
     /** Advance immediately, including in Keep current mode, without moving the next scheduled change. */
     fun refreshNow() {
+        reuseReviewedOnRefresh = false
         onlineEnabled = true
         schedule = schedule.copy(rotation = ((schedule.rotation.toLong() + 1) % Int.MAX_VALUE).toInt())
         save(encodedSettings())
@@ -142,6 +145,9 @@ class HomeArtworkSettings(saved: String?, private val save: (String) -> Unit) {
         if (theme == this.theme) return
         this.theme = theme
         refreshNow()
+        // Selecting a theme may revisit its reviewed collection. Refresh now,
+        // unlike theme selection, must look for genuinely unseen artwork.
+        reuseReviewedOnRefresh = true
     }
 
     private fun encodedSettings() = schedule.encode() + (if (onlineEnabled) "|online" else "|offline") + "|${theme.name}"

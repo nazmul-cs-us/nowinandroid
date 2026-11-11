@@ -49,7 +49,9 @@ internal fun FamilyVideoCallLayout(
     val name = callDisplayName(call.peer(state.me))
     val outgoing = call.stage == "ringing" && call.caller == state.me
     val incoming = call.stage == "ringing" && call.callee == state.me
+    val active = call.stage == "active"
     var shelfHeightPx by remember { mutableIntStateOf(0) }
+    var headerHeightPx by remember(call.id) { mutableIntStateOf(0) }
     val density = LocalDensity.current
     val backdrop = rememberLayerBackdrop()
     BoxWithConstraints(Modifier.fillMaxSize().background(colors.surface)
@@ -74,7 +76,8 @@ internal fun FamilyVideoCallLayout(
             Box(Modifier.fillMaxWidth().height(180.dp).background(Brush.verticalGradient(
                 listOf(Color.Black.copy(alpha = .65f), Color.Transparent))))
             Column(Modifier.fillMaxSize().padding(bottom = obscuredVideo + 12.dp)) {
-                Column(Modifier.fillMaxWidth().padding(top = 24.dp, start = 20.dp, end = 20.dp),
+                Column(Modifier.fillMaxWidth().onSizeChanged { headerHeightPx = it.height }
+                    .padding(top = 24.dp, start = 20.dp, end = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(name, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -96,6 +99,25 @@ internal fun FamilyVideoCallLayout(
                                 else -> "Starting your camera…"
                             }, color = colors.onSurfaceVariant, fontSize = 13.sp, textAlign = TextAlign.Center)
                         }
+                    }
+                }
+            }
+            if (active) {
+                FamilyDraggableVideoPreview(call.id, tileWidth, tileHeight,
+                    Modifier.padding(start = 12.dp, end = 12.dp,
+                        top = with(density) { headerHeightPx.toDp() } + 12.dp,
+                        bottom = obscuredVideo + 12.dp)) {
+                    Box(Modifier.fillMaxSize().background(colors.secondaryContainer)) {
+                        if (state.camera && localReady) localThumbnail()
+                        else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Outlined.VideocamOff, if (state.camera) "Starting your camera" else "Your camera is off",
+                                tint = colors.onSecondaryContainer)
+                        }
+                        Text("You", Modifier.align(Alignment.BottomStart).padding(6.dp)
+                            .background(Color.Black.copy(alpha = .5f), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+                            color = Color.White, fontSize = 10.sp)
+                        if (state.muted) Icon(Icons.Outlined.MicOff, "Your microphone is muted",
+                            Modifier.align(Alignment.BottomEnd).padding(6.dp).size(18.dp), tint = Color.White)
                     }
                 }
             }
@@ -144,7 +166,7 @@ internal fun FamilyVideoCallLayout(
                     if (outgoing || incoming) Text(if (incoming) "Decline" else "Cancel", color = Color.White, fontSize = 10.sp)
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
+            if (!active) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
                 Column(Modifier.width(tileWidth), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Box(Modifier.fillMaxWidth().height(tileHeight).clip(RoundedCornerShape(16.dp))

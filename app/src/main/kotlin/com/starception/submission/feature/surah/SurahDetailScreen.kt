@@ -5102,6 +5102,9 @@ private const val MARKER_INK_GAP_EM = 0.08f
  */
 private const val MUSHAF_TYPESETTING_SCALE = 0.68f
 
+/** The embedded Home reader and full Surah reader share the same typesetting scale. */
+internal fun mushafReadingFontSize(preferredFontSize: Float): Float = preferredFontSize * MUSHAF_TYPESETTING_SCALE
+
 /** Offscreen ink-scan bitmap scale (half resolution is ample for edges). */
 private const val MARKER_INK_SCAN_SCALE = 0.5f
 
@@ -5982,9 +5985,10 @@ private fun MushafPageWithFrame(
     inkGeometries: List<MarkerGeometry>? = null,
     /** Shared show/hide progress so removal waits for the fade-out to finish. */
     translationVisibility: Float = 1f,
+    embedded: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    val surfaceColor = if (embedded) Color.Transparent else MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val glowColor = MaterialTheme.colorScheme.primary
     val markerColor = onSurfaceColor.copy(alpha = 0.90f)
@@ -6161,7 +6165,7 @@ private fun MushafPageWithFrame(
         val statusBar = WindowInsets.statusBars.getTop(this)
         maxOf(cutout, statusBar).toDp()
     }
-    val navBarHeight = with(LocalDensity.current) {
+    val navBarHeight = if (embedded) 0.dp else with(LocalDensity.current) {
         WindowInsets.navigationBars.getBottom(this).toDp()
     }
     val horizontalPadding = 12.dp
@@ -6344,6 +6348,9 @@ private fun MushafPageWithFrame(
                     textDirection = androidx.compose.ui.text.style.TextDirection.Rtl,
                     letterSpacing = 0.sp,
                     lineHeight = lineHeightSp.sp,
+                    shadow = if (embedded) androidx.compose.ui.graphics.Shadow(
+                        color = Color.Black.copy(alpha = .8f), offset = Offset(0f, 2f), blurRadius = 6f,
+                    ) else null,
                     // Trim extra font-metric leading/trailing on the first/last
                     // line so pages whose first line contains the Amiri Quran
                     // rosette glyph don't get inflated top padding from the
@@ -6481,7 +6488,7 @@ private fun MushafPageWithFrame(
             // Reveal the inserted gloss without changing the text being measured.
             // The mask shares the Text's exact content bounds, and its annotated
             // range survives AnnotatedString.subSequence when an ayah crosses pages.
-            if (translationAnnotation != null && translationVisibility < 0.999f) {
+            if (!embedded && translationAnnotation != null && translationVisibility < 0.999f) {
                 androidx.compose.foundation.Canvas(
                     modifier = Modifier
                         .fillMaxSize()
@@ -6583,7 +6590,7 @@ private fun MushafPageWithFrame(
 // Ayahs flow naturally across pages like a real printed Quran.
 // ---------------------------------------------------------------------------
 @Composable
-private fun MushafPagerView(
+internal fun MushafPagerView(
     ayahs: List<com.starception.submission.core.qurandatabase.Ayah>,
     arabicFont: String,
     arabicFontSize: Float,
@@ -6609,12 +6616,14 @@ private fun MushafPagerView(
     onPageChange: (current: Int, total: Int) -> Unit = { _, _ -> },
     onNavigateToPreviousSurah: () -> Unit = {},
     onNavigateToNextSurah: () -> Unit = {},
+    /** Reuse the exact Mushaf renderer without taking over Home's system keys or mini-bar. */
+    embedded: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (ayahs.isEmpty()) return
 
     val markerColor = MaterialTheme.colorScheme.primary
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    val surfaceColor = if (embedded) Color.Transparent else MaterialTheme.colorScheme.surface
     // Keep only the current page and Compose's bounded neighbour in memory. The former
     // curl renderer retained multiple full-screen graphics layers during rapid turns;
     // together with Arabic TextLayout objects this exhausted the 256 MB app heap.
@@ -6632,7 +6641,7 @@ private fun MushafPagerView(
     // preview. After repagination the pager re-anchors to the ayah that was at
     // the top of the page being read.
     var committedFontSize by remember { mutableStateOf(arabicFontSize) }
-    val typesetFontSize = committedFontSize * MUSHAF_TYPESETTING_SCALE
+    val typesetFontSize = mushafReadingFontSize(committedFontSize)
     var pendingAnchorAyah by remember { mutableStateOf(0) }
     // Per-page measures (marker ink geometry) — small layouts, worth caching.
     val textMeasurer = rememberTextMeasurer(cacheSize = 3)
@@ -6649,8 +6658,8 @@ private fun MushafPagerView(
     // is on screen. Activity.onKeyDown checks MushafKeyBus.handle{Next,Prev}().
     val mushafScope = rememberCoroutineScope()
     val miniBarOwner = remember { Any() }
-    DisposableEffect(state, pagerPageCount) {
-        MushafKeyBus.bind(
+    DisposableEffect(state, pagerPageCount, embedded) {
+        if (!embedded) MushafKeyBus.bind(
             next = {
                 mushafScope.launch {
                     if (state.currentPage < pagerPageCount - 1) {
@@ -6666,14 +6675,14 @@ private fun MushafPagerView(
                 }
             },
         )
-        onDispose { MushafKeyBus.unbind() }
+        onDispose { if (!embedded) MushafKeyBus.unbind() }
     }
     val statusBarHeight = with(density) {
         val cutout = WindowInsets.displayCutout.getTop(this)
         val statusBar = WindowInsets.statusBars.getTop(this)
         maxOf(cutout, statusBar).toDp()
     }
-    val navBarHeight = with(density) {
+    val navBarHeight = if (embedded) 0.dp else with(density) {
         WindowInsets.navigationBars.getBottom(this).toDp()
     }
     val lineSpacingMultiplier = 1.55f
@@ -7078,7 +7087,8 @@ private fun MushafPagerView(
                                     // Pulling down from Mushaf reveals the album header and
                                     // Surah information, then settles cleanly at its top.
                                     verticalDragTotal > verticalThreshold -> {
-                                        parentScrollState?.animateScrollToItem(
+                                        if (embedded && state.currentPage > 0) state.animateScrollToPage(state.currentPage - 1)
+                                        else parentScrollState?.animateScrollToItem(
                                             index = 0,
                                             scrollOffset = 0,
                                         )
@@ -7333,12 +7343,13 @@ private fun MushafPagerView(
             // Publish current Mushaf page to PullToSyncContainer's mini-bar.
             // Cleared on dispose so leaving Mushaf mode hides the strip.
             DisposableEffect(
+                embedded,
                 surahNameArabic,
                 surahNameEnglish,
                 state.currentPage,
                 paginatedPages.size,
             ) {
-                if (paginatedPages.isNotEmpty()) {
+                if (!embedded && paginatedPages.isNotEmpty()) {
                     MushafMiniBarBus.bind(
                         owner = miniBarOwner,
                         next = {
@@ -7384,7 +7395,7 @@ private fun MushafPagerView(
                         ),
                     )
                 }
-                onDispose { MushafMiniBarBus.unbind(miniBarOwner) }
+                onDispose { if (!embedded) MushafMiniBarBus.unbind(miniBarOwner) }
             }
 
             // Snap to the page containing scrollToAyah after pagination is ready.
@@ -7601,6 +7612,7 @@ private fun MushafPagerView(
             ) { pageIndex ->
                 val page = paginatedPages.getOrNull(pageIndex) ?: return@HorizontalPager
                 MushafPageWithFrame(
+                    embedded = embedded,
                     pageText = page.text,
                     tajweed = page.tajweed,
                     inlineContent = pageInlineContent,
@@ -7678,8 +7690,8 @@ private fun MushafPagerView(
             MushafEdgeTurnControl(
                 isLeftEdge = true,
                 crossesSurah = atFirstPage,
-                enabled = paginatedPages.isNotEmpty() && (!atFirstPage || surahNumber > 1),
-                longPressEnabled = surahNumber > 1,
+                enabled = paginatedPages.isNotEmpty() && (!atFirstPage || (!embedded && surahNumber > 1)),
+                longPressEnabled = !embedded && surahNumber > 1,
                 onVerticalDrag = moveLeftEdgeControlVertically,
                 onTouchActiveChanged = { edgeControlTouchActive = it },
                 onClick = {
@@ -7700,8 +7712,8 @@ private fun MushafPagerView(
             MushafEdgeTurnControl(
                 isLeftEdge = false,
                 crossesSurah = atLastPage,
-                enabled = paginatedPages.isNotEmpty() && (!atLastPage || surahNumber < 114),
-                longPressEnabled = surahNumber < 114,
+                enabled = paginatedPages.isNotEmpty() && (!atLastPage || (!embedded && surahNumber < 114)),
+                longPressEnabled = !embedded && surahNumber < 114,
                 onVerticalDrag = moveRightEdgeControlVertically,
                 onTouchActiveChanged = { edgeControlTouchActive = it },
                 onClick = {

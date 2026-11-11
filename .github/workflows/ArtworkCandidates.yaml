@@ -8,15 +8,54 @@ permissions:
 jobs:
   discover:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
+    concurrency:
+      group: artwork-discovery
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Discover NASA candidates without publishing them
-        run: python tools/artwork_feed.py discover --source nasa --query nebula --limit 10 --output "${{ runner.temp }}/artwork/nasa.json"
+      - name: Install preview image validator
+        run: python -m pip install 'Pillow==12.3.0'
+      - name: Verify discovery and approval safeguards
+        run: python -m unittest discover -s tools -p 'test_*artwork*.py'
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/artwork-state
+          key: artwork-discovery-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: artwork-discovery-v1-
+      - name: Discover new candidates across all themes without approving or publishing
+        run: >-
+          python tools/discover_artwork_queue.py
+          --feed core/images/artwork/home-artwork-feed.json
+          --rejected core/images/artwork/rejected-artwork-ids.json
+          --state "${{ runner.temp }}/artwork-state/pending.json"
+          --output "${{ runner.temp }}/artwork"
+          --limit 10
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ${{ runner.temp }}/artwork-state
+          key: artwork-discovery-v1-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: artwork-review-candidates
           path: ${{ runner.temp }}/artwork
-          retention-days: 7
+          retention-days: 30
+      - name: Summarize review queue
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path(os.environ["RUNNER_TEMP"]) / "artwork/summary.json"
+          if path.exists():
+              summary = json.loads(path.read_text())
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as output:
+                  output.write(f'## Artwork review queue\n{summary["newCandidates"]} new candidates; {summary["pendingCandidates"]} pending review.\n')
+                  output.write(f'Provider/preview errors: {len(summary["failures"])}. Download the review artifact and open review.html.\n')
+                  output.write('Nothing is automatically approved or published. Verify the full image, no people/animals, credits and reuse rights before approving exact bytes.\n')
+          PY

@@ -128,7 +128,7 @@ class HomeArtworkSettingsTest {
         compose.onNodeWithText("Quiet Valley 6").assertIsDisplayed()
     }
 
-    @Test fun refreshNowExplainsWhenApprovedImagesAreFetchedAgain() {
+    @Test fun refreshNowExplainsWhenNewImagesAwaitApproval() {
         compose.setContent { ArtworkSettingsScene(showHomeCollection = true, approvedCount = 5) }
         compose.onNodeWithTag("homeArtworkFrequency").performClick()
         compose.onNodeWithText("Every day").performClick()
@@ -136,7 +136,7 @@ class HomeArtworkSettingsTest {
         compose.onNodeWithTag("homeArtworkFrequency").performClick()
         compose.onNodeWithText("Keep current").performClick()
         compose.onNodeWithTag("homeArtworkRefreshNow").performClick()
-        compose.onNodeWithText("previously viewed", substring = true).assertExists()
+        compose.onNodeWithText("No new reviewed", substring = true).assertExists()
         compose.onNodeWithText("Home shows Quiet Valley 1").assertExists()
     }
 

@@ -8,6 +8,7 @@ const val HOME_ARTWORK_FEED_URL = "https://raw.githubusercontent.com/nazmul-cs-u
 internal fun allowedArtworkDownload(url: String): Boolean = url == HOME_ARTWORK_FEED_URL ||
     url.startsWith("https://images.metmuseum.org/CRDImages/is/web-large/") ||
     url.startsWith("https://www.clevelandart.org/_next/image?url=https%3A%2F%2Fpiction.clevelandart.org%2F") ||
+    url.startsWith("https://openaccess-cdn.clevelandart.org/") ||
     url.startsWith("https://images-assets.nasa.gov/image/") ||
     url.startsWith("https://fastly.picsum.photos/id/") ||
     (url.startsWith("https://api.openverse.org/v1/images/") && url.substringBefore('?').endsWith("/thumb/")) ||

@@ -5379,7 +5379,7 @@ private fun EditorialQuranReadingStage(
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (
                 key == "quran_translation" || key == "show_translation" ||
-                key == "arabic_font" || key == "show_tajweed" ||
+                key == "arabic_font" || key == "arabic_font_size" || key == "show_tajweed" ||
                 key == "text_alignment"
             ) {
                 quranPreferenceVersion++
@@ -5392,12 +5392,8 @@ private fun EditorialQuranReadingStage(
     val showTranslation = quranPrefs.getBoolean("show_translation", true)
     val showTajweed = quranPrefs.getBoolean("show_tajweed", false)
     val selectedArabicFont = quranPrefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
-    val textAlignment = when (quranPrefs.getString("text_alignment", "start")) {
-        "center" -> TextAlign.Center
-        "end" -> TextAlign.End
-        "justify" -> TextAlign.Justify
-        else -> TextAlign.Start
-    }
+    val textAlignment = quranPrefs.getString("text_alignment", "start") ?: "start"
+    val preferredArabicFontSize = quranPrefs.getFloat("arabic_font_size", 41f).coerceIn(14f, 80f)
     val useIndoPakEdition = selectedArabicFont == "indopak_script" || selectedArabicFont == "pdms_saleem"
     val assetRepository = remember(context) {
         EntryPointAccessors.fromApplication(
@@ -5472,7 +5468,7 @@ private fun EditorialQuranReadingStage(
             val matchingText = indoPakTexts[ayah.numberInSurah] ?: return@map ayah
             ayah.copy(text = removeBismillahIfNeeded(matchingText, surah.number, ayah.numberInSurah))
         }
-        translations = if (showTranslation && translationCode != "ar") {
+        translations = if (translationCode.isNotBlank() && translationCode != "ar") {
             runCatching {
                 val translationRepository = QuranTranslationRepository(
                     context,
@@ -5513,11 +5509,10 @@ private fun EditorialQuranReadingStage(
     val applyPinchZoom: (Float) -> Unit = { zoomChange ->
         arabicFontScale = (arabicFontScale * zoomChange).coerceIn(0.75f, 2f)
     }
-    val readingScrollState = rememberLazyListState()
     // Keep translations paired with their verse. Arabic-only reading flows in
     // bounded passages so even long Surahs retain lazy text layout.
     val passages = remember(ayahs, translations) {
-        ayahs.chunked(if (translations.values.any(String::isNotBlank)) 1 else 12)
+        ayahs.chunked(if (showTranslation && translations.values.any(String::isNotBlank)) 1 else 12)
     }
     val readingShadow = androidx.compose.ui.graphics.Shadow(
         color = Color.Black.copy(alpha = 0.8f),
@@ -5525,18 +5520,19 @@ private fun EditorialQuranReadingStage(
         blurRadius = 6f,
     )
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val typesetFontSize = com.starception.submission.feature.surah.mushafReadingFontSize(preferredArabicFontSize * arabicFontScale)
         val arabicVerseStyle = MaterialTheme.typography.bodyMedium.copy(
             fontFamily = arabicFontFamily,
-            fontSize = ((24f - 5f * compression) * arabicFontScale).sp,
+            fontSize = typesetFontSize.sp,
             // IndoPak and Uthmani diacritics extend beyond the glyph body.
-            lineHeight = ((48f - 7f * compression) * arabicFontScale).sp,
+            lineHeight = (typesetFontSize * 1.55f).sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.sp,
             textDirection = TextDirection.Rtl,
             shadow = readingShadow,
         )
         val blocks = passages.flatMap { passage ->
-            val translation = translations[passage.first().numberInSurah]?.takeIf(String::isNotBlank)
+            val translation = translations[passage.first().numberInSurah]?.takeIf { showTranslation && it.isNotBlank() }
             listOfNotNull(
                 InsightTextBlock(
                     passage.joinToString("  ") { "${it.text.trim()} ${it.numberInSurah.toArabicIndic()}" },
@@ -5637,74 +5633,19 @@ private fun EditorialQuranReadingStage(
                         }
                     }
                 }
-            } else LazyColumn(
-                // A mask over the last line made a partially visible
-                // translation look clipped before the user scrolled it in.
-                // The reader viewport clips naturally at its boundary.
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .detectPinchZoom(surah.number, applyPinchZoom),
-                state = readingScrollState,
-                overscrollEffect = null,
-                contentPadding = PaddingValues(
-                    top = 20.dp,
-                    bottom = 20.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                items(
-                    items = passages,
-                    key = { passage -> passage.first().numberInSurah },
-                ) { passage ->
-                    val translation = translations[passage.first().numberInSurah]
-                        ?.takeIf(String::isNotBlank)
-                    val passageText = remember(passage, showTajweed, editionTajweedAnnotations) {
-                        buildAnnotatedString {
-                            passage.forEachIndexed { index, ayah ->
-                                if (index > 0) append("  ")
-                                append(
-                                    if (showTajweed) {
-                                        com.starception.submission.feature.surah.tajweed.TajweedTextApplier
-                                            .applyWithOverlap(
-                                                text = ayah.text.trim(),
-                                                annotations = editionTajweedAnnotations[ayah.numberInSurah].orEmpty(),
-                                            )
-                                    } else {
-                                        androidx.compose.ui.text.AnnotatedString(ayah.text.trim())
-                                    },
-                                )
-                                append("\u00A0")
-                                pushStringAnnotation(QURAN_AYAH_MARKER_TAG, ayah.numberInSurah.toArabicIndic())
-                                append('\uFFFC')
-                                pop()
-                                append("\u00A0")
-                            }
-                        }
-                    }
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        QuranPassageText(
-                            text = passageText,
-                            style = arabicVerseStyle,
-                            selectedArabicFont = selectedArabicFont,
-                            textAlign = textAlignment,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        translation?.let { translatedText ->
-                            Text(
-                                text = translatedText,
-                                style = insightReadingTranslationStyle(compression).copy(shadow = readingShadow),
-                                color = Color.White.copy(alpha = 0.88f),
-                                textAlign = TextAlign.Start,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-                }
-            }
+            } else TodayQuranMushaf(
+                ayahs = ayahs,
+                translations = translations,
+                arabicFont = selectedArabicFont,
+                arabicFontSize = preferredArabicFontSize * arabicFontScale,
+                showTranslation = showTranslation,
+                showTajweed = showTajweed,
+                tajweedAnnotations = editionTajweedAnnotations,
+                textAlignment = textAlignment,
+                translationCode = translationCode,
+                onOpenSurah = onOpenSurah,
+                modifier = Modifier.fillMaxWidth().weight(1f).detectPinchZoom(surah.number, applyPinchZoom),
+            )
         }
     }
 }

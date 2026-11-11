@@ -19,4 +19,11 @@ class ReviewedArtworkFeedTest {
         assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
             artworkSha256("abc".encodeToByteArray()))
     }
+    @Test fun clevelandOpenAccessImagesStillRequireExplicitApprovalAndAnExactHost() {
+        val cleveland = feed.replace("https://images.metmuseum.org/CRDImages/is/web-large/test.jpg",
+            "https://openaccess-cdn.clevelandart.org/2004.70/2004.70_web.jpg")
+        assertEquals(1, parseReviewedArtworkFeed(cleveland).size)
+        assertTrue(parseReviewedArtworkFeed(cleveland.replace("\"approved\":true", "\"approved\":false")).isEmpty())
+        assertFails { parseReviewedArtworkFeed(cleveland.replace("openaccess-cdn.clevelandart.org/", "openaccess-cdn.clevelandart.org.evil.example/")) }
+    }
 }

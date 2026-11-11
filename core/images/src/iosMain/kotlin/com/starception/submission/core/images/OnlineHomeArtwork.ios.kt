@@ -39,6 +39,7 @@ private class IosHomeArtworkPlatform : HomeArtworkPlatform {
             (target.port == null || target.port?.intValue == 443) &&
             (url == HOME_ARTWORK_FEED_URL || (target.host == "images.metmuseum.org" && target.path?.startsWith("/CRDImages/is/web-large/") == true) ||
                 (target.host == "www.clevelandart.org" && target.path == "/_next/image") ||
+                target.host == "openaccess-cdn.clevelandart.org" ||
                 (target.host == "images-assets.nasa.gov" && target.path?.startsWith("/image/") == true) ||
                 (target.host == "fastly.picsum.photos" && target.path?.startsWith("/id/") == true) ||
                 target.host in setOf("api.openverse.org", "live.staticflickr.com", "upload.wikimedia.org")))

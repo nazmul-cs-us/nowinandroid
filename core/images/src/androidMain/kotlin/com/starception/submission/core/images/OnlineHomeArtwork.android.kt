@@ -38,6 +38,7 @@ internal class AndroidHomeArtworkPlatform(context: Context) : HomeArtworkPlatfor
         require(source.protocol == "https" && source.userInfo == null && source.port in listOf(-1, 443))
         require(url == HOME_ARTWORK_FEED_URL || (source.host == "images.metmuseum.org" && source.path.startsWith("/CRDImages/is/web-large/")) ||
             (source.host == "www.clevelandart.org" && source.path == "/_next/image") ||
+            source.host == "openaccess-cdn.clevelandart.org" ||
             (source.host == "images-assets.nasa.gov" && source.path.startsWith("/image/")) ||
             (source.host == "fastly.picsum.photos" && source.path.startsWith("/id/")) ||
             source.host in setOf("api.openverse.org", "live.staticflickr.com", "upload.wikimedia.org"))

@@ -574,6 +574,8 @@ struct FamilyCallPresentation: ViewModifier {
 private struct FamilyCallView: View {
     let presentedCall: FamilyCallInfo
     @State private var lastCall: FamilyCallInfo?
+    @State private var videoPreviewPosition = CGPoint(x: 1, y: 0)
+    @State private var videoControlsHeight: CGFloat = 116
     @ObservedObject private var store = FamilyStore.shared
     @ObservedObject private var media = FamilyStore.shared.media
     @ObservedObject private var appearance = FamilyAppearance.shared
@@ -617,18 +619,8 @@ private struct FamilyCallView: View {
                         VStack(spacing: compact ? 8 : 24) {
                             if preview { Spacer().frame(height: 28) }
                             if video {
-                                VStack {
-                                    Spacer()
-                                    HStack {
-                                        Spacer()
-                                        ZStack(alignment: .bottomLeading) {
-                                            colors.field
-                                            if store.cameraEnabled { FamilyVideoRenderer(track: media.localVideo, mirror: true) }
-                                            else { Image(systemName: "video.slash").foregroundStyle(colors.muted).frame(maxWidth: .infinity, maxHeight: .infinity) }
-                                            Text("You").font(.system(size: 10)).foregroundStyle(.white).padding(6)
-                                                .background(.black.opacity(0.4), in: Capsule()).padding(8)
-                                        }.frame(width: 104, height: 148).clipShape(RoundedRectangle(cornerRadius: 22))
-                                    }
+                                FamilyDraggableVideoPreview(position: $videoPreviewPosition) {
+                                    selfPreview
                                 }.padding(.bottom, 18)
                             }
                             if !video {
@@ -700,8 +692,11 @@ private struct FamilyCallView: View {
                         callStatus(incoming: false, stage: call.stage)
                         Text(FamilyConnectionRoute().label(route: store.connectionRoute)).font(.system(size: 10)).foregroundStyle(.white.opacity(0.72))
                     }.padding(.top, 24)
+                }.overlay {
+                    FamilyDraggableVideoPreview(position: $videoPreviewPosition) { selfPreview }
+                        .padding(EdgeInsets(top: 116, leading: 12, bottom: 12, trailing: 12))
                 }.clipShape(RoundedRectangle(cornerRadius: 30))
-                Spacer().frame(height: 116)
+                Spacer().frame(height: videoControlsHeight)
             }
             ZStack(alignment: .topTrailing) {
                 VStack(spacing: 10) {
@@ -714,23 +709,6 @@ private struct FamilyCallView: View {
                         Spacer(minLength: 0)
                         videoButton("speaker.wave.2", title: "Speaker", selected: store.speakerEnabled) { store.speaker() }
                     }.padding(.trailing, 60)
-                    HStack(spacing: 14) {
-                        VStack(spacing: 6) {
-                            ZStack {
-                                colors.field
-                                if store.cameraEnabled { FamilyVideoRenderer(track: media.localVideo, mirror: true) }
-                                else { Image(systemName: "video.slash").foregroundStyle(colors.muted) }
-                            }.frame(width: 110, height: 106).clipShape(RoundedRectangle(cornerRadius: 16))
-                            Text("You").font(.system(size: 11)).foregroundStyle(colors.ink)
-                        }
-                        VStack(spacing: 6) {
-                            VStack(spacing: 8) {
-                                FamilyContactAvatar(jid: call.peer(store.me), size: 42)
-                                Text(store.mediaConnected ? "Connected" : "Connecting…").font(.system(size: 9)).foregroundStyle(.white.opacity(0.8))
-                            }.frame(width: 110, height: 106).background(colors.brand, in: RoundedRectangle(cornerRadius: 16))
-                            Text(familyName(call.peer(store.me)).components(separatedBy: " ")[0]).font(.system(size: 11)).foregroundStyle(colors.ink)
-                        }
-                    }.frame(maxWidth: .infinity)
                     if let message = store.callMessage { Text(message).font(.system(size: 11)).foregroundStyle(colors.error) }
                 }.padding(12).background(colors.panel.opacity(0.65)).background(.ultraThinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 26)).shadow(color: .black.opacity(0.1), radius: 8, y: 4).padding(.top, 28)
@@ -739,7 +717,22 @@ private struct FamilyCallView: View {
                         .frame(width: 56, height: 56).background(colors.error, in: Circle())
                 }.accessibilityLabel("End call").padding(.trailing, 10)
             }.padding(.horizontal, 12).padding(.bottom, 8)
+                .background(GeometryReader { geometry in
+                    Color.clear.preference(key: FamilyVideoControlsHeightKey.self, value: geometry.size.height)
+                })
         }.padding(12)
+            .onPreferenceChange(FamilyVideoControlsHeightKey.self) { height in
+                if height > 0 { videoControlsHeight = height }
+            }
+    }
+    private var selfPreview: some View {
+        ZStack(alignment: .bottomLeading) {
+            colors.field
+            if store.cameraEnabled { FamilyVideoRenderer(track: media.localVideo, mirror: true) }
+            else { Image(systemName: "video.slash").foregroundStyle(colors.muted).frame(maxWidth: .infinity, maxHeight: .infinity) }
+            Text("You").font(.system(size: 10)).foregroundStyle(.white).padding(6)
+                .background(.black.opacity(0.4), in: Capsule()).padding(8)
+        }
     }
     private func videoButton(_ symbol: String, title: String, selected: Bool = false, enabled: Bool = true, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -792,6 +785,49 @@ private struct FamilyCallView: View {
             return String(format: "%02d:%02d", seconds / 60, seconds % 60)
         }
         return store.connectedAt == nil ? "Connecting…" : "Reconnecting…"
+    }
+}
+
+private struct FamilyVideoControlsHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 116
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/** A stable renderer moves within its safe video region, independently of the call controls. */
+private struct FamilyDraggableVideoPreview<Content: View>: View {
+    @Binding var position: CGPoint
+    @GestureState private var translation: CGSize = .zero
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = min(104, max(0, geometry.size.width))
+            let height = min(148, max(0, geometry.size.height))
+            let travelX = max(0, geometry.size.width - width)
+            let travelY = max(0, geometry.size.height - height)
+            let x = min(travelX, max(0, position.x * travelX + translation.width))
+            let y = min(travelY, max(0, position.y * travelY + translation.height))
+            content().frame(width: width, height: height)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.5), lineWidth: 1))
+                .contentShape(Rectangle())
+                .offset(x: x, y: y)
+                .gesture(DragGesture(minimumDistance: 6)
+                    .updating($translation) { value, current, _ in current = value.translation }
+                    .onEnded { value in
+                        if travelX > 0 {
+                            let fraction = min(1, max(0, position.x + value.translation.width / travelX))
+                            position.x = fraction < 0.5 ? 0 : 1
+                        }
+                        if travelY > 0 { position.y = min(1, max(0, position.y + value.translation.height / travelY)) }
+                    })
+                .accessibilityLabel("Your video preview")
+                .accessibilityHint("Drag to move your preview")
+                .accessibilityAction(named: Text("Move preview left")) { position.x = 0 }
+                .accessibilityAction(named: Text("Move preview right")) { position.x = 1 }
+                .accessibilityAction(named: Text("Move preview up")) { position.y = max(0, position.y - 0.25) }
+                .accessibilityAction(named: Text("Move preview down")) { position.y = min(1, position.y + 0.25) }
+        }
     }
 }
 

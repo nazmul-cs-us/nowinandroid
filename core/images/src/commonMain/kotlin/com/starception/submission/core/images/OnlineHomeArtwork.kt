@@ -78,7 +78,8 @@ class HomeArtworkRepository(
     private val restored = scope.async { restore() }
 
     /** Manual revisions are consumed once across Home, Settings, previews and expanded tiles. */
-    fun update(rotation: Int, frozen: Boolean, manualRevision: Int = 0, theme: ArtworkTheme = ArtworkTheme.ISLAMIC) {
+    fun update(rotation: Int, frozen: Boolean, manualRevision: Int = 0, theme: ArtworkTheme = ArtworkTheme.ISLAMIC,
+               reuseReviewed: Boolean = false) {
         val manual = manualRevision > lastManualRevision
         if (manual) lastManualRevision = manualRevision
         if (frozen && !manual) {
@@ -114,7 +115,7 @@ class HomeArtworkRepository(
                         mutable.value = previous
                         return@withLock
                     }
-                    val downloaded = withContext(ioDispatcher) { fetchReviewed(theme, allowPreviouslySeen = manual) }
+                    val downloaded = withContext(ioDispatcher) { fetchReviewed(theme, allowPreviouslySeen = manual && reuseReviewed) }
                     ensureActive()
                     if (version != generation) return@withLock
                     val updated = clock.now()
@@ -127,7 +128,7 @@ class HomeArtworkRepository(
                     lastFailure = null
                     mutable.value = HomeArtworkCollectionState(downloaded, updatedAt = updated,
                         notice = if (reusedImages > 0) {
-                            "Collection fetched again · Includes previously viewed artwork because fewer than five new images were available."
+                            "Selected theme collection · Includes previously viewed, reviewed artwork."
                         } else null)
                 } catch (cancelled: CancellationException) {
                     if (version == generation) mutable.value = previous.copy(loading = false)
@@ -137,7 +138,7 @@ class HomeArtworkRepository(
                         lastFailure = clock.now()
                         mutable.value = previous.copy(loading = false,
                             error = if (failure is ReviewedArtworkExhausted) {
-                                "No new reviewed ${theme.label} artwork is available. Use Refresh now to fetch approved images again."
+                                "No new reviewed ${theme.label} artwork is available yet. Your current collection is unchanged. Newly discovered images must be approved before download."
                             } else "Couldn't download reviewed artwork. Your current collection is unchanged. Try Refresh now when you're online.")
                     }
                 } finally {
@@ -161,9 +162,8 @@ class HomeArtworkRepository(
             val offset = chooseOffset(entries.size).mod(entries.size)
             return entries.drop(offset) + entries.take(offset)
         }
-        // Explicit refresh always fetches the remote feed and image bytes. Prefer
-        // unseen images, then older reviewed images, and the current set last.
-        // Scheduled updates keep their no-repeat policy. Never use live search.
+        // Only explicit theme selection may revisit approved artwork. Refresh now
+        // and scheduled updates require genuinely unseen images, never a shuffle.
         val currentIds = mutable.value.artworks.map { it.id }.toSet()
         val candidates = rotate(unseen) + if (allowPreviouslySeen) {
             rotate(approved.filter { it.artwork.id in seen && it.artwork.id !in currentIds }) +
@@ -252,10 +252,11 @@ fun rememberHomeArtworkCollection(
     val revision = settings.refreshRevision
     val onlineEnabled = settings.onlineEnabled
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(repository, lifecycle, scheduled.rotation, schedule.frequency, revision, onlineEnabled, settings.theme) {
+    LaunchedEffect(repository, lifecycle, scheduled.rotation, schedule.frequency, revision, onlineEnabled, settings.theme, settings.reuseReviewedOnRefresh) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             repository.update(settings.schedule.rotationAt(clock.now()),
-                settings.schedule.frequency == ArtworkFrequency.FIXED || !settings.onlineEnabled, settings.refreshRevision, settings.theme)
+                settings.schedule.frequency == ArtworkFrequency.FIXED || !settings.onlineEnabled, settings.refreshRevision, settings.theme,
+                reuseReviewed = settings.reuseReviewedOnRefresh)
             awaitCancellation()
         }
     }

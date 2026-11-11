@@ -132,7 +132,7 @@ class OnlineHomeArtworkTest {
         assertEquals(5, repository.state.value.artworks.size)
     }
 
-    @Test fun legacyCacheIsRevalidatedAndCanBeForceFetchedWhenNoNewApprovedImagesExist() = runTest {
+    @Test fun legacyCacheCanBeRevalidatedForExplicitThemeReuse() = runTest {
         val platform = Platform()
         val dispatcher = StandardTestDispatcher(testScheduler)
         val first = HomeArtworkRepository(platform, this, chooseOffset = { 0 }, ioDispatcher = dispatcher, catalog = platform.catalog.take(5))
@@ -143,7 +143,7 @@ class OnlineHomeArtworkTest {
         platform.metadata = legacy.toString()
         platform.remoteCatalog = platform.catalog.take(5)
         val restored = HomeArtworkRepository(platform, this, ioDispatcher = dispatcher)
-        restored.update(1, frozen = true, manualRevision = 1)
+        restored.update(1, frozen = true, manualRevision = 1, reuseReviewed = true)
         advanceUntilIdle()
         assertEquals(ids.toSet(), restored.state.value.artworks.map { it.id }.toSet())
         assertNull(restored.state.value.error)
@@ -256,7 +256,7 @@ class OnlineHomeArtworkTest {
         assertTrue(platform.requests.all { it.startsWith("https://images.metmuseum.org/") })
     }
 
-    @Test fun forceRefreshRefetchesTheFeedAndSeenImagesInsteadOfOnlyShufflingTheCache() = runTest {
+    @Test fun explicitThemeReuseRefetchesTheFeedAndSeenImagesInsteadOfOnlyShufflingTheCache() = runTest {
         val platform = Platform()
         platform.remoteCatalog = platform.catalog.take(5)
         val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
@@ -264,7 +264,7 @@ class OnlineHomeArtworkTest {
         repository.update(0, frozen = false)
         advanceUntilIdle()
         val original = repository.state.value.artworks.map { it.id }
-        repository.update(1, frozen = true, manualRevision = 1)
+        repository.update(1, frozen = true, manualRevision = 1, reuseReviewed = true)
         advanceUntilIdle()
         assertEquals(original, repository.state.value.artworks.map { it.id })
         assertEquals(2, platform.requests.count { it == HOME_ARTWORK_FEED_URL })
@@ -273,7 +273,7 @@ class OnlineHomeArtworkTest {
         assertTrue(repository.state.value.notice.orEmpty().contains("previously viewed"))
     }
 
-    @Test fun forceRefreshCanSwitchBackToAPreviouslyViewedTheme() = runTest {
+    @Test fun themeSelectionCanSwitchBackToAPreviouslyViewedTheme() = runTest {
         val platform = Platform()
         platform.remoteCatalog = platform.catalog.take(5).map { it.copy(theme = ArtworkTheme.SPACE) } +
             platform.catalog.drop(5).take(5).map { it.copy(theme = ArtworkTheme.NATURE) }
@@ -282,17 +282,17 @@ class OnlineHomeArtworkTest {
         repository.update(0, frozen = false, theme = ArtworkTheme.SPACE)
         advanceUntilIdle()
         val space = repository.state.value.artworks.map { it.id }
-        repository.update(1, frozen = true, manualRevision = 1, theme = ArtworkTheme.NATURE)
+        repository.update(1, frozen = true, manualRevision = 1, theme = ArtworkTheme.NATURE, reuseReviewed = true)
         advanceUntilIdle()
         assertTrue(space.toSet().intersect(repository.state.value.artworks.map { it.id }.toSet()).isEmpty())
-        repository.update(2, frozen = true, manualRevision = 2, theme = ArtworkTheme.SPACE)
+        repository.update(2, frozen = true, manualRevision = 2, theme = ArtworkTheme.SPACE, reuseReviewed = true)
         advanceUntilIdle()
         assertEquals(space, repository.state.value.artworks.map { it.id })
         assertEquals(15, platform.imageRequests)
         assertNull(repository.state.value.error)
     }
 
-    @Test fun forceRefreshUsesRemainingNewImagesBeforeRepeatingOlderApprovedImages() = runTest {
+    @Test fun themeSelectionUsesRemainingNewImagesBeforeRepeatingOlderApprovedImages() = runTest {
         val platform = Platform()
         platform.remoteCatalog = platform.catalog.take(12)
         val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
@@ -303,7 +303,7 @@ class OnlineHomeArtworkTest {
         repository.update(1, frozen = false)
         advanceUntilIdle()
         val current = repository.state.value.artworks.map { it.id }.toSet()
-        repository.update(2, frozen = true, manualRevision = 1)
+        repository.update(2, frozen = true, manualRevision = 1, reuseReviewed = true)
         advanceUntilIdle()
         val refreshed = repository.state.value.artworks.map { it.id }
         assertEquals(listOf("test11", "test12"), refreshed.take(2))
@@ -312,7 +312,7 @@ class OnlineHomeArtworkTest {
         assertNotNull(repository.state.value.notice)
     }
 
-    @Test fun forceRefreshStillRejectsChangedImageBytes() = runTest {
+    @Test fun explicitThemeReuseStillRejectsChangedImageBytes() = runTest {
         val platform = Platform()
         platform.remoteCatalog = platform.catalog.take(5)
         val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
@@ -322,7 +322,7 @@ class OnlineHomeArtworkTest {
         val original = repository.state.value.artworks.map { it.id }
         val saved = platform.metadata
         platform.corruptImages = true
-        repository.update(1, frozen = true, manualRevision = 1)
+        repository.update(1, frozen = true, manualRevision = 1, reuseReviewed = true)
         advanceUntilIdle()
         assertEquals(original, repository.state.value.artworks.map { it.id })
         assertEquals(saved, platform.metadata)
@@ -346,10 +346,34 @@ class OnlineHomeArtworkTest {
         assertNotNull(repository.state.value.error)
         assertFalse(repository.state.value.loading)
         platform.offline = false
+        platform.remoteCatalog = platform.catalog.drop(5).take(5)
         repository.update(2, frozen = true, manualRevision = 2)
         advanceUntilIdle()
         assertNull(repository.state.value.error)
         assertEquals(10, platform.imageRequests)
+    }
+
+    @Test fun refreshNowNeverPretendsRepeatedImagesAreNewAndFindsNewlyApprovedInternetImages() = runTest {
+        val platform = Platform()
+        platform.remoteCatalog = platform.catalog.take(5)
+        val repository = HomeArtworkRepository(platform, this, chooseOffset = { 0 },
+            ioDispatcher = StandardTestDispatcher(testScheduler))
+        repository.update(0, frozen = false)
+        advanceUntilIdle()
+        val original = repository.state.value.artworks.map { it.id }
+        repository.update(1, frozen = true, manualRevision = 1)
+        advanceUntilIdle()
+        assertEquals(original, repository.state.value.artworks.map { it.id })
+        assertEquals(5, platform.imageRequests)
+        assertEquals(2, platform.requests.count { it == HOME_ARTWORK_FEED_URL })
+        assertTrue(repository.state.value.error.orEmpty().contains("No new reviewed"))
+        assertNull(repository.state.value.notice)
+        platform.remoteCatalog = platform.catalog.take(10)
+        repository.update(2, frozen = true, manualRevision = 2)
+        advanceUntilIdle()
+        assertTrue(original.toSet().intersect(repository.state.value.artworks.map { it.id }.toSet()).isEmpty())
+        assertEquals(10, platform.imageRequests)
+        assertNull(repository.state.value.error)
     }
 
     @Test fun legacyGettySearchCachesAreNotDisplayedEvenInKeepCurrentMode() = runTest {

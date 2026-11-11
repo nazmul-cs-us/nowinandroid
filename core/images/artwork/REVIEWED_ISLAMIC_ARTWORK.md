@@ -20,6 +20,9 @@ failures retain the last-good set. Successfully downloaded images and their appr
 catalog are stored privately for offline use. Legacy cached images require validation
 against the new feed before reuse. No new approved entries means a clear error and
 the current set stays; there is no silent shuffle or unrestricted random-photo fallback.
+**Refresh now** bypasses the retry delay and HTTP cache to check the latest feed,
+but never substitutes previously viewed images for new artwork. Explicitly changing
+the theme may revisit that theme's reviewed collection; this is labelled separately.
 
 ## Providers and rights
 
@@ -65,7 +68,52 @@ python tools/artwork_feed.py approve --candidates "$TMPDIR/artwork-review/nasa.j
 ```
 
 Approval checks that the source still matches the reviewed bytes. Review/commit/publish
-the feed normally. The daily GitHub workflow discovers NASA metadata into a temporary
-review artifact only; it does not auto-approve images or commit new screenshots.
+the feed normally.
+
+## Automatic discovery and review queue
+
+`.github/workflows/ArtworkCandidates.yaml` runs daily at 03:17 UTC and supports
+**Run workflow**. It discovers candidates from NASA (Space), The Met/Cleveland (Islamic), and
+Openverse/Picsum (Nature). Queries and result pages change each day, rather than
+repeatedly scanning the same first page. Published images, already queued IDs,
+duplicate image hashes and `rejected-artwork-ids.json` are excluded.
+
+The workflow downloads bounded, dimension-checked previews and produces a
+`artwork-review-candidates` artifact with `review.html`, `candidates.json`, previews
+and `summary.json`. Provider failures are reported individually; a working provider
+can still contribute when another is unavailable. Open the HTML after extracting
+the artifact. Inspect each full-size preview, source record, attribution and rights.
+Keyword queries are **not** a content-safety guarantee.
+
+Pending metadata survives subsequent runs through the GitHub Actions cache; it is
+not written to the repository. The queue stops growing at 300 pending entries until
+reviews free space. Cache eviction may rediscover unreviewed entries, but published
+and rejected entries are still excluded. Artifacts are retained for 30 days. For a
+pending candidate whose preview was in an older artifact, download its exact bytes:
+
+```bash
+python tools/artwork_feed.py fetch-preview --candidates candidates.json \
+  --id CANDIDATE_ID --output "$TMPDIR/artwork-review/previews"
+```
+
+This verifies the original discovery hash; changed source bytes require discovery
+and review again. Approve using the existing `approve` command with the downloaded
+`candidates.json`, reviewed file, reviewer name and both explicit confirmations.
+To reject a candidate permanently, add its ID to `rejected-artwork-ids.json`.
+
+For a local discovery run, install Pillow 12.3.0 in an isolated Python environment:
+
+```bash
+python tools/discover_artwork_queue.py \
+  --feed core/images/artwork/home-artwork-feed.json \
+  --rejected core/images/artwork/rejected-artwork-ids.json \
+  --state "$TMPDIR/artwork-review/pending.json" \
+  --output "$TMPDIR/artwork-review/current"
+```
+
+Discovery never approves, commits or publishes images. New images become available
+to the app only after explicit review and publication of the approved feed. Publishing
+this workflow to the default branch is required to activate the scheduled discovery;
+until reviews are published, the app correctly reports that no new images are available.
 Feed publication is required before a new app can use this endpoint. No Family VM
 module deployment or restart is needed for artwork updates.

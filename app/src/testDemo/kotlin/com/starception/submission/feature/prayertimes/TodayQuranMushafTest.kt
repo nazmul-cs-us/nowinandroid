@@ -1,0 +1,162 @@
+package com.starception.submission.feature.prayertimes
+
+import android.app.Application
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+import com.github.takahirom.roborazzi.RoborazziOptions
+import com.github.takahirom.roborazzi.RoborazziTaskType
+import com.github.takahirom.roborazzi.captureRoboImage
+import com.starception.submission.core.qurandatabase.Ayah
+import com.starception.submission.feature.surah.MushafKeyBus
+import com.starception.submission.feature.surah.MushafMiniBarBus
+import com.starception.submission.feature.surah.MushafMiniBarState
+import com.starception.submission.feature.surah.MushafPagerView
+import com.starception.submission.feature.surah.mushafReadingFontSize
+import com.starception.submission.feature.surah.tajweed.TajweedAnnotation
+import com.starception.submission.feature.surah.tajweed.TajweedRule
+import java.io.File
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+@RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class, qualifiers = "w800dp-h844dp-mdpi", sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class TodayQuranMushafTest {
+    @get:Rule val compose = createComposeRule()
+    private val busOwner = Any()
+    private val verses = listOf(
+        "سَبِّحِ اسْمَ رَبِّكَ الْأَعْلَىٰ",
+        "الَّذِي خَلَقَ فَسَوَّىٰ",
+        "وَالَّذِي قَدَّرَ فَهَدَىٰ",
+    ).mapIndexed { index, text -> Ayah(index + 1, index + 1, text, index + 1, 591, 87, 87, 119, 30, false) }
+
+    @After fun releaseTestControls() {
+        MushafKeyBus.unbind()
+        MushafMiniBarBus.unbind(busOwner)
+    }
+
+    @Composable private fun Reader(
+        showTranslation: Boolean = false,
+        translations: Map<Int, String> = emptyMap(),
+        annotations: Map<Int, List<TajweedAnnotation>> = emptyMap(),
+        fontSize: Float = 41f,
+        height: Int = 404,
+    ) {
+        TodayQuranMushaf(verses, translations, "uthmani_script", fontSize, showTranslation,
+            annotations.isNotEmpty(), annotations, "justify", "en", {},
+            Modifier.size(360.dp, height.dp).background(Color(0xFF0B1827)))
+    }
+
+    private fun arabicLayout(index: Int = 0): TextLayoutResult {
+        val results = mutableListOf<TextLayoutResult>()
+        compose.onAllNodes(hasText("سَبِّحِ", substring = true), useUnmergedTree = true)[index]
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        return results.single()
+    }
+
+    @Test fun embeddedAndSurahReadersUseTheSameArabicShapingSizeAndLineBreaking() {
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
+            Row(Modifier.background(Color.Black)) {
+                Box(Modifier.size(360.dp, 380.dp)) {
+                    MushafPagerView(ayahs = verses, arabicFont = "uthmani_script", arabicFontSize = 41f,
+                        showTranslation = false, showTajweed = false, tajweedAnnotations = emptyMap(),
+                        showBismillah = true, textAlignment = "justify", translationCode = "en", onAyahLongPress = {})
+                }
+                Reader()
+            }
+        } }
+        val full = arabicLayout(0)
+        val embedded = arabicLayout(1)
+        assertEquals(full.layoutInput.style.fontFamily, embedded.layoutInput.style.fontFamily)
+        assertEquals(mushafReadingFontSize(41f).sp, embedded.layoutInput.style.fontSize)
+        assertEquals(full.layoutInput.style.fontSize, embedded.layoutInput.style.fontSize)
+        assertEquals(full.layoutInput.style.textAlign, embedded.layoutInput.style.textAlign)
+        assertEquals(full.layoutInput.text.text, embedded.layoutInput.text.text)
+        assertEquals(full.lineCount, embedded.lineCount)
+    }
+
+    @OptIn(ExperimentalRoborazziApi::class)
+    @Test fun tajweedDoesNotSplitArabicWordsIntoSeparateColourSpans() {
+        val wordStart = verses.first().text.indexOf("رَبِّكَ")
+        // A synthetic partial-word mask tests rendering, not the recitation rule itself.
+        val rules = mapOf(1 to listOf(TajweedAnnotation(TajweedRule.IKHFA, wordStart + 1, wordStart + 4)))
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) { Reader(annotations = rules) } }
+        val text = arabicLayout().layoutInput.text
+        assertTrue(text.text.contains("رَبِّكَ"))
+        assertTrue("Colour spans inside Arabic words break their cursive joins", text.spanStyles.none {
+            it.start < wordStart + 6 && it.end > wordStart && it.item.color != Color.Unspecified
+        })
+        val output = File(System.getProperty("java.io.tmpdir"), "opencode/todays-reading-mushaf.png")
+        output.parentFile.mkdirs()
+        compose.onRoot().captureRoboImage(output.absolutePath,
+            roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
+    }
+
+    @Test fun selectedTranslationsStayWithTheirAyahsAndBismillahIsShown() {
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
+            Reader(showTranslation = true, translations = mapOf(1 to "Glorify the name of your Lord, the Most High."), height = 600)
+        } }
+        compose.onNodeWithText("Glorify the name of your Lord, the Most High.", substring = true).assertExists()
+        compose.onAllNodesWithText("بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ").assertCountEquals(1)
+    }
+
+    @Test fun homeReaderDoesNotReplaceOrClearExistingVolumeKeysAndMiniBarOwners() {
+        var next = 0
+        var previous = 0
+        val existing = MushafMiniBarState(18, "الكهف", "Al-Kahf", 2, 8)
+        MushafKeyBus.bind(next = { next++ }, prev = { previous++ })
+        MushafMiniBarBus.bind(busOwner, {}, {}, {}, {})
+        MushafMiniBarBus.publish(busOwner, existing)
+        val visible = mutableStateOf(true)
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) { if (visible.value) Reader() } }
+        compose.runOnIdle {
+            assertSame(existing, MushafMiniBarBus.state.value)
+            assertTrue(MushafKeyBus.handleNext())
+            visible.value = false
+        }
+        compose.runOnIdle {
+            assertTrue(MushafKeyBus.handlePrev())
+            assertEquals(1, next)
+            assertEquals(1, previous)
+            assertSame(existing, MushafMiniBarBus.state.value)
+        }
+    }
+
+    @Test fun pageControlsReadTheRestOfTheSurahInsideTheTile() {
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) { Reader(fontSize = 70f, height = 220) } }
+        compose.onNodeWithContentDescription("Next Mushaf page").performClick()
+        val label = compose.onNodeWithTag("todayQuranMushafPageNumber").fetchSemanticsNode()
+            .config[SemanticsProperties.Text].first().text
+        assertTrue(label.startsWith("Page 2 of "))
+    }
+}
