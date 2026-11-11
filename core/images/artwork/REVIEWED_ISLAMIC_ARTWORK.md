@@ -24,6 +24,26 @@ the current set stays; there is no silent shuffle or unrestricted random-photo f
 but never substitutes previously viewed images for new artwork. Explicitly changing
 the theme may revisit that theme's reviewed collection; this is labelled separately.
 
+### Restricted mode and personal preview gallery
+
+Settings now has a **Restricted mode** switch, on by default. Turning it off first
+asks for explicit consent: unreviewed images may contain people or animals and their
+reuse rights have not been verified. Confirmation opens a separate manual-review
+gallery and fetches candidates directly from Picsum (Nature), NASA (Space), or the
+Cleveland open-access API (Islamic). This does not wait for a GitHub feed update.
+**Fetch more** searches a different provider result page rather than shuffling the
+Home cache. Known published IDs and already viewed preview IDs/hashes are skipped.
+
+The gallery offers full-image, source and rights links and a dismiss action. It
+does **not** approve, publish, or automatically apply images to Home. Manual content
+and rights review plus the publication workflow below are still required for Home.
+Switching **Restrict** back on cancels the request and clears the in-memory gallery.
+There are no scheduled preview fetches and no unreviewed writes to Home's offline
+collection. Previews are bounded to five images, resized to at most 720 pixels on
+their longest side; the original image remains available through the full-image link.
+Downloads use a separate HTTPS endpoint/redirect allowlist and byte/dimension limits.
+Android preview-network diagnostics use the `ArtworkReview` logcat tag.
+
 ## Providers and rights
 
 The initial remote feed contains 25 reviewed Islamic images (The Met/Cleveland),

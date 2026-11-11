@@ -42,6 +42,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.lifecycle.Lifecycle
@@ -113,6 +115,14 @@ class HomeArtworkSettingsTest {
         compose.onNodeWithText("Next update at", substring = true).assertIsDisplayed()
         compose.onNodeWithTag("homeArtworkFrequency").performClick()
         compose.onNodeWithText("Every day").performClick()
+    }
+
+    @Test fun restrictedReviewAndExistingArtworkControlsRemainReachable() {
+        compose.setContent { ArtworkSettingsScene() }
+        compose.onNodeWithTag("homeArtworkRestrictedMode").performScrollTo().assertIsOn()
+        compose.onNodeWithTag("homeArtworkRefreshNow").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkTheme").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkFrequency").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun refreshSettingsAndHomeShareTheSameDownloadedCollection() {
