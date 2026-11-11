@@ -139,7 +139,7 @@ private fun ContentSetupGate(
             setupState = SetupGateState.Ready
             return@LaunchedEffect
         }
-        setupState = loadRequiredContentState() ?: SetupGateState.Ready
+        setupState = loadRequiredContentState(selectedLanguage)
     }
     when (val state = setupState) {
         SetupGateState.Checking, is SetupGateState.LoadingManifest ->
@@ -151,25 +151,25 @@ private fun ContentSetupGate(
             val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
             val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state
                 .collectAsState()
-            androidx.compose.runtime.LaunchedEffect(downloadStatus) {
-                val chainFinished = downloadStatus == null && state.isDownloading
-                if (chainFinished) {
-                    // Verify every required category actually landed, then enter.
-                    val rechecked = loadRequiredContentState()
-                    if (rechecked is SetupGateState.Ready) {
-                        store.saveContentSetupComplete(true)
-                        setupState = SetupGateState.Ready
-                    } else if (rechecked is SetupGateState.NeedDownload) {
-                        // Still missing: show what remains with a retry.
-                        setupState = rechecked.copy(error = "Some content did not finish downloading.")
-                    } else {
-                        setupState = SetupGateState.Ready
+            val startDownload: () -> Unit = {
+                setupState = state.copy(isDownloading = true, error = null)
+                coroutineScope.launch {
+                    try {
+                        downloadRequiredContent(state.keys, selectedLanguage)
+                        val rechecked = loadRequiredContentState(selectedLanguage)
+                        if (rechecked is SetupGateState.Ready) {
+                            store.saveContentSetupComplete(true)
+                            setupState = rechecked
+                        } else if (rechecked is SetupGateState.NeedDownload) {
+                            setupState = rechecked.copy(error = "Some content did not finish downloading. Please retry.")
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        setupState = state.copy(isDownloading = false, error = "Download failed. Please retry.")
+                    } finally {
+                        com.starception.submission.shared.assets.ContentDownloadBus.publish(null)
                     }
-                } else if (downloadStatus != null) {
-                    setupState = state.copy(
-                        overallProgress = downloadStatus?.progress ?: state.overallProgress,
-                        isDownloading = true,
-                    )
                 }
             }
             ContentSetupScreen(
@@ -183,25 +183,21 @@ private fun ContentSetupGate(
                 error = state.error,
                 selectedLanguage = selectedLanguage,
                 onLanguageSelected = { language ->
-                    selectedLanguage = language
-                    store.savePreferredContentLanguage(language.code)
+                    if (!state.isDownloading) {
+                        selectedLanguage = language
+                        store.savePreferredContentLanguage(language.code)
+                        coroutineScope.launch {
+                            val rechecked = loadRequiredContentState(language)
+                            setupState = if (rechecked is SetupGateState.Ready) state.copy(categories = emptyList(), keys = emptyList()) else rechecked
+                        }
+                    }
                 },
                 onComplete = {
                     store.saveContentSetupComplete(true)
                     setupState = SetupGateState.Ready
                 },
-                onDownload = {
-                    setupState = state.copy(isDownloading = true, error = null)
-                    coroutineScope.launch {
-                        downloadRequiredContent(state.keys, selectedLanguage)
-                    }
-                },
-                onRetry = {
-                    setupState = state.copy(isDownloading = true, error = null)
-                    coroutineScope.launch {
-                        downloadRequiredContent(state.keys, selectedLanguage)
-                    }
-                },
+                onDownload = startDownload,
+                onRetry = startDownload,
                 onSkip = {
                     store.saveContentSetupComplete(true)
                     setupState = SetupGateState.Ready
@@ -224,16 +220,21 @@ private sealed interface SetupGateState {
     ) : SetupGateState
 }
 
-private suspend fun loadRequiredContentState(): SetupGateState =
+private suspend fun loadRequiredContentState(language: com.starception.submission.shared.quran.QuranTranslationLanguage): SetupGateState =
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val manifest = iosCloudAssets.loadManifest()
-            ?: return@withContext SetupGateState.Ready
+            ?: return@withContext SetupGateState.NeedDownload(
+                keys = emptyList(), categories = emptyList(), overallProgress = 0f,
+                isDownloading = false, error = "Content manifest unavailable. Please retry.",
+            )
         val requiredCategories = manifest.categories.filter { it.value.required }
         val missing = requiredCategories.filter { (key, _) ->
             val status = iosCloudAssets.getCategoryStatus(key, manifest)
             !status.isAvailable
         }
-        if (missing.isEmpty()) {
+        val translationKey = setupTranslationKey(language)
+        val translationMissing = translationKey != null && iosCloudAssets.lookupAsset(translationKey, manifest) == null
+        if (missing.isEmpty() && !translationMissing) {
             return@withContext SetupGateState.Ready
         }
         SetupGateState.NeedDownload(
@@ -245,17 +246,26 @@ private suspend fun loadRequiredContentState(): SetupGateState =
                     description = storageCategoryDescription(key),
                     sizeBytes = info.totalSize,
                 )
-            },
+            } + if (translationMissing) listOf(com.starception.submission.shared.ui.ContentSetupCategory(
+                key = "selected_reading_translation",
+                label = "Quran · ${language.displayName}",
+                description = "Selected offline translation",
+                sizeBytes = manifest.assets[translationKey]?.size ?: 0L,
+            )) else emptyList(),
             overallProgress = 0f,
             isDownloading = false,
         )
     }
 
+private fun setupTranslationKey(language: com.starception.submission.shared.quran.QuranTranslationLanguage): String? =
+    if (language == com.starception.submission.shared.quran.QuranTranslationLanguage.None) null
+    else "databases/quran/quran_${language.code}.db"
+
 private suspend fun downloadRequiredContent(
     keys: List<String>,
     language: com.starception.submission.shared.quran.QuranTranslationLanguage,
 ) {
-    val manifest = iosCloudAssets.loadManifest() ?: return
+    val manifest = checkNotNull(iosCloudAssets.loadManifest()) { "Content manifest unavailable" }
     // Network reads, file writes, and SHA-256 verification all run in the
     // caller's context — the setup gate calls this from a Main-dispatched
     // LaunchedEffect, so the whole chain must stay off Main (see
@@ -278,13 +288,11 @@ private suspend fun downloadRequiredContent(
             }
         }
     }
-    val translationKey = when (language) {
-        com.starception.submission.shared.quran.QuranTranslationLanguage.None -> null
-        com.starception.submission.shared.quran.QuranTranslationLanguage.Transliteration ->
-            "databases/quran/quran_transliteration.db"
-        else -> "databases/quran/quran_${language.code}.db"
+    setupTranslationKey(language)?.let { key ->
+        withContext(Dispatchers.Default) {
+            checkNotNull(iosCloudAssets.resolveAsset(key, manifest)) { "Selected translation download failed" }
+        }
     }
-    translationKey?.let { iosCloudAssets.resolveAsset(it, manifest) }
     // The whole chain finished: clear the bus so the gate advances to Ready
     // (the settings' per-category downloads clear it themselves; this chain
     // is ours, so it clears it here).

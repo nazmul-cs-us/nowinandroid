@@ -371,7 +371,7 @@ fun HadithDetailScreen(
     var showTranslationSheet by remember { mutableStateOf(false) }
 
     // Available translations
-    val availableTranslations = listOf("en", "ar", "bn", "zh", "es", "fr", "id", "ru", "sv", "tr", "ur")
+    val availableTranslations = listOf("en", "ar", "bn", "hi", "zh", "es", "fr", "id", "ru", "sv", "tr", "ur")
 
     // Available providers
     val availableProviders = listOf(
@@ -547,6 +547,10 @@ fun HadithDetailScreen(
     // Uses local Bukhari translations for English, online API for other languages
     LaunchedEffect(hadith, selectedLanguage, selectedProvider) {
         val currentHadith = hadith ?: return@LaunchedEffect
+        translatedArabic = null
+        translatedText = null
+        translatedElaboration = null
+        isTranslating = false
 
         // Skip translation only for transliteration (no API support)
         if (selectedLanguage == "transliteration") {
@@ -561,6 +565,17 @@ fun HadithDetailScreen(
             translatedArabic = null // Show original Arabic
             translatedText = currentHadith.textPlain
             translatedElaboration = currentHadith.elaboration
+            return@LaunchedEffect
+        }
+
+        val localTranslation = when (selectedLanguage) {
+            "en" -> currentHadith.englishText
+            "bn" -> currentHadith.bengaliText
+            else -> null
+        }?.takeIf(String::isNotBlank)
+        if (localTranslation != null) {
+            translatedText = localTranslation
+            translatedElaboration = if (selectedLanguage == "bn") currentHadith.bengaliExplanation else null
             return@LaunchedEffect
         }
 

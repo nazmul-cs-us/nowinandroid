@@ -75,6 +75,7 @@ fun AssetDownloadScreen(
     modifier: Modifier = Modifier,
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
+    val selectedLanguage by viewModel.selectedLanguage.collectAsStateWithLifecycle()
 
     AnimatedContent(
         targetState = screenState,
@@ -110,6 +111,8 @@ fun AssetDownloadScreen(
             is DownloadScreenState.NeedsDownload -> {
                 DownloadContent(
                     state = state,
+                    selectedLanguage = selectedLanguage,
+                    onLanguageSelected = viewModel::selectLanguage,
                     onDownloadRequired = viewModel::downloadRequired,
                     onDownloadCategory = viewModel::downloadCategory,
                     onDeleteCategory = viewModel::deleteCategory,
@@ -181,6 +184,8 @@ private fun ErrorContent(
 @Composable
 private fun DownloadContent(
     state: DownloadScreenState.NeedsDownload,
+    selectedLanguage: String,
+    onLanguageSelected: (String) -> Unit,
     onDownloadRequired: () -> Unit,
     onDownloadCategory: (String) -> Unit,
     onDeleteCategory: (String) -> Unit,
@@ -226,6 +231,10 @@ private fun DownloadContent(
                         textAlign = TextAlign.Center,
                     )
                 }
+            }
+
+            item {
+                ReadingLanguagePicker(selectedLanguage, !state.isDownloading, onLanguageSelected)
             }
 
             // Overall progress bar when downloading

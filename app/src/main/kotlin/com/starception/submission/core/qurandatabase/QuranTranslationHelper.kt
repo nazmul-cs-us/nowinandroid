@@ -73,7 +73,10 @@ object QuranTranslationHelper {
 
         try {
             val instanceName = "quran_${translationCode}_instance"
-            val dbFile = assetRepository?.getDatabaseFile(cdnKey)
+            // Legacy readers (including Dua) do not inject the repository. They must
+            // still see the selected translation downloaded during Content Setup.
+            val resolvedRepository = assetRepository ?: com.starception.submission.download.readingAssetRepository(context)
+            val dbFile = resolvedRepository?.getDatabaseFile(cdnKey)
 
             // Refuse to build a database with nothing to fill it from. Room would
             // happily create an empty file with the right schema, and because it only

@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -87,6 +88,21 @@ class AssetDownloadViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val contentSetupPreferences = ContentSetupPreferences(context)
+    private val translationService = com.starception.submission.core.translation.TranslationService.getInstance(context)
+    private val _selectedLanguage = MutableStateFlow(translationService.getSelectedLanguage())
+    val selectedLanguage: StateFlow<String> = _selectedLanguage.asStateFlow()
+
+    fun selectLanguage(code: String) {
+        if (isCurrentlyDownloading || ContentReadingLanguage.languages.none { it.first == code }) return
+        translationService.setSelectedLanguage(code)
+        context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE).edit()
+            .putBoolean("show_translation", code != "ar").apply()
+        _selectedLanguage.value = code
+        refreshCategoryStates()
+    }
+
+    private fun selectedTranslationReady(): Boolean =
+        ContentReadingLanguage.assetKey(_selectedLanguage.value)?.let(downloadManager::isAssetAvailable) ?: true
 
     private val _screenState = MutableStateFlow<DownloadScreenState>(DownloadScreenState.Loading)
     val screenState: StateFlow<DownloadScreenState> = _screenState.asStateFlow()
@@ -119,9 +135,10 @@ class AssetDownloadViewModel @Inject constructor(
                     return@launch
                 }
                 manifest = m
+                _selectedLanguage.value = translationService.getSelectedLanguage()
 
                 // Check if all required assets are already available (bundled fallback works)
-                if (downloadManager.hasEssentialAssets(m)) {
+                if (downloadManager.hasEssentialAssets(m) && selectedTranslationReady()) {
                     markContentSetupComplete()
                     _screenState.value = DownloadScreenState.AllReady
                     Log.i(TAG, "All essential assets ready")
@@ -130,7 +147,7 @@ class AssetDownloadViewModel @Inject constructor(
 
                 // Also check if all required categories are individually complete
                 val requiredKeys = m.categories.filter { it.value.required }.keys
-                if (requiredKeys.all { downloadManager.isCategoryComplete(it, m) }) {
+                if (requiredKeys.all { downloadManager.isCategoryComplete(it, m) } && selectedTranslationReady()) {
                     markContentSetupComplete()
                     _screenState.value = DownloadScreenState.AllReady
                     Log.i(TAG, "All required categories complete, skipping download screen")
@@ -162,7 +179,23 @@ class AssetDownloadViewModel @Inject constructor(
                 isComplete = isComplete,
                 progress = if (info.totalSize > 0) downloadedSize.toFloat() / info.totalSize else 0f,
             )
-        }.sortedWith(compareByDescending<CategoryDownloadState> { it.required }.thenBy { it.displayName })
+        }.toMutableList()
+        ContentReadingLanguage.assetKey(_selectedLanguage.value)?.let { key ->
+            val size = m.assets[key]?.size ?: 0L
+            val ready = selectedTranslationReady()
+            categories += CategoryDownloadState(
+                categoryKey = ContentReadingLanguage.CATEGORY,
+                displayName = "Quran · ${ContentReadingLanguage.displayName(_selectedLanguage.value)}",
+                description = "Selected reading translation for offline use",
+                totalSize = size,
+                downloadedSize = if (ready) size else 0L,
+                fileCount = 1,
+                required = true,
+                isComplete = ready,
+                progress = if (ready) 1f else 0f,
+            )
+        }
+        categories.sortWith(compareByDescending<CategoryDownloadState> { it.required }.thenBy { it.displayName })
 
         val totalRequiredSize = categories.filter { it.required }.sumOf { it.totalSize }
         val totalOptionalSize = categories.filter { !it.required }.sumOf { it.totalSize }
@@ -191,9 +224,11 @@ class AssetDownloadViewModel @Inject constructor(
     fun downloadRequired() {
         val m = manifest ?: return
         if (isCurrentlyDownloading) return
+        // Persist even the unchanged default so all readers use the same code.
+        selectLanguage(_selectedLanguage.value)
 
         val requiredCategories = m.categories.filter { it.value.required }.keys
-        val allAlreadyComplete = requiredCategories.all { downloadManager.isCategoryComplete(it, m) }
+        val allAlreadyComplete = requiredCategories.all { downloadManager.isCategoryComplete(it, m) } && selectedTranslationReady()
 
         if (allAlreadyComplete) {
             Log.i(TAG, "All required categories already complete, skipping download")
@@ -233,6 +268,27 @@ class AssetDownloadViewModel @Inject constructor(
                     }
                     if (!completed) failedCategories += formatCategoryName(category)
                 }
+                ContentReadingLanguage.assetKey(_selectedLanguage.value)?.let { key ->
+                    if (!selectedTranslationReady()) {
+                        val progressJob = launch {
+                            downloadManager.getDownloadState(key).collect { transfer ->
+                                if (transfer is AssetDownloadManager.DownloadState.Downloading) {
+                                    updateCategoryProgress(ContentReadingLanguage.CATEGORY, transfer.progress, transfer.bytesDownloaded)
+                                }
+                            }
+                        }
+                        val ready = try {
+                            ContentReadingLanguage.ensureAvailable(_selectedLanguage.value, downloadManager::isAssetAvailable) { selectedKey ->
+                                downloadManager.downloadAsset(selectedKey, m) is AssetDownloadManager.DownloadState.Completed
+                            }
+                        } finally {
+                            progressJob.cancel()
+                        }
+                        if (!ready) {
+                            failedCategories += "${ContentReadingLanguage.displayName(_selectedLanguage.value)} translation"
+                        }
+                    }
+                }
                 isCurrentlyDownloading = false
                 refreshCategoryStates()
 
@@ -263,6 +319,7 @@ class AssetDownloadViewModel @Inject constructor(
                 } catch (e: Exception) {
                     Log.e(TAG, "Error regenerating news.db after download", e)
                 }
+                markContentSetupComplete()
                 _screenState.value = DownloadScreenState.AllReady
             } catch (e: Exception) {
                 Log.e(TAG, "Download error", e)
@@ -282,6 +339,10 @@ class AssetDownloadViewModel @Inject constructor(
      * Download a specific optional category.
      */
     fun downloadCategory(categoryKey: String) {
+        if (categoryKey == ContentReadingLanguage.CATEGORY) {
+            downloadRequired()
+            return
+        }
         val m = manifest ?: return
 
         viewModelScope.launch {

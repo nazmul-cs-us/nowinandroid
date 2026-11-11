@@ -60,6 +60,8 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
     /** One first-run reading language shared by Quran, Hadith and Dua. */
     fun preferredContentLanguage(): String =
         store.getString(CONTENT_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank)
+            ?: store.getString(QURAN_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank)
+            ?: store.getString(HADITH_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank)
             ?: QuranTranslationLanguage.English.code
 
     fun savePreferredContentLanguage(code: String) {

@@ -87,4 +87,24 @@ class PrayerHadithRecommendationRepositoryTest {
             db.version = 2
         }
     }
+
+    @Test
+    fun homeHadithUsesLocalBengaliWithoutOnlineTranslation() = runBlocking {
+        val bengali = "এটি স্থানীয় বাংলা অনুবাদের পরীক্ষার পাঠ।"
+        installCollection(bengali)
+        val reading = loadHomeHadithTranslation(context,
+            com.starception.submission.core.model.deenly.PrayerHadithCandidate(databaseFile, "Bukhari", 1, "Old source text"), "bn")
+        assertEquals(bengali, reading.text)
+        assertEquals("Local translation", reading.notice)
+    }
+
+    @Test
+    fun unsupportedTransliterationDoesNotPretendSourceIsATranslation() = runBlocking {
+        val original = "Original narration text"
+        installCollection(original)
+        val reading = loadHomeHadithTranslation(context,
+            com.starception.submission.core.model.deenly.PrayerHadithCandidate(databaseFile, "Bukhari", 1, original), "transliteration")
+        assertEquals(original, reading.text)
+        assertTrue(reading.notice.contains("unavailable"))
+    }
 }

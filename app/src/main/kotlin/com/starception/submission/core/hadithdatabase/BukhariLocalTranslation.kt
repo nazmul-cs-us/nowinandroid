@@ -53,7 +53,8 @@ class BukhariLocalTranslationRepository private constructor(
 
         return withContext(Dispatchers.IO) {
             try {
-                val inputStream = assetRepository?.openAsset("json/sahih_bukhari.json")
+                val repository = assetRepository ?: com.starception.submission.download.readingAssetRepository(context)
+                val inputStream = repository?.openAsset("json/sahih_bukhari.json")
                     ?: context.assets.open("sahih_bukhari.json")
                 val jsonString = inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(jsonString)

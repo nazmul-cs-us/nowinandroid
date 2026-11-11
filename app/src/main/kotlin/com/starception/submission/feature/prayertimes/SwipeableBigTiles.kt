@@ -3692,7 +3692,9 @@ internal fun InsightPreviewCard(
                 Image(
                     bitmap = backgroundBitmap,
                     contentDescription = null,
-                    contentScale = ContentScale.FillBounds,
+                    // Downloaded images may be square, portrait or landscape.
+                    // Fill the tile by cropping, never by stretching either axis.
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
                         .blur(expandedArtworkBlur)
@@ -3721,7 +3723,7 @@ internal fun InsightPreviewCard(
                     Image(
                         bitmap = backgroundOverlayBitmap,
                         contentDescription = null,
-                        contentScale = ContentScale.FillBounds,
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxSize()
                             .blur(expandedArtworkBlur)
@@ -3821,7 +3823,7 @@ internal fun InsightPreviewCard(
                     backgroundBitmap != null -> Image(
                         bitmap = backgroundBitmap,
                         contentDescription = null,
-                        contentScale = ContentScale.FillBounds,
+                        contentScale = ContentScale.Crop,
                         modifier = partialBlurModifier,
                     )
 
@@ -3963,7 +3965,7 @@ internal fun InsightPreviewCard(
                         Image(
                             bitmap = backgroundBitmap,
                             contentDescription = null,
-                            contentScale = ContentScale.FillBounds,
+                            contentScale = ContentScale.Crop,
                             modifier = waterImageModifier,
                         )
                     } else if (backgroundPainterRes != null) {
@@ -5382,7 +5384,7 @@ private fun EditorialQuranReadingStage(
         quranPrefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { quranPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val translationCode = quranPrefs.getString("quran_translation", "ar") ?: "ar"
+    val translationCode = quranPrefs.getString("quran_translation", "en") ?: "en"
     val showTranslation = quranPrefs.getBoolean("show_translation", true)
     val showTajweed = quranPrefs.getBoolean("show_tajweed", false)
     val selectedArabicFont = quranPrefs.getString("arabic_font", "indopak_script") ?: "indopak_script"
@@ -5805,7 +5807,8 @@ private fun SalahHadithExpandedStage(
             loading = false
         }
     }
-    val body = formatInsightHadithText(recommendation?.source?.text ?: when {
+    val translatedReading = rememberHomeHadithTranslation(recommendation?.source)
+    val body = formatInsightHadithText(translatedReading?.text ?: recommendation?.source?.text ?: when {
         loading -> "Selecting a Hadith for this prayer…"
         searchFailed -> "Unable to read your Hadith collections. Reopen this tile to try again."
         hadithContext.isFriday -> "No matching Friday narration was found in your available collections."
@@ -5896,10 +5899,13 @@ private fun SalahHadithExpandedStage(
                         onTextLayout = { result ->
                             val bodyHeight = with(density) { result.size.height.toDp() }
                             onPreferredHeightChange(
-                                bodyHeight + 80.dp + (if (source.isNotBlank()) 64.dp else 0.dp),
+                                bodyHeight + 112.dp + (if (source.isNotBlank()) 64.dp else 0.dp),
                             )
                         },
                     )
+                    translatedReading?.notice?.let { notice ->
+                        Text(notice, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                    }
                     if (compression < 0.50f && source.isNotBlank()) {
                         FlowingSourceDisclosure(source, selection)
                     }
@@ -6465,6 +6471,7 @@ private fun RecommendationExpandedStage(
     onPreferredHeightChange: (Dp) -> Unit = {},
 ) {
     val density = LocalDensity.current
+    val translatedReading = rememberHomeSuggestionTranslation(candidate)
     val compression = compactProgress.coerceIn(0f, 1f)
     val aiScrollState = rememberScrollState()
     Box(
@@ -6565,13 +6572,16 @@ private fun RecommendationExpandedStage(
                             verticalArrangement = Arrangement.Top,
                         ) {
                             Text(
-                                text = formatInsightHadithText(nudge.supportingText?.takeIf(String::isNotBlank) ?: nudge.label),
+                                text = formatInsightHadithText(translatedReading?.text ?: nudge.supportingText?.takeIf(String::isNotBlank) ?: nudge.label),
                                 modifier = Modifier.fillMaxWidth(),
                                 style = insightReaderBodyStyle(compression),
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium,
                             )
 
+                            translatedReading?.notice?.let { notice ->
+                                Text(notice, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                            }
                         }
                         if (aiScrollState.maxValue > 0) {
                             LinearProgressIndicator(

@@ -128,7 +128,7 @@ fun ContentSetupScreen(
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { showLanguages = !showLanguages },
+                            .clickable(enabled = !isDownloading) { showLanguages = !showLanguages },
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -141,7 +141,7 @@ fun ContentSetupScreen(
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Text(
-                                    "Used for Quran, Hadith and Dua translations",
+                                    "Offline Quran translation; other translations use local content or internet",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -155,7 +155,7 @@ fun ContentSetupScreen(
                         }
                     }
                 }
-                if (showLanguages) {
+                if (showLanguages && !isDownloading) {
                     items(setupLanguages, key = { "language-${it.code}" }) { language ->
                         Surface(
                             modifier = Modifier

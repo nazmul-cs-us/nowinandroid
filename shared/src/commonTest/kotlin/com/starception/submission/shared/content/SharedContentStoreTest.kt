@@ -24,6 +24,29 @@ import kotlin.test.assertTrue
 
 class SharedContentStoreTest {
     @Test
+    fun setupReadingLanguagePersistsForAllReaders() {
+        val keys = InMemoryKeyValueStore()
+        SharedContentStore(keys).savePreferredContentLanguage("bn")
+        val restored = SharedContentStore(keys)
+        assertEquals("bn", restored.preferredContentLanguage())
+        assertEquals("bn", restored.quranTranslationLanguage())
+        assertEquals("bn", restored.hadithTranslationLanguage())
+        assertEquals("bn", restored.duaTranslationLanguage())
+    }
+
+    @Test
+    fun setupDefaultPreservesAnExistingReadingPreferenceUntilExplicitlyChanged() {
+        val content = SharedContentStore(InMemoryKeyValueStore())
+        content.saveQuranTranslationLanguage("ur")
+        content.saveHadithTranslationLanguage("fr")
+        assertEquals("ur", content.preferredContentLanguage())
+        assertEquals("fr", content.hadithTranslationLanguage())
+        content.savePreferredContentLanguage("bn")
+        assertEquals("bn", content.quranTranslationLanguage())
+        assertEquals("bn", content.hadithTranslationLanguage())
+    }
+
+    @Test
     fun hadithSizeDefaultsToAndroidReadingSizeAndStaysSeparateFromQuran() {
         val keys = InMemoryKeyValueStore()
         val content = SharedContentStore(keys)

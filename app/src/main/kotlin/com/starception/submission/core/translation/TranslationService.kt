@@ -56,6 +56,7 @@ class TranslationService private constructor(private val context: Context) {
             "en" to "en",
             "ar" to "ar",
             "bn" to "bn", // Bengali
+            "hi" to "hi", // Hindi
             "zh" to "zh", // Chinese
             "es" to "es", // Spanish
             "fr" to "fr", // French

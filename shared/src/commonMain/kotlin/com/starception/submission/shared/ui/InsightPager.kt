@@ -1640,7 +1640,42 @@ private fun ExpandedSalahHadith(
         }
         return
     }
-    val text = formatInsightHadithText(recommendation?.source?.text ?: when {
+    val readingStore = remember { com.starception.submission.shared.content.SharedContentStore() }
+    val readingLanguage = readingStore.preferredContentLanguage()
+    val translationRepository = remember { com.starception.submission.shared.hadith.createSharedHadithRepository() }
+    var translatedReading by remember(recommendation, readingLanguage) { mutableStateOf<String?>(null) }
+    var translationNotice by remember(recommendation, readingLanguage) { mutableStateOf("") }
+    LaunchedEffect(recommendation, readingLanguage) {
+        val selected = recommendation?.source ?: return@LaunchedEffect
+        translationNotice = "Loading selected translation…"
+        try {
+            val hadith = translationRepository.getCollectionHadith(selected.databaseFile, selected.hadithNumber)
+            if (readingLanguage == "ar") {
+                translatedReading = hadith?.arabic?.takeIf(String::isNotBlank)
+                translationNotice = if (translatedReading != null) "Arabic source" else "Selected translation unavailable · Showing source text"
+            } else {
+                val english = hadith?.english?.takeIf(String::isNotBlank)
+                if (english == null) {
+                    translationNotice = "Selected translation unavailable · Showing source text"
+                } else if (readingLanguage == "en") {
+                    translatedReading = english
+                    translationNotice = "Local English translation"
+                } else {
+                    val translated = com.starception.submission.shared.translation.SharedTranslationService.translateFromEnglish(
+                        english, readingLanguage, readingStore.hadithTranslationProvider(),
+                    )
+                    translatedReading = translated.takeIf { it.isNotBlank() && it != english }
+                    translationNotice = if (translatedReading != null) "Machine translation · May contain errors"
+                        else "Selected translation unavailable · Showing source text"
+                }
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            translationNotice = "Selected translation unavailable · Showing source text"
+        }
+    }
+    val text = formatInsightHadithText(translatedReading ?: recommendation?.source?.text ?: when {
         loading -> "Selecting a Hadith for this prayer…"
         searchFailed -> "Unable to read your Hadith collections. Reopen this tile to try again."
         hadithContext.isFriday -> "No matching Friday narration was found."
@@ -1704,9 +1739,12 @@ private fun ExpandedSalahHadith(
                         fontWeight = FontWeight.Medium,
                         onTextLayout = { result ->
                             val bodyHeight = with(density) { result.size.height.toDp() }
-                            onPreferredHeightChange(bodyHeight + 112.dp)
+                            onPreferredHeightChange(bodyHeight + 144.dp)
                         },
                     )
+                    if (translationNotice.isNotBlank()) {
+                        Text(translationNotice, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                    }
                 }
             }
             if (source.isNotBlank()) Box(Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current)) {

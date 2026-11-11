@@ -35,6 +35,7 @@ object SharedTranslationService {
         "en" to "English",
         "ar" to "العربية",
         "bn" to "বাংলা",
+        "hi" to "हिन्दी",
         "zh" to "中文",
         "es" to "Español",
         "fr" to "Français",
