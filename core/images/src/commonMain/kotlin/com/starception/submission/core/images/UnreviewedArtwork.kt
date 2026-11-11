@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
+import kotlin.random.Random
 
 /** Deliberately not a ReviewedHomeArtwork: previews cannot enter Home's approved collection. */
 data class UnreviewedArtwork(val artwork: OnlineHomeArtwork, val sha256: String)
@@ -47,11 +48,13 @@ class ArtworkReviewRepository(
     private val scope: CoroutineScope,
     private val clock: Clock = Clock.System,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    initialPageOffset: Int = Random.nextInt(20),
 ) {
     private val mutable = MutableStateFlow(ArtworkReviewState())
     val state = mutable.asStateFlow()
     private val seen = mutableSetOf<String>()
-    private var batch = 0
+    private val seenHashes = mutableSetOf<String>()
+    private var batch = initialPageOffset.coerceIn(0, 19)
     private var generation = 0
     private var request: Job? = null
 
@@ -71,42 +74,54 @@ class ArtworkReviewRepository(
         request?.cancel()
         val version = ++generation
         val page = 1 + ((clock.now().epochSeconds / 86400 + batch++) % 20).toInt()
+        val previouslySeen = seen.toSet()
+        val previousHashes = seenHashes.toSet()
         mutable.value = ArtworkReviewState(loading = true)
         request = scope.launch {
             try {
-                withContext(dispatcher) {
+                val result = withContext(dispatcher) {
+                    var approvedFeedUnavailable = false
                     val approved = try {
                         parseReviewedArtworkFeed(platform.download(HOME_ARTWORK_FEED_URL, 2_000_000).decodeToString())
                             .map { it.artwork.id }.toSet()
                     } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Exception) { emptySet() }
+                    catch (_: Exception) { approvedFeedUnavailable = true; emptySet() }
                     val discoveries = discover(theme, page).distinctBy { it.id }
-                        .filter { it.id !in approved && it.id !in seen }
+                        .filter { it.id !in approved && it.id !in previouslySeen }
                     val loaded = mutableListOf<UnreviewedArtwork>()
                     var failures = 0
                     for (candidate in discoveries.take(15)) {
                         ensureActive()
                         try {
                             val bytes = platform.download(candidate.imageUrl, 8_000_000)
+                            val digest = artworkSha256(bytes)
+                            if (digest in previousHashes || loaded.any { it.sha256 == digest }) continue
                             val bitmap = decodeArtworkReviewPreview(bytes)
-                            loaded += UnreviewedArtwork(candidate.copy(bitmap = bitmap), artworkSha256(bytes))
+                            loaded += UnreviewedArtwork(candidate.copy(bitmap = bitmap), digest)
                         } catch (cancelled: CancellationException) { throw cancelled }
                         catch (_: Exception) { failures++ }
                         if (loaded.size == 5) break
                     }
                     ensureActive()
-                    if (version == generation) {
-                        seen.addAll(loaded.map { it.artwork.id })
-                        mutable.value = ArtworkReviewState(
+                    ArtworkReviewState(
                             candidates = loaded,
                             error = when {
                                 discoveries.isEmpty() -> "No more candidates on this page. Tap Fetch more to search another page."
+                                loaded.isEmpty() && failures == 0 -> "No new preview images on this page. Tap Fetch more to search another page."
                                 loaded.isEmpty() -> "Could not download the candidate previews. Check your connection and try again."
                                 else -> null
                             },
-                            notice = if (failures > 0) "$failures candidate preview(s) could not be loaded." else null,
-                        )
-                    }
+                            notice = listOfNotNull(
+                                if (failures > 0) "$failures candidate preview(s) could not be loaded." else null,
+                                if (approvedFeedUnavailable) "The approved-feed check was unavailable; some candidates may already have been reviewed." else null,
+                             ).joinToString(" ").takeIf(String::isNotBlank),
+                         )
+                }
+                ensureActive()
+                if (version == generation) {
+                    seen.addAll(result.candidates.map { it.artwork.id })
+                    seenHashes.addAll(result.candidates.map { it.sha256 })
+                    mutable.value = result
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) {
@@ -122,6 +137,15 @@ class ArtworkReviewRepository(
             ArtworkTheme.ISLAMIC -> "https://openaccess-api.clevelandart.org/api/artworks/?q=tile&cc0=1&has_image=1&department=Islamic%20Art&limit=20&skip=${(page - 1) * 20}"
         }
         var text = platform.download(url, 2_000_000).decodeToString()
+        if (theme == ArtworkTheme.SPACE) {
+            val collection = Json.parseToJsonElement(text).jsonObject["collection"]?.jsonObject
+            val total = collection?.get("metadata")?.jsonObject?.get("total_hits")?.jsonPrimitive?.intOrNull ?: 0
+            if (collection?.get("items")?.jsonArray.orEmpty().isEmpty() && total > 0) {
+                val lastPage = ((total + 19) / 20).coerceAtLeast(1)
+                val availablePage = 1 + (page - 1) % lastPage
+                text = platform.download(url.substringBeforeLast("page=") + "page=$availablePage", 2_000_000).decodeToString()
+            }
+        }
         if (theme == ArtworkTheme.ISLAMIC) {
             val root = Json.parseToJsonElement(text).jsonObject
             val total = root["info"]?.jsonObject?.get("total")?.jsonPrimitive?.intOrNull ?: 0
