@@ -60,6 +60,40 @@ class FamilyChatUiTest {
         chatDraft = "Assalamu alaikum",
     )
 
+    @Test fun outgoingMessagesShowSentDeliveredAndSeen() {
+        val sent = FamilyChatMessage("receipt", state().me, peer, "Salaam", 1, 1000)
+        val ui = mutableStateOf(state().copy(messages = listOf(sent)))
+        compose.setContent { NiaTheme { FamilyScreenContent(ui.value) } }
+        compose.onNodeWithContentDescription("Sent").assertIsDisplayed()
+        compose.runOnIdle { ui.value = ui.value.copy(messages = listOf(sent.copy(deliveredAt = 2000))) }
+        compose.onNodeWithContentDescription("Delivered").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Sent").assertDoesNotExist()
+        compose.runOnIdle { ui.value = ui.value.copy(messages = listOf(sent.copy(deliveredAt = 2000, seenAt = 3000))) }
+        compose.onNodeWithContentDescription("Seen").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Delivered").assertDoesNotExist()
+    }
+
+    @Test fun staleMessageResponsesCannotUndoSeenReceipts() {
+        val sent = FamilyChatMessage("receipt", state().me, peer, "Salaam", 1, 1000)
+        val seen = sent.copy(deliveredAt = 2000, seenAt = 3000)
+        assertEquals(seen, seen.mergeReceipt(sent))
+        assertEquals(seen, sent.mergeReceipt(seen))
+        assertEquals(seen, seen.mergeReceipt(sent.copy(deliveredAt = 2000)))
+    }
+
+    @Test fun readCallbacksContainOnlyMessagesInTheViewport() {
+        val rows = (1..25).map { FamilyChatMessage("visible-$it", peer, state().me, "Salaam $it", it.toLong(), 1000) }
+        var visible = emptyList<String>()
+        compose.setContent { NiaTheme {
+            FamilyScreenContent(state().copy(messages = rows), FamilyActions(readChat = { visible = it }))
+        } }
+        compose.waitUntil(5000) { "visible-25" in visible }
+        compose.runOnIdle {
+            assertFalse("visible-1" in visible)
+            assertTrue(visible.size < rows.size)
+        }
+    }
+
     @Test fun offlineContactShowsLastSeenInChatAndProfile() {
         val member = FamilyMember(peer, "accepted", "offline", System.currentTimeMillis() - 150000)
         compose.setContent { NiaTheme { FamilyScreenContent(state().copy(members = listOf(member))) } }

@@ -101,8 +101,10 @@ process_iq(Acc, _, _, IQ, _) ->
 
 execute(D, U, _, #{<<"action">> := <<"ack_notifications">>}) ->
     mod_deenly_family_chat:execute_ack(D, U);
+execute(D, U, _, #{<<"action">> := <<"pending_messages">>}) ->
+    {mod_deenly_family_chat:pending(D, U), []};
 execute(D, U, _, #{<<"action">> := A, <<"peer">> := P} = R)
-  when A =:= <<"send_message">>; A =:= <<"chat_history">>; A =:= <<"read_messages">> ->
+  when A =:= <<"send_message">>; A =:= <<"chat_history">>; A =:= <<"read_messages">>; A =:= <<"message_receipts">> ->
     valid_peer(D, U, P), family(D, U, P), mod_deenly_family_chat:execute(D, U, P, R);
 execute(D, U, _, #{<<"action">> := <<"pair_web_helper">>} = R) ->
     mod_deenly_family_web:pair(D, U, R);
@@ -315,7 +317,7 @@ turn(U, Id) ->
 deliver(D, Events) ->
     From = jid:from_binary(D),
     lists:foreach(fun({Target, Body}) ->
-        IsPresence = lists:member(maps:get(<<"event">>, Body, <<>>), [<<"presence">>, <<"chat">>, <<"inbox">>]),
+        IsPresence = lists:member(maps:get(<<"event">>, Body, <<>>), [<<"presence">>, <<"chat">>, <<"chat_receipts">>, <<"inbox">>]),
         Type = case IsPresence of true -> <<"headline">>; false -> <<"normal">> end,
         Hints = case IsPresence of
             true -> [#xmlel{name = <<"no-store">>, attrs = #{<<"xmlns">> => <<"urn:xmpp:hints">>}},

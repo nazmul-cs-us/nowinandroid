@@ -61,6 +61,21 @@ All actions use the existing authenticated `urn:starception:family:1` IQ envelop
 
 Server-domain `chat` and `inbox` events carry the same versioned inbox state. A `chat` event also includes the full new message. Durable tables provide reconnect recovery; transient headline events carry no-store/no-copy hints.
 
+## Message receipts
+
+Outgoing text messages show one grey tick after the server saves them, two grey ticks after a recipient app acknowledges receipt, and two blue ticks after the recipient views them in an active conversation. Sending failures retain the draft for retry. Call timeline entries do not display message ticks.
+
+The server advertises `receiptVersion: 1` in chat replies and inbox snapshots. New clients retain sent-only behavior on an older server. Older clients can still send and clear unread counts, but cannot confirm delivery or seen status. Messages sent before this server upgrade have no pending-delivery entry; viewing them with an updated client can still confirm seen status.
+
+- `pending_messages` returns up to 50 incoming messages and `hasMore`. The durable queue survives restart, is scoped to the authenticated account, and is removed when family membership ends.
+- `message_receipts` takes `peer` and at most 50 message `ids`. Only the recipient can acknowledge incoming text messages; the server assigns `deliveredAt`.
+- `read_messages` additionally accepts explicit visible message `ids`. These receive server-timed `seenAt` and imply delivery. The legacy `through` cursor still controls unread counts; it does not automatically mark every preceding message seen.
+- `chat_receipts` events carry updated `messages` and versioned inbox summaries to both participants. Clients merge receipt timestamps monotonically so delayed history/send responses cannot revert seen status.
+
+Only rows at least halfway visible (or covering half the viewport for a tall message) qualify for seen status. Background apps, contact details, and active call screens do not send seen receipts. Reconnecting clients drain pending delivery and reload the active conversation. Receiving a push or routing a stanza alone does not count as delivery.
+
+Deploy the server first, then update both apps. The installer uses the existing indexed disk tables; no table-schema migration or additional ports are required. Verify Android→iOS and iOS→Android: recipient disconnected (one tick), recipient connected outside chat (two grey), conversation visible (two blue), scrolling/pagination, reconnect, and family removal. A Mac/Xcode build and device checks are still required for the iOS UI.
+
 ## Deploy this update
 
 Run on the existing VM (MongooseIM restarts and signed-in clients reconnect):

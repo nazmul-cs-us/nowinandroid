@@ -93,7 +93,7 @@ internal fun permissionRequest(): (Boolean, () -> Unit) -> Unit {
 internal data class FamilyActions(
     val openChat: (String) -> Unit = {}, val closeChat: () -> Unit = {}, val chatDraft: (String) -> Unit = {},
     val sendMessage: () -> Unit = {}, val olderMessages: () -> Unit = {}, val retryMessages: () -> Unit = {},
-    val readChat: () -> Unit = {}, val acknowledgeNotifications: () -> Unit = {},
+    val readChat: (List<String>) -> Unit = {}, val acknowledgeNotifications: () -> Unit = {},
     val signIn: (String, String) -> Unit = { _, _ -> },
     val signUp: (String, String, String) -> Unit = { _, _, _ -> },
     val webHelper: () -> Unit = {}, val dismissWebHelper: () -> Unit = {},
@@ -138,7 +138,7 @@ fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
     FamilyScreenContent(state, FamilyActions(exit = { backDispatcher?.onBackPressed() },
         openChat = client::openChat, closeChat = client::closeChat, chatDraft = client::chatDraft,
         sendMessage = { client.sendMessage() }, olderMessages = { client.loadMessages(true) }, retryMessages = { client.loadMessages() },
-        readChat = { client.markChatRead() }, acknowledgeNotifications = { client.acknowledgeNotifications() },
+        readChat = { client.markChatRead(it) }, acknowledgeNotifications = { client.acknowledgeNotifications() },
         signUp = { username, secret, confirmation -> client.signUp(username, secret, confirmation) },
         signIn = { account, password ->
             if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)

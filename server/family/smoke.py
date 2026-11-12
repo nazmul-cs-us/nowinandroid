@@ -191,9 +191,21 @@ def main():
         history = b.request("chat_history", peer=a.jid)["messages"]
         require(len(history) == 1 and history[0]["id"] == message_id, "Chat retry was duplicated.")
         require(b.request("snapshot")["unreadCount"] == 1, "Unread message missing.")
-        b.request("read_messages", peer=a.jid, through=sent["message"]["sequence"])
+        require(sent.get("receiptVersion") == 1, "Receipt protocol not enabled.")
+        require(history[0].get("deliveredAt") == 0 and history[0].get("seenAt") == 0,
+                "Routing alone incorrectly marked a message delivered or seen.")
+        pending = b.request("pending_messages")["messages"]
+        require(any(m["id"] == message_id for m in pending), "Pending delivery missing.")
+        a.request("message_receipts", "invalid_receipt", peer=b.jid, ids=[message_id])
+        ack = b.request("message_receipts", peer=a.jid, ids=[message_id])["messages"][0]
+        require(ack["deliveredAt"] > 0 and ack["seenAt"] == 0, "Delivery acknowledgement failed.")
+        require(a.event("chat_receipts")["messages"][0]["id"] == message_id, "Live receipt missing.")
+        require(b.request("pending_messages")["messages"] == [], "Delivery queue was not drained.")
+        b.request("read_messages", peer=a.jid, through=sent["message"]["sequence"], ids=[message_id])
+        seen = a.request("chat_history", peer=b.jid)["messages"][0]
+        require(seen["seenAt"] > 0 and seen["deliveredAt"] == ack["deliveredAt"], "Seen acknowledgement failed.")
         require(b.request("snapshot")["unreadCount"] == 0, "Read cursor did not clear unread messages.")
-        print("PASS: durable family-only chat, live delivery, duplicate protection and unread cursor.", flush=True)
+        print("PASS: private durable chat, delivery/seen receipts, duplicate protection and unread cursor.", flush=True)
         a.request("presence", active=True, activityVersion=1)
         update = b.event("presence")
         require(update.get("jid") == a.jid and update.get("presence") == "online", "Live family presence was not delivered.")

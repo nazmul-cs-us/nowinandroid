@@ -10,6 +10,10 @@
 
 family_test_() -> {setup, fun setup/0, fun cleanup/1, [
     ?_test(chat_persists_across_restart()),
+    ?_test(message_receipts_are_recipient_authorized_and_monotonic()),
+    ?_test(seen_requires_explicit_visible_message_ids()),
+    ?_test(pending_delivery_is_durable_paginated_and_private()),
+    ?_test(removal_clears_pending_receipts()),
     ?_test(call_history_answered_is_durable_and_idempotent()),
     ?_test(call_history_cancel_decline_and_expiry()),
     ?_test(call_history_is_private_and_removed_with_membership()),
@@ -323,6 +327,64 @@ chat_requires_accepted_family() ->
     ?assertEqual({aborted, {denied, <<"not_family">>}}, chat_history(?B, ?BF, ?A, 999)),
     ?assertEqual({atomic, set}, mnesia:transaction(fun() -> mnesia:table_info(deenly_family_inbox, type) end)),
     ?assertEqual([node()], mnesia:table_info(deenly_family_messages, disc_copies)).
+message_receipts_are_recipient_authorized_and_monotonic() ->
+    reset(), family(),
+    {atomic, {#{<<"message">> := Sent}, _}} = chat_send(?A, ?AF, ?B, 1, <<"Salaam">>),
+    Id = maps:get(<<"id">>, Sent),
+    ?assertEqual(0, maps:get(<<"deliveredAt">>, Sent)),
+    ?assertEqual(0, maps:get(<<"seenAt">>, Sent)),
+    R = #{<<"peer">> => ?A, <<"ids">> => [Id]},
+    ?assertEqual({aborted, {denied, <<"invalid_receipt">>}},
+        act(?A, ?AF, <<"message_receipts">>, R#{<<"peer">> => ?B})),
+    {atomic, {#{<<"messages">> := [Delivered]}, Events}} = act(?B, ?BF, <<"message_receipts">>, R),
+    ?assert(maps:get(<<"deliveredAt">>, Delivered) > 0),
+    ?assertEqual(0, maps:get(<<"seenAt">>, Delivered)),
+    ?assertEqual(lists:sort([?A, ?B]), lists:sort([U || {U, _} <- Events])),
+    {atomic, {#{<<"messages">> := []}, []}} = act(?B, ?BF, <<"message_receipts">>, R),
+    {atomic, _} = act(?B, ?BF, <<"read_messages">>, R#{<<"through">> => 1}),
+    {atomic, {#{<<"messages">> := [Seen]}, _}} = chat_history(?A, ?AF, ?B, 999),
+    ?assert(maps:get(<<"seenAt">>, Seen) > 0),
+    ?assertEqual(maps:get(<<"deliveredAt">>, Delivered), maps:get(<<"deliveredAt">>, Seen)),
+    {atomic, _} = act(?B, ?BF, <<"message_receipts">>, R),
+    {atomic, {#{<<"messages">> := [Seen]}, _}} = chat_history(?A, ?AF, ?B, 999),
+    {atomic, {Inbox, _}} = act(?A, ?AF, <<"snapshot">>, #{}),
+    [Conversation] = maps:get(<<"conversations">>, Inbox),
+    ?assertEqual(maps:get(<<"seenAt">>, Seen), maps:get(<<"seenAt">>, maps:get(<<"lastMessage">>, Conversation))).
+seen_requires_explicit_visible_message_ids() ->
+    reset(), family(),
+    {atomic, {#{<<"message">> := First}, _}} = chat_send(?A, ?AF, ?B, 1, <<"One">>),
+    {atomic, {#{<<"message">> := Second}, _}} = chat_send(?A, ?AF, ?B, 2, <<"Two">>),
+    {atomic, _} = act(?B, ?BF, <<"read_messages">>, #{<<"peer">> => ?A, <<"through">> => 2}),
+    {atomic, {#{<<"messages">> := [First, Second]}, _}} = chat_history(?A, ?AF, ?B, 999),
+    {atomic, _} = act(?B, ?BF, <<"read_messages">>, #{<<"peer">> => ?A, <<"through">> => 2, <<"ids">> => [maps:get(<<"id">>, Second)]}),
+    {atomic, {#{<<"messages">> := [First, Seen]}, _}} = chat_history(?A, ?AF, ?B, 999),
+    ?assert(maps:get(<<"deliveredAt">>, Seen) > 0),
+    ?assert(maps:get(<<"seenAt">>, Seen) > 0).
+pending_delivery_is_durable_paginated_and_private() ->
+    reset(), family(),
+    [begin mnesia:dirty_delete(deenly_family_inbox, {rate, ?D, ?A}),
+        {atomic, _} = chat_send(?A, ?AF, ?B, N, <<"Queued">>) end || N <- lists:seq(1, 51)],
+    stopped = mnesia:stop(), ok = mnesia:start(),
+    ok = mnesia:wait_for_tables([deenly_family, deenly_family_messages, deenly_family_inbox], 10000),
+    ok = mod_deenly_family_presence:init(),
+    {atomic, {#{<<"messages">> := [], <<"hasMore">> := false}, _}} = act(?A, ?AF, <<"pending_messages">>, #{}),
+    {atomic, {#{<<"messages">> := Rows, <<"hasMore">> := true}, _}} = act(?B, ?BF, <<"pending_messages">>, #{}),
+    ?assertEqual(50, length(Rows)),
+    {atomic, _} = act(?B, ?BF, <<"message_receipts">>, #{<<"peer">> => ?A, <<"ids">> => [maps:get(<<"id">>, M) || M <- Rows]}),
+    {atomic, {#{<<"messages">> := [Last], <<"hasMore">> := false}, _}} = act(?B, ?BF, <<"pending_messages">>, #{}),
+    ?assertEqual(51, maps:get(<<"sequence">>, Last)),
+    {atomic, _} = act(?B, ?BF, <<"message_receipts">>, #{<<"peer">> => ?A, <<"ids">> => [maps:get(<<"id">>, Last)]}),
+    {atomic, {#{<<"messages">> := []}, _}} = act(?B, ?BF, <<"pending_messages">>, #{}),
+    {atomic, {Inbox, _}} = act(?B, ?BF, <<"snapshot">>, #{}),
+    ?assertEqual(51, maps:get(<<"unreadCount">>, Inbox)).
+removal_clears_pending_receipts() ->
+    reset(), family(),
+    {atomic, {#{<<"message">> := M}, _}} = chat_send(?A, ?AF, ?B, 1, <<"Private">>),
+    {atomic, _} = act(?A, ?AF, <<"remove_member">>, #{<<"peer">> => ?B}),
+    {atomic, {#{<<"messages">> := []}, _}} = act(?B, ?BF, <<"pending_messages">>, #{}),
+    ?assertEqual({aborted, {denied, <<"not_family">>}}, act(?B, ?BF, <<"message_receipts">>,
+        #{<<"peer">> => ?A, <<"ids">> => [maps:get(<<"id">>, M)]})).
+
 chat_is_idempotent() ->
     reset(), family(),
     {atomic, {#{<<"message">> := M}, Events}} = chat_send(?A, ?AF, ?B, 1, <<"Salaam">>),

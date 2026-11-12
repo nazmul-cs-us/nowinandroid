@@ -9,10 +9,14 @@ struct FamilyChatMessage: Identifiable, Equatable {
     let sequence: Int64
     let createdAt: Int64
     let call: FamilyChatCall?
+    var deliveredAt: Int64
+    var seenAt: Int64
     init?(_ o: [String: Any]) {
         guard let id = o["id"] as? String, let from = o["from"] as? String, let to = o["to"] as? String,
               let text = o["text"] as? String, let seq = o["sequence"] as? NSNumber, let time = o["createdAt"] as? NSNumber else { return nil }
         self.id = id; self.from = from; self.to = to; self.text = text; sequence = seq.int64Value; createdAt = time.int64Value
+        deliveredAt = max(0, (o["deliveredAt"] as? NSNumber)?.int64Value ?? 0)
+        seenAt = max(0, (o["seenAt"] as? NSNumber)?.int64Value ?? 0)
         if o["type"] as? String == "call", let value = o["call"] as? [String: Any],
            let entry = FamilyChatCall(value), id == "call:\(entry.id)" { call = entry } else { call = nil }
     }

@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.repeatOnLifecycle
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
-import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.distinctUntilChanged
 import java.text.DateFormat
 import java.util.Date
 import java.util.Calendar
@@ -74,9 +74,19 @@ internal fun FamilyChatContent(
     val list = rememberLazyListState()
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     BackHandler { actions.closeChat() }
-    LaunchedEffect(peer, state.messages.lastOrNull()?.id, state.call?.id) {
-        if (state.call == null) lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-            actions.readChat(); awaitCancellation()
+    val currentMessages by rememberUpdatedState(state.messages)
+    val currentActions by rememberUpdatedState(actions)
+    LaunchedEffect(peer, state.call?.id, details, state.connected) {
+        if (state.call == null && !details && state.connected) lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            snapshotFlow {
+                val layout = list.layoutInfo
+                layout.visibleItemsInfo.mapNotNull { item ->
+                    currentMessages.firstOrNull { it.id == item.key }?.takeIf {
+                        FamilyMessageReceiptPolicy().visible(item.offset.toFloat(), item.size.toFloat(),
+                            layout.viewportStartOffset.toFloat(), layout.viewportEndOffset.toFloat())
+                    }?.id
+                }
+            }.distinctUntilChanged().collect { currentActions.readChat(it) }
         }
     }
     LaunchedEffect(peer, state.messages.lastOrNull()?.id) {
@@ -151,9 +161,11 @@ internal fun FamilyChatContent(
                                     fontSize = 16.sp, lineHeight = 23.sp, letterSpacing = 0.sp)
                             }
                         }
-                        if (groupEnds) Row(Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (groupEnds || mine) Row(Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(familyTime(message.createdAt), fontSize = 10.sp, color = colors.onSurfaceVariant)
-                            if (mine) Icon(Icons.Default.Check, "Saved to server", Modifier.size(12.dp), tint = colors.primary)
+                            if (mine) Icon(if (message.deliveredAt > 0 || message.seenAt > 0) Icons.Default.DoneAll else Icons.Default.Check,
+                                FamilyMessageReceiptPolicy().label(message.deliveredAt, message.seenAt), Modifier.size(15.dp),
+                                tint = if (message.seenAt > 0) Color(0xFF34B7F1) else colors.onSurfaceVariant)
                         }
                     }
                 }

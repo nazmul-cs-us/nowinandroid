@@ -3,7 +3,9 @@ package com.starception.submission.family
 import org.json.JSONObject
 
 data class FamilyChatMessage(val id: String, val from: String, val to: String, val text: String, val sequence: Long, val createdAt: Long,
-    val call: FamilyChatCall? = null) {
+    val call: FamilyChatCall? = null, val deliveredAt: Long = 0, val seenAt: Long = 0) {
+    fun mergeReceipt(other: FamilyChatMessage): FamilyChatMessage = other.copy(
+        deliveredAt = maxOf(deliveredAt, other.deliveredAt), seenAt = maxOf(seenAt, other.seenAt))
     fun preview(me: String): String = call?.let {
         val policy = FamilyCallHistoryPolicy()
         "${policy.title(it.kind)} · ${policy.status(it.outcome, from == me)}"
@@ -15,7 +17,8 @@ data class FamilyChatMessage(val id: String, val from: String, val to: String, v
             val call = if (o.optString("type") == "call") FamilyChatCall.parse(o.optJSONObject("call"))
                 ?.takeIf { id == "call:${it.id}" } else null
             return FamilyChatMessage(id, o.getString("from"), o.getString("to"), o.getString("text"),
-                o.getLong("sequence"), o.getLong("createdAt"), call)
+                o.getLong("sequence"), o.getLong("createdAt"), call,
+                o.optLong("deliveredAt").coerceAtLeast(0), o.optLong("seenAt").coerceAtLeast(0))
         }
     }
 }

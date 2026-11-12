@@ -82,6 +82,8 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private var ringingJob: Job? = null
     private var heartbeat: Job? = null
     private var chatGeneration = 0
+    private var receiptVersion = 0
+    private var deliverySync: Job? = null
     private var inboxVersion = 0L
     private var retryMessage: Pair<String, String>? = null
     private val visibleActivities = mutableSetOf<android.app.Activity>()
@@ -272,6 +274,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             }
             registerPushToken()
             refresh()
+            if (mutable.value.chatPeer != null) loadMessages()
             heartbeat = scope.launch {
                 var failures = 0
                 while (isActive) {
@@ -302,6 +305,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         android.util.Log.i("FamilyCalls", "Session reset: clearSaved=$clearSaved; hadCall=${mutable.value.call != null}")
         if (clearSaved) { restoreEpoch++; restoreJob?.cancel(); restorePolicy.explicitSignOut(); credentials.clear() }
         generation++
+        receiptVersion = 0; deliverySync?.cancel(); deliverySync = null
         inboxVersion = 0L
         presenceCache.clear()
         heartbeat?.cancel(); heartbeat = null
@@ -328,6 +332,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     private fun lost(token: Int) {
         if (token != generation) return
         android.util.Log.w("FamilyCalls", "Session lost: hadCall=${mutable.value.call != null}")
+        deliverySync?.cancel(); deliverySync = null
         generation++
         val failed = connection; connection = null
         scope.launch(Dispatchers.IO) { runCatching { failed?.disconnect() } }
@@ -416,7 +421,10 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             messages.mapNotNull { it.call?.kind }.distinct().forEach {
                 android.util.Log.i("FamilyCalls", "Call history loaded: kind=$it")
             }
-            mutable.value = mutable.value.copy(messages = (messages + mutable.value.messages).distinctBy { it.id }.sortedBy { it.sequence }, nextBefore = reply.optLong("nextBefore"))
+            mergeMessages(messages)
+            receiptVersion = maxOf(receiptVersion, reply.optInt("receiptVersion"))
+            syncDelivery()
+            mutable.value = mutable.value.copy(nextBefore = reply.optLong("nextBefore"))
         } catch (e: Exception) { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatError = chatError(e)) }
         finally { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatLoading = false) }
     }
@@ -433,16 +441,59 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             val result = request("send_message", "peer" to peer, "id" to id, "text" to text)
             if (mutable.value.chatPeer != peer || chatToken != chatGeneration) return@launch
             val message = FamilyChatMessage.parse(result.getJSONObject("message"))
-            mutable.value = mutable.value.copy(messages = (mutable.value.messages + message).distinctBy { it.id }.sortedBy { it.sequence },
-                chatDraft = if (mutable.value.chatDraft == text) "" else mutable.value.chatDraft)
+            mergeMessages(listOf(message))
+            mutable.value = mutable.value.copy(chatDraft = if (mutable.value.chatDraft == text) "" else mutable.value.chatDraft)
             retryMessage = null
         } catch (e: Exception) { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatError = chatError(e)) }
         finally { if (mutable.value.chatPeer == peer && chatToken == chatGeneration) mutable.value = mutable.value.copy(chatSending = false) }
     }
-    fun markChatRead() = scope.launch {
+    private fun mergeMessages(rows: List<FamilyChatMessage>) {
+        val current = mutable.value
+        val peer = current.chatPeer ?: return
+        val byId = current.messages.associateBy { it.id }.toMutableMap()
+        rows.filter { setOf(it.from, it.to) == setOf(peer, current.me) }.forEach { row ->
+            byId[row.id] = byId[row.id]?.mergeReceipt(row) ?: row
+        }
+        mutable.value = current.copy(messages = byId.values.sortedBy { it.sequence })
+    }
+    // Durable recipient acknowledgements, including messages received while offline.
+    private fun syncDelivery() {
+        if (receiptVersion < 1 || !mutable.value.connected || deliverySync?.isActive == true) return
+        val token = generation
+        deliverySync = scope.launch {
+            try {
+                do {
+                    val reply = request("pending_messages")
+                    if (token != generation) return@launch
+                    val values = reply.getJSONArray("messages")
+                    val rows = (0 until values.length()).map { FamilyChatMessage.parse(values.getJSONObject(it)) }
+                    if (rows.isEmpty()) break
+                    rows.filter { it.to == mutable.value.me && it.call == null }.groupBy { it.from }.forEach { (peer, messages) ->
+                        val ack = request("message_receipts", "peer" to peer, "ids" to JSONArray(messages.map { it.id }))
+                        if (token != generation) return@launch
+                        mergeReceiptReply(ack)
+                    }
+                } while (reply.optBoolean("hasMore"))
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { /* Retry on the next snapshot/reconnect. */ }
+        }
+    }
+    private fun mergeReceiptReply(body: JSONObject) {
+        body.optJSONArray("messages")?.let { rows ->
+            mergeMessages((0 until rows.length()).map { FamilyChatMessage.parse(rows.getJSONObject(it)) })
+        }
+    }
+    fun markChatRead(ids: List<String>) = scope.launch {
         val s = mutable.value; val peer = s.chatPeer ?: return@launch
-        if (!foreground || s.messages.isEmpty()) return@launch
-        runCatching { apply(request("read_messages", "peer" to peer, "through" to s.messages.last().sequence)) }
+        val visible = s.messages.filter { it.id in ids }
+        if (!foreground || s.call != null || visible.isEmpty()) return@launch
+        val token = generation
+        try {
+            val reply = request("read_messages", "peer" to peer, "through" to visible.maxOf { it.sequence },
+                "ids" to JSONArray(visible.filter { it.to == s.me && it.call == null && it.seenAt == 0L }.take(50).map { it.id }))
+            if (token == generation) apply(reply)
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { /* The next visibility/session change retries. */ }
     }
     fun acknowledgeNotifications() = perform { apply(request("ack_notifications")) }
     private fun chatError(e: Exception): String = when (e.message) {
@@ -536,6 +587,8 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         }
     }
     internal suspend fun apply(body: JSONObject) {
+        receiptVersion = maxOf(receiptVersion, body.optInt("receiptVersion"))
+        if (body.optString("event") == "chat_receipts") mergeReceiptReply(body)
         val applyInbox = body.optLong("inboxVersion") > inboxVersion
         if (applyInbox) inboxVersion = body.optLong("inboxVersion")
         if (applyInbox) body.optJSONArray("conversations")?.let { rows ->
@@ -550,9 +603,10 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             val message = FamilyChatMessage.parse(o); val peer = mutable.value.chatPeer
             message.call?.let { android.util.Log.i("FamilyCalls", "Call history event: kind=${it.kind}") }
             if (peer != null && setOf(message.from, message.to) == setOf(peer, mutable.value.me)) {
-                mutable.value = mutable.value.copy(messages = (mutable.value.messages + message).distinctBy { it.id }.sortedBy { it.sequence })
+                mergeMessages(listOf(message))
             }
         }
+        if (body.has("members") || body.optString("event") == "chat") syncDelivery()
         presenceCache.beginEpoch(body.optString("presenceEpoch"))
         if (body.has("members")) {
             val rows = body.getJSONArray("members")

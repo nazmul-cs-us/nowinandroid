@@ -912,6 +912,13 @@ private struct FamilyVideoRenderer: UIViewRepresentable {
     }
 }
 
+private struct FamilyMessageFrames: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
+    }
+}
+
 private struct FamilyChatView: View {
     @ObservedObject private var store = FamilyStore.shared
     @ObservedObject private var appearance = FamilyAppearance.shared
@@ -919,10 +926,12 @@ private struct FamilyChatView: View {
     @Environment(\.scenePhase) private var scenePhase
     private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
     @State private var details = false
+    @State private var visibleIDs: Set<String> = []
     private var peer: String { store.chatPeer ?? "" }
     var body: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
+                GeometryReader { viewport in
                 ScrollView {
                     LazyVStack(spacing: 4) {
                         if store.chatLoading { ProgressView().padding(12) }
@@ -930,13 +939,27 @@ private struct FamilyChatView: View {
                         else if store.messages.isEmpty { Text("Say salaam to \(familyName(peer))").font(.footnote).foregroundStyle(colors.muted).padding(24) }
                         ForEach(Array(store.messages.enumerated()), id: \.element.id) { index, message in
                             messageRow(message, index: index).id(message.id)
+                                .background(GeometryReader { geometry in
+                                    Color.clear.preference(key: FamilyMessageFrames.self,
+                                        value: [message.id: geometry.frame(in: .named("familyChatViewport"))])
+                                })
                         }
                     }.padding(18)
                 }.background(colors.panel)
+                    .coordinateSpace(name: "familyChatViewport")
+                    .onPreferenceChange(FamilyMessageFrames.self) { frames in
+                        let policy = FamilyMessageReceiptPolicy()
+                        let next: Set<String> = Set(frames.compactMap { id, rect in
+                            policy.visible(top: Float(rect.minY), height: Float(rect.height),
+                                viewportStart: 0, viewportEnd: Float(viewport.size.height)) ? id : nil
+                        })
+                        if next != visibleIDs { visibleIDs = next; readVisible() }
+                    }
                     .onChange(of: store.messages.last?.id) { id in
                         if let id { withAnimation { proxy.scrollTo(id, anchor: .bottom) } }
                         readVisible()
                     }
+                }
             }
             if let error = store.chatError {
                 HStack {
@@ -991,8 +1014,10 @@ private struct FamilyChatView: View {
         .onAppear { readVisible() }
         .onChange(of: scenePhase) { _ in readVisible() }
         .onChange(of: store.call?.id) { _ in readVisible() }
+        .onChange(of: details) { _ in readVisible() }
+        .onChange(of: store.connected) { _ in readVisible() }
     }
-    private func readVisible() { if scenePhase == .active && store.call == nil { store.markChatRead() } }
+    private func readVisible() { if scenePhase == .active && store.call == nil && !details { store.markChatRead(ids: visibleIDs) } }
     private func messageRow(_ message: FamilyChatMessage, index: Int) -> some View {
         let previous = index > 0 ? store.messages[index - 1] : nil
         let date = Date(timeIntervalSince1970: Double(message.createdAt) / 1000)
@@ -1018,7 +1043,15 @@ private struct FamilyChatView: View {
                         .background(mine ? colors.brand : colors.header, in: RoundedRectangle(cornerRadius: 18))
                     HStack(spacing: 4) {
                         Text(date, style: .time).font(.system(size: 9)).foregroundStyle(colors.muted)
-                        if mine { Image(systemName: "checkmark").font(.system(size: 9)).foregroundStyle(colors.accent).accessibilityLabel("Saved to server") }
+                        if mine {
+                            HStack(spacing: -4) {
+                                Image(systemName: "checkmark")
+                                if message.deliveredAt > 0 || message.seenAt > 0 { Image(systemName: "checkmark") }
+                            }.font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(message.seenAt > 0 ? Color(red: 52/255, green: 183/255, blue: 241/255) : colors.muted)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(FamilyMessageReceiptPolicy().label(deliveredAt: message.deliveredAt, seenAt: message.seenAt))
+                        }
                     }.padding(.horizontal, 4)
                 }.frame(maxWidth: 260, alignment: mine ? .trailing : .leading)
                 if !mine { Spacer(minLength: 48) }

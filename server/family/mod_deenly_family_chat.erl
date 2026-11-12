@@ -3,7 +3,7 @@
 -module(mod_deenly_family_chat).
 -compile({no_auto_import, [now/0]}).
 -export([init/0, execute/4, inbox/2, invitation/3, clear_invitation/3,
-         missed/2, call_ended/3, revoke/3, purge/2, execute_ack/2]).
+         missed/2, call_ended/3, revoke/3, purge/2, execute_ack/2, pending/2]).
 -define(M, deenly_family_messages).
 -define(I, deenly_family_inbox).
 init() ->
@@ -26,10 +26,12 @@ execute(D, U, P, #{<<"action">> := <<"send_message">>, <<"id">> := Id, <<"text">
             Seq = counter({sequence, Pair}, Pair),
             A = summary(D, U, P), B = summary(D, P, U),
             Public = #{<<"id">> => Id, <<"from">> => U, <<"to">> => P, <<"text">> => Text,
-                       <<"sequence">> => Seq, <<"createdAt">> => now()},
+                       <<"sequence">> => Seq, <<"createdAt">> => now(),
+                       <<"deliveredAt">> => 0, <<"seenAt">> => 0},
             Stored = Public#{ordinals => #{U => maps:get(total, A), P => maps:get(total, B) + 1}},
             mnesia:write({?M, {Pair, Seq}, Pair, Stored}),
             mnesia:write({?M, {Pair, Id}, Pair, Seq}),
+            put_i({delivery, D, P, U, Id}, {D, P}, Seq),
             save_summary(D, U, P, A#{<<"lastMessage">> => preview(Public)}),
             Total = maps:get(total, B) + 1,
             save_summary(D, P, U, B#{total => Total, <<"unread">> => Total - maps:get(read, B), <<"lastMessage">> => preview(Public)}),
@@ -39,18 +41,24 @@ execute(D, U, P, #{<<"action">> := <<"send_message">>, <<"id">> := Id, <<"text">
             require(maps:get(<<"from">>, Existing) =:= U andalso maps:get(<<"text">>, Existing) =:= Text, <<"message_conflict">>), Existing
     end,
     PublicMessage = maps:remove(ordinals, Message),
-    {#{<<"message">> => PublicMessage},
+    {#{<<"message">> => PublicMessage, <<"receiptVersion">> => 1},
      [{X, (inbox(D, X))#{<<"event">> => <<"chat">>, <<"message">> => PublicMessage}} || X <- [U, P]]};
 execute(D, U, P, #{<<"action">> := <<"chat_history">>} = R) ->
     Before = maps:get(<<"before">>, R, 9007199254740991),
     valid(is_integer(Before) andalso Before > 0 andalso Before =< 9007199254740991),
     Messages = history(pair(D, U, P), Before, 10, []),
     Next = case Messages of [First | _] when length(Messages) =:= 10 -> maps:get(<<"sequence">>, First); _ -> 0 end,
-    {#{<<"messages">> => Messages, <<"nextBefore">> => Next}, []};
-execute(D, U, P, #{<<"action">> := <<"read_messages">>, <<"through">> := Through}) ->
+    {#{<<"messages">> => Messages, <<"nextBefore">> => Next, <<"receiptVersion">> => 1}, []};
+execute(D, U, P, #{<<"action">> := <<"message_receipts">>, <<"ids">> := Ids}) ->
+    Updated = receipts(D, U, P, <<"delivered">>, Ids),
+    {#{<<"messages">> => Updated, <<"receiptVersion">> => 1}, receipt_events(D, U, P, Updated)};
+execute(D, U, P, #{<<"action">> := <<"read_messages">>, <<"through">> := Through} = Request) ->
     valid(is_integer(Through) andalso Through > 0),
     Message = get(?M, {pair(D, U, P), Through}),
     require(is_map(Message), <<"message_not_found">>),
+    %% Only explicitly visible messages receive a seen receipt. Legacy clients
+    %% may still clear their unread cursor without inventing per-message reads.
+    Updated = receipts(D, U, P, <<"seen">>, maps:get(<<"ids">>, Request, [])),
     S = summary(D, U, P), Read = max(maps:get(read, S), maps:get(U, maps:get(ordinals, Message))),
     Unread = maps:get(total, S) - Read,
     save_summary(D, U, P, S#{read => Read, <<"unread">> => Unread}),
@@ -68,7 +76,7 @@ execute(D, U, P, #{<<"action">> := <<"read_messages">>, <<"through">> := Through
             end;
         _ -> ok
     end,
-    {inbox(D, U), [{U, (inbox(D, U))#{<<"event">> => <<"inbox">>}}]};
+    {inbox(D, U), [{U, (inbox(D, U))#{<<"event">> => <<"inbox">>}}] ++ receipt_events(D, U, P, Updated)};
 execute(_, _, _, _) -> mnesia:abort({denied, <<"invalid_request">>}).
 inbox(D, U) ->
     Rows = mnesia:index_read(?I, {D, U}, account),
@@ -77,7 +85,56 @@ inbox(D, U) ->
     Count = lists:sum([maps:get(<<"unread">>, S) || S <- Conversations]) +
         lists:sum([maps:get(<<"count">>, N) || N <- Notices, maps:get(<<"kind">>, N) =/= <<"message">>, maps:get(<<"unread">>, N)]),
     Revision = counter({inbox_revision, D, U}, {D, U}),
-    #{<<"inboxVersion">> => Revision, <<"conversations">> => Conversations, <<"notifications">> => lists:sublist(lists:sort(fun(A, B) -> maps:get(<<"createdAt">>, A) > maps:get(<<"createdAt">>, B) end, Notices), 50), <<"unreadCount">> => Count}.
+    #{<<"receiptVersion">> => 1, <<"inboxVersion">> => Revision, <<"conversations">> => Conversations, <<"notifications">> => lists:sublist(lists:sort(fun(A, B) -> maps:get(<<"createdAt">>, A) > maps:get(<<"createdAt">>, B) end, Notices), 50), <<"unreadCount">> => Count}.
+
+%% A device fetches and acknowledges this durable queue after reconnecting;
+%% merely routing an XMPP stanza or sending an APNs alert is not delivery.
+pending(D, U) ->
+    Rows = lists:sort([{Seq, P, Id} || {?I, {delivery, _, _, P, Id}, _, Seq} <- mnesia:index_read(?I, {D, U}, account)]),
+    Messages = lists:flatmap(fun({Seq, P, Id}) ->
+        case get(?M, {pair(D, U, P), Seq}) of
+            undefined -> mnesia:delete({?I, {delivery, D, U, P, Id}}), [];
+            M -> [maps:remove(ordinals, M)]
+        end
+    end, lists:sublist(Rows, 50)),
+    #{<<"messages">> => Messages, <<"hasMore">> => length(Rows) > 50, <<"receiptVersion">> => 1}.
+
+receipts(D, U, P, Kind, Ids) ->
+    valid(is_list(Ids) andalso length(Ids) =< 50 andalso
+        lists:all(fun(Id) -> is_binary(Id) andalso byte_size(Id) =< 64 end, Ids)),
+    Pair = pair(D, U, P), At = now(),
+    lists:flatmap(fun(Id) ->
+        Seq = get(?M, {Pair, Id}),
+        require(is_integer(Seq), <<"message_not_found">>),
+        M = get(?M, {Pair, Seq}),
+        require(is_map(M) andalso maps:get(<<"from">>, M) =:= P andalso maps:get(<<"to">>, M) =:= U
+            andalso maps:get(<<"type">>, M, <<"text">>) =/= <<"call">>, <<"invalid_receipt">>),
+        Delivered = maps:get(<<"deliveredAt">>, M, 0), Seen = maps:get(<<"seenAt">>, M, 0),
+        New = M#{<<"deliveredAt">> => case Delivered of 0 -> At; _ -> Delivered end,
+                 <<"seenAt">> => case {Kind, Seen} of {<<"seen">>, 0} -> At; _ -> Seen end},
+        mnesia:delete({?I, {delivery, D, U, P, Id}}),
+        case {maps:get(<<"deliveredAt">>, New), maps:get(<<"seenAt">>, New)} of
+            {Delivered, Seen} -> [];
+            _ ->
+                mnesia:write({?M, {Pair, Seq}, Pair, New}),
+                [refresh_preview(D, A, B, New) || {A, B} <- [{U, P}, {P, U}]],
+                [maps:remove(ordinals, New)]
+        end
+    end, lists:usort(Ids)).
+refresh_preview(D, U, P, M) ->
+    S = summary(D, U, P),
+    case maps:get(<<"lastMessage">>, S, undefined) of
+        #{<<"id">> := Id} = Last ->
+            case Id =:= maps:get(<<"id">>, M) of
+                true -> save_summary(D, U, P, S#{<<"lastMessage">> => maps:merge(Last,
+                    maps:with([<<"deliveredAt">>, <<"seenAt">>], M))});
+                false -> ok
+            end;
+        _ -> ok
+    end.
+receipt_events(_, _, _, []) -> [];
+receipt_events(D, U, P, Messages) ->
+    [{A, (inbox(D, A))#{<<"event">> => <<"chat_receipts">>, <<"messages">> => Messages}} || A <- [U, P]].
 invitation(D, U, P) ->
     K = {notification, D, U, <<"invitation">>, P},
     case get(?I, K) of undefined -> notice(D, U, <<"invitation">>, P, 1, <<>>); _ -> ok end.
@@ -135,6 +192,8 @@ revoke(D, U, P) ->
      end || {A, B} <- [{U, P}, {P, U}]],
     %% Removal deletes the conversation for both accounts; a fresh invitation starts afresh.
     Pair = pair(D, U, P),
+    [mnesia:delete({?I, K}) || {A, B} <- [{U, P}, {P, U}],
+        {?I, K = {delivery, _, _, Peer, _}, _, _} <- mnesia:index_read(?I, {D, A}, account), Peer =:= B],
     [mnesia:delete({?M, K}) || {?M, K, _, _} <- mnesia:index_read(?M, Pair, conversation)],
     mnesia:delete({?I, {sequence, Pair}}), ok.
 purge(D, U) ->

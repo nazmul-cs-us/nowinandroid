@@ -77,6 +77,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     @Published private(set) var chatError: String?
     private var retryMessage: (id: String, text: String)?
     private var chatGeneration = 0
+    private var receiptVersion = 0
+    private var deliverySync: Task<Void, Never>?
     private var inboxVersion: Int64 = 0
     let media = FamilyWebRTC()
     private let logger = Logger(subsystem: "com.starception.submission", category: "FamilyCalls")
@@ -220,6 +222,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     func disconnect(clearSaved: Bool = true) {
         logger.info("Session reset; clearSaved=\(clearSaved); hadCall=\(self.call != nil)")
         if clearSaved { recoveryEpoch += 1; recovery?.cancel(); recovery = nil; restorePolicy.explicitSignOut(); unregisterPushToken(); FamilyCredentials.clear() }
+        receiptVersion = 0; deliverySync?.cancel(); deliverySync = nil
         inboxVersion = 0; conversations = []; notifications = []; unreadCount = 0; closeChat()
         presenceCache.clear(); webPairing = nil
         callMessage = nil; pushRegistrationMessage = nil
@@ -248,6 +251,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         password = nil; connected = false; serviceReady = false; busy = false; media.close(); mediaCall = nil
         call = nil; queuedSignals.removeAll(); ringingTask?.cancel(); heartbeat?.cancel()
         rejectPending(); message = text
+        deliverySync?.cancel(); deliverySync = nil
         let failed = stream; stream = nil; failed?.removeDelegate(self); failed?.disconnect()
         reconnecting = restorePolicy.canRestore(connected: false, busy: false) && FamilyCredentials.load() != nil
         if reconnecting { message = "Reconnecting to Family…"; restoreSavedSession() }
@@ -273,6 +277,8 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
                 let reply = try await request("chat_history", ["peer": peer, "before": before])
                 guard chatPeer == peer, chatGeneration == chatToken else { return }
                 mergeMessages((reply["messages"] as? [[String: Any]] ?? []).compactMap(FamilyChatMessage.init))
+                receiptVersion = max(receiptVersion, reply["receiptVersion"] as? Int ?? 0)
+                syncDelivery()
                 nextBefore = (reply["nextBefore"] as? NSNumber)?.int64Value ?? 0
             } catch { if chatPeer == peer && chatGeneration == chatToken { chatError = chatErrorText(error) } }
         }
@@ -295,11 +301,51 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     private func mergeMessages(_ rows: [FamilyChatMessage]) {
         var byID = Dictionary(uniqueKeysWithValues: messages.map { ($0.id, $0) })
-        rows.forEach { byID[$0.id] = $0 }; messages = byID.values.sorted { $0.sequence < $1.sequence }
+        rows.filter { Set([$0.from, $0.to]) == Set([chatPeer ?? "", me]) }.forEach { row in
+            var next = row
+            if let old = byID[row.id] {
+                next.deliveredAt = max(old.deliveredAt, row.deliveredAt)
+                next.seenAt = max(old.seenAt, row.seenAt)
+            }
+            byID[row.id] = next
+        }
+        messages = byID.values.sorted { $0.sequence < $1.sequence }
     }
-    func markChatRead() {
-        guard foreground, let peer = chatPeer, let last = messages.last else { return }
-        Task { if let reply = try? await request("read_messages", ["peer": peer, "through": last.sequence]) { await apply(reply) } }
+    private func mergeReceiptReply(_ body: [String: Any]) {
+        mergeMessages((body["messages"] as? [[String: Any]] ?? []).compactMap(FamilyChatMessage.init))
+    }
+    private func syncDelivery() {
+        guard receiptVersion >= 1, connected, deliverySync == nil, let activeStream = stream else { return }
+        deliverySync = Task { [weak self] in
+            guard let self else { return }
+            defer { if self.stream === activeStream { self.deliverySync = nil } }
+            do {
+                while !Task.isCancelled {
+                    let reply = try await self.request("pending_messages")
+                    guard self.stream === activeStream else { return }
+                    let rows = (reply["messages"] as? [[String: Any]] ?? []).compactMap(FamilyChatMessage.init)
+                    if rows.isEmpty { return }
+                    let incoming = rows.filter { $0.to == self.me && $0.call == nil }
+                    for (peer, messages) in Dictionary(grouping: incoming, by: \.from) {
+                        let ack = try await self.request("message_receipts", ["peer": peer, "ids": messages.map(\.id)])
+                        guard self.stream === activeStream else { return }
+                        self.mergeReceiptReply(ack)
+                    }
+                    if reply["hasMore"] as? Bool != true { return }
+                }
+            } catch { /* Retry on the next snapshot/reconnect. */ }
+        }
+    }
+    func markChatRead(ids: Set<String>) {
+        guard foreground, call == nil, let peer = chatPeer, let activeStream = stream else { return }
+        let visible = messages.filter { ids.contains($0.id) }
+        guard let through = visible.map(\.sequence).max() else { return }
+        let seen = visible.filter { $0.to == me && $0.call == nil && $0.seenAt == 0 }.prefix(50).map(\.id)
+        Task {
+            if let reply = try? await request("read_messages", ["peer": peer, "through": through, "ids": seen]), stream === activeStream {
+                await apply(reply)
+            }
+        }
     }
     func acknowledgeNotifications() { perform { try await self.apply(self.request("ack_notifications")) } }
     private func chatErrorText(_ error: Error) -> String {
@@ -457,6 +503,9 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         return response
     }
     private func apply(_ body: [String: Any]) async {
+        receiptVersion = max(receiptVersion, body["receiptVersion"] as? Int ?? 0)
+        if body["event"] as? String == "chat_receipts" { mergeReceiptReply(body) }
+        if body["members"] != nil || body["event"] as? String == "chat" { syncDelivery() }
         if let revision = body["inboxVersion"] as? NSNumber, revision.int64Value > inboxVersion {
             inboxVersion = revision.int64Value
             if let rows = body["conversations"] as? [[String: Any]] {
@@ -635,6 +684,7 @@ extension FamilyStore: XMPPStreamDelegate {
             registerPushToken()
             sender.send(XMPPPresence())
             refresh()
+            if chatPeer != nil { loadMessages() }
             heartbeat?.cancel()
             heartbeat = Task { [weak self, weak sender] in
                 var failures = 0
