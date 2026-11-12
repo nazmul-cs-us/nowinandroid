@@ -88,58 +88,15 @@ private struct PrayerPresentation {
 
 private struct PrayerBrandIcon: View {
     var size: CGFloat = 16
-    var tint: Color = .cyan
-
-    private static let image = UIImage(
-        named: "DeenlyLiveGlyph",
-        in: .main,
-        compatibleWith: nil
-    )
 
     var body: some View {
-        ZStack {
-            // The subtle theme-colored field keeps the navy portion of the
-            // transparent mark visible against the black Dynamic Island.
-            Circle().fill(tint.opacity(0.22))
-            if let image = Self.image {
-                Image(uiImage: image)
-                    .resizable()
-                    .renderingMode(.original)
-                    .scaledToFit()
-            } else {
-                // Asset catalogs can be unavailable to an already-running
-                // archived activity after an app update. Keep the Deenly
-                // compass mark visible until the system starts a new activity.
-                DeenlyVectorMark(tint: tint)
-                    .padding(size * 0.08)
-            }
-        }
-        .frame(width: size, height: size)
-        .fixedSize()
-        .accessibilityHidden(true)
-    }
-}
-
-private struct DeenlyVectorMark: View {
-    let tint: Color
-
-    var body: some View {
-        GeometryReader { geometry in
-            let side = min(geometry.size.width, geometry.size.height)
-            ZStack {
-                Circle()
-                    .trim(from: 0.10, to: 0.90)
-                    .stroke(tint, style: StrokeStyle(lineWidth: side * 0.14, lineCap: .round))
-                    .rotationEffect(.degrees(90))
-                Image(systemName: "location.north.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(tint)
-                    .frame(width: side * 0.56, height: side * 0.56)
-                    .offset(y: side * 0.10)
-            }
-            .frame(width: side, height: side)
-        }
+        Image("DeenlyLiveGlyph", bundle: .main)
+            .resizable()
+            .renderingMode(.original)
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .fixedSize()
+            .accessibilityHidden(true)
     }
 }
 
@@ -189,7 +146,7 @@ private struct PrayerIdentity: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            PrayerBrandIcon(size: 20, tint: presentation.tint)
+            PrayerBrandIcon(size: 20)
             VStack(alignment: .leading, spacing: 1) {
                 Text(presentation.activityLabel)
                     .font(.caption2)
@@ -279,7 +236,7 @@ struct PrayerLiveActivityWidget: Widget {
                 }
             } compactLeading: {
                 HStack(spacing: 3) {
-                    PrayerBrandIcon(tint: presentation.tint)
+                    PrayerBrandIcon()
                     Text(context.state.prayerName)
                         .font(.caption2.weight(.semibold))
                         .lineLimit(1)
@@ -301,7 +258,7 @@ struct PrayerLiveActivityWidget: Widget {
                         .accessibilityLabel(presentation.status)
                 }
             } minimal: {
-                PrayerBrandIcon(size: 18, tint: presentation.tint)
+                PrayerBrandIcon(size: 18)
                     .accessibilityElement()
                     .accessibilityLabel("Deenly, \(context.state.prayerName) prayer")
             }
