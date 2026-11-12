@@ -650,7 +650,8 @@ fun PrayerTimesScreen(
                     modifier = Modifier
                         .widthIn(max = 1200.dp)
                         .fillMaxSize()
-                        .align(Alignment.TopCenter),
+                        .align(Alignment.TopCenter)
+                        .background(if (isPhoneHome) homeFeed.background else Color.Transparent),
                 ) {
                     // The fixed full-screen artwork backdrop of the Android
                     // home: edge-to-edge under the status bar, fixed behind
@@ -688,8 +689,11 @@ fun PrayerTimesScreen(
                             )
                             .clipToBounds()
                             .padding(
-                                start = if (useSideNavigation) 80.dp else 24.dp,
-                                end = 24.dp,
+                                // Phone feed shading paints before its own
+                                // gutters, like Android. Tablet/rail layouts
+                                // retain their existing outer content margins.
+                                start = if (useSideNavigation) 80.dp else if (isPhoneHome) 0.dp else 24.dp,
+                                end = if (isPhoneHome) 0.dp else 24.dp,
                             )
                             .padding(top = if (isPhoneHome) homeTopGap else 8.dp),
                     ) {
@@ -879,20 +883,23 @@ fun PrayerTimesScreen(
                                       sectionGap * 3 - 4.dp).coerceAtLeast(0.dp)
                                   // Captured for the scrolling column below: its content
                                   // lambda leaves the BoxWithConstraints receiver scope.
-                                  val phoneViewportWidth = maxWidth
+                                  val phoneViewportWidth = if (isPhoneHome) maxWidth - 48.dp else maxWidth
                                   Column(
                                       modifier = Modifier.fillMaxSize()
                                           .verticalScroll(homePortraitScroll)
                                           .drawBehind {
                                               if (isPhoneHome && !isPagerRevealed && homeCoverHeightPx.intValue > 0) {
-                                                  val coverBottom = homeCoverHeightPx.intValue + homeTopGap.toPx()
+                                                  // The outer column already
+                                                  // applies homeTopGap above us.
+                                                  val coverBottom = homeCoverHeightPx.intValue.toFloat()
                                                   val start = (coverBottom - 150.dp.toPx()).coerceAtLeast(0f)
                                                   drawRect(homeReflectionScrim(start, start + 450.dp.toPx(), homeFeed.background),
                                                       topLeft = androidx.compose.ui.geometry.Offset(0f, start),
                                                       size = androidx.compose.ui.geometry.Size(size.width, (size.height - start).coerceAtLeast(0f)))
                                                   drawHomeFeedGlow(homeFeed, coverBottom)
                                               }
-                                          },
+                                          }
+                                          .padding(horizontal = if (isPhoneHome) 24.dp else 0.dp),
                                       verticalArrangement = Arrangement.spacedBy(sectionGap),
                                   ) {
                                       // The insight reader slot, Android home order: it

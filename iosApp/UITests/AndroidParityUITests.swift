@@ -30,6 +30,12 @@ final class AndroidParityUITests: XCTestCase {
         family.tap()
         XCTAssertTrue(app.staticTexts["Family"].waitForExistence(timeout: 10) ||
             app.buttons["Family contacts"].waitForExistence(timeout: 10), app.debugDescription)
+        let back = app.buttons["family-back-to-app"]
+        XCTAssertTrue(back.waitForExistence(timeout: 10), app.debugDescription)
+        back.tap()
+        let homeSelected = NSPredicate { _, _ in app.tabBars.buttons["Home"].isSelected }
+        expectation(for: homeSelected, evaluatedWith: nil)
+        waitForExpectations(timeout: 10)
     }
 
     func testSettingsHidesNativeTabBar() {

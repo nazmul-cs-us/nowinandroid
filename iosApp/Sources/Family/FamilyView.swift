@@ -147,6 +147,11 @@ struct FamilyView: View {
 
         .toolbar(store.signedIn ? .hidden : .visible, for: .navigationBar)
         .toolbar(store.signedIn ? .hidden : .visible, for: .tabBar)
+        .toolbar {
+            if !store.signedIn {
+                ToolbarItem(placement: .navigationBarLeading) { backToAppButton }
+            }
+        }
         .sheet(item: Binding(get: { store.webPairing }, set: { _ in store.dismissWebHelper() })) { pairing in
             FamilyCallAlertsSetup(pairing: pairing)
         }
@@ -178,6 +183,7 @@ struct FamilyView: View {
     private var contactHeader: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
+                backToAppButton
                 Text(directory ? "Contacts" : "Chats").font(.system(size: 24, weight: .medium)).frame(maxWidth: .infinity, alignment: .leading)
                 Menu {
                     Button(requests.isEmpty ? "Invitations" : "Invitations · \(requests.count)") { invitations = true }
@@ -453,7 +459,20 @@ struct FamilyView: View {
         }.onAppear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: true) }
     }
 
+    private var backToAppButton: some View {
+        Button { leaveFamily() } label: {
+            Image(systemName: "arrow.backward")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(store.signedIn ? Color.white : colors.ink)
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Back to app")
+        .accessibilityIdentifier("family-back-to-app")
+    }
+
     private func leaveFamily() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         if let onBackToApp { onBackToApp() } else { dismiss() }
     }
 
