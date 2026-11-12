@@ -16,6 +16,11 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.inset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+
 import com.starception.submission.core.designsystem.theme.homeFeedPalette
 import com.starception.submission.core.designsystem.theme.drawHomeFeedGlow
 
@@ -560,6 +565,9 @@ fun PrayerTimesScreen(
                 val homeSafeTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
                 val homePortraitScroll = rememberScrollState()
                 val homeCoverHeightPx = remember { mutableIntStateOf(0) }
+                val backdropTopInWindow = remember { mutableFloatStateOf(0f) }
+                val feedTopInWindow = remember { mutableFloatStateOf(Float.NaN) }
+                val feedViewportHeight = remember { mutableIntStateOf(0) }
                 if (isPhoneHome) {
                     val artworkIcons = homeStatusBarUsesLightIcons(
                         homeCoverHeaderUsesLightText(coverPage, coverNightArtwork),
@@ -651,6 +659,7 @@ fun PrayerTimesScreen(
                         .widthIn(max = 1200.dp)
                         .fillMaxSize()
                         .align(Alignment.TopCenter)
+                        .onGloballyPositioned { backdropTopInWindow.floatValue = it.positionInWindow().y }
                         .background(if (isPhoneHome) homeFeed.background else Color.Transparent),
                 ) {
                     // The fixed full-screen artwork backdrop of the Android
@@ -670,6 +679,28 @@ fun PrayerTimesScreen(
                             coverHeightPx = homeCoverHeightPx.intValue,
                             modifier = Modifier.matchParentSize(),
                         )
+                        // Paint outside the feed's clipped scrolling viewport
+                        // so the same shading continues behind native tabs.
+                        Canvas(Modifier.matchParentSize()) {
+                            if (!isPagerRevealed && homeCoverHeightPx.intValue > 0 &&
+                                feedTopInWindow.floatValue.isFinite()) {
+                                val top = feedTopInWindow.floatValue - backdropTopInWindow.floatValue -
+                                    homePortraitScroll.value
+                                val scrollRange = homePortraitScroll.maxValue.takeUnless { it == Int.MAX_VALUE } ?: 0
+                                val paintHeight = maxOf(feedViewportHeight.intValue.toFloat() + scrollRange, size.height - top)
+                                inset(left = 0f, top = top, right = 0f, bottom = size.height - top - paintHeight) {
+                                    val coverBottom = homeCoverHeightPx.intValue.toFloat()
+                                    val start = (coverBottom - 150.dp.toPx()).coerceAtLeast(0f)
+                                    drawRect(
+                                        homeReflectionScrim(start, start + 450.dp.toPx(), homeFeed.background),
+                                        topLeft = androidx.compose.ui.geometry.Offset(0f, start),
+                                        size = androidx.compose.ui.geometry.Size(size.width,
+                                            (size.height - start).coerceAtLeast(0f)),
+                                    )
+                                    drawHomeFeedGlow(homeFeed, coverBottom)
+                                }
+                            }
+                        }
                     }
                     Column(
                         modifier = Modifier
@@ -849,7 +880,9 @@ fun PrayerTimesScreen(
                         } else {
                             // Keep the phone viewport fixed while the insight
                             // borrows room from progressively reduced home content.
-                            BoxWithConstraints(Modifier.fillMaxSize()) {
+                            BoxWithConstraints(Modifier.fillMaxSize()
+                                .onGloballyPositioned { feedTopInWindow.floatValue = it.positionInWindow().y }
+                                .onSizeChanged { feedViewportHeight.intValue = it.height }) {
                                 val phoneDensity = LocalDensity.current
                                 var phoneInsightHeight by remember { mutableStateOf(0.dp) }
                                 var phoneLocationHeight by remember { mutableStateOf(58.dp) }
@@ -887,18 +920,6 @@ fun PrayerTimesScreen(
                                   Column(
                                       modifier = Modifier.fillMaxSize()
                                           .verticalScroll(homePortraitScroll)
-                                          .drawBehind {
-                                              if (isPhoneHome && !isPagerRevealed && homeCoverHeightPx.intValue > 0) {
-                                                  // The outer column already
-                                                  // applies homeTopGap above us.
-                                                  val coverBottom = homeCoverHeightPx.intValue.toFloat()
-                                                  val start = (coverBottom - 150.dp.toPx()).coerceAtLeast(0f)
-                                                  drawRect(homeReflectionScrim(start, start + 450.dp.toPx(), homeFeed.background),
-                                                      topLeft = androidx.compose.ui.geometry.Offset(0f, start),
-                                                      size = androidx.compose.ui.geometry.Size(size.width, (size.height - start).coerceAtLeast(0f)))
-                                                  drawHomeFeedGlow(homeFeed, coverBottom)
-                                              }
-                                          }
                                           .padding(horizontal = if (isPhoneHome) 24.dp else 0.dp),
                                       verticalArrangement = Arrangement.spacedBy(sectionGap),
                                   ) {

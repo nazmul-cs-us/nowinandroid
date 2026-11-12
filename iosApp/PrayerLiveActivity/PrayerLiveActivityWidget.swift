@@ -91,11 +91,11 @@ private struct PrayerBrandIcon: View {
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     // Keep the bundled PNG identical to AppIcon. Archive a small display image
-    // for WidgetKit instead of sending the full 1024px texture to a 20pt view.
-    // 64px covers the largest presentation (20pt) on a 3x screen.
+    // for WidgetKit instead of sending the full 1024px texture to a small view.
+    // 128px covers the Lock Screen's 40pt icon on a 3x screen.
     private static let image: UIImage? = {
         UIImage(named: "DeenlyLiveGlyph", in: .main, compatibleWith: nil)?
-            .preparingThumbnail(of: CGSize(width: 64, height: 64))
+            .preparingThumbnail(of: CGSize(width: 128, height: 128))
     }()
 
     var body: some View {
@@ -111,6 +111,7 @@ private struct PrayerBrandIcon: View {
             }
         }
         .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
         .fixedSize()
         .accessibilityHidden(true)
     }
@@ -159,10 +160,11 @@ private struct PrayerCountdown: View {
 /// Shared identity anchor: upper leading in both expanded and Lock Screen.
 private struct PrayerIdentity: View {
     let presentation: PrayerPresentation
+    var iconSize: CGFloat = 20
 
     var body: some View {
         HStack(spacing: 8) {
-            PrayerBrandIcon(size: 20)
+            PrayerBrandIcon(size: iconSize)
             VStack(alignment: .leading, spacing: 1) {
                 Text(presentation.activityLabel)
                     .font(.caption2)
@@ -294,8 +296,8 @@ private struct LockScreenPrayerActivityView: View {
             // Same identity-leading / value-trailing anchors as the expanded
             // island, with the secondary content underneath both anchors.
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 16) {
-                    PrayerIdentity(presentation: presentation)
+                HStack(alignment: .center, spacing: 16) {
+                    PrayerIdentity(presentation: presentation, iconSize: 40)
                         .fixedSize(horizontal: true, vertical: false)
                     Spacer(minLength: 8)
                     VStack(alignment: .trailing, spacing: 1) {
@@ -308,7 +310,7 @@ private struct LockScreenPrayerActivityView: View {
                     .foregroundStyle(presentation.tint)
                 }
                 VStack(alignment: .leading, spacing: 8) {
-                    PrayerIdentity(presentation: presentation)
+                    PrayerIdentity(presentation: presentation, iconSize: 40)
                     PrayerCountdown(presentation: presentation, textAlignment: .leading)
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(presentation.tint)
