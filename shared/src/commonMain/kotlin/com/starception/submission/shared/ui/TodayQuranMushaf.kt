@@ -1,14 +1,21 @@
 package com.starception.submission.shared.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -42,33 +49,33 @@ internal fun TodayQuranMushaf(
         val content = remember(verses, surahNumber, tajweedAnnotations) {
             prepareHomeMushaf(surahNumber, verses, tajweedAnnotations)
         }
-        // The embedded reader sits over artwork instead of an opaque page.
-        val embeddedColors = MaterialTheme.colorScheme.copy(
-            onSurface = Color.White,
-            onSurfaceVariant = Color.White.copy(alpha = 0.8f),
-        )
         Column(modifier.fillMaxSize().testTag("todayQuranMushaf")) {
-            MaterialTheme(colorScheme = embeddedColors) {
-                CompositionLocalProvider(LocalContentColor provides Color.White) {
-                    MushafPagerView(
-                        verses = content.verses,
-                        arabicFont = arabicFont,
-                        arabicFontSize = arabicFontSize,
-                        showTranslation = showTranslation,
-                        textAlignment = textAlignment,
-                        showBismillah = surahNumber !in listOf(1, 9),
-                        tajweedAnnotations = content.tajweed,
-                        onPageChanged = { current, total -> page = current; pageCount = total },
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                    )
+            MushafPagerView(
+                verses = content.verses,
+                arabicFont = arabicFont,
+                arabicFontSize = arabicFontSize,
+                showTranslation = showTranslation,
+                textAlignment = textAlignment,
+                showBismillah = surahNumber !in listOf(1, 9),
+                tajweedAnnotations = content.tajweed,
+                requestedPage = page,
+                onPageChanged = { current, total -> page = current; pageCount = total },
+                modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface),
+            )
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { page-- }, enabled = page > 1,
+                    modifier = Modifier.semantics { contentDescription = "Previous Mushaf page" }) {
+                    Text("Previous", color = Color.White.copy(alpha = if (page > 1) 1f else .38f))
+                }
+                Text("Page $page of $pageCount", modifier = Modifier.testTag("todayQuranMushafPageNumber"),
+                    style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = .85f), textAlign = TextAlign.Center)
+                TextButton(onClick = { page++ }, enabled = page < pageCount,
+                    modifier = Modifier.semantics { contentDescription = "Next Mushaf page" }) {
+                    Text("Next", color = Color.White.copy(alpha = if (page < pageCount) 1f else .38f))
                 }
             }
-            Text("Page $page of $pageCount",
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                    .testTag("todayQuranMushafPageNumber"),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center)
         }
     }
 }

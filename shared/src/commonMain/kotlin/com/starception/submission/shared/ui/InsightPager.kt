@@ -2774,6 +2774,9 @@ private fun ArtworkTile(
                     ),
             )
             if (isExpanded) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .50f)))
+            }
+            if (isExpanded) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,

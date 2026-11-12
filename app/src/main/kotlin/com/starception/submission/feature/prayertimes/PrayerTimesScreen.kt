@@ -3160,7 +3160,7 @@ fun PrayerTimesScreen(
                 val coverReadingDate = LocalDate.now()
                 val currentHomeWeather by rememberCurrentWeatherLoadState(prayerTimes?.location)
                 val homeDateLabel = coverReadingDate.format(
-                    java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d", java.util.Locale.getDefault()),
+                    java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d, yyyy", java.util.Locale.getDefault()),
                 )
                 val homeWeather = (currentHomeWeather as? CurrentWeatherLoadState.Available)?.weather?.let {
                     "${it.temperatureCelsius.roundToInt()}°C · ${weatherConditionLabel(it)}"
@@ -3168,7 +3168,17 @@ fun PrayerTimesScreen(
                 val homePlace = remember(location, prayerTimes?.location) {
                     prayerLocationLabel(prayerTimes?.location) {
                         getLocationWithCountryCode(location, prayerTimes?.location)
-                    }.singleLine
+                    }.singleLine.let { place ->
+                        val data = prayerTimes?.location
+                        val country = data?.country?.trim().orEmpty().ifBlank {
+                            data?.countryCode?.takeIf { it.length == 2 }?.let {
+                                java.util.Locale.Builder().setRegion(it.uppercase(java.util.Locale.ROOT))
+                                    .build().getDisplayCountry(java.util.Locale.getDefault())
+                            }.orEmpty()
+                        }
+                        if (country.isBlank() || place.contains(country, ignoreCase = true)) place
+                        else listOf(place, country).filter(String::isNotBlank).joinToString(" · ")
+                    }
                 }
                 val homeHijriDate = remember(coverReadingDate, java.util.Locale.getDefault()) {
                     runCatching {

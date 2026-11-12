@@ -244,6 +244,7 @@ fun PrayerTimesScreen(
     forceMoonForTesting: Boolean = false,
     forceSunForTesting: Boolean = false,
     onInsightImmersiveChange: (Boolean) -> Unit = {},
+    homeCountryName: String = "",
 ) {
     val prayerContentHeights = remember(LocalDensity.current.fontScale) { mutableStateMapOf<String, Dp>() }
     var showAllPrayers by remember { mutableStateOf(initialShowAllPrayers) }
@@ -1117,7 +1118,10 @@ fun PrayerTimesScreen(
                             PrayerHomeHeader(
                                 lightHeaderInk = homeCoverHeaderUsesLightText(coverPage, coverNightArtwork),
                                 greeting = homeGreetingForHour(day.nowMinute / 60),
-                                supportingTexts = listOfNotNull(placeName.takeIf { it.isNotBlank() },
+                                supportingTexts = listOfNotNull(
+                                    "${today.dayOfMonth} ${today.month.name.lowercase().replaceFirstChar { it.uppercase() }}, ${today.year}",
+                                    listOf(placeName, homeCountryName.takeUnless { placeName.contains(it, ignoreCase = true) }.orEmpty())
+                                        .filter(String::isNotBlank).joinToString(" · ").takeIf(String::isNotBlank),
                                     day.temperatureCelsius?.let { "${it.toInt()}°C · ${day.currentPrayer.orEmpty()}" }),
                                 onOpenSettings = onOpenSettings,
                                 onOpenProfile = onOpenProfile,

@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -105,6 +106,7 @@ class TodayQuranMushafTest {
             assertEquals(mushafReadingFontSize(41f).sp, embedded.layoutInput.style.fontSize)
             assertEquals(full.layoutInput.style.fontSize, embedded.layoutInput.style.fontSize)
             assertEquals(full.layoutInput.style.textAlign, embedded.layoutInput.style.textAlign)
+            assertEquals(full.layoutInput.style.color, embedded.layoutInput.style.color)
             assertEquals(full.layoutInput.text.text, embedded.layoutInput.text.text)
             assertEquals(full.lineCount, embedded.lineCount)
         }
@@ -159,9 +161,18 @@ class TodayQuranMushafTest {
 
     @Test fun pageControlsReadTheRestOfTheSurahInsideTheTile() {
         compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) { Reader(fontSize = 70f, height = 220) } }
-        compose.onNodeWithContentDescription("Next Mushaf page").performClick()
+        compose.onNodeWithContentDescription("Previous Mushaf page").assertIsNotEnabled()
+        val next = compose.onNodeWithContentDescription("Next Mushaf page")
+        val textBottom = compose.onAllNodes(hasText("سَبِّحِ", substring = true), useUnmergedTree = true)
+            .fetchSemanticsNodes().first().boundsInRoot.bottom
+        assertTrue("Page controls must sit below the Quran text", next.fetchSemanticsNode().boundsInRoot.top >= textBottom)
+        next.performClick()
         val label = compose.onNodeWithTag("todayQuranMushafPageNumber").fetchSemanticsNode()
             .config[SemanticsProperties.Text].first().text
         assertTrue(label.startsWith("Page 2 of "))
+        compose.onNodeWithContentDescription("Previous Mushaf page").performClick()
+        val restored = compose.onNodeWithTag("todayQuranMushafPageNumber").fetchSemanticsNode()
+            .config[SemanticsProperties.Text].first().text
+        assertTrue(restored.startsWith("Page 1 of "))
     }
 }

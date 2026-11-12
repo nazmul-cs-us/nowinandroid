@@ -5988,7 +5988,7 @@ private fun MushafPageWithFrame(
     embedded: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val surfaceColor = if (embedded) Color.Transparent else MaterialTheme.colorScheme.surface
+    val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val glowColor = MaterialTheme.colorScheme.primary
     val markerColor = onSurfaceColor.copy(alpha = 0.90f)
@@ -6618,12 +6618,15 @@ internal fun MushafPagerView(
     onNavigateToNextSurah: () -> Unit = {},
     /** Reuse the exact Mushaf renderer without taking over Home's system keys or mini-bar. */
     embedded: Boolean = false,
+    /** Home places accessible page controls below the text rather than over it. */
+    showEdgeControls: Boolean = true,
+    requestedPage: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     if (ayahs.isEmpty()) return
 
     val markerColor = MaterialTheme.colorScheme.primary
-    val surfaceColor = if (embedded) Color.Transparent else MaterialTheme.colorScheme.surface
+    val surfaceColor = MaterialTheme.colorScheme.surface
     // Keep only the current page and Compose's bounded neighbour in memory. The former
     // curl renderer retained multiple full-screen graphics layers during rapid turns;
     // together with Arabic TextLayout objects this exhausted the 256 MB app heap.
@@ -7320,12 +7323,16 @@ internal fun MushafPagerView(
                 pages
             }
 
-            LaunchedEffect(paginatedPages.size, initialPage) {
+            LaunchedEffect(paginatedPages.size, initialPage, requestedPage) {
                 pagerPageCount = paginatedPages.size.coerceAtLeast(1)
                 // Let Pager observe the new count before restoring a saved page that may
                 // be outside the one-page bootstrap count used during pagination.
                 androidx.compose.runtime.withFrameNanos { }
-                if (paginatedPages.isNotEmpty() && !initialPageRestored) {
+                if (paginatedPages.isNotEmpty() && requestedPage != null) {
+                    val target = requestedPage.coerceIn(0, paginatedPages.lastIndex)
+                    if (state.currentPage != target) state.scrollToPage(target)
+                    initialPageRestored = true
+                } else if (paginatedPages.isNotEmpty() && !initialPageRestored) {
                     state.scrollToPage(initialPage.coerceIn(0, paginatedPages.lastIndex))
                     initialPageRestored = true
                 } else if (
@@ -7687,7 +7694,7 @@ internal fun MushafPagerView(
                         ).coerceIn(0f, 1f)
                 }
             }
-            MushafEdgeTurnControl(
+            if (showEdgeControls) MushafEdgeTurnControl(
                 isLeftEdge = true,
                 crossesSurah = atFirstPage,
                 enabled = paginatedPages.isNotEmpty() && (!atFirstPage || (!embedded && surahNumber > 1)),
@@ -7709,7 +7716,7 @@ internal fun MushafPagerView(
                     .offset { androidx.compose.ui.unit.IntOffset(0, leftEdgeControlTopPx) }
                     .zIndex(4f),
             )
-            MushafEdgeTurnControl(
+            if (showEdgeControls) MushafEdgeTurnControl(
                 isLeftEdge = false,
                 crossesSurah = atLastPage,
                 enabled = paginatedPages.isNotEmpty() && (!atLastPage || (!embedded && surahNumber < 114)),

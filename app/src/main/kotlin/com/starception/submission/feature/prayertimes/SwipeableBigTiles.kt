@@ -4121,6 +4121,10 @@ internal fun InsightPreviewCard(
                     ),
             )
 
+            if (isExpanded) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .50f)))
+            }
+
             val isReadingHeader = readingSurahIndex != null && onReadingPlayPause != null
             val useCompactReadingHeader = isReadingHeader &&
                 (compactProgress >= 0.08f || maxWidth < 240.dp)

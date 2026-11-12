@@ -1,10 +1,19 @@
 package com.starception.submission.feature.prayertimes
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,14 +70,24 @@ internal fun TodayQuranMushaf(
                     onAyahLongPress = { onOpenSurah() },
                     onPageChange = { current, total -> page = current; pageCount = total.coerceAtLeast(1) },
                     embedded = true,
-                    modifier = Modifier.fillMaxSize(),
+                    showEdgeControls = false,
+                    requestedPage = page,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
                 )
             }
-            Text("Page ${page + 1} of $pageCount", modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                .testTag("todayQuranMushafPageNumber"),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center)
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { page-- }, enabled = page > 0,
+                    modifier = Modifier.semantics { contentDescription = "Previous Mushaf page" }) {
+                    Text("Previous", color = Color.White.copy(alpha = if (page > 0) 1f else .38f))
+                }
+                Text("Page ${page + 1} of $pageCount", modifier = Modifier.testTag("todayQuranMushafPageNumber"),
+                    style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = .85f), textAlign = TextAlign.Center)
+                TextButton(onClick = { page++ }, enabled = page < pageCount - 1,
+                    modifier = Modifier.semantics { contentDescription = "Next Mushaf page" }) {
+                    Text("Next", color = Color.White.copy(alpha = if (page < pageCount - 1) 1f else .38f))
+                }
+            }
         }
     }
 }
