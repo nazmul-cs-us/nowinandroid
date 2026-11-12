@@ -88,15 +88,31 @@ private struct PrayerPresentation {
 
 private struct PrayerBrandIcon: View {
     var size: CGFloat = 16
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+
+    // Keep the bundled PNG identical to AppIcon. Archive a small display image
+    // for WidgetKit instead of sending the full 1024px texture to a 20pt view.
+    // 64px covers the largest presentation (20pt) on a 3x screen.
+    private static let image: UIImage? = {
+        UIImage(named: "DeenlyLiveGlyph", in: .main, compatibleWith: nil)?
+            .preparingThumbnail(of: CGSize(width: 64, height: 64))
+    }()
 
     var body: some View {
-        Image("DeenlyLiveGlyph", bundle: .main)
-            .resizable()
-            .renderingMode(.original)
-            .scaledToFit()
-            .frame(width: size, height: size)
-            .fixedSize()
-            .accessibilityHidden(true)
+        Group {
+            if let image = Self.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .renderingMode(.original)
+                    .scaledToFit()
+                    // Match Apple's Food Truck Live Activity sample's
+                    // reduced-luminance treatment without overriding redaction.
+                    .opacity(isLuminanceReduced ? 0.5 : 1.0)
+            }
+        }
+        .frame(width: size, height: size)
+        .fixedSize()
+        .accessibilityHidden(true)
     }
 }
 
