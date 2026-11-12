@@ -4,6 +4,7 @@ import UIKit
 
 extension Notification.Name {
     static let openPrayerLiveActivity = Notification.Name("openPrayerLiveActivity")
+    static let openFamily = Notification.Name("openFamily")
 }
 
 @MainActor
@@ -112,7 +113,11 @@ struct iOSApp: App {
                 .onOpenURL { url in
                     guard url.scheme == "deenly" else { return }
                     if url.host == "family-call" {
-                        showingFamily = true
+                        if #available(iOS 26.0, *) {
+                            NotificationCenter.default.post(name: .openFamily, object: nil)
+                        } else {
+                            showingFamily = true
+                        }
                         if let id = FamilyCallLink().callId(input: url.absoluteString) {
                             Task { if !(await FamilyStore.shared.resumeForPush(id)) { FamilyStore.shared.message = "This call is no longer ringing. Open Family to call back." } }
                         }

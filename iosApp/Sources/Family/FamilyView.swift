@@ -59,6 +59,11 @@ private struct FamilyColors {
 }
 
 struct FamilyView: View {
+    private let onBackToApp: (() -> Void)?
+
+    init(onBackToApp: (() -> Void)? = nil) {
+        self.onBackToApp = onBackToApp
+    }
     @ObservedObject private var store = FamilyStore.shared
     @ObservedObject private var appearance = FamilyAppearance.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -178,7 +183,7 @@ struct FamilyView: View {
                     Button(requests.isEmpty ? "Invitations" : "Invitations · \(requests.count)") { invitations = true }
                     Button { store.requestWebHelper() } label: { Label("Temporary call alerts", systemImage: "bell.badge") }
                     Button { store.refresh() } label: { Label("Refresh family", systemImage: "arrow.clockwise") }
-                    Button("Back to app") { dismiss() }
+                    Button("Back to app") { leaveFamily() }
                     Button(role: .destructive) { store.disconnect() } label: { Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right") }
                 } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)).frame(width: 32, height: 44) }.accessibilityLabel("Family menu")
             }.foregroundStyle(.white).frame(height: 64).padding(.horizontal, 20).padding(.top, 24)
@@ -276,7 +281,7 @@ struct FamilyView: View {
                 Button("Invitations") { settings = false; invitations = true }
                 Button("Temporary call alerts") { settings = false; store.requestWebHelper() }
                 Button("Refresh family") { settings = false; store.refresh() }
-                Button("Back to app") { settings = false; dismiss() }
+                Button("Back to app") { settings = false; leaveFamily() }
                 Button("Sign out", role: .destructive) { settings = false; store.disconnect() }
             }.navigationTitle("Family settings").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { settings = false } } }
@@ -446,6 +451,10 @@ struct FamilyView: View {
                     settings: { pendingProfileAction = { settings = true }; selected = nil })
             }
         }.onAppear { NativeAppearanceBridge.shared.setCallAppearance(lightIcons: true) }
+    }
+
+    private func leaveFamily() {
+        if let onBackToApp { onBackToApp() } else { dismiss() }
     }
 
     private func suggestPeer() {

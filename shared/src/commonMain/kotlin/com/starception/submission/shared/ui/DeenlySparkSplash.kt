@@ -1,6 +1,5 @@
 package com.starception.submission.shared.ui
 
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -62,7 +61,7 @@ internal fun DeenlySparkSplash(onFinished: () -> Unit) {
             finished.value()
         }
     }
-    BackHandler { finished.value() }
+    PlatformBackHandler { finished.value() }
     MaterialTheme {
         SparkSplashArtwork(progress = { progress.value }, onContinue = { finished.value() })
     }

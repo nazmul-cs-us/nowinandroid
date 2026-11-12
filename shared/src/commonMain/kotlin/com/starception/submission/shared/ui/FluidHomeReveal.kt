@@ -1,6 +1,5 @@
 package com.starception.submission.shared.ui
 
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -85,7 +84,7 @@ internal fun FluidHomeReveal(
     val clearancePx = with(LocalDensity.current) { bottomClearance.toPx() }
     val trailingEdgeHeightPx = with(LocalDensity.current) { 160.dp.toPx() }
     val actionable = expanded && progress >= .99f
-    BackHandler(enabled = expanded) { onExpandedChange(false) }
+    PlatformBackHandler(enabled = expanded) { onExpandedChange(false) }
     LaunchedEffect(transition.currentState, transition.targetState, measuredSize, clearancePx) {
         if (transition.currentState && transition.targetState) {
             // The home navigation floats over the scroll viewport. Include its

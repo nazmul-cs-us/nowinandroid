@@ -1350,7 +1350,8 @@ private fun ExpandedReadingPreview(
     val store = remember { SharedContentStore() }
     // Read on recomposition so returning from Quran settings refreshes the
     // retained home carousel instead of keeping its first remembered values.
-    val mushafMode = store.quranMushafMode()
+    val arabicFontSize = store.quranArabicFontSize()
+    val textAlignment = store.quranTextAlignment()
     val arabicFont = store.quranArabicFont()
     val showTranslation = store.quranShowTranslation()
     val showTajweed = store.quranTajweedEnabled()
@@ -1404,37 +1405,16 @@ private fun ExpandedReadingPreview(
         label = "quranStageGlowPhase",
     )
 
-    // Scale Arabic from the actual expanded tile width. Fixed 17–23sp text
-    // was too small on the iPad/large expanded card and hard to read.
+    // The Mushaf below owns the reading scale. Size only the loading-state
+    // Bismillah against the tile width here.
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val readingScrollState = rememberLazyListState()
-        val hasTranslation = verses.any { it.translation.isNotBlank() }
-        val readingArabicSize = (
-            maxWidth.value * if (hasTranslation) 0.073f else 0.078f
-            ).coerceIn(if (hasTranslation) 18f else 21f, if (hasTranslation) 26f else 31f).sp
-        val readingArabicLineHeight = (readingArabicSize.value * 1.35f).sp
         val bismillahSize = (maxWidth.value * 0.048f).coerceIn(17f, 24f).sp
-        val readingTranslationSize = (maxWidth.value * 0.035f).coerceIn(14f, 17f).sp
-        val blocks = verses.flatMap { verse ->
-            listOfNotNull(
-                InsightTextBlock(verse.arabicText.trim(), MaterialTheme.typography.bodyMedium.copy(
-                    fontFamily = QuranArabicFonts.fontFamily(arabicFont),
-                    fontSize = readingArabicSize, lineHeight = readingArabicLineHeight,
-                    letterSpacing = 0.sp,
-                ), 56.dp),
-                verse.translation.takeIf(String::isNotBlank)?.let {
-                    InsightTextBlock(it, MaterialTheme.typography.bodySmall.copy(
-                        fontSize = readingTranslationSize,
-                        lineHeight = (readingTranslationSize.value * 1.55f).sp,
-                    ), 8.dp)
-                },
-            )
+        // A pager needs a reading viewport, not the measured height of every
+        // verse in the Surah. Avoid typesetting the entire chapter on Main.
+        LaunchedEffect(loading, verses.isNotEmpty()) {
+            if (!loading && verses.isNotEmpty()) onPreferredHeightChange(320.dp)
         }
-        val naturalHeight = insightTextHeight(blocks, maxWidth) + 128.dp
-        LaunchedEffect(naturalHeight, loading) {
-            if (!loading && verses.isNotEmpty()) onPreferredHeightChange(naturalHeight)
-        }
-
 
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -1448,7 +1428,7 @@ private fun ExpandedReadingPreview(
                 accent = ReadingPreviewGold,
                 modifier = Modifier.insightChromeVisibility(LocalInsightReaderChromeProgress.current),
             )
-            LazyColumn(
+            if (loading || loadFailed) LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f)
                     .insightReadingEdges(
                         canScrollBackward = { readingScrollState.canScrollBackward },
@@ -1505,48 +1485,18 @@ private fun ExpandedReadingPreview(
                         }
                     }
                 }
-                item(key = "flowing-passage") {
-                    val passage = androidx.compose.ui.text.buildAnnotatedString {
-                        verses.forEachIndexed { index, verse ->
-                            if (index > 0) append("  ")
-                            val arabic = if (index == 0 && surahNumber != 1 && surahNumber != 9)
-                                com.starception.submission.shared.quran.removeLeadingBismillah(verse.arabicText.trim())
-                                else verse.arabicText.trim()
-                            append(if (showTajweed) tajweedAnnotatedString(arabic, tajweedAnnotations[verse.numberInSurah])
-                                else androidx.compose.ui.text.AnnotatedString(arabic))
-                            append(" ")
-                            appendInlineContent("ayah-${verse.numberInSurah}", "(${verse.numberInSurah.toArabicIndic()})")
-                        }
-                    }
-                    val markers = verses.associate { verse ->
-                        "ayah-${verse.numberInSurah}" to InlineTextContent(
-                            Placeholder(1.4.em, 1.1.em, PlaceholderVerticalAlign.TextCenter)) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Box(Modifier.fillMaxHeight().aspectRatio(1f).padding(2.dp)
-                                    .background(InsightReadingContrastBackground, CircleShape)
-                                    .border(0.8.dp, ReadingPreviewGold.copy(alpha = .9f), CircleShape), contentAlignment = Alignment.Center) {
-                                    val numberSize = readingArabicSize * if (verse.numberInSurah >= 100) .40f else .48f
-                                    Text(verse.numberInSurah.toArabicIndic(), color = ReadingPreviewGold,
-                                        style = androidx.compose.ui.text.TextStyle(fontSize = numberSize,
-                                            lineHeight = numberSize * 1.3f, textAlign = TextAlign.Center,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif),
-                                        maxLines = 1)
-                                }
-                            }
-                        }
-                    }
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(passage, inlineContent = markers,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = QuranArabicFonts.fontFamily(arabicFont), fontSize = readingArabicSize,
-                                lineHeight = readingArabicLineHeight, letterSpacing = 0.sp,
-                                textDirection = androidx.compose.ui.text.style.TextDirection.ContentOrRtl,
-                                shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = .7f), blurRadius = 3f)),
-                            color = Color.White, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
-                        verses.mapNotNull { it.translation.takeIf(String::isNotBlank) }.joinToString("\n\n")
-                            .takeIf(String::isNotBlank)?.let { ReadingTranslationPanel(it, readingTranslationSize) }
-                    }
-                }
+
+            } else {
+                TodayQuranMushaf(
+                    surahNumber = surahNumber,
+                    verses = verses,
+                    arabicFont = arabicFont,
+                    arabicFontSize = arabicFontSize,
+                    showTranslation = showTranslation,
+                    textAlignment = textAlignment,
+                    tajweedAnnotations = tajweedAnnotations,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
             }
         }
     }
@@ -1652,16 +1602,14 @@ private fun ExpandedSalahHadith(
         translationNotice = "Loading selected translation…"
         try {
             val hadith = translationRepository.getCollectionHadith(selected.databaseFile, selected.hadithNumber)
-            if (readingLanguage == "ar") {
-                translatedReading = hadith?.arabic?.takeIf(String::isNotBlank)
-                translationNotice = if (translatedReading != null) "Arabic source" else "Selected translation unavailable · Showing source text"
+            val local = localHomeHadithReading(hadith, readingLanguage)
+            if (local != null) {
+                translatedReading = local.text
+                translationNotice = local.notice
             } else {
-                val english = hadith?.english?.takeIf(String::isNotBlank)
-                if (english == null) {
+                val english = homeHadithEnglishForTranslation(hadith)
+                if (english == null || readingLanguage == "ar" || readingLanguage.isEmpty()) {
                     translationNotice = "Selected translation unavailable · Showing source text"
-                } else if (readingLanguage == "en") {
-                    translatedReading = english
-                    translationNotice = "Local English translation"
                 } else {
                     val translated = com.starception.submission.shared.translation.SharedTranslationService.translateFromEnglish(
                         english, readingLanguage, readingStore.hadithTranslationProvider(),
@@ -2511,7 +2459,9 @@ private fun ModelSuggestionStage(
 ) {
     val density = LocalDensity.current
     val sourceScrollState = rememberScrollState()
-    val formatted = remember(card?.sourceText) { formatInsightHadithText(card?.sourceText.orEmpty()) }
+    val translatedReading = rememberHomeSuggestionTranslation(card)
+    val displayedText = translatedReading?.text ?: card?.sourceText.orEmpty()
+    val formatted = remember(displayedText) { formatInsightHadithText(displayedText) }
     val sections = remember(formatted) { formatted.split("\n\n", limit = 2) }
     val narrator = sections.firstOrNull()?.takeIf { sections.size == 2 && it.startsWith("Narrated ") }
     val body = if (narrator != null) sections[1] else formatted
@@ -2576,10 +2526,15 @@ private fun ModelSuggestionStage(
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontSize = 16.sp,
                     lineHeight = 27.sp,
+                    textDirection = androidx.compose.ui.text.style.TextDirection.Content,
                 ),
                 color = Color.White.copy(alpha = 0.88f),
                 modifier = Modifier.fillMaxWidth(),
             )
+            translatedReading?.notice?.takeIf(String::isNotBlank)?.let {
+                Text(it, style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.7f))
+            }
         }
         if (sourceScrollState.maxValue > 0) {
             LinearProgressIndicator(

@@ -836,12 +836,14 @@ struct NativePrayerTabsView: View {
             Tab("Saved", systemImage: "bookmark", value: 2) {
                 tabContent(2)
             }
-            Tab("Interests", systemImage: "square.grid.2x2", value: 4) {
-                tabContent(4)
-            }
+            Tab("Family", systemImage: "person.2", value: 7) {
+                NavigationStack {
+                    FamilyView(onBackToApp: { selectedTab = 0 })
+                }
+            }.badge(familyStore.unreadCount)
             Tab("More", systemImage: "ellipsis", value: 5) {
                 MorePrayerTabsView(path: $morePath, onSelectTab: selectContentTab)
-            }.badge(familyStore.unreadCount)
+            }
             Tab(value: 6, role: .search) {
                 Color.clear
             } label: {
@@ -855,7 +857,7 @@ struct NativePrayerTabsView: View {
         .scrollEdgeEffectHidden(true, for: .all)
         .tint(Color.accentColor)
         .overlay(alignment: .bottomTrailing) {
-            if !insightImmersive && destinationChrome[activeOwner] != true {
+            if selectedTab != 7 && !insightImmersive && destinationChrome[activeOwner] != true {
                 NowNudgeBotLayer(model: bot)
                     .padding(.trailing, 16)
                     .padding(.bottom, 0)
@@ -872,6 +874,10 @@ struct NativePrayerTabsView: View {
             morePath = []
             selectedTab = 0
             lastSelectedTab = 0
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openFamily)) { _ in
+            selectedTab = 7
+            lastSelectedTab = 7
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("sharedDestinationChromeChanged"))) { notification in
             guard let value = notification.object as? String else { return }
@@ -920,8 +926,8 @@ struct NativePrayerTabsView: View {
             selectedTab = 0
         case 2:
             selectedTab = 2
-        case 4:
-            selectedTab = 4
+        case 7:
+            selectedTab = 7
         default:
             morePath = [index]
             selectedTab = 5
@@ -1091,7 +1097,6 @@ private let NowNudgeThinkingVerbs = [
 
 @available(iOS 26.0, *)
 private struct MorePrayerTabsView: View {
-    @ObservedObject private var familyStore = FamilyStore.shared
     @Binding var path: [Int]
     let onSelectTab: (Int) -> Void
 
@@ -1106,19 +1111,15 @@ private struct MorePrayerTabsView: View {
                 NavigationLink(value: 3) {
                     Label("Course", systemImage: "play.rectangle")
                 }
-                NavigationLink(value: 7) {
-                    Label("Family", systemImage: "person.2").badge(familyStore.unreadCount)
+                NavigationLink(value: 4) {
+                    Label("Interests", systemImage: "square.grid.2x2")
                 }
             }
             .navigationTitle("More")
             .navigationDestination(for: Int.self) { index in
-                if index == 7 {
-                    FamilyView()
-                } else {
-                    ComposePrayerTimesTabView(tabIndex: index, onSelectTab: onSelectTab)
-                        .ignoresSafeArea(.container, edges: .bottom)
-                        .navigationBarTitleDisplayMode(.inline)
-                }
+                ComposePrayerTimesTabView(tabIndex: index, onSelectTab: onSelectTab)
+                    .ignoresSafeArea(.container, edges: .bottom)
+                    .navigationBarTitleDisplayMode(.inline)
             }
         }
     }

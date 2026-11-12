@@ -12,10 +12,24 @@ final class AndroidParityUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Collapse insight"].exists, app.debugDescription)
         let passageCount = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "^[0-9]+ AYAT$")).firstMatch
         XCTAssertTrue(passageCount.waitForExistence(timeout: 30), app.debugDescription)
+        let page = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "^Page [0-9]+ of [0-9]+$")).firstMatch
+        XCTAssertTrue(page.waitForExistence(timeout: 30), app.debugDescription)
         let image = XCTAttachment(screenshot: app.screenshot())
         image.name = "Expanded Quran parity"
         image.lifetime = .keepAlways
         add(image)
+    }
+
+    func testFamilyIsReachableFromTheNativeTabBar() throws {
+        guard #available(iOS 26.0, *) else { throw XCTSkip("Native tabs require iOS 26") }
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        let family = app.tabBars.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Family")).firstMatch
+        XCTAssertTrue(family.waitForExistence(timeout: 30), app.debugDescription)
+        family.tap()
+        XCTAssertTrue(app.staticTexts["Family"].waitForExistence(timeout: 10) ||
+            app.buttons["Family contacts"].waitForExistence(timeout: 10), app.debugDescription)
     }
 
     func testSettingsHidesNativeTabBar() {
