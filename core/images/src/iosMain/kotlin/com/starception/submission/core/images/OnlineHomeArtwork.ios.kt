@@ -67,6 +67,8 @@ private class IosHomeArtworkPlatform : HomeArtworkPlatform {
 
     override fun readMetadata(): String? = NSData.dataWithContentsOfFile("$directory/collection.json")?.bytes(1_000_000)?.decodeToString()
     override fun writeMetadata(value: String) = write("$directory/collection.json", value.encodeToByteArray())
+    override fun readPersonalApprovals(): String? = NSData.dataWithContentsOfFile("$directory/personal-approvals.json")?.bytes(1_000_000)?.decodeToString()
+    override fun writePersonalApprovals(value: String) = write("$directory/personal-approvals.json", value.encodeToByteArray())
     override fun readImage(id: String): ByteArray? = NSData.dataWithContentsOfFile(image(id))?.bytes(8_000_000)
     override fun writeImage(id: String, bytes: ByteArray) = write(image(id), bytes)
     override fun retainImages(ids: Set<String>) {

@@ -69,6 +69,16 @@ class ArtworkReviewRepository(
         mutable.value = mutable.value.copy(candidates = mutable.value.candidates.filterNot { it.artwork.id == id })
     }
 
+    suspend fun approveForDevice(candidate: UnreviewedArtwork, theme: ArtworkTheme, home: HomeArtworkRepository) {
+        val bytes = withContext(dispatcher) {
+            platform.download(candidate.artwork.imageUrl, 8_000_000).also {
+                require(artworkSha256(it) == candidate.sha256) { "Image changed since preview; fetch and review it again" }
+            }
+        }
+        home.approveForDevice(candidate, theme, bytes)
+        dismiss(candidate.artwork.id)
+    }
+
     fun fetch(theme: ArtworkTheme, allowUnreviewed: Boolean = false) {
         if (!allowUnreviewed) { clear(); return }
         request?.cancel()

@@ -14,7 +14,7 @@ internal fun allowedArtworkDownload(url: String): Boolean = url == HOME_ARTWORK_
     (url.startsWith("https://api.openverse.org/v1/images/") && url.substringBefore('?').endsWith("/thumb/")) ||
     url.startsWith("https://live.staticflickr.com/") || url.startsWith("https://upload.wikimedia.org/")
 
-fun parseReviewedArtworkFeed(text: String): List<ReviewedHomeArtwork> {
+fun parseReviewedArtworkFeed(text: String, personalDeviceApproval: Boolean = false): List<ReviewedHomeArtwork> {
     val root = Json.parseToJsonElement(text).jsonObject
     require(root["schemaVersion"]?.jsonPrimitive?.intOrNull == 1)
     val rows = root.getValue("artworks").jsonArray
@@ -27,7 +27,8 @@ fun parseReviewedArtworkFeed(text: String): List<ReviewedHomeArtwork> {
         val id = field("id")
         require(id.matches(Regex("[A-Za-z0-9_-]{1,80}")))
         val image = field("imageUrl")
-        require(image != HOME_ARTWORK_FEED_URL && allowedArtworkDownload(image))
+        require(image != HOME_ARTWORK_FEED_URL && (allowedArtworkDownload(image) ||
+            (personalDeviceApproval && image.startsWith("https://picsum.photos/id/"))))
         val hash = field("sha256")
         require(hash.length == 64 && hash.all { it in '0'..'9' || it in 'a'..'f' })
         val source = field("sourceUrl"); val license = field("licenseUrl")

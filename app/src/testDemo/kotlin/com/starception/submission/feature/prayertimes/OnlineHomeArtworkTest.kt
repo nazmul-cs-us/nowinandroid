@@ -33,6 +33,9 @@ import java.io.IOException
 class OnlineHomeArtworkTest {
     internal class Platform : HomeArtworkPlatform {
         var metadata: String? = null
+        var personalMetadata: String? = null
+        override fun readPersonalApprovals() = personalMetadata
+        override fun writePersonalApprovals(value: String) { personalMetadata = value }
         val images = mutableMapOf<String, ByteArray>()
         val requests = mutableListOf<String>()
         var offline = false

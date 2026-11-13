@@ -62,7 +62,8 @@ internal fun FamilyVideoCallLayout(
         val shelfWidth = if (wide) (maxWidth * .43f).coerceAtLeast(240.dp) else maxWidth
         val tileWidth = if (maxWidth < 360.dp) 80.dp else 88.dp
         val shelfHeight = if (shelfHeightPx > 0) with(density) { shelfHeightPx.toDp() } else 220.dp
-        val videoBottomMargin = 64.dp
+        // In portrait the shelf belongs inside the video frame, not below it.
+        val videoBottomMargin = 0.dp
         val obscuredVideo = if (wide) 0.dp else (shelfHeight - videoBottomMargin).coerceAtLeast(0.dp)
         Box(Modifier.fillMaxSize().then(if (wide) Modifier.padding(end = shelfWidth + 12.dp) else Modifier.padding(bottom = videoBottomMargin))
             .clip(RoundedCornerShape(32.dp)).background(colors.surfaceContainerHigh).layerBackdrop(backdrop)
@@ -128,12 +129,13 @@ internal fun FamilyVideoCallLayout(
             .onSizeChanged { shelfHeightPx = it.height }.testTag("familyVideoShelf")
             .drawBackdrop(backdrop = backdrop, shape = { RoundedCornerShape(22.dp) },
                 effects = { blur(18.dp.toPx()) }, highlight = { null }, shadow = { null }, innerShadow = { null },
-                onDrawSurface = { drawRect(colors.surface.copy(alpha = if (wide) .86f else .34f)) })
+                onDrawSurface = { drawRect(if (incoming) colors.surface.copy(alpha = .86f)
+                    else Color.Black.copy(alpha = if (wide) .78f else .56f)) })
             .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .44f), RoundedCornerShape(16.dp))
+            Box(Modifier.fillMaxWidth().heightIn(min = 72.dp)
                 .padding(horizontal = 4.dp, vertical = 4.dp)) {
-                BoxWithConstraints(Modifier.fillMaxWidth().padding(end = 64.dp)) {
+                BoxWithConstraints(Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(end = 64.dp)) {
                     FlowRow(Modifier.fillMaxWidth(), maxItemsInEachRow = if (maxWidth < 192.dp) 2 else 4,
                         horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (incoming) {
@@ -157,16 +159,19 @@ internal fun FamilyVideoCallLayout(
                         }
                     }
                 }
-                Column(Modifier.align(Alignment.TopEnd).offset(y = (-12).dp),
+                Column(Modifier.align(Alignment.CenterEnd),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     FilledIconButton(onClick = actions.hangup, modifier = Modifier.size(52.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFFC62828), contentColor = Color.White)) {
                         Icon(Icons.Default.CallEnd, if (incoming) "Decline" else if (outgoing) "Cancel" else "End call", Modifier.size(24.dp))
                     }
-                    if (outgoing || incoming) Text(if (incoming) "Decline" else "Cancel", color = Color.White, fontSize = 10.sp)
+                    if (outgoing || incoming) Text(if (incoming) "Decline" else "Cancel",
+                        color = if (incoming) colors.onSurface else Color.White, fontSize = 10.sp)
                 }
             }
-            if (!active) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
+            // Outgoing calls already show the local camera as the main preview.
+            // Incoming calls show avatars only until the user accepts.
+            if (incoming) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
                 Column(Modifier.width(tileWidth), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Box(Modifier.fillMaxWidth().height(tileHeight).clip(RoundedCornerShape(16.dp))

@@ -49,6 +49,8 @@ interface HomeArtworkPlatform {
     fun readImage(id: String): ByteArray?
     fun writeImage(id: String, bytes: ByteArray)
     fun retainImages(ids: Set<String>)
+    fun readPersonalApprovals(): String? = null
+    fun writePersonalApprovals(value: String) { error("Personal approval storage is not available") }
 }
 
 private class ReviewedArtworkExhausted : Exception()
@@ -73,6 +75,7 @@ class HomeArtworkRepository(
     private var generation = 0
     private var lastFailure: Instant? = null
     private var activeCatalog: List<ReviewedHomeArtwork> = catalog.orEmpty()
+    private var personalApprovals = emptyList<ReviewedHomeArtwork>()
     private var legacyMetadata: JsonObject? = null
     private val seen = homeArtworkGallery.map { it.sourceUrl.substringAfterLast('/') }.toMutableSet()
     private val restored = scope.async { restore() }
@@ -105,7 +108,7 @@ class HomeArtworkRepository(
                     val reviewed = withContext(ioDispatcher) {
                         catalog ?: parseReviewedArtworkFeed(platform.download(HOME_ARTWORK_FEED_URL, 2_000_000).decodeToString())
                     }
-                    activeCatalog = reviewed
+                    activeCatalog = (reviewed + personalApprovals).distinctBy { it.artwork.id }
                     legacyMetadata?.let { old ->
                         withContext(ioDispatcher) { runCatching { restoreCollection(old, reviewed) } }
                         legacyMetadata = null
@@ -122,7 +125,7 @@ class HomeArtworkRepository(
                     val reusedImages = downloaded.count { it.id in seen }
                     val updatedSeen = (seen + downloaded.map { it.id }).toList().takeLast(2000)
                     // The small atomic metadata commit is the collection's publication point.
-                    platform.writeMetadata(encodeCollection(downloaded, rotation, updated, updatedSeen, reviewed))
+                    platform.writeMetadata(encodeCollection(downloaded, rotation, updated, updatedSeen, activeCatalog))
                     seen.addAll(downloaded.map { it.id })
                     activeRotation = rotation
                     lastFailure = null
@@ -143,7 +146,7 @@ class HomeArtworkRepository(
                     }
                 } finally {
                     withContext(NonCancellable + ioDispatcher) {
-                        runCatching { platform.retainImages(mutable.value.artworks.map { it.id }.toSet()) }
+                        runCatching { platform.retainImages((mutable.value.artworks.map { it.id } + personalApprovals.map { it.artwork.id }).toSet()) }
                     }
                     if (version == generation) manualRequest = false
                 }
@@ -172,7 +175,9 @@ class HomeArtworkRepository(
         for (reviewed in candidates.take(15)) {
             val artwork = reviewed.artwork
             val result = runCatching {
-                val bytes = platform.download(artwork.imageUrl, 8_000_000)
+                val bytes = if (personalApprovals.any { it.artwork.id == artwork.id }) {
+                    requireNotNull(platform.readImage(artwork.id))
+                } else platform.download(artwork.imageUrl, 8_000_000)
                 require(artworkSha256(bytes) == reviewed.sha256) { "Artwork changed since visual review" }
                 val image = bytes.decodeToImageBitmap()
                 require(image.width in 100..1800 && image.height in 100..1800)
@@ -190,13 +195,18 @@ class HomeArtworkRepository(
 
     @OptIn(ExperimentalResourceApi::class)
     private suspend fun restore() = withContext(ioDispatcher) {
+        personalApprovals = runCatching { platform.readPersonalApprovals()?.let {
+            parseReviewedArtworkFeed(it, personalDeviceApproval = true)
+        }.orEmpty() }.getOrDefault(emptyList())
         runCatching {
             val root = Json.parseToJsonElement(platform.readMetadata() ?: return@runCatching).jsonObject
             seen.addAll(root["seen"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content })
-            val reviewed = catalog ?: root["reviewedCatalog"]?.let { parseReviewedArtworkFeed(it.toString()) }
+            val reviewed = catalog ?: root["reviewedCatalog"]?.let {
+                parseReviewedArtworkFeed(it.toString(), personalDeviceApproval = personalApprovals.isNotEmpty())
+            }
             if (reviewed == null) { legacyMetadata = root; return@runCatching }
-            activeCatalog = reviewed
-            restoreCollection(root, reviewed)
+            activeCatalog = (reviewed + personalApprovals).distinctBy { it.artwork.id }
+            restoreCollection(root, activeCatalog)
         }
     }
 
@@ -214,10 +224,36 @@ class HomeArtworkRepository(
                 require(bitmap.width in 100..1800 && bitmap.height in 100..1800)
                 approved.artwork.copy(bitmap = cropArtwork(bitmap, approved.crop))
             }
-            require(artworks.size == 5 && artworks.distinctBy { it.id }.size == 5)
+            require(artworks.size in 1..5 && artworks.distinctBy { it.id }.size == artworks.size)
+            require(artworks.size == 5 || artworks.all { image -> personalApprovals.any { it.artwork.id == image.id } })
             val updatedAt = Instant.parse(root.getValue("updated").jsonPrimitive.content)
             activeRotation = root.getValue("rotation").jsonPrimitive.int
             mutable.value = HomeArtworkCollectionState(artworks, updatedAt = updatedAt)
+    }
+
+    /** Explicit user approval only; no upload or publication to the shared feed. */
+    suspend fun approveForDevice(candidate: UnreviewedArtwork, theme: ArtworkTheme, bytes: ByteArray) {
+        restored.await()
+        mutex.withLock {
+            withContext(ioDispatcher) {
+                require(artworkSha256(bytes) == candidate.sha256) { "Image changed since preview; review it again" }
+                val bitmap = decodeArtworkReviewPreview(bytes)
+                val image = candidate.artwork.copy(id = "personal-" + candidate.artwork.id, bitmap = bitmap)
+                require(image.id.length <= 80)
+                val approved = ReviewedHomeArtwork(image.copy(bitmap = null), candidate.sha256, theme = theme)
+                val updatedApprovals = (personalApprovals.filterNot { it.artwork.id == image.id } + approved).takeLast(100)
+                platform.writeImage(image.id, bytes)
+                platform.writePersonalApprovals(encodeReviewedArtworkFeed(updatedApprovals).toString())
+                personalApprovals = updatedApprovals
+                activeCatalog = (activeCatalog.filterNot { it.artwork.id == image.id } + approved)
+                val images = (listOf(image) + mutable.value.artworks.filterNot { it.id == image.id }).take(5)
+                val updated = clock.now()
+                platform.writeMetadata(encodeCollection(images, activeRotation ?: 0, updated, (seen + image.id).toList(), activeCatalog))
+                seen.add(image.id)
+                mutable.value = HomeArtworkCollectionState(images, updatedAt = updated,
+                    notice = "Personally approved on this device · Not published to other users")
+            }
+        }
     }
 }
 

@@ -5509,9 +5509,9 @@ private fun EditorialQuranReadingStage(
 
     val isPlaying = playback.isPlaying && playback.surahIndex == surah.number - 1
     val compression = compactProgress.coerceIn(0f, 1f)
-    var arabicFontScale by remember(surah.number) { mutableFloatStateOf(1f) }
+    var arabicFontScale by rememberTodayReadingZoom(quranPrefs)
     val applyPinchZoom: (Float) -> Unit = { zoomChange ->
-        arabicFontScale = (arabicFontScale * zoomChange).coerceIn(0.75f, 2f)
+        arabicFontScale = (arabicFontScale * zoomChange).coerceIn(0.75f, 3f)
     }
     // Keep translations paired with their verse. Arabic-only reading flows in
     // bounded passages so even long Surahs retain lazy text layout.
@@ -5648,7 +5648,8 @@ private fun EditorialQuranReadingStage(
                 textAlignment = textAlignment,
                 translationCode = translationCode,
                 onOpenSurah = onOpenSurah,
-                modifier = Modifier.fillMaxWidth().weight(1f).detectPinchZoom(surah.number, applyPinchZoom),
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                onPinchZoom = applyPinchZoom,
             )
         }
     }

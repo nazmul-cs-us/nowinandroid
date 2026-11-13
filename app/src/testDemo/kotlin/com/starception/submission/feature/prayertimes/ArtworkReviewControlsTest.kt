@@ -7,6 +7,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -20,6 +22,8 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import com.starception.submission.core.images.ArtworkReviewRepository
 import com.starception.submission.core.images.ArtworkTheme
 import com.starception.submission.core.images.LocalArtworkReviewRepository
+import com.starception.submission.core.images.LocalHomeArtworkRepository
+import com.starception.submission.core.images.HomeArtworkRepository
 import com.starception.submission.settings.components.HomeArtworkReviewControls
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -38,13 +42,17 @@ class ArtworkReviewControlsTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var platform: ReviewPlatformFixture
     private lateinit var repository: ArtworkReviewRepository
+    private lateinit var homePlatform: OnlineHomeArtworkTest.Platform
+    private lateinit var home: HomeArtworkRepository
 
     private fun render() {
         compose.setContent {
             val scope = rememberCoroutineScope()
             platform = remember { ReviewPlatformFixture() }
             repository = remember { ArtworkReviewRepository(platform, scope, dispatcher = Dispatchers.Main.immediate, initialPageOffset = 0) }
-            CompositionLocalProvider(LocalArtworkReviewRepository provides repository) {
+            homePlatform = remember { OnlineHomeArtworkTest.Platform() }
+            home = remember { HomeArtworkRepository(homePlatform, scope, ioDispatcher = Dispatchers.Main.immediate) }
+            CompositionLocalProvider(LocalArtworkReviewRepository provides repository, LocalHomeArtworkRepository provides home) {
                 MaterialTheme(colorScheme = darkColorScheme()) { HomeArtworkReviewControls(ArtworkTheme.NATURE) }
             }
         }
@@ -82,8 +90,8 @@ class ArtworkReviewControlsTest {
         render()
         openGallery()
         compose.onNodeWithTag("homeArtworkReviewGallery").assertExists()
-        compose.onNodeWithText("Nothing here is approved for Home.", substring = true).assertExists()
-        compose.onAllNodesWithText("UNREVIEWED", substring = true)[0].assertExists()
+        compose.onNodeWithText("Preview only until you approve.", substring = true).assertExists()
+        compose.onAllNodesWithText("Not approved")[0].assertExists()
         val file = File(System.getProperty("java.io.tmpdir"), "opencode/unapproved-artwork-review.png")
         file.parentFile.mkdirs()
         compose.onNodeWithTag("homeArtworkReviewGallery").captureRoboImage(file.absolutePath,
@@ -110,8 +118,27 @@ class ArtworkReviewControlsTest {
     @Test fun manuallyDismissingAPreviewDoesNotApproveIt() {
         render()
         openGallery()
-        compose.onAllNodesWithText("Dismiss this preview")[0].performScrollTo().performClick()
+        compose.onAllNodesWithText("Skip")[0].performClick()
         compose.runOnIdle { assertEquals(4, repository.state.value.candidates.size) }
-        compose.onNodeWithText("Nothing here is approved for Home.", substring = true).assertExists()
+        compose.onNodeWithText("Preview only until you approve.", substring = true).assertExists()
+    }
+
+    @Test fun approvalRequiresBothConfirmationsAndAddsAnImageOnlyToThisDevice() {
+        render()
+        openGallery()
+        compose.onAllNodesWithTag("homeArtworkApprove")[0].performClick()
+        compose.onNodeWithTag("homeArtworkApproveConfirm").assertIsNotEnabled()
+        compose.onNodeWithTag("homeArtworkConfirmContent").performClick()
+        compose.onNodeWithTag("homeArtworkApproveConfirm").assertIsNotEnabled()
+        compose.onNodeWithTag("homeArtworkConfirmRights").performClick()
+        compose.onNodeWithTag("homeArtworkApproveConfirm").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Approved on this device · Added to Home").assertExists()
+        compose.runOnIdle {
+            assertEquals(1, home.state.value.artworks.size)
+            assertTrue(home.state.value.artworks.single().id.startsWith("personal-"))
+            assertNotNull(homePlatform.personalMetadata)
+            assertTrue(homePlatform.requests.isEmpty())
+        }
     }
 }

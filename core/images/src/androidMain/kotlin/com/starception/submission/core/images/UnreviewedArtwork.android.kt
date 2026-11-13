@@ -29,6 +29,7 @@ internal class AndroidArtworkReviewPlatform : ArtworkReviewPlatform {
             require(allowedArtworkReviewDownload(address))
             require(target.protocol == "https" && target.userInfo == null && target.port in listOf(-1, 443))
             val connection = target.openConnection() as HttpsURLConnection
+            Log.i("ArtworkReview", "Starting preview request host=${target.host}")
             connection.connectTimeout = 15_000
             connection.readTimeout = 20_000
             connection.instanceFollowRedirects = false
@@ -57,6 +58,9 @@ internal class AndroidArtworkReviewPlatform : ArtworkReviewPlatform {
                     }
                     output.toByteArray().also { require(it.isNotEmpty()) }
                 }
+            } catch (failure: Exception) {
+                Log.w("ArtworkReview", "Preview request failed host=${target.host} reason=${failure.javaClass.simpleName}")
+                throw failure
             } finally { connection.disconnect() }
         }
         error("Too many artwork preview redirects")

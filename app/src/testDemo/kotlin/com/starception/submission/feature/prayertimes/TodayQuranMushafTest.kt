@@ -24,6 +24,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,6 +57,73 @@ import org.robolectric.annotation.GraphicsMode
 class TodayQuranMushafTest {
     @get:Rule val compose = createComposeRule()
     private val busOwner = Any()
+
+    @Test fun embeddedTranslationsUseRealParagraphBreaksWithoutStrayInlineControls() {
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
+            Reader(showTranslation = true, translations = mapOf(1 to "Glorify the name of your Lord, the Most High."), height = 600)
+        } }
+        val layout = arabicLayout()
+        val text = layout.layoutInput.text.text
+        assertTrue(text.contains("Glorify the name of your Lord, the Most High."))
+        assertTrue(layout.layoutInput.text.paragraphStyles.isNotEmpty())
+        assertFalse(text.contains('\u2028'))
+        assertFalse(text.contains('\u2068'))
+        assertFalse(text.contains('\u2069'))
+        val translationEnd = text.indexOf("Glorify the name of your Lord, the Most High.") +
+            "Glorify the name of your Lord, the Most High.".length - 1
+        val nextAyah = text.indexOf("الَّذِي")
+        assertTrue("The next ayah must remain on the same rendered page", nextAyah >= 0)
+        val gap = layout.getLineTop(layout.getLineForOffset(nextAyah)) -
+            layout.getLineBottom(layout.getLineForOffset(translationEnd))
+        assertTrue("Translation paragraphs must not insert an empty Arabic-height line: gap=$gap", gap <= 4f)
+    }
+
+    @Test fun shortPagesKeepNavigationNearTheLastAyahInsteadOfAtTheViewportBottom() {
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) { Reader(height = 650) } }
+        val textNode = compose.onAllNodes(hasText("سَبِّحِ", substring = true), useUnmergedTree = true)[0]
+        val textTop = textNode.fetchSemanticsNode().boundsInRoot.top
+        val layout = arabicLayout()
+        val lastLineBottom = textTop + layout.getLineBottom(layout.lineCount - 1)
+        val labelTop = compose.onNodeWithTag("todayQuranMushafPageNumber").fetchSemanticsNode().boundsInRoot.top
+        assertTrue("Page controls must follow the short passage, not sit across a large empty region",
+            labelTop <= lastLineBottom + 64f)
+    }
+
+    @Test fun pinchingTheActualMushafSurfaceCanEnlargeItsText() {
+        val fontSize = mutableStateOf(41f)
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
+            TodayQuranMushaf(verses, emptyMap(), "uthmani_script", fontSize.value, false, false,
+                emptyMap(), "justify", "en", {}, Modifier.size(360.dp, 500.dp),
+                onPinchZoom = { fontSize.value = (fontSize.value * it).coerceIn(20f, 120f) })
+        } }
+        compose.onNodeWithTag("todayQuranMushaf").performTouchInput {
+            down(0, Offset(120f, 140f))
+            down(1, Offset(220f, 140f))
+            moveTo(0, Offset(80f, 140f), delayMillis = 200)
+            moveTo(1, Offset(260f, 140f), delayMillis = 200)
+            up(0)
+            up(1)
+        }
+        compose.mainClock.advanceTimeBy(500)
+        compose.runOnIdle { assertTrue("Pinch-out must increase the reading size", fontSize.value > 50f) }
+    }
+
+    @OptIn(ExperimentalRoborazziApi::class)
+    @Test fun embeddedReaderLeavesArtworkVisibleInsteadOfPaintingTheThemeSurface() {
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme(surface = Color(0xFF36170E))) {
+            Box(Modifier.size(360.dp, 404.dp).background(Color.Magenta)) {
+                TodayQuranMushaf(verses, emptyMap(), "uthmani_script", 41f, false, false,
+                    emptyMap(), "justify", "en", {})
+            }
+        } }
+        val output = File(System.getProperty("java.io.tmpdir"), "opencode/todays-reading-transparent-regression.png")
+        output.parentFile.mkdirs()
+        compose.onRoot().captureRoboImage(output.absolutePath,
+            roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
+        val bitmap = requireNotNull(android.graphics.BitmapFactory.decodeFile(output.absolutePath))
+        assertEquals("The embedded page must not cover the artwork with a solid theme surface",
+            android.graphics.Color.MAGENTA, bitmap.getPixel(180, 300))
+    }
     private val verses = listOf(
         "سَبِّحِ اسْمَ رَبِّكَ الْأَعْلَىٰ",
         "الَّذِي خَلَقَ فَسَوَّىٰ",
@@ -86,7 +155,7 @@ class TodayQuranMushafTest {
         return results.single()
     }
 
-    @Test fun embeddedAndSurahReadersUseTheSameArabicShapingSizeAndLineBreaking() {
+    @Test fun embeddedReaderKeepsSurahTypographyButPacksNarrowLinesBeforeWrapping() {
         val font = mutableStateOf("uthmani_script")
         compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
             Row(Modifier.background(Color.Black)) {
@@ -107,8 +176,13 @@ class TodayQuranMushafTest {
             assertEquals(full.layoutInput.style.fontSize, embedded.layoutInput.style.fontSize)
             assertEquals(full.layoutInput.style.textAlign, embedded.layoutInput.style.textAlign)
             assertEquals(full.layoutInput.style.color, embedded.layoutInput.style.color)
-            assertEquals(full.layoutInput.text.text, embedded.layoutInput.text.text)
-            assertEquals(full.lineCount, embedded.lineCount)
+            assertEquals(full.layoutInput.text.text.filterNot { it == '\u2060' || it == '\u200B' },
+                embedded.layoutInput.text.text.filterNot { it == '\u2060' || it == '\u200B' })
+            assertTrue("Full Surah pages keep their word-to-marker binding", full.layoutInput.text.text.contains('\u2060'))
+            assertFalse("Home must not move a fitting word merely to keep its ornament attached",
+                embedded.layoutInput.text.text.contains('\u2060'))
+            assertEquals(androidx.compose.ui.text.style.LineBreak.Simple, embedded.layoutInput.style.lineBreak)
+            assertEquals(androidx.compose.ui.text.style.LineBreak.Paragraph, full.layoutInput.style.lineBreak)
         }
     }
 
@@ -163,8 +237,12 @@ class TodayQuranMushafTest {
         compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) { Reader(fontSize = 70f, height = 220) } }
         compose.onNodeWithContentDescription("Previous Mushaf page").assertIsNotEnabled()
         val next = compose.onNodeWithContentDescription("Next Mushaf page")
+        val layout = arabicLayout()
+        val filler = layout.layoutInput.text.getStringAnnotations("androidx.compose.foundation.text.inlineContent", 0,
+            layout.layoutInput.text.length).firstOrNull { it.item == "mushafLineFiller" }?.start ?: layout.layoutInput.text.length
+        val contentLine = layout.getLineForOffset((filler - 1).coerceAtLeast(0))
         val textBottom = compose.onAllNodes(hasText("سَبِّحِ", substring = true), useUnmergedTree = true)
-            .fetchSemanticsNodes().first().boundsInRoot.bottom
+            .fetchSemanticsNodes().first().boundsInRoot.top + layout.getLineBottom(contentLine)
         assertTrue("Page controls must sit below the Quran text", next.fetchSemanticsNode().boundsInRoot.top >= textBottom)
         next.performClick()
         val label = compose.onNodeWithTag("todayQuranMushafPageNumber").fetchSemanticsNode()

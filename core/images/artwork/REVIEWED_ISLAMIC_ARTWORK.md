@@ -34,12 +34,17 @@ Cleveland open-access API (Islamic). This does not wait for a GitHub feed update
 **Fetch more** searches a different provider result page rather than shuffling the
 Home cache. Known published IDs and already viewed preview IDs/hashes are skipped.
 
-The gallery offers full-image, source and rights links and a dismiss action. It
-does **not** approve, publish, or automatically apply images to Home. Manual content
-and rights review plus the publication workflow below are still required for Home.
+The gallery offers **Approve / Skip**, with expandable source and rights details.
+Approval requires separate confirmation of image content (no people or animals)
+and reuse rights. The app re-downloads the original image and verifies its preview
+hash before saving it in private app storage and adding it to Home immediately.
+Approvals and original image bytes survive offline relaunches on that device.
+They are never uploaded to the shared feed, and do not require GitHub publishing.
+The publication workflow below is only for approvals intended for all app users.
 Switching **Restrict** back on cancels the request and clears the in-memory gallery.
 There are no scheduled preview fetches and no unreviewed writes to Home's offline
-collection. Previews are bounded to five images, resized to at most 720 pixels on
+collection. Explicitly approved images are stored separately from the preview session.
+Previews are bounded to five images, resized to at most 720 pixels on
 their longest side; the original image remains available through the full-image link.
 Downloads use a separate HTTPS endpoint/redirect allowlist and byte/dimension limits.
 Android preview-network diagnostics use the `ArtworkReview` logcat tag.

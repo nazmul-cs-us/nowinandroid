@@ -74,6 +74,9 @@ internal class AndroidHomeArtworkPlatform(context: Context) : HomeArtworkPlatfor
     override fun readMetadata(): String? = metadata.takeIf { it.isFile && it.length() <= 1_000_000 }?.readText()
 
     override fun writeMetadata(value: String) = atomicWrite(metadata, value.encodeToByteArray())
+    override fun readPersonalApprovals(): String? = File(directory, "personal-approvals.json")
+        .takeIf { it.isFile && it.length() <= 1_000_000 }?.readText()
+    override fun writePersonalApprovals(value: String) = atomicWrite(File(directory, "personal-approvals.json"), value.encodeToByteArray())
     override fun readImage(id: String): ByteArray? = image(id).takeIf { it.isFile && it.length() <= 8_000_000 }?.readBytes()
     override fun writeImage(id: String, bytes: ByteArray) = atomicWrite(image(id), bytes)
     override fun retainImages(ids: Set<String>) {

@@ -263,6 +263,7 @@ private fun ArtworkAvailability(collection: HomeArtworkCollectionState, frequenc
     Text(when {
         collection.loading -> "Fetching reviewed artwork…"
         collection.artworks.size == 5 -> "5 downloaded artworks · Available offline"
+        collection.artworks.isNotEmpty() -> "${collection.artworks.size} approved artwork(s) · Available offline"
         !onlineEnabled -> "Tap Refresh now to download your first collection"
         frequency == ArtworkFrequency.FIXED -> "Bundled fallback · Automatic updates paused"
         else -> "Bundled fallback · Online updates enabled"

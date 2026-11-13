@@ -607,7 +607,7 @@ fun FamilyCallOverlay(client: FamilyClient) {
             mute = { client.mute() }, speaker = { client.speaker() }, camera = { client.toggleCamera(); client.previewCamera() }, flip = { client.switchCamera() }),
             remoteReady = remote != null, localReady = local != null,
             remoteVideo = { VideoSurface(client.media, false, Modifier.fillMaxSize(), onGlassFrame = { remoteGlassFrame = it }) },
-            localVideo = { VideoSurface(client.media, true, Modifier.fillMaxSize(), onGlassFrame = { localGlassFrame = it }) },
+            localVideo = { VideoSurface(client.media, true, Modifier.fillMaxSize(), fitPreview = true, onGlassFrame = { localGlassFrame = it }) },
             localThumbnail = { VideoSurface(client.media, true, Modifier.fillMaxSize()) },
             glassFrame = if (call.stage == "ringing" && state.camera) localGlassFrame else remoteGlassFrame)
     }
@@ -743,6 +743,7 @@ private fun CallControl(icon: ImageVector, label: String, active: Boolean = fals
 
 @Composable
 private fun VideoSurface(media: AndroidFamilyMedia, local: Boolean, modifier: Modifier,
+    fitPreview: Boolean = false,
     onGlassFrame: ((androidx.compose.ui.graphics.ImageBitmap?) -> Unit)? = null) {
     val track by (if (local) media.localVideo else media.remoteVideo).collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -750,7 +751,8 @@ private fun VideoSurface(media: AndroidFamilyMedia, local: Boolean, modifier: Mo
     val latestFrameConsumer by rememberUpdatedState(onGlassFrame)
     val renderer = remember { SurfaceViewRenderer(context).apply {
         init(media.egl.eglBaseContext, null); setMirror(local); setZOrderMediaOverlay(local)
-        setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+        setScalingType(if (fitPreview) org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT
+            else org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
         setEnableHardwareScaler(true)
     } }
     DisposableEffect(track, renderer) {

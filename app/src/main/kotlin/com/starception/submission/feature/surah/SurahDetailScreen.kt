@@ -5986,9 +5986,10 @@ private fun MushafPageWithFrame(
     /** Shared show/hide progress so removal waits for the fade-out to finish. */
     translationVisibility: Float = 1f,
     embedded: Boolean = false,
+    onContentBottom: ((Float) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    val surfaceColor = if (embedded) Color.Transparent else MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val glowColor = MaterialTheme.colorScheme.primary
     val markerColor = onSurfaceColor.copy(alpha = 0.90f)
@@ -6168,11 +6169,11 @@ private fun MushafPageWithFrame(
     val navBarHeight = if (embedded) 0.dp else with(LocalDensity.current) {
         WindowInsets.navigationBars.getBottom(this).toDp()
     }
-    val horizontalPadding = 12.dp
+    val horizontalPadding = if (embedded) 0.dp else 12.dp
     // 16dp strip at the top hosts the morphing pull-down hint drawn by the
     // screen overlay (pill ↔ grabber); MUST match the paginator's topPadding
     // so measured pages fit exactly.
-    val topPadding = 16.dp
+    val topPadding = if (embedded) 4.dp else 16.dp
     // Keep the render bounds identical to the paginator's bounds. The page is
     // edge-to-edge, so the navigation inset is part of maxHeight and must be
     // excluded here as well as during page splitting.
@@ -6335,7 +6336,17 @@ private fun MushafPageWithFrame(
 
             Text(
                 text = pageText,
-                onTextLayout = { pageLayout.value = it },
+                onTextLayout = { layout ->
+                    pageLayout.value = layout
+                    val filler = pageText.getStringAnnotations("androidx.compose.foundation.text.inlineContent", 0, pageText.length)
+                        .firstOrNull { it.item == MUSHAF_LINE_FILLER_TAG }?.start ?: pageText.length
+                    if (filler > 0 && layout.lineCount > 0) {
+                        val line = layout.getLineForOffset(filler - 1)
+                        onContentBottom?.invoke(layout.getLineBottom(line) + with(cloudDensity) {
+                            (topPadding + bismillahHeightDp + 8.dp).toPx()
+                        })
+                    }
+                },
                 inlineContent = renderedInlineContent,
                 color = onSurfaceColor,
                 style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
@@ -6344,7 +6355,10 @@ private fun MushafPageWithFrame(
                     // High-quality (optimizing) line breaking packs words far more
                     // evenly than the greedy default, so Justify stretches gaps much
                     // less. MUST match the paginator's measureStyle exactly.
-                    lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
+                    // The narrow Home tile should fill the current line before wrapping,
+                    // rather than balancing spare space across subsequent lines.
+                    lineBreak = if (embedded) androidx.compose.ui.text.style.LineBreak.Simple
+                        else androidx.compose.ui.text.style.LineBreak.Paragraph,
                     textDirection = androidx.compose.ui.text.style.TextDirection.Rtl,
                     letterSpacing = 0.sp,
                     lineHeight = lineHeightSp.sp,
@@ -6621,12 +6635,15 @@ internal fun MushafPagerView(
     /** Home places accessible page controls below the text rather than over it. */
     showEdgeControls: Boolean = true,
     requestedPage: Int? = null,
+    onPinchZoom: ((Float) -> Unit)? = null,
+    onContentBottom: ((Float) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (ayahs.isEmpty()) return
+    val currentPinchZoom by rememberUpdatedState(onPinchZoom)
 
     val markerColor = MaterialTheme.colorScheme.primary
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    val surfaceColor = if (embedded) Color.Transparent else MaterialTheme.colorScheme.surface
     // Keep only the current page and Compose's bounded neighbour in memory. The former
     // curl renderer retained multiple full-screen graphics layers during rapid turns;
     // together with Arabic TextLayout objects this exhausted the 256 MB app heap.
@@ -6689,11 +6706,11 @@ internal fun MushafPagerView(
         WindowInsets.navigationBars.getBottom(this).toDp()
     }
     val lineSpacingMultiplier = 1.55f
-    val horizontalPadding = 12.dp
+    val horizontalPadding = if (embedded) 0.dp else 12.dp
     // 16dp strip at the top hosts the morphing pull-down hint drawn by the
     // screen overlay (pill ↔ grabber); MUST match MushafPageWithFrame's
     // topPadding so rendered pages fit exactly.
-    val topPadding = 16.dp
+    val topPadding = if (embedded) 4.dp else 16.dp
     val bottomPadding = navBarHeight + 8.dp
     val bismillahHeightDp = 36.dp
 
@@ -6795,7 +6812,7 @@ internal fun MushafPagerView(
     )
 
     val markerData = remember(
-        ayahs, showTranslation, hiddenTranslationAyahs, showTajweed, tajweedAnnotations,
+        ayahs, showTranslation, hiddenTranslationAyahs, showTajweed, tajweedAnnotations, embedded,
         typesetFontSize, translationCode, inlinedAyah, inlinedText,
     ) {
         val placeholderRanges = mutableListOf<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
@@ -6844,7 +6861,11 @@ internal fun MushafPagerView(
                 // The end marker always belongs to the Arabic ayah. Previously a
                 // revealed translation moved the marker below the translation,
                 // making the Arabic ending look unfinished and the gloss detached.
-                append('\u2060') // WORD JOINER: marker wraps with the final word
+                // On the narrow Home tile, forcing the final word and ornament
+                // into one unit can leave space large enough for the word unused.
+                // Permit a wrap at the ornament, never inside the Arabic word.
+                // Full Surah pages retain their printed-Mushaf punctuation rule.
+                append(if (embedded && !showTranslation) '\u200B' else '\u2060')
                 val markerStart = length
                 appendInlineContent("ayahOrnament", slotText)
                 placeholderRanges.add(
@@ -6868,7 +6889,7 @@ internal fun MushafPagerView(
                     )
                     // A compact leading break makes the translation readable
                     // without inserting a full Arabic line of empty space.
-                    withStyle(translationSeparatorParagraphStyle) {
+                    if (!embedded) withStyle(translationSeparatorParagraphStyle) {
                         withStyle(translationSeparatorSpanStyle) { append('\u2028') }
                     }
                     withStyle(translationParagraphStyle) {
@@ -6876,14 +6897,17 @@ internal fun MushafPagerView(
                             // FIRST-STRONG ISOLATE lets Bengali, English, Arabic,
                             // Urdu and other selected translations choose their
                             // own direction inside the surrounding RTL Mushaf.
-                            append('\u2068')
+                            if (!embedded) append('\u2068')
                             append(translationText)
-                            append('\u2069') // POP DIRECTIONAL ISOLATE
+                            if (!embedded) append('\u2069') // POP DIRECTIONAL ISOLATE
+                            // ParagraphStyle already establishes the Home gloss's
+                            // boundaries. An additional newline creates a phantom
+                            // empty paragraph at the end of the styled range.
                         }
                     }
                     // The next Arabic ayah begins immediately after this gloss,
                     // preserving a consistent ayah-by-ayah reading sequence.
-                    withStyle(translationSeparatorParagraphStyle) {
+                    if (!embedded) withStyle(translationSeparatorParagraphStyle) {
                         withStyle(translationSeparatorSpanStyle) { append('\u2028') }
                     }
                     pop()
@@ -7041,6 +7065,7 @@ internal fun MushafPagerView(
                         var directionDecided = false
                         var isVerticalScroll = false
                         var verticalDragTotal = 0f
+                        var previousPinchSpan = 0f
                         val touchSlop = viewConfiguration.touchSlop
 
                         do {
@@ -7053,8 +7078,12 @@ internal fun MushafPagerView(
                                 // Do not consume here; the control's interop handler
                                 // needs the unchanged stream to follow the finger.
                             } else if (pointers.size >= 2) {
+                                val span = (pointers[0].position - pointers[1].position).getDistance()
+                                if (previousPinchSpan > 0f && span > 0f) currentPinchZoom?.invoke(span / previousPinchSpan)
+                                previousPinchSpan = span
                                 pointers.forEach { it.consume() }
                             } else if (pointers.size == 1) {
+                                previousPinchSpan = 0f
                                 val change = pointers[0]
                                 val delta = change.position - change.previousPosition
 
@@ -7147,7 +7176,8 @@ internal fun MushafPagerView(
                 // of that contract: without it the measured paragraph can resolve
                 // LTR (left-aligned last lines), shifting every X on those lines
                 // ~half a page from what is displayed.
-                lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
+                lineBreak = if (embedded) androidx.compose.ui.text.style.LineBreak.Simple
+                    else androidx.compose.ui.text.style.LineBreak.Paragraph,
                 textDirection = androidx.compose.ui.text.style.TextDirection.Rtl,
                 letterSpacing = 0.sp,
                 lineHeight = (typesetFontSize * lineSpacingMultiplier).sp,
@@ -7240,7 +7270,7 @@ internal fun MushafPagerView(
                     val oneLineWidow = arabicLineBlocks.firstOrNull { (blockStart, blockEnd) ->
                         blockStart <= endLine && blockEnd == endLine + 1 && linesOnPage > 1
                     }
-                    if (oneLineWidow != null) {
+                    if (oneLineWidow != null && !embedded) {
                         linesOnPage--
                         endLine--
                     }
@@ -7293,7 +7323,7 @@ internal fun MushafPagerView(
                     // the master layout and the independently rendered page slice.
                     // Cap the expansion so a widow-protection decision can never
                     // produce visibly loose lines.
-                    val stretchPerGapPx = if (!isFinalPage && lineGapCount > 0) {
+                    val stretchPerGapPx = if (!embedded && !isFinalPage && lineGapCount > 0) {
                         val roundingSafetyPx = with(density) { 1.dp.toPx() }
                         val maxStretchPx = with(density) { 3.dp.toPx() }
                         ((pageHeightPx - usedHeightPx - roundingSafetyPx) / lineGapCount)
@@ -7620,6 +7650,7 @@ internal fun MushafPagerView(
                 val page = paginatedPages.getOrNull(pageIndex) ?: return@HorizontalPager
                 MushafPageWithFrame(
                     embedded = embedded,
+                    onContentBottom = if (pageIndex == state.currentPage) onContentBottom else null,
                     pageText = page.text,
                     tajweed = page.tajweed,
                     inlineContent = pageInlineContent,

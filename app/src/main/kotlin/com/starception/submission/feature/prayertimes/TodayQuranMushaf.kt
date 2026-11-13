@@ -3,6 +3,7 @@ package com.starception.submission.feature.prayertimes
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
@@ -26,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.mutableFloatStateOf
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.feature.surah.MushafPagerView
 import com.starception.submission.feature.surah.tajweed.TajweedAnnotation
@@ -44,6 +48,7 @@ internal fun TodayQuranMushaf(
     translationCode: String,
     onOpenSurah: () -> Unit,
     modifier: Modifier = Modifier,
+    onPinchZoom: ((Float) -> Unit)? = null,
 ) {
     if (ayahs.isEmpty()) return
     key(ayahs.first().surahNumber) {
@@ -55,8 +60,14 @@ internal fun TodayQuranMushaf(
         }
         var page by remember { mutableIntStateOf(0) }
         var pageCount by remember { mutableIntStateOf(1) }
+        var viewportHeight by remember { mutableIntStateOf(0) }
+        var contentBottom by remember(readerAyahs, arabicFont, arabicFontSize, page) { mutableFloatStateOf(0f) }
+        val density = LocalDensity.current
+        val footerLift = with(density) {
+            if (contentBottom > 0f) (viewportHeight - contentBottom).coerceAtLeast(0f).toDp() else 0.dp
+        }
         Column(modifier.fillMaxSize().testTag("todayQuranMushaf")) {
-            Box(Modifier.fillMaxWidth().weight(1f)) {
+            Box(Modifier.fillMaxWidth().weight(1f).onSizeChanged { viewportHeight = it.height }) {
                 MushafPagerView(
                     ayahs = readerAyahs,
                     arabicFont = arabicFont,
@@ -72,10 +83,12 @@ internal fun TodayQuranMushaf(
                     embedded = true,
                     showEdgeControls = false,
                     requestedPage = page,
+                    onPinchZoom = onPinchZoom,
+                    onContentBottom = { contentBottom = it },
                     modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
                 )
             }
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).offset(y = 8.dp - footerLift),
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { page-- }, enabled = page > 0,
                     modifier = Modifier.semantics { contentDescription = "Previous Mushaf page" }) {

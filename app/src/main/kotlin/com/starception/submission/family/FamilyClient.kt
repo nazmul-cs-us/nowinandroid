@@ -306,6 +306,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         if (clearSaved) { restoreEpoch++; restoreJob?.cancel(); restorePolicy.explicitSignOut(); credentials.clear() }
         generation++
         receiptVersion = 0; deliverySync?.cancel(); deliverySync = null
+        readAcknowledgement?.cancel(); readAcknowledgement = null
         inboxVersion = 0L
         presenceCache.clear()
         heartbeat?.cancel(); heartbeat = null
@@ -483,7 +484,10 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             mergeMessages((0 until rows.length()).map { FamilyChatMessage.parse(rows.getJSONObject(it)) })
         }
     }
-    fun markChatRead(ids: List<String>) = scope.launch {
+    private var readAcknowledgement: kotlinx.coroutines.Job? = null
+    fun markChatRead(ids: List<String>): kotlinx.coroutines.Job {
+        readAcknowledgement?.takeIf { it.isActive }?.let { return it }
+        return scope.launch {
         val s = mutable.value; val peer = s.chatPeer ?: return@launch
         val visible = s.messages.filter { it.id in ids }
         if (!foreground || s.call != null || visible.isEmpty()) return@launch
@@ -492,8 +496,12 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             val reply = request("read_messages", "peer" to peer, "through" to visible.maxOf { it.sequence },
                 "ids" to JSONArray(visible.filter { it.to == s.me && it.call == null && it.seenAt == 0L }.take(50).map { it.id }))
             if (token == generation) apply(reply)
+            android.util.Log.i("FamilyReceipts", "Seen acknowledgement completed; protocolVersion=${reply.optInt("receiptVersion")}")
         } catch (e: CancellationException) { throw e }
-        catch (_: Exception) { /* The next visibility/session change retries. */ }
+        catch (failure: Exception) {
+            android.util.Log.w("FamilyReceipts", "Seen acknowledgement failed: ${failure.javaClass.simpleName}")
+        }
+        }.also { readAcknowledgement = it }
     }
     fun acknowledgeNotifications() = perform { apply(request("ack_notifications")) }
     private fun chatError(e: Exception): String = when (e.message) {

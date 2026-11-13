@@ -64,10 +64,14 @@ class FamilyOutgoingVideoUiTest {
         val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
         val card = compose.onNodeWithTag("familyVideoMainCard").fetchSemanticsNode().boundsInRoot
         val preview = compose.onAllNodesWithTag("localVideoFixture")[0].fetchSemanticsNode().boundsInRoot
-        compose.onAllNodesWithTag("localVideoFixture").assertCountEquals(2)
+        compose.onAllNodesWithTag("localVideoFixture").assertCountEquals(1)
         assertTrue("Preview must not be full bleed", card.left > root.left && card.right < root.right)
         assertTrue(preview.left >= card.left && preview.right <= card.right && preview.bottom <= card.bottom)
         compose.onNodeWithTag("familyVideoShelf").assertIsDisplayed()
+        val shelf = compose.onNodeWithTag("familyVideoShelf").fetchSemanticsNode().boundsInRoot
+        assertTrue("Portrait controls must remain inside the video frame", shelf.bottom <= card.bottom)
+        val cancel = compose.onNodeWithContentDescription("Cancel").fetchSemanticsNode().boundsInRoot
+        assertTrue("Cancel must not protrude above the toolbar", cancel.top >= shelf.top)
         compose.onNodeWithText("Your camera preview").assertIsDisplayed()
         compose.onNodeWithText("Calling…").assertIsDisplayed()
         compose.onNodeWithContentDescription("Camera").assertIsDisplayed().performClick()
@@ -104,7 +108,7 @@ class FamilyOutgoingVideoUiTest {
             FamilyCallContent(ui.value, elapsed = 94, localReady = true, remoteReady = true,
                 localVideo = { Text("Local camera fixture") }, remoteVideo = { Text("Remote camera fixture") })
         } }
-        compose.onAllNodesWithText("Local camera fixture").assertCountEquals(2)
+        compose.onAllNodesWithText("Local camera fixture").assertCountEquals(1)
         compose.onNodeWithText("Remote camera fixture").assertDoesNotExist()
         compose.runOnIdle { ui.value = ui.value.copy(call = ui.value.call?.copy(stage = "active"), mediaConnected = true) }
         compose.onNodeWithTag("familyVideoMainCard").assertIsDisplayed()

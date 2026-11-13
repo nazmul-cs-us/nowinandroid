@@ -54,6 +54,27 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
 @Config(application = Application::class, sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ArtworkReviewRepositoryTest {
+    @Test fun explicitlyApprovedImageIsSavedPrivatelyAndRestoredOfflineWithoutPublishing() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val homePlatform = OnlineHomeArtworkTest.Platform()
+        val home = HomeArtworkRepository(homePlatform, this, ioDispatcher = dispatcher)
+        val platform = ReviewPlatformFixture()
+        val review = ArtworkReviewRepository(platform, this, dispatcher = dispatcher)
+        review.fetch(ArtworkTheme.NATURE, allowUnreviewed = true)
+        advanceUntilIdle()
+        val candidate = review.state.value.candidates.first()
+        review.approveForDevice(candidate, ArtworkTheme.NATURE, home)
+        assertEquals("personal-" + candidate.artwork.id, home.state.value.artworks.single().id)
+        assertNotNull(homePlatform.personalMetadata)
+        assertTrue(homePlatform.images.containsKey("personal-" + candidate.artwork.id))
+        assertEquals(candidate.artwork.artist, home.state.value.artworks.single().artist)
+        homePlatform.offline = true
+        val restored = HomeArtworkRepository(homePlatform, this, ioDispatcher = dispatcher)
+        restored.update(0, frozen = true)
+        advanceUntilIdle()
+        assertEquals(home.state.value.artworks.map { it.id }, restored.state.value.artworks.map { it.id })
+        assertTrue(homePlatform.requests.isEmpty())
+    }
     @Test fun restrictionIsSafeByDefaultAndMakesNoPreviewRequests() = runTest {
         val platform = ReviewPlatformFixture()
         val repository = ArtworkReviewRepository(platform, this, dispatcher = StandardTestDispatcher(testScheduler))

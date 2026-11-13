@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.repeatOnLifecycle
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.collectLatest
 import java.text.DateFormat
 import java.util.Date
 import java.util.Calendar
@@ -86,7 +87,9 @@ internal fun FamilyChatContent(
                             layout.viewportStartOffset.toFloat(), layout.viewportEndOffset.toFloat())
                     }?.id
                 }
-            }.distinctUntilChanged().collect { currentActions.readChat(it) }
+            }.distinctUntilChanged().collectLatest { visible ->
+                acknowledgeVisibleChat(visible, state.me, { currentMessages }, { currentActions.readChat(it) })
+            }
         }
     }
     LaunchedEffect(peer, state.messages.lastOrNull()?.id) {
