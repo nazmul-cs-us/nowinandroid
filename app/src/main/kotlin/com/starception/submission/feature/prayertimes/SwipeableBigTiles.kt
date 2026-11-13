@@ -4122,7 +4122,11 @@ internal fun InsightPreviewCard(
             )
 
             if (isExpanded) {
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .50f)))
+                // Reading needs stronger contrast across the whole passage, not
+                // just the lower gradient. Keep the closed Home cover untouched.
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(
+                    alpha = if (readingSurahIndex != null) .68f else .50f,
+                )))
             }
 
             val isReadingHeader = readingSurahIndex != null && onReadingPlayPause != null

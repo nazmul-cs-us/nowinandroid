@@ -60,14 +60,8 @@ internal fun TodayQuranMushaf(
         }
         var page by remember { mutableIntStateOf(0) }
         var pageCount by remember { mutableIntStateOf(1) }
-        var viewportHeight by remember { mutableIntStateOf(0) }
-        var contentBottom by remember(readerAyahs, arabicFont, arabicFontSize, page) { mutableFloatStateOf(0f) }
-        val density = LocalDensity.current
-        val footerLift = with(density) {
-            if (contentBottom > 0f) (viewportHeight - contentBottom).coerceAtLeast(0f).toDp() else 0.dp
-        }
         Column(modifier.fillMaxSize().testTag("todayQuranMushaf")) {
-            Box(Modifier.fillMaxWidth().weight(1f).onSizeChanged { viewportHeight = it.height }) {
+            Box(Modifier.fillMaxWidth().weight(1f)) {
                 MushafPagerView(
                     ayahs = readerAyahs,
                     arabicFont = arabicFont,
@@ -84,11 +78,10 @@ internal fun TodayQuranMushaf(
                     showEdgeControls = false,
                     requestedPage = page,
                     onPinchZoom = onPinchZoom,
-                    onContentBottom = { contentBottom = it },
                     modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
                 )
             }
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).offset(y = 8.dp - footerLift),
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).offset(y = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { page-- }, enabled = page > 0,
                     modifier = Modifier.semantics { contentDescription = "Previous Mushaf page" }) {

@@ -78,15 +78,12 @@ class TodayQuranMushafTest {
         assertTrue("Translation paragraphs must not insert an empty Arabic-height line: gap=$gap", gap <= 4f)
     }
 
-    @Test fun shortPagesKeepNavigationNearTheLastAyahInsteadOfAtTheViewportBottom() {
+    @Test fun shortPagesKeepNavigationAtTheTileBottomWithoutAnUnusedRegionBelowIt() {
         compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) { Reader(height = 650) } }
-        val textNode = compose.onAllNodes(hasText("سَبِّحِ", substring = true), useUnmergedTree = true)[0]
-        val textTop = textNode.fetchSemanticsNode().boundsInRoot.top
-        val layout = arabicLayout()
-        val lastLineBottom = textTop + layout.getLineBottom(layout.lineCount - 1)
+        val readerBottom = compose.onNodeWithTag("todayQuranMushaf").fetchSemanticsNode().boundsInRoot.bottom
         val labelTop = compose.onNodeWithTag("todayQuranMushafPageNumber").fetchSemanticsNode().boundsInRoot.top
-        assertTrue("Page controls must follow the short passage, not sit across a large empty region",
-            labelTop <= lastLineBottom + 64f)
+        assertTrue("Page controls must not float upward and leave a blank region below them",
+            labelTop >= readerBottom - 48f)
     }
 
     @Test fun pinchingTheActualMushafSurfaceCanEnlargeItsText() {
