@@ -46,7 +46,9 @@ _sandbox
 captures/
 
 # Local visual verification and generated-image working files
-artifacts/screenshots/
+/artifacts/
+/generated_images/
+*.kt.backup
 tmp/
 # Local backups, build logs, and Xcode derived data
 /work/
