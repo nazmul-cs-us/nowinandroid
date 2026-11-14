@@ -5105,6 +5105,14 @@ private const val MUSHAF_TYPESETTING_SCALE = 0.68f
 /** The embedded Home reader and full Surah reader share the same typesetting scale. */
 internal fun mushafReadingFontSize(preferredFontSize: Float): Float = preferredFontSize * MUSHAF_TYPESETTING_SCALE
 
+/** A trailing paragraph break can have height even though it paints no content. */
+internal fun mushafVisibleContentBottom(layout: androidx.compose.ui.text.TextLayoutResult): Float {
+    val last = layout.layoutInput.text.text.indexOfLast {
+        !it.isWhitespace() && it !in charArrayOf('\u200B', '\u2060', '\u2068', '\u2069', '\u200E', '\u200F')
+    }
+    return if (last < 0 || layout.lineCount == 0) 0f else layout.getLineBottom(layout.getLineForOffset(last))
+}
+
 /** Offscreen ink-scan bitmap scale (half resolution is ample for edges). */
 private const val MARKER_INK_SCAN_SCALE = 0.5f
 
@@ -6338,6 +6346,8 @@ private fun MushafPageWithFrame(
                 text = pageText,
                 onTextLayout = { layout ->
                     pageLayout.value = layout
+                    if (embedded) android.util.Log.i("TodayReadingLayout",
+                        "render width=${layout.size.width} height=${layout.size.height} lines=${layout.lineCount} contentBottom=${mushafVisibleContentBottom(layout)}")
                     val filler = pageText.getStringAnnotations("androidx.compose.foundation.text.inlineContent", 0, pageText.length)
                         .firstOrNull { it.item == MUSHAF_LINE_FILLER_TAG }?.start ?: pageText.length
                     if (filler > 0 && layout.lineCount > 0) {
@@ -7244,9 +7254,11 @@ internal fun MushafPagerView(
 
                 val pages = mutableListOf<PaginatedPage>()
                 var currentLine = 0
+                var embeddedCursor = 0
                 var pageNum = 1
 
-                while (currentLine < fullLayout.lineCount) {
+                while (if (embedded) embeddedCursor < masterString.length else currentLine < fullLayout.lineCount) {
+                    if (embedded) currentLine = fullLayout.getLineForOffset(embeddedCursor)
                     val pageHeightPx = if (pageNum == 1) firstPageHeightPx else fullPageHeightPx
                     var linesOnPage = 0
 
@@ -7259,7 +7271,36 @@ internal fun MushafPagerView(
 
                     if (linesOnPage == 0) linesOnPage = 1
 
-                    val startCharIndex = fullLayout.getLineStart(currentLine)
+                    if (embedded) {
+                        // A page slice trims its own first/last line leading.
+                        // Subtracting positions in the whole-Surah layout can
+                        // overestimate its height, especially across translation
+                        // paragraphs, and leave room for another complete line.
+                        val sliceStart = embeddedCursor
+                        fun sliceHeight(lineCount: Int): Float {
+                            val last = currentLine + lineCount - 1
+                            val sliceEnd = if (last == fullLayout.lineCount - 1) masterString.length
+                                else fullLayout.getLineEnd(last, visibleEnd = true)
+                            val placeholders = markerPlaceholders.filter { it.start >= sliceStart && it.end <= sliceEnd }
+                                .map { it.copy(start = it.start - sliceStart, end = it.end - sliceStart) }
+                            val measured = pageMeasurer.measure(
+                                text = masterString.subSequence(sliceStart, sliceEnd),
+                                style = measureStyle,
+                                constraints = androidx.compose.ui.unit.Constraints(maxWidth = availableWidthPx.toInt()),
+                                placeholders = placeholders,
+                                density = density,
+                            )
+                            // Do not reserve a whole invisible trailing paragraph:
+                            // only the last line that actually contains Quran or
+                            // translation content must fit above the controls.
+                            return mushafVisibleContentBottom(measured)
+                        }
+                        while (linesOnPage > 1 && sliceHeight(linesOnPage) > pageHeightPx) linesOnPage--
+                        while (currentLine + linesOnPage < fullLayout.lineCount &&
+                            sliceHeight(linesOnPage + 1) <= pageHeightPx) linesOnPage++
+                    }
+
+                    val startCharIndex = if (embedded) embeddedCursor else fullLayout.getLineStart(currentLine)
                     var endLine = currentLine + linesOnPage - 1
 
                     // Do not leave a single final Arabic line (often only one
@@ -7274,10 +7315,32 @@ internal fun MushafPagerView(
                         linesOnPage--
                         endLine--
                     }
-                    val endCharIndex = if (endLine >= fullLayout.lineCount - 1) {
+                    var endCharIndex = if (endLine >= fullLayout.lineCount - 1) {
                         masterString.length
                     } else {
                         fullLayout.getLineEnd(endLine, visibleEnd = true)
+                    }
+
+                    if (embedded && endCharIndex < masterString.length) {
+                        // Reflow can fit part of the next master-layout line.
+                        // Try complete words, retaining an exact character cursor
+                        // so the remainder starts at the next unread character.
+                        val limit = fullLayout.getLineEnd((endLine + 1).coerceAtMost(fullLayout.lineCount - 1), visibleEnd = true)
+                        var candidateEnd = endCharIndex
+                        while (candidateEnd < limit) {
+                            var next = candidateEnd
+                            while (next < limit && (masterString[next].isWhitespace() || masterString[next] == '\u200B')) next++
+                            while (next < limit && !masterString[next].isWhitespace() && masterString[next] != '\u200B') next++
+                            if (next <= candidateEnd) break
+                            val placeholders = markerPlaceholders.filter { it.start >= startCharIndex && it.end <= next }
+                                .map { it.copy(start = it.start - startCharIndex, end = it.end - startCharIndex) }
+                            val measured = pageMeasurer.measure(masterString.subSequence(startCharIndex, next), measureStyle,
+                                constraints = androidx.compose.ui.unit.Constraints(maxWidth = availableWidthPx.toInt()),
+                                placeholders = placeholders, density = density)
+                            if (mushafVisibleContentBottom(measured) > pageHeightPx) break
+                            endCharIndex = next
+                            candidateEnd = next
+                        }
                     }
 
                     val rawSlice = masterString.subSequence(startCharIndex, endCharIndex)
@@ -7346,7 +7409,15 @@ internal fun MushafPagerView(
                         ),
                     )
 
+                    if (embedded && pageNum == 1) android.util.Log.i("TodayReadingLayout",
+                        "pagination width=$availableWidthPx budget=$pageHeightPx masterLines=$linesOnPage font=$typesetFontSize")
+
                     currentLine += linesOnPage
+                    if (embedded) {
+                        embeddedCursor = endCharIndex
+                        while (embeddedCursor < masterString.length &&
+                            (masterString[embeddedCursor].isWhitespace() || masterString[embeddedCursor] == '\u200B')) embeddedCursor++
+                    }
                     pageNum++
                 }
 

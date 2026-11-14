@@ -72,6 +72,8 @@ class FamilyOutgoingVideoUiTest {
         assertTrue("Portrait controls must remain inside the video frame", shelf.bottom <= card.bottom)
         val cancel = compose.onNodeWithContentDescription("Cancel").fetchSemanticsNode().boundsInRoot
         assertTrue("Cancel must not protrude above the toolbar", cancel.top >= shelf.top)
+        val camera = compose.onNodeWithContentDescription("Camera").fetchSemanticsNode().boundsInRoot
+        assertEquals("Toolbar controls must share the hang-up button's centre line", camera.center.y, cancel.center.y, 1f)
         compose.onNodeWithText("Your camera preview").assertIsDisplayed()
         compose.onNodeWithText("Calling…").assertIsDisplayed()
         compose.onNodeWithContentDescription("Camera").assertIsDisplayed().performClick()

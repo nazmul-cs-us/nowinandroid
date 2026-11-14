@@ -58,6 +58,22 @@ class TodayQuranMushafTest {
     @get:Rule val compose = createComposeRule()
     private val busOwner = Any()
 
+    @Test fun paginationDoesNotReserveAnInvisibleTrailingParagraphAsAContentLine() {
+        var measured: TextLayoutResult? = null
+        compose.setContent {
+            val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+            measured = measurer.measure(androidx.compose.ui.text.AnnotatedString(verses.first().text + "\n"),
+                style = androidx.compose.ui.text.TextStyle(fontSize = 24.sp, lineHeight = 48.sp))
+        }
+        compose.runOnIdle {
+            val layout = requireNotNull(measured)
+            val visibleBottom = com.starception.submission.feature.surah.mushafVisibleContentBottom(layout)
+            assertTrue("A trailing blank paragraph must not prevent another Quran line fitting",
+                visibleBottom < layout.multiParagraph.height)
+            assertEquals(layout.getLineBottom(0), visibleBottom, .01f)
+        }
+    }
+
     @Test fun embeddedTranslationsUseRealParagraphBreaksWithoutStrayInlineControls() {
         compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
             Reader(showTranslation = true, translations = mapOf(1 to "Glorify the name of your Lord, the Most High."), height = 600)

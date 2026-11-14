@@ -31,6 +31,7 @@ import com.starception.submission.core.designsystem.theme.homeFeedPalette
 import com.starception.submission.core.designsystem.theme.drawHomeFeedGlow
 
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.onSizeChanged
 import com.starception.submission.core.designsystem.component.homeLocationNeedsCollapse
 import com.starception.submission.core.designsystem.component.resolveHomePrayerRows
@@ -3239,7 +3240,18 @@ fun PrayerTimesScreen(
                 Box(Modifier.fillMaxSize().then(
                     if (darkHome || !outerIsLandscape) Modifier.background(homeFeed.background)
                     else Modifier.background(mainPageBackgroundBrush()),
-                )) {
+                ).drawWithContent {
+                    drawContent()
+                    if (insightTileExpanded && !outerIsLandscape) {
+                        // The scrolling feed can extend beyond the reader into
+                        // the gesture inset. Never expose that unrelated content
+                        // below the floating navigation while reading.
+                        val inset = navigationBarInset.toPx()
+                        if (inset > 0f) drawRect(Color.Black,
+                            topLeft = Offset(0f, (size.height - inset).coerceAtLeast(0f)),
+                            size = androidx.compose.ui.geometry.Size(size.width, inset))
+                    }
+                }) {
                 if (!outerIsLandscape) {
                     HomeCoverArtworkBackdrop(
                         position = coverScrollPosition,

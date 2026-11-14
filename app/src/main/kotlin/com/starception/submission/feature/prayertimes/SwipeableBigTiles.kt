@@ -5559,7 +5559,7 @@ private fun EditorialQuranReadingStage(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 0.dp, vertical = (8f - (2f * compression)).dp),
+                .padding(horizontal = 0.dp, vertical = (4f - (2f * compression)).dp),
             verticalArrangement = Arrangement.spacedBy((6f - (2f * compression)).dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -5567,32 +5567,22 @@ private fun EditorialQuranReadingStage(
                 Row(
                     // The tile shell already supplies the shared horizontal
                     // margins used by Salah, Qibla and the other expanded tiles.
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        Text(
-                            text = "SURAH ${surah.number}",
-                            style = HomeTypography.eyebrow,
-                            color = HomeReferenceGold,
-                            letterSpacing = 1.3.sp,
-                        )
                         Text(
                             text = surah.nameEnglish,
+                            modifier = Modifier.weight(1f),
                             style = HomeTypography.section,
                             color = Color.White,
                             maxLines = 1,
                         )
-                    }
                     Text(
                         text = when {
                             isPlaying -> "PLAYING"
                             isLoadingAyahs -> "LOADING"
                             ayahs.isEmpty() -> "TEXT UNAVAILABLE"
-                            else -> "${ayahs.size} AYAT"
+                            else -> "${surah.number} · ${ayahs.size} AYAT"
                         },
                         style = HomeTypography.eyebrow,
                         color = HomeReferenceGold.copy(alpha = 0.94f),

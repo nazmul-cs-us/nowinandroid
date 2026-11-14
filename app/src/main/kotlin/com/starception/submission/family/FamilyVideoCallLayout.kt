@@ -2,6 +2,8 @@ package com.starception.submission.family
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -59,7 +61,7 @@ internal fun FamilyVideoCallLayout(
         val tileHeight = if (maxHeight < 650.dp) 88.dp else 112.dp
         val wide = maxWidth > maxHeight
         val availableHeight = maxHeight
-        val shelfWidth = if (wide) (maxWidth * .43f).coerceAtLeast(240.dp) else maxWidth
+        val shelfWidth = if (wide) (maxWidth * .43f).coerceAtLeast(288.dp).coerceAtMost(maxWidth * .55f) else maxWidth
         val tileWidth = if (maxWidth < 360.dp) 80.dp else 88.dp
         val shelfHeight = if (shelfHeightPx > 0) with(density) { shelfHeightPx.toDp() } else 220.dp
         // In portrait the shelf belongs inside the video frame, not below it.
@@ -127,13 +129,13 @@ internal fun FamilyVideoCallLayout(
             .then(if (wide) Modifier.width(shelfWidth).heightIn(max = availableHeight).verticalScroll(rememberScrollState())
                 else Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp))
             .onSizeChanged { shelfHeightPx = it.height }.testTag("familyVideoShelf")
-            .drawBackdrop(backdrop = backdrop, shape = { RoundedCornerShape(22.dp) },
+            .drawBackdrop(backdrop = backdrop, shape = { RoundedCornerShape(32.dp) },
                 effects = { blur(18.dp.toPx()) }, highlight = { null }, shadow = { null }, innerShadow = { null },
                 onDrawSurface = { drawRect(if (incoming) colors.surface.copy(alpha = .86f)
                     else Color.Black.copy(alpha = if (wide) .78f else .56f)) })
             .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.fillMaxWidth().heightIn(min = 72.dp)
+            Box(Modifier.fillMaxWidth().heightIn(min = 56.dp)
                 .padding(horizontal = 4.dp, vertical = 4.dp)) {
                 BoxWithConstraints(Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(end = 64.dp)) {
                     FlowRow(Modifier.fillMaxWidth(), maxItemsInEachRow = if (maxWidth < 192.dp) 2 else 4,
@@ -165,8 +167,6 @@ internal fun FamilyVideoCallLayout(
                         colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFFC62828), contentColor = Color.White)) {
                         Icon(Icons.Default.CallEnd, if (incoming) "Decline" else if (outgoing) "Cancel" else "End call", Modifier.size(24.dp))
                     }
-                    if (outgoing || incoming) Text(if (incoming) "Decline" else "Cancel",
-                        color = if (incoming) colors.onSurface else Color.White, fontSize = 10.sp)
                 }
             }
             // Outgoing calls already show the local camera as the main preview.
@@ -213,11 +213,15 @@ internal fun FamilyVideoCallLayout(
 @Composable
 private fun VideoControl(icon: ImageVector, label: String, active: Boolean, action: () -> Unit,
     enabled: Boolean = true) {
+        val background by animateColorAsState(if (active) FamilyVisuals.peach else Color.Transparent,
+            animationSpec = tween(180), label = "familyVideoControlBackground")
+        val ink by animateColorAsState(if (active) FamilyVisuals.forest else Color.White,
+            animationSpec = tween(180), label = "familyVideoControlInk")
         IconButton(onClick = action, enabled = enabled,
             modifier = Modifier.size(48.dp).semantics { selected = active }
-                .background(if (active) FamilyVisuals.peach else Color.Transparent, CircleShape),
+                .background(background, CircleShape),
             colors = IconButtonDefaults.iconButtonColors(
-                contentColor = if (active) FamilyVisuals.forest else Color.White,
+                contentColor = ink,
                 disabledContentColor = Color.White.copy(alpha = .4f))) {
             Icon(icon, label, Modifier.size(22.dp))
         }
