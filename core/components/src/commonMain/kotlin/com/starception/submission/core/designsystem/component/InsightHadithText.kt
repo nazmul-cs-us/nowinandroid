@@ -16,6 +16,28 @@
 
 package com.starception.submission.core.designsystem.component
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.sp
+
+/** Common prose layout for Today's Salah and AI Suggested readings on both platforms. */
+@Composable
+fun insightReadingBodyStyle(compactProgress: Float = 0f): TextStyle {
+    val compression = compactProgress.coerceIn(0f, 1f)
+    return MaterialTheme.typography.bodyLarge.copy(
+        fontSize = (17f - 2f * compression).sp,
+        lineHeight = (26f - 3f * compression).sp,
+        letterSpacing = 0.sp,
+        fontWeight = FontWeight.Medium,
+        textAlign = TextAlign.Justify,
+        textDirection = TextDirection.Content,
+    )
+}
+
 private val hadithWhitespace = Regex("[\\s\u00a0\u2028\u2029]+")
 private val hadithAttribution = Regex("^(Narrated [^:]{1,180}:) (.+)$")
 

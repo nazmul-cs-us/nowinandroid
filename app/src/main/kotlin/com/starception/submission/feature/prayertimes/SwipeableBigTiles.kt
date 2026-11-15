@@ -5688,14 +5688,8 @@ private fun insightReadingTranslationStyle(compactProgress: Float): TextStyle {
 
 /** Shared prose metrics for the expanded Hadith, translation and suggestion readers. */
 @Composable
-private fun insightReaderBodyStyle(compactProgress: Float): TextStyle {
-    val compression = compactProgress.coerceIn(0f, 1f)
-    return MaterialTheme.typography.bodyLarge.copy(
-        fontSize = (17f - 2f * compression).sp,
-        lineHeight = (26f - 3f * compression).sp,
-        letterSpacing = 0.sp,
-    )
-}
+private fun insightReaderBodyStyle(compactProgress: Float): TextStyle =
+    com.starception.submission.core.designsystem.component.insightReadingBodyStyle(compactProgress)
 
 @Composable
 private fun SalahHadithSectionLabel(text: String) {

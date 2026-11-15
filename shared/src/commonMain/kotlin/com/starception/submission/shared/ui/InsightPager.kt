@@ -127,6 +127,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.starception.submission.core.designsystem.component.formatInsightHadithText
+import com.starception.submission.core.designsystem.component.insightReadingBodyStyle
 import com.starception.submission.core.designsystem.component.formatGroundedSuggestionTitle
 import com.starception.submission.core.designsystem.component.InsightContentLayout
 import com.starception.submission.core.designsystem.component.InsightResizeHandle
@@ -1680,11 +1681,7 @@ private fun ExpandedSalahHadith(
                     } else Text(
                         text = text,
                         textAlign = TextAlign.Justify,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontSize = 17.sp,
-                            lineHeight = 26.sp,
-                            letterSpacing = 0.sp,
-                        ),
+                        style = insightReadingBodyStyle(),
                         color = Color.White.copy(alpha = 0.98f),
                         fontWeight = FontWeight.Medium,
                         onTextLayout = { result ->
@@ -2172,11 +2169,9 @@ private fun ExpandedSuggestion(
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = supportingText,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = 16.sp,
-                lineHeight = 25.sp,
-            ),
+            text = formatInsightHadithText(supportingText),
+            modifier = Modifier.fillMaxWidth(),
+            style = insightReadingBodyStyle(),
             color = Color.White,
             fontWeight = FontWeight.Medium,
         )
@@ -2523,11 +2518,7 @@ private fun ModelSuggestionStage(
             }
             Text(
                 text = body,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 16.sp,
-                    lineHeight = 27.sp,
-                    textDirection = androidx.compose.ui.text.style.TextDirection.Content,
-                ),
+                style = insightReadingBodyStyle(),
                 color = Color.White.copy(alpha = 0.88f),
                 modifier = Modifier.fillMaxWidth(),
             )
