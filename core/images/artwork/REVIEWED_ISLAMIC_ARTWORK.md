@@ -88,6 +88,14 @@ normal preview validation and explicit approval. Android metadata requests use
 Cancellation closes the request without starting a fallback after the gallery
 has been dismissed. A real-device retry still verifies whether the alternative
 source is reachable on the phone's network.
+
+The follow-up device trace confirmed Openverse metadata returned HTTP 200, but
+each `/thumb/` request returned HTTP 406. The thumbnail endpoint negotiates an
+API renderer before redirecting to an image; requesting only `image/jpeg`
+prevented that redirect. Both app platforms now send `Accept: */*` for Openverse
+thumbnail requests. Metadata still requests JSON and direct image requests
+retain their existing header. The Android HTTP contract regression reproduces
+the old 406 and checks the corrected API → image-CDN redirect and returned bytes.
 Android preview-network diagnostics use the `ArtworkReview` logcat tag.
 
 ## Providers and rights

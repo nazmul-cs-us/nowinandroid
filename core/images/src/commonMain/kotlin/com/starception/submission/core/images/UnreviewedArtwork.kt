@@ -60,6 +60,15 @@ internal fun artworkReviewMetadataUrl(url: String): Boolean = url == HOME_ARTWOR
     url.startsWith("https://images-api.nasa.gov/search?") ||
     url.startsWith("https://openaccess-api.clevelandart.org/api/artworks/?")
 
+internal fun artworkReviewAcceptHeader(url: String): String = when {
+    artworkReviewMetadataUrl(url) -> "application/json"
+    // Openverse negotiates an API renderer before returning the image redirect.
+    // image/jpeg alone rejects the API response with 406; a wildcard also works
+    // when NSURLSession preserves this header on the redirected image request.
+    url.startsWith("https://api.openverse.org/") -> "*/*"
+    else -> "image/jpeg"
+}
+
 internal fun allowedArtworkReviewDownload(url: String): Boolean = artworkReviewMetadataUrl(url) ||
     allowedArtworkDownload(url) || url.startsWith("https://picsum.photos/id/")
 

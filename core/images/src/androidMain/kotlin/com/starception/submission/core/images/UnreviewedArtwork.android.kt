@@ -21,14 +21,16 @@ actual fun rememberArtworkReviewRepository(): ArtworkReviewRepository {
     return remember(scope) { ArtworkReviewRepository(AndroidArtworkReviewPlatform(), scope) }
 }
 
-internal class AndroidArtworkReviewPlatform : ArtworkReviewPlatform {
+class AndroidArtworkReviewPlatform(
+    private val openConnection: (URL) -> HttpsURLConnection = { it.openConnection() as HttpsURLConnection },
+) : ArtworkReviewPlatform {
     override suspend fun download(url: String, maximumBytes: Int): ByteArray = withContext(Dispatchers.IO) {
         var target = URL(url)
         repeat(4) {
             val address = target.toExternalForm()
             require(allowedArtworkReviewDownload(address))
             require(target.protocol == "https" && target.userInfo == null && target.port in listOf(-1, 443))
-            val connection = target.openConnection() as HttpsURLConnection
+            val connection = openConnection(target)
             Log.i("ArtworkReview", "Starting preview request host=${target.host}")
             val metadata = artworkReviewMetadataUrl(address)
             connection.connectTimeout = if (metadata) 8_000 else 15_000
@@ -36,7 +38,7 @@ internal class AndroidArtworkReviewPlatform : ArtworkReviewPlatform {
             connection.instanceFollowRedirects = false
             connection.useCaches = false
             connection.setRequestProperty("User-Agent", "StarceptionArtworkReview/1.0 (+https://github.com/nazmul-cs-us/nowinandroid)")
-            connection.setRequestProperty("Accept", if (artworkReviewMetadataUrl(address)) "application/json" else "image/jpeg")
+            connection.setRequestProperty("Accept", artworkReviewAcceptHeader(address))
             connection.setRequestProperty("Cache-Control", "no-cache")
             try {
                 val status = connection.responseCode

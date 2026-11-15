@@ -52,7 +52,7 @@ private class IosArtworkReviewPlatform : ArtworkReviewPlatform {
         configuration.timeoutIntervalForResource = if (metadata) 15.0 else 30.0
         val session = NSURLSession.sessionWithConfiguration(configuration, ReviewRedirects(), null)
         val request = NSMutableURLRequest(uRL = target)
-        request.setValue(if (artworkReviewMetadataUrl(url)) "application/json" else "image/jpeg", "Accept")
+        request.setValue(artworkReviewAcceptHeader(url), "Accept")
         request.setValue("StarceptionArtworkReview/1.0 (+https://github.com/nazmul-cs-us/nowinandroid)", "User-Agent")
         request.setValue("no-cache", "Cache-Control")
         val task = session.dataTaskWithRequest(request) { data, response, error ->
