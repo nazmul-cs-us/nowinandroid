@@ -148,8 +148,7 @@ private fun ArtworkReviewGallery(
                                 ArtworkPreviewActions(candidate, index, state, approvalMessage, linkError, approving,
                                     onPrevious = { index = (index - 1).coerceAtLeast(0) },
                                     onNext = { index = (index + 1).coerceAtMost(state.candidates.lastIndex) },
-                                    onSkip = { onDismissCandidate(candidate.artwork.id) },
-                                    onApprove = { onApprove(candidate) }, onOpen = ::open,
+                                    onOpen = ::open,
                                     modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()))
                             }
                         } else {
@@ -160,12 +159,19 @@ private fun ArtworkReviewGallery(
                                 ArtworkPreviewActions(candidate, index, state, approvalMessage, linkError, approving,
                                     onPrevious = { index = (index - 1).coerceAtLeast(0) },
                                     onNext = { index = (index + 1).coerceAtMost(state.candidates.lastIndex) },
-                                    onSkip = { onDismissCandidate(candidate.artwork.id) },
-                                    onApprove = { onApprove(candidate) }, onOpen = ::open)
+                                    onOpen = ::open)
                             }
                         }
                     }
                     if (candidate != null) {
+                        HorizontalDivider()
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(onClick = { onDismissCandidate(candidate.artwork.id) },
+                                enabled = !state.loading && !approving,
+                                modifier = Modifier.weight(1f).testTag("homeArtworkSkip")) { Text("Skip") }
+                            Button(onClick = { onApprove(candidate) }, enabled = !state.loading && !approving,
+                                modifier = Modifier.weight(1f).testTag("homeArtworkApprove")) { Text("Approve") }
+                        }
                         FilledTonalButton(onClick = { index = 0; onFetch() }, enabled = !state.loading && !approving,
                             modifier = Modifier.fillMaxWidth().testTag("homeArtworkReviewFetchMore")) {
                             Text(if (state.loading) "Fetching…" else "Fetch more")
@@ -198,8 +204,6 @@ private fun ArtworkPreviewActions(
     approving: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onSkip: () -> Unit,
-    onApprove: () -> Unit,
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -221,11 +225,6 @@ private fun ArtworkPreviewActions(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = onPrevious, enabled = index > 0) { Text("Previous") }
             TextButton(onClick = onNext, enabled = index < state.candidates.lastIndex) { Text("Next") }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onSkip, enabled = !approving, modifier = Modifier.weight(1f)) { Text("Skip") }
-            Button(onClick = onApprove, enabled = !approving,
-                modifier = Modifier.weight(1f).testTag("homeArtworkApprove")) { Text("Approve") }
         }
         TextButton(onClick = { details = !details }) { Text(if (details) "Hide details" else "Source & rights") }
         if (details) {

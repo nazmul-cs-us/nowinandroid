@@ -102,6 +102,17 @@ class ArtworkReviewControlsTest {
         }
     }
 
+    @Test @Config(qualifiers = "w360dp-h640dp-mdpi")
+    fun compactPhoneKeepsReviewActionsVisibleWithoutScrolling() {
+        RuntimeEnvironment.setFontScale(1.5f)
+        render(dark = false)
+        openGallery()
+        compose.onNodeWithTag("homeArtworkApprove").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("homeArtworkSkip").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("homeArtworkReviewFetchMore").assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkReviewGallery").captureRoboImage("src/testDemo/screenshots/home_artwork_choose_compact.png")
+    }
+
     @Test fun closingTheGalleryClearsItsSessionAndAllowsReopening() {
         render()
         openGallery()
@@ -125,7 +136,8 @@ class ArtworkReviewControlsTest {
     fun landscapeKeepsThePreviewAndActionsReachable() {
         render(dark = false)
         openGallery()
-        compose.onNodeWithTag("homeArtworkApprove").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkApprove").assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkSkip").assertIsDisplayed()
         compose.onNodeWithTag("homeArtworkReviewFetchMore").assertIsDisplayed()
         compose.onNodeWithText("Close").assertIsDisplayed()
         compose.onNodeWithText("Not approved").performScrollTo()
@@ -137,7 +149,7 @@ class ArtworkReviewControlsTest {
         RuntimeEnvironment.setFontScale(1.5f)
         render()
         openGallery()
-        compose.onNodeWithTag("homeArtworkApprove").performScrollTo().performClick()
+        compose.onNodeWithTag("homeArtworkApprove").assertIsDisplayed().performClick()
         compose.onNodeWithTag("homeArtworkConfirmContent").performScrollTo().assertIsOn()
         compose.onNodeWithTag("homeArtworkConfirmRights").performScrollTo().assertIsOn()
         compose.onNodeWithTag("homeArtworkApproveConfirm").assertIsDisplayed().assertIsEnabled()
@@ -150,7 +162,7 @@ class ArtworkReviewControlsTest {
     @Test fun approvalStartsCheckedAndSavesOnlyAfterExplicitApproval() {
         render()
         openGallery()
-        compose.onAllNodesWithTag("homeArtworkApprove")[0].performScrollTo().performClick()
+        compose.onAllNodesWithTag("homeArtworkApprove")[0].assertIsDisplayed().performClick()
         compose.onNodeWithTag("homeArtworkConfirmContent").assertIsOn()
         compose.onNodeWithTag("homeArtworkConfirmRights").assertIsOn()
         compose.onNodeWithTag("homeArtworkApproveConfirm").assertIsEnabled()
