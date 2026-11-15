@@ -28,16 +28,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -58,19 +53,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.images.ArtworkFrequency
-import com.starception.submission.core.images.HomeArtwork
 import com.starception.submission.core.images.homeArtworkGallery
-import com.starception.submission.core.images.homeArtworkIndex
 import com.starception.submission.core.images.rememberHomeArtworkState
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -79,8 +70,6 @@ import com.starception.submission.core.images.rememberHomeArtworkCollection
 import com.starception.submission.core.images.currentHomeArtworkPainter
 import com.starception.submission.core.images.HomeArtworkCollectionState
 import com.starception.submission.core.images.ArtworkTheme
-import com.starception.submission.core.images.artworkServices
-import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun HomeArtworkSettingsSection() {
@@ -192,7 +181,7 @@ fun HomeArtworkSettingsSection() {
             }
         }
     }
-    if (showDetails) ArtworkDetailsDialog(artworks, onDismiss = { showDetails = false })
+    if (showDetails) HomeArtworkCollectionDialog(artworks, onDismiss = { showDetails = false })
 }
 
 @Composable
@@ -303,55 +292,3 @@ private val ArtworkFrequency.description: String
         ArtworkFrequency.MONTHLY -> "At the start of each month"
         ArtworkFrequency.FIXED -> "Your current set stays"
     }
-
-@Composable
-private fun ArtworkDetailsDialog(artworks: List<HomeArtwork>, onDismiss: () -> Unit) {
-    val uriHandler = LocalUriHandler.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Today's collection") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text("Credits and reuse terms belong to each image's source; not every provider uses CC0.",
-                    style = MaterialTheme.typography.bodySmall)
-                artworks.forEachIndexed { page, artwork ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                            .clickable(role = Role.Button) { uriHandler.openUri(artwork.sourceUrl) }
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Image(currentHomeArtworkPainter(page), contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.width(40.dp).height(56.dp).clip(RoundedCornerShape(6.dp)))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(artwork.title, style = MaterialTheme.typography.labelLarge,
-                                maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text(artwork.artist, style = MaterialTheme.typography.bodySmall,
-                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            TextButton(onClick = { uriHandler.openUri(artwork.licenseUrl) }) {
-                                Text(artwork.licenseName, style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
-                        Icon(Icons.Outlined.OpenInNew, contentDescription = "Open image source",
-                            modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                HorizontalDivider()
-                Text("Artwork services", style = MaterialTheme.typography.titleSmall)
-                artworkServices.forEach { service ->
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(service.name, style = MaterialTheme.typography.labelMedium)
-                        Text(service.status, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
-    )
-}

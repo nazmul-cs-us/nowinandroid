@@ -24,6 +24,14 @@ the current set stays; there is no silent shuffle or unrestricted random-photo f
 but never substitutes previously viewed images for new artwork. Explicitly changing
 the theme may revisit that theme's reviewed collection; this is labelled separately.
 
+### Today's collection
+
+**About the artwork** opens a full-page gallery shared by Android and iOS. Swipe
+the large preview or select any of the five thumbnails to inspect an artwork.
+The preview preserves its aspect ratio, and the credits, source, and license
+actions follow the selected image. The page uses the selected app theme and
+scrolls on compact screens or with larger text; **Done** stays in the header.
+
 ### Personal artwork gallery
 
 Settings → Appearance → Home artwork has a **Choose artwork** action. Opening it

@@ -33,16 +33,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.lifecycle.Lifecycle
@@ -67,6 +73,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -200,6 +207,47 @@ class HomeArtworkSettingsTest {
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_artwork_settings_large_text.png")
         compose.onNodeWithTag("homeArtworkFrequency").performClick()
         compose.onNodeWithText("Every day").performClick()
+    }
+
+    @Test fun collectionSelectionAndSwipingUpdateThePreviewAndCreditLinks() {
+        val opened = mutableListOf<String>()
+        compose.setContent {
+            CompositionLocalProvider(LocalUriHandler provides object : UriHandler {
+                override fun openUri(uri: String) { opened += uri }
+            }) { ArtworkSettingsScene(showHomeCollection = true) }
+        }
+        compose.onNodeWithTag("homeArtworkFrequency").performClick()
+        compose.onNodeWithText("Every day").performClick()
+        compose.onNodeWithText("Home shows Quiet Valley 1").assertExists()
+        compose.onNodeWithTag("homeArtworkDetails").performClick()
+        compose.onNodeWithTag("homeArtworkCollectionTitle").assertTextEquals("Quiet Valley 1")
+        compose.onNodeWithTag("homeArtworkCollectionItem1").performClick().assertIsSelected()
+        compose.onNodeWithTag("homeArtworkCollectionTitle").assertTextEquals("Quiet Valley 2")
+        compose.onNodeWithTag("homeArtworkCollectionPager").performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("homeArtworkCollectionItem2").assertIsSelected()
+        compose.onNodeWithTag("homeArtworkCollectionTitle").assertTextEquals("Quiet Valley 3")
+        compose.onNodeWithTag("homeArtworkCollectionSource").performScrollTo().performClick()
+        compose.onNodeWithTag("homeArtworkCollectionLicense").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(listOf("https://www.metmuseum.org/art/collection/search/3",
+                "https://creativecommons.org/publicdomain/zero/1.0/"), opened)
+        }
+        compose.onNodeWithText("Done").performClick()
+        compose.onNodeWithTag("homeArtworkCollection").assertDoesNotExist()
+    }
+
+    @Test @Config(qualifiers = "w320dp-h852dp")
+    fun collectionCreditsStayReachableWithLargeText() {
+        // Dialogs use the window configuration, so exercise the real system font scale.
+        RuntimeEnvironment.setFontScale(1.5f)
+        compose.setContent { ArtworkSettingsScene() }
+        compose.onNodeWithTag("homeArtworkDetails").performScrollTo().performClick()
+        compose.onNodeWithText("Today's collection").assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkCollectionItem4").performScrollTo().performClick().assertIsSelected()
+        compose.onNodeWithTag("homeArtworkCollectionSource").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("homeArtworkCollectionLicense").performScrollTo().assertIsDisplayed()
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_artwork_details_large_text.png")
+        compose.onNodeWithText("Done").assertIsDisplayed().performClick()
     }
 
 }
