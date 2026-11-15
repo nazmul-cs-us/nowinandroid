@@ -187,7 +187,10 @@ class ArtworkReviewRepository(
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { /* An independent source keeps Nature discovery available. */ }
             coroutineContext.ensureActive()
-            val fallback = platform.download("https://api.openverse.org/v1/images/?q=nature&aspect_ratio=tall&license=cc0&page_size=20&page=$page", 2_000_000)
+            // Anonymous Openverse searches allow 240 results: 12 pages of 20.
+            // Other providers use up to 20 pages; wrap before requesting Openverse.
+            val openversePage = 1 + (page - 1) % 12
+            val fallback = platform.download("https://api.openverse.org/v1/images/?q=nature&aspect_ratio=tall&license=cc0&page_size=20&page=$openversePage", 2_000_000)
             return Discovery(parseArtworkReviewCandidates(theme, fallback.decodeToString()), "Nature previews supplied by Openverse.")
         }
         val url = when (theme) {

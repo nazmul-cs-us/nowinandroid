@@ -117,6 +117,19 @@ retain their existing header. The Android HTTP contract regression reproduces
 the old 406 and checks the corrected API → image-CDN redirect and returned bytes.
 Android preview-network diagnostics use the `ArtworkReview` logcat tag.
 
+Openverse limits anonymous searches to 240 results (12 pages at our page size of
+20). The chooser previously reused other providers' 20-page range, so pages
+13–20 could produce HTTP 401 and the “service blocked this request” message.
+Both apps now wrap Openverse requests within pages 1–12, retaining the portrait
+filter. This requires no API account. The limit is defined in Openverse's
+[restricted feature constants](https://github.com/WordPress/openverse/blob/main/api/api/constants/restricted_features.py).
+The repository regression exercises discovery page 20 with an enforcing provider
+fixture and verifies successful previews from Openverse page 8. The follow-up
+Android trace confirms HTTP 401 on a search request; earlier thumbnail requests
+also returned HTTP 424 alongside successful HTTP 200 downloads. Individual
+thumbnail failures are skipped, with a notice, while other portraits can load;
+a separate repository regression checks this partial-failure behavior.
+
 ## Providers and rights
 
 The initial remote feed contains 25 reviewed Islamic images (The Met/Cleveland),

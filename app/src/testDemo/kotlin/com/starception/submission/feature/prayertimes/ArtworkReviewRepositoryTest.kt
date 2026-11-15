@@ -8,6 +8,8 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.URI
 import java.net.SocketTimeoutException
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -32,6 +34,7 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
     var landscapeImages = false
     var natureMetadataFailure: Exception? = null
     var pauseNatureMetadata: CompletableDeferred<Unit>? = null
+    var unavailablePreviews = 0
     override suspend fun download(url: String, maximumBytes: Int): ByteArray {
         requests += url
         if (offline) throw IOException("Offline fixture")
@@ -45,6 +48,7 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
         }
         if (url.startsWith("https://api.openverse.org/v1/images/?")) {
             val page = URI(url).query.split('&').first { it.startsWith("page=") }.substringAfter('=').toInt()
+            require(page in 1..12) { "Openverse anonymous pagination limit exceeded" }
             return JSONObject().put("results", JSONArray((1..20).map { n ->
                 JSONObject().put("id", "$page-$n").put("title", "Landscape $n").put("license", "cc0")
                     .put("creator", "Fixture photographer")
@@ -52,6 +56,10 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
             })).toString().encodeToByteArray()
         }
         pauseImages?.await()
+        if (unavailablePreviews > 0) {
+            unavailablePreviews--
+            throw IOException("Unavailable provider thumbnail")
+        }
         if (corruptImages) return byteArrayOf(1, 2, 3)
         return ByteArrayOutputStream().use { output ->
             val bitmap = Bitmap.createBitmap(if (oversizedImages) 2000 else if (landscapeImages) 1600 else 1000, if (landscapeImages) 1000 else 1600, Bitmap.Config.ARGB_8888)
@@ -68,6 +76,33 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
 @Config(application = Application::class, sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ArtworkReviewRepositoryTest {
+    @Test fun unavailableOpenversePreviewsDoNotPreventLoadingOtherPortraits() = runTest {
+        val platform = ReviewPlatformFixture().apply {
+            natureMetadataFailure = SocketTimeoutException("Synthetic timeout")
+            unavailablePreviews = 3
+        }
+        val repository = ArtworkReviewRepository(platform, this,
+            dispatcher = StandardTestDispatcher(testScheduler), initialPageOffset = 0)
+        repository.fetch(ArtworkTheme.NATURE, allowUnreviewed = true)
+        advanceUntilIdle()
+        assertEquals(5, repository.state.value.candidates.size)
+        assertNull(repository.state.value.error)
+        assertTrue(repository.state.value.notice.orEmpty().contains("3 candidate preview(s) could not be loaded"))
+    }
+
+    @Test fun deepDiscoveryPageStaysWithinOpenverseAnonymousPaginationLimits() = runTest {
+        val platform = ReviewPlatformFixture().apply { natureMetadataFailure = SocketTimeoutException("Synthetic timeout") }
+        val clock = object : Clock { override fun now() = Instant.fromEpochSeconds(19 * 86400L) }
+        val repository = ArtworkReviewRepository(platform, this, clock = clock,
+            dispatcher = StandardTestDispatcher(testScheduler), initialPageOffset = 0)
+        repository.fetch(ArtworkTheme.NATURE, allowUnreviewed = true)
+        advanceUntilIdle()
+        assertEquals(5, repository.state.value.candidates.size)
+        assertNull(repository.state.value.error)
+        val request = platform.requests.single { it.startsWith("https://api.openverse.org/v1/images/?") }
+        assertTrue(request.contains("page=8"))
+    }
+
     @Test fun landscapeResultsAreRejectedEvenWhenTheProviderIgnoresThePortraitRequest() = runTest {
         val platform = ReviewPlatformFixture().apply { landscapeImages = true }
         val repository = ArtworkReviewRepository(platform, this, dispatcher = StandardTestDispatcher(testScheduler))
