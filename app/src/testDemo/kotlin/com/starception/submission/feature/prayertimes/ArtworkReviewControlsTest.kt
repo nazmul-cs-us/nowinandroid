@@ -6,7 +6,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -59,8 +58,7 @@ class ArtworkReviewControlsTest {
     }
 
     private fun openGallery() {
-        compose.onNodeWithTag("homeArtworkRestrictedMode").performClick()
-        compose.onNodeWithTag("homeArtworkReviewConsent").performClick()
+        compose.onNodeWithTag("homeArtworkReviewOpen").performClick()
         compose.onNodeWithTag("homeArtworkReviewGallery").assertExists()
         compose.waitForIdle()
         try {
@@ -73,20 +71,18 @@ class ArtworkReviewControlsTest {
         }
     }
 
-    @Test fun restrictedDefaultAndCancelledConsentNeverFetchUnapprovedImages() {
+    @Test fun galleryIsDirectlyAccessibleWithoutAModeSwitchOrConsentDialog() {
         render()
-        compose.onNodeWithTag("homeArtworkRestrictedMode").assertIsOn()
-        compose.onNodeWithTag("homeArtworkRestrictedMode").performClick()
-        compose.onNodeWithText("View unapproved images?").assertExists()
+        compose.onNodeWithTag("homeArtworkRestrictedMode").assertDoesNotExist()
+        compose.onNodeWithTag("homeArtworkReviewConsent").assertDoesNotExist()
+        compose.onNodeWithText("Choose artwork").assertExists()
         compose.runOnIdle { assertTrue(platform.requests.isEmpty()) }
-        compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithTag("homeArtworkRestrictedMode").assertIsOn()
-        compose.onNodeWithTag("homeArtworkReviewGallery").assertDoesNotExist()
-        compose.runOnIdle { assertTrue(platform.requests.isEmpty()) }
+        openGallery()
+        compose.onNodeWithText("View unapproved images?").assertDoesNotExist()
     }
 
     @OptIn(ExperimentalRoborazziApi::class)
-    @Test fun confirmingUnrestrictedFetchesASeparateClearlyLabelledManualReviewGallery() {
+    @Test fun openingTheGalleryFetchesPreviewsAndCanFetchMore() {
         render()
         openGallery()
         compose.onNodeWithTag("homeArtworkReviewGallery").assertExists()
@@ -105,14 +101,15 @@ class ArtworkReviewControlsTest {
         }
     }
 
-    @Test fun restrictingAgainClearsImagesAndStopsTheReviewSession() {
+    @Test fun closingTheGalleryClearsItsSessionAndAllowsReopening() {
         render()
         openGallery()
-        compose.onNodeWithTag("homeArtworkReviewRestrict").performClick()
+        compose.onNodeWithTag("homeArtworkReviewRestrict").assertDoesNotExist()
+        compose.onNodeWithText("Close").performClick()
         compose.onNodeWithTag("homeArtworkReviewGallery").assertDoesNotExist()
-        compose.onNodeWithTag("homeArtworkRestrictedMode").assertIsOn()
-        compose.onNodeWithTag("homeArtworkReviewOpen").assertDoesNotExist()
+        compose.onNodeWithTag("homeArtworkReviewOpen").assertExists()
         compose.runOnIdle { assertTrue(repository.state.value.candidates.isEmpty()); assertFalse(repository.state.value.loading) }
+        openGallery()
     }
 
     @Test fun manuallyDismissingAPreviewDoesNotApproveIt() {

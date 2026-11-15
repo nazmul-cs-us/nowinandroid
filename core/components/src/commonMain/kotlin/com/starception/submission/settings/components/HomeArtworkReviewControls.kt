@@ -28,11 +28,9 @@ import com.starception.submission.core.images.rememberHomeArtworkRepository
 import com.starception.submission.core.images.UnreviewedArtwork
 import kotlinx.coroutines.launch
 
-/** Restriction applies to a separate review gallery, never to Home's approval requirement. */
+/** Explicitly opening the gallery starts a preview session. */
 @Composable
 fun HomeArtworkReviewControls(theme: ArtworkTheme) {
-    var restricted by rememberSaveable { mutableStateOf(true) }
-    var confirmUnrestricted by rememberSaveable { mutableStateOf(false) }
     var showGallery by rememberSaveable { mutableStateOf(false) }
     val repository = LocalArtworkReviewRepository.current ?: rememberArtworkReviewRepository()
     val state by repository.state.collectAsStateWithLifecycle()
@@ -42,46 +40,19 @@ fun HomeArtworkReviewControls(theme: ArtworkTheme) {
     var approvalMessage by remember { mutableStateOf<String?>(null) }
     var approving by remember { mutableStateOf(false) }
     DisposableEffect(repository) { onDispose { repository.clear() } }
-    LaunchedEffect(showGallery, restricted, theme) {
-        if (showGallery && !restricted) repository.fetch(theme, allowUnreviewed = true)
+    LaunchedEffect(showGallery, theme) {
+        if (showGallery) repository.fetch(theme, allowUnreviewed = true)
         else repository.clear()
     }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Restricted mode", style = MaterialTheme.typography.bodyMedium)
-                Text(if (restricted) "Approved artwork only" else "Unapproved previews · Manual review only",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Switch(checked = restricted, onCheckedChange = { value ->
-                if (!value) confirmUnrestricted = true
-                else { restricted = true; showGallery = false; repository.clear() }
-            }, modifier = Modifier.testTag("homeArtworkRestrictedMode"))
-        }
-        if (!restricted) {
-            TextButton(onClick = { showGallery = true }, modifier = Modifier.testTag("homeArtworkReviewOpen")) {
-                Text("Review unapproved images")
-            }
-        }
+    TextButton(onClick = { showGallery = true }, modifier = Modifier.testTag("homeArtworkReviewOpen")) {
+        Text("Choose artwork")
     }
-    if (confirmUnrestricted) AlertDialog(
-        onDismissRequest = { confirmUnrestricted = false },
-        title = { Text("View unapproved images?") },
-        text = { Text("This fetches internet images that have not passed content or rights review. They may contain people or animals. Previews never replace your Home artwork.") },
-        confirmButton = { TextButton(onClick = {
-            confirmUnrestricted = false
-            restricted = false
-            showGallery = true
-        }, modifier = Modifier.testTag("homeArtworkReviewConsent")) { Text("Fetch previews") } },
-        dismissButton = { TextButton(onClick = { confirmUnrestricted = false }) { Text("Cancel") } },
-    )
-    if (showGallery && !restricted) ArtworkReviewGallery(theme, state,
+    if (showGallery) ArtworkReviewGallery(theme, state,
         approvalMessage = approvalMessage, approving = approving,
         onApprove = { selected = it },
-        onFetch = { if (!restricted) repository.fetch(theme, allowUnreviewed = true) },
+        onFetch = { repository.fetch(theme, allowUnreviewed = true) },
         onDismissCandidate = repository::dismiss,
-        onClose = { showGallery = false; repository.clear() },
-        onRestrict = { restricted = true; showGallery = false; repository.clear() })
+        onClose = { showGallery = false; repository.clear() })
     selected?.let { candidate ->
         var contentConfirmed by remember(candidate.artwork.id) { mutableStateOf(false) }
         var rightsConfirmed by remember(candidate.artwork.id) { mutableStateOf(false) }
@@ -121,7 +92,6 @@ private fun ArtworkReviewGallery(
     onFetch: () -> Unit,
     onDismissCandidate: (String) -> Unit,
     onClose: () -> Unit,
-    onRestrict: () -> Unit,
     onApprove: (UnreviewedArtwork) -> Unit,
     approvalMessage: String?,
     approving: Boolean,
@@ -197,7 +167,6 @@ private fun ArtworkReviewGallery(
                             }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(onClick = onRestrict, modifier = Modifier.testTag("homeArtworkReviewRestrict")) { Text("Restrict") }
                     if (candidate != null) FilledTonalButton(onClick = { index = 0; onFetch() }, enabled = !state.loading && !approving, modifier = Modifier.testTag("homeArtworkReviewFetchMore")) {
                         Text(if (state.loading) "Fetching…" else "Fetch more")
                     }

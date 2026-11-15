@@ -43,7 +43,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.lifecycle.Lifecycle
@@ -117,9 +116,10 @@ class HomeArtworkSettingsTest {
         compose.onNodeWithText("Every day").performClick()
     }
 
-    @Test fun restrictedReviewAndExistingArtworkControlsRemainReachable() {
+    @Test fun artworkGalleryAndExistingControlsRemainReachable() {
         compose.setContent { ArtworkSettingsScene() }
-        compose.onNodeWithTag("homeArtworkRestrictedMode").performScrollTo().assertIsOn()
+        compose.onNodeWithTag("homeArtworkRestrictedMode").assertDoesNotExist()
+        compose.onNodeWithTag("homeArtworkReviewOpen").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("homeArtworkRefreshNow").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("homeArtworkTheme").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("homeArtworkFrequency").performScrollTo().assertIsDisplayed()
@@ -176,7 +176,8 @@ class HomeArtworkSettingsTest {
         compose.onNodeWithText("Today's collection").assertDoesNotExist()
         compose.onNodeWithTag("homeArtworkPreview").assertIsDisplayed()
         val bounds = compose.onNodeWithTag("homeArtworkSettings").getUnclippedBoundsInRoot()
-        assertTrue(bounds.bottom - bounds.top < 480.dp)
+        // Include the theme picker and direct gallery action in the compact section budget.
+        assertTrue("Artwork settings should fit within 540dp: $bounds", bounds.bottom - bounds.top < 540.dp)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_artwork_settings_light.png")
         compose.onNodeWithTag("homeArtworkDetails").performClick()
         compose.onNodeWithText("Today's collection").assertIsDisplayed()

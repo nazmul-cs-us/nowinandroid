@@ -24,13 +24,13 @@ the current set stays; there is no silent shuffle or unrestricted random-photo f
 but never substitutes previously viewed images for new artwork. Explicitly changing
 the theme may revisit that theme's reviewed collection; this is labelled separately.
 
-### Restricted mode and personal preview gallery
+### Personal artwork gallery
 
-Settings now has a **Restricted mode** switch, on by default. Turning it off first
-asks for explicit consent: unreviewed images may contain people or animals and their
-reuse rights have not been verified. Confirmation opens a separate manual-review
-gallery and fetches candidates directly from Picsum (Nature), NASA (Space), or the
-Cleveland open-access API (Islamic). This does not wait for a GitHub feed update.
+Settings → Appearance → Home artwork has a **Choose artwork** action. Opening it
+starts the preview gallery directly and fetches candidates from Picsum (Nature),
+NASA (Space), or the Cleveland open-access API (Islamic). There is no Restricted
+mode switch, preview-consent dialog, or Restrict action. Opening Settings alone
+does not start preview requests. The gallery does not wait for a GitHub feed update.
 **Fetch more** searches a different provider result page rather than shuffling the
 Home cache. Known published IDs and already viewed preview IDs/hashes are skipped.
 
@@ -41,7 +41,7 @@ hash before saving it in private app storage and adding it to Home immediately.
 Approvals and original image bytes survive offline relaunches on that device.
 They are never uploaded to the shared feed, and do not require GitHub publishing.
 The publication workflow below is only for approvals intended for all app users.
-Switching **Restrict** back on cancels the request and clears the in-memory gallery.
+Closing the gallery cancels its request and clears the in-memory previews.
 There are no scheduled preview fetches and no unreviewed writes to Home's offline
 collection. Explicitly approved images are stored separately from the preview session.
 Previews are bounded to five images, resized to at most 720 pixels on
