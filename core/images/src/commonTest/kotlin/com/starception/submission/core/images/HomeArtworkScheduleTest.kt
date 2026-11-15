@@ -35,12 +35,25 @@ class HomeArtworkScheduleTest {
     @Test fun selectingAThemeOptsInAndPersistsAnImmediateSyncRequest() {
         var saved = ""
         val settings = HomeArtworkSettings(null) { saved = it }
-        assertEquals(ArtworkTheme.ISLAMIC, settings.theme)
+        assertEquals(ArtworkTheme.NATURE, settings.theme)
         settings.selectTheme(ArtworkTheme.SPACE)
         assertTrue(settings.onlineEnabled)
         assertEquals(1, settings.refreshRevision)
         assertEquals(ArtworkTheme.SPACE, HomeArtworkSettings(saved) {}.theme)
         assertTrue(HomeArtworkSettings(saved) {}.onlineEnabled)
+    }
+    @Test fun natureDefaultMigratesMissingThemeWithoutOverridingSavedChoices() {
+        val legacy = "DAILY|1794092400|3|online"
+        var migrated = ""
+        val settings = HomeArtworkSettings(legacy) { migrated = it }
+        assertEquals(ArtworkTheme.NATURE, settings.theme)
+        assertEquals(3, settings.schedule.rotation)
+        assertTrue(settings.onlineEnabled)
+        assertTrue(migrated.endsWith("|online|NATURE"))
+        for (theme in ArtworkTheme.entries) {
+            val saved = "$legacy|${theme.name}"
+            assertEquals(theme, HomeArtworkSettings(saved) {}.theme)
+        }
     }
     private val dubai = TimeZone.of("Asia/Dubai")
     private val anchor = Instant.parse("2026-11-07T19:30:00Z") // 23:30 locally
@@ -196,7 +209,7 @@ class HomeArtworkScheduleTest {
         var persisted = ""
         val migrated = HomeArtworkSettings(legacy) { persisted = it }
         assertTrue(migrated.onlineEnabled)
-        assertEquals("$legacy|online|ISLAMIC", persisted)
+        assertEquals("$legacy|online|NATURE", persisted)
         assertTrue(HomeArtworkSettings(persisted) {}.onlineEnabled)
 
         val fresh = HomeArtworkSettings(null) { persisted = it }

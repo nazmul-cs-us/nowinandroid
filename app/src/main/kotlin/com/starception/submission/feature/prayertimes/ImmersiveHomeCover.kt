@@ -1,11 +1,11 @@
 package com.starception.submission.feature.prayertimes
 
 import com.starception.submission.core.designsystem.theme.homeFeedPalette
+import com.starception.submission.core.designsystem.component.ArtworkBackdropImage
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -132,19 +131,11 @@ private fun HomeCoverArtworkImages(lowerPage: Int, swipeProgress: Float, useNigh
     for (layer in 0..1) {
         if (layer == 1 && swipeProgress <= .001f) continue
         val page = if (layer == 0) lowerPage else nextPage
-        Image(
+        ArtworkBackdropImage(
             painter = com.starception.submission.core.images.currentHomeArtworkPainter(page, useNightArtwork),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize().graphicsLayer {
-                // Overscan covers the parallax travel so neither photo exposes
-                // a hard vertical edge while it crossfades over the other.
-                scaleX = 1.12f
-                scaleY = 1.12f
-                translationX = (if (layer == 0) -swipeProgress else 1f - swipeProgress) * size.width * .06f
-                alpha = if (layer == 0) 1f else swipeProgress
-            },
+            overscan = 1.12f,
+            horizontalTravel = (if (layer == 0) -swipeProgress else 1f - swipeProgress) * .06f,
+            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = if (layer == 0) 1f else swipeProgress },
         )
     }
 }

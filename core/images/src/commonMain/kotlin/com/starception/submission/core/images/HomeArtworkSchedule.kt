@@ -104,7 +104,7 @@ data class HomeArtworkSchedule(
 class HomeArtworkSettings(saved: String?, private val save: (String) -> Unit) {
     var schedule by mutableStateOf(HomeArtworkSchedule.decode(saved))
         private set
-    var theme by mutableStateOf(runCatching { ArtworkTheme.valueOf(saved.orEmpty().split('|')[4]) }.getOrDefault(ArtworkTheme.ISLAMIC))
+    var theme by mutableStateOf(runCatching { ArtworkTheme.valueOf(saved.orEmpty().split('|')[4]) }.getOrDefault(ArtworkTheme.NATURE))
         private set
     // Existing cadence choices migrate to online updates. A fresh install waits
     // for an explicit refresh/cadence selection before spending mobile data.

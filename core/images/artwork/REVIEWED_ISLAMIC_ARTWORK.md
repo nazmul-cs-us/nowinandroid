@@ -32,6 +32,12 @@ The preview preserves its aspect ratio, and the credits, source, and license
 actions follow the selected image. The page uses the selected app theme and
 scrolls on compact screens or with larger text; **Done** stays in the header.
 
+Nature is the default artwork theme when no theme has been saved. Existing
+explicit choices remain unchanged. Landscape photos on portrait Home covers
+retain the complete image over a softly blurred, theme-colored surround. They
+do not receive the portrait cover's overscan/parallax zoom; portrait artwork
+keeps its existing cover treatment.
+
 ### Personal artwork gallery
 
 Settings → Appearance → Home artwork has a **Choose artwork** action. Opening it
@@ -43,9 +49,15 @@ does not start preview requests. The gallery does not wait for a GitHub feed upd
 **Fetch more** searches a different provider result page rather than shuffling the
 Home cache. Known published IDs and already viewed preview IDs/hashes are skipped.
 
+The full-window gallery paints its background behind the system safe areas and
+keeps controls inset, so Settings cannot show through above or below it. Portrait
+uses a scrollable image-and-actions layout; landscape puts the preview beside
+scrollable actions.
+
 The gallery offers **Approve / Skip**, with expandable source and rights details.
-Approval requires separate confirmation of image content (no people or animals)
-and reuse rights. The app re-downloads the original image and verifies its preview
+The two content/rights checkboxes in **Approve for my device** start checked and
+remain editable. Saving still requires tapping **Approve**; unchecking either
+option disables that action until both are checked. The app re-downloads the original image and verifies its preview
 hash before saving it in private app storage and adding it to Home immediately.
 Approvals and original image bytes survive offline relaunches on that device.
 They are never uploaded to the shared feed, and do not require GitHub publishing.

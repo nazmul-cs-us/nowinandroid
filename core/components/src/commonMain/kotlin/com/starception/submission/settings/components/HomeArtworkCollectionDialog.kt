@@ -66,7 +66,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.starception.submission.core.images.HomeArtwork
 import com.starception.submission.core.images.currentHomeArtworkPainter
 import kotlinx.coroutines.launch
@@ -83,7 +82,7 @@ internal fun HomeArtworkCollectionDialog(artworks: List<HomeArtwork>, onDismiss:
             .onFailure { linkError = "This link could not be opened. Please try again." }
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = onDismiss, properties = artworkDialogProperties()) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
                 contentAlignment = Alignment.TopCenter) {

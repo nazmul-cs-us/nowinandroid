@@ -3,8 +3,9 @@ package com.starception.submission.settings.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,12 +13,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.core.images.ArtworkReviewState
 import com.starception.submission.core.images.ArtworkTheme
@@ -54,18 +57,23 @@ fun HomeArtworkReviewControls(theme: ArtworkTheme) {
         onDismissCandidate = repository::dismiss,
         onClose = { showGallery = false; repository.clear() })
     selected?.let { candidate ->
-        var contentConfirmed by remember(candidate.artwork.id) { mutableStateOf(false) }
-        var rightsConfirmed by remember(candidate.artwork.id) { mutableStateOf(false) }
+        var contentConfirmed by remember(candidate.artwork.id) { mutableStateOf(true) }
+        var rightsConfirmed by remember(candidate.artwork.id) { mutableStateOf(true) }
         AlertDialog(onDismissRequest = { if (!approving) selected = null },
+            modifier = Modifier.testTag("homeArtworkApprovalDialog"),
             title = { Text("Approve for my device") },
-            text = { Column {
+            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("This saves the image privately and adds it to Home. It does not publish it for anyone else.")
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(contentConfirmed, { contentConfirmed = it }, modifier = Modifier.testTag("homeArtworkConfirmContent"))
+                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(contentConfirmed, enabled = !approving, role = Role.Checkbox,
+                    onValueChange = { contentConfirmed = it }).testTag("homeArtworkConfirmContent"),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(contentConfirmed, onCheckedChange = null, modifier = Modifier.padding(end = 12.dp))
                     Text("I checked the full image: no people or animals.")
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(rightsConfirmed, { rightsConfirmed = it }, modifier = Modifier.testTag("homeArtworkConfirmRights"))
+                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(rightsConfirmed, enabled = !approving, role = Role.Checkbox,
+                    onValueChange = { rightsConfirmed = it }).testTag("homeArtworkConfirmRights"),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(rightsConfirmed, onCheckedChange = null, modifier = Modifier.padding(end = 12.dp))
                     Text("I checked the source, credit and reuse rights.")
                 }
             } },
@@ -103,76 +111,130 @@ private fun ArtworkReviewGallery(
     fun open(url: String) {
         runCatching { uri.openUri(url) }.onFailure { linkError = "No app could open this link." }
     }
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).testTag("homeArtworkReviewGallery"),
-            color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Choose artwork", style = MaterialTheme.typography.titleLarge)
-                        Text("${theme.label} · Private on this device", style = MaterialTheme.typography.bodySmall)
+    Dialog(onDismissRequest = onClose, properties = artworkDialogProperties()) {
+        Surface(Modifier.fillMaxSize().testTag("homeArtworkReviewGallery"), color = MaterialTheme.colorScheme.background) {
+            BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                val wide = maxWidth > maxHeight
+                Column(Modifier.widthIn(max = 1100.dp).fillMaxSize().align(Alignment.TopCenter).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Choose artwork", style = MaterialTheme.typography.titleLarge)
+                            Text("${theme.label} · Private on this device", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        TextButton(onClick = onClose) { Text("Close") }
                     }
-                    TextButton(onClick = onClose) { Text("Close") }
-                }
-                Text("Preview only until you approve. Check content and reuse rights.",
-                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                approvalMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                if (candidate != null) state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                state.notice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                linkError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                if (candidate == null) {
-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    if (candidate == null) {
+                        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                            horizontalAlignment = Alignment.CenterHorizontally) {
                             if (state.loading) CircularProgressIndicator()
                             Text(if (state.loading) "Finding your next artwork…" else "No artwork loaded",
                                 style = MaterialTheme.typography.titleMedium)
                             if (!state.loading) {
                                 Text(state.error ?: "Fetch a fresh collection to start reviewing.",
-                                    style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                    style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+                                state.notice?.let { Text(it, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center) }
                                 Button(onClick = onFetch, enabled = !approving, modifier = Modifier.testTag("homeArtworkReviewRetry")) { Text("Try again") }
                             }
                         }
-                    }
-                } else {
-                        val artwork = candidate.artwork
-                            Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Not approved", style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                artwork.bitmap?.let { bitmap ->
-                                    Image(bitmap, artwork.title, Modifier.fillMaxWidth().weight(1f)
-                                        .clickable { open(artwork.imageUrl) }, contentScale = ContentScale.Fit)
-                                }
-                                Text(artwork.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-                                Text(artwork.artist, style = MaterialTheme.typography.bodySmall)
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    TextButton(onClick = { index = (index - 1).coerceAtLeast(0) }, enabled = index > 0) { Text("Previous") }
-                                    Text("${index.coerceAtMost(state.candidates.lastIndex) + 1} / ${state.candidates.size}", style = MaterialTheme.typography.labelMedium)
-                                    TextButton(onClick = { index = (index + 1).coerceAtMost(state.candidates.lastIndex) }, enabled = index < state.candidates.lastIndex) { Text("Next") }
-                                }
-                                var details by remember(artwork.id) { mutableStateOf(false) }
-                                TextButton(onClick = { details = !details }) { Text(if (details) "Hide details" else "Source & rights") }
-                                if (details) Text("Reported license: ${artwork.licenseName} · Verify before approval", style = MaterialTheme.typography.bodySmall)
-                                if (details) Text("Reference: ${artwork.id}", style = MaterialTheme.typography.labelSmall)
-                                if (details) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    TextButton(onClick = { open(artwork.imageUrl) }) { Text("Full image") }
-                                    TextButton(onClick = { open(artwork.sourceUrl) }) { Text("Source") }
-                                    TextButton(onClick = { open(artwork.licenseUrl) }) { Text("Rights") }
-                                }
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    OutlinedButton(onClick = { onDismissCandidate(artwork.id) }, enabled = !approving, modifier = Modifier.weight(1f)) { Text("Skip") }
-                                    Button(onClick = { onApprove(candidate) }, enabled = !approving,
-                                        modifier = Modifier.weight(1f).testTag("homeArtworkApprove")) { Text("Approve") }
-                                }
+                    } else {
+                        if (wide) {
+                            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                                ArtworkPreview(candidate, onOpen = { open(candidate.artwork.imageUrl) },
+                                    modifier = Modifier.weight(1f).fillMaxHeight())
+                                ArtworkPreviewActions(candidate, index, state, approvalMessage, linkError, approving,
+                                    onPrevious = { index = (index - 1).coerceAtLeast(0) },
+                                    onNext = { index = (index + 1).coerceAtMost(state.candidates.lastIndex) },
+                                    onSkip = { onDismissCandidate(candidate.artwork.id) },
+                                    onApprove = { onApprove(candidate) }, onOpen = ::open,
+                                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()))
                             }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    if (candidate != null) FilledTonalButton(onClick = { index = 0; onFetch() }, enabled = !state.loading && !approving, modifier = Modifier.testTag("homeArtworkReviewFetchMore")) {
-                        Text(if (state.loading) "Fetching…" else "Fetch more")
+                        } else {
+                            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                ArtworkPreview(candidate, onOpen = { open(candidate.artwork.imageUrl) },
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(1.15f))
+                                ArtworkPreviewActions(candidate, index, state, approvalMessage, linkError, approving,
+                                    onPrevious = { index = (index - 1).coerceAtLeast(0) },
+                                    onNext = { index = (index + 1).coerceAtMost(state.candidates.lastIndex) },
+                                    onSkip = { onDismissCandidate(candidate.artwork.id) },
+                                    onApprove = { onApprove(candidate) }, onOpen = ::open)
+                            }
+                        }
                     }
+                    if (candidate != null) {
+                        FilledTonalButton(onClick = { index = 0; onFetch() }, enabled = !state.loading && !approving,
+                            modifier = Modifier.fillMaxWidth().testTag("homeArtworkReviewFetchMore")) {
+                            Text(if (state.loading) "Fetching…" else "Fetch more")
+                        }
+                    }
+                    Text("Only images you explicitly approve are saved privately for Home.",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("Only images you explicitly approve are saved privately for Home.",
-                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtworkPreview(candidate: UnreviewedArtwork, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(modifier.clip(RoundedCornerShape(24.dp)), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        candidate.artwork.bitmap?.let { bitmap ->
+            Image(bitmap, candidate.artwork.title, Modifier.fillMaxSize().clickable(onClick = onOpen), contentScale = ContentScale.Fit)
+        }
+    }
+}
+
+@Composable
+private fun ArtworkPreviewActions(
+    candidate: UnreviewedArtwork,
+    index: Int,
+    state: ArtworkReviewState,
+    approvalMessage: String?,
+    linkError: String?,
+    approving: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSkip: () -> Unit,
+    onApprove: () -> Unit,
+    onOpen: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val artwork = candidate.artwork
+    var details by remember(artwork.id) { mutableStateOf(false) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Not approved", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            Text("${index.coerceAtMost(state.candidates.lastIndex) + 1} / ${state.candidates.size}", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(artwork.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
+        Text(artwork.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Preview only until you approve.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        approvalMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary) }
+        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        state.notice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        linkError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = onPrevious, enabled = index > 0) { Text("Previous") }
+            TextButton(onClick = onNext, enabled = index < state.candidates.lastIndex) { Text("Next") }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = onSkip, enabled = !approving, modifier = Modifier.weight(1f)) { Text("Skip") }
+            Button(onClick = onApprove, enabled = !approving,
+                modifier = Modifier.weight(1f).testTag("homeArtworkApprove")) { Text("Approve") }
+        }
+        TextButton(onClick = { details = !details }) { Text(if (details) "Hide details" else "Source & rights") }
+        if (details) {
+            Text("Reported license: ${artwork.licenseName}", style = MaterialTheme.typography.bodySmall)
+            Text("Reference: ${artwork.id}", style = MaterialTheme.typography.labelSmall)
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onOpen(artwork.imageUrl) }) { Text("Full image") }
+                TextButton(onClick = { onOpen(artwork.sourceUrl) }) { Text("Source") }
+                TextButton(onClick = { onOpen(artwork.licenseUrl) }) { Text("Rights") }
             }
         }
     }

@@ -60,6 +60,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.starception.submission.core.images.ArtworkFrequency
+import com.starception.submission.core.images.ArtworkTheme
 import com.starception.submission.core.images.HomeArtworkSchedule
 import com.starception.submission.core.images.HomeArtworkSettings
 import com.starception.submission.core.images.HomeArtworkRepository
@@ -260,7 +261,7 @@ private fun ArtworkSettingsScene(dark: Boolean = true, showHomeCollection: Boole
     val repository = remember {
         val platform = OnlineHomeArtworkTest.Platform()
         HomeArtworkRepository(platform, scope, chooseOffset = { 0 },
-            ioDispatcher = Dispatchers.Main.immediate, catalog = platform.catalog.take(approvedCount))
+            ioDispatcher = Dispatchers.Main.immediate, catalog = platform.catalog.take(approvedCount).map { it.copy(theme = ArtworkTheme.NATURE) })
     }
     CompositionLocalProvider(LocalInspectionMode provides true) {
         org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
