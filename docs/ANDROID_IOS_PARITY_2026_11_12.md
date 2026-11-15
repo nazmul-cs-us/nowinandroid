@@ -1,5 +1,7 @@
 # Android / iOS parity review — 12 November 2026
 
+Follow-up: [15 November implementation and remaining device/provisioning checks](ANDROID_IOS_PARITY_2026_11_15.md).
+
 Reviewed the 18 commits after `bcd5b63cd` through `e8175ede4`, covering changes
 from 9 November 2026 00:00 Asia/Dubai through the latest pulled main. This is a
 source audit; the simulator validation recorded in the 4 November review does

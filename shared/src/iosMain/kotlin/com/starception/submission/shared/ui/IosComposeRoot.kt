@@ -1145,6 +1145,11 @@ private fun createPrayerTimesViewController(
                 salah3DService = salah3DService,
                 settings = { onBack, onOpenSalahTraining ->
                     PrayerSettingsScreen(
+                        onOpenAppNotificationSettings = {
+                            platform.Foundation.NSURL.URLWithString(platform.UIKit.UIApplicationOpenSettingsURLString)?.let { url ->
+                                platform.UIKit.UIApplication.sharedApplication.openURL(url, options = emptyMap<Any?, Any>(), completionHandler = null)
+                            }
+                        },
                         initialReciterStorageExpanded = NSProcessInfo.processInfo.arguments.any { it == "--start-reciter-storage" },
                         settings = prayerSettings,
                         countryName = country?.countryName,

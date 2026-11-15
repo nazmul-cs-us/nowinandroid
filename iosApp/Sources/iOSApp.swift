@@ -67,19 +67,12 @@ struct iOSApp: App {
         PrayerNotificationCoordinator.shared.start()
     }
 
-    @State private var showingFamily = false
-    @ObservedObject private var familyStore = FamilyStore.shared
 
     var body: some Scene {
         WindowGroup {
             ZStack {
             Group {
-                if #available(iOS 26.0, *) {
-                    NativePrayerTabsView()
-                } else {
-                    ComposePrayerTimesView()
-                        .ignoresSafeArea(.container)
-                }
+                NativePrayerTabsView()
             }
                 if showingStartup {
                     StartupSparkView {
@@ -90,19 +83,7 @@ struct iOSApp: App {
                     .zIndex(10)
                 }
             }
-                .modifier(FamilyCallPresentation(enabled: !showingFamily))
-                .overlay(alignment: .topTrailing) {
-                    if #available(iOS 26.0, *) { EmptyView() }
-                    else {
-                        Button { showingFamily = true } label: {
-                            Label(familyStore.unreadCount > 0 ? "Family (\(familyStore.unreadCount))" : "Family", systemImage: "person.2.fill")
-                                .padding(10).background(.regularMaterial, in: Capsule())
-                        }.padding(.trailing, 12)
-                    }
-                }
-                .sheet(isPresented: $showingFamily) {
-                    NavigationStack { FamilyView().modifier(FamilyCallPresentation()) }
-                }
+                .modifier(FamilyCallPresentation())
                 .preferredColorScheme(appPreferredColorScheme)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("sharedBarAppearanceChanged"))) { notification in
             guard let value = notification.object as? String else { return }
@@ -113,11 +94,7 @@ struct iOSApp: App {
                 .onOpenURL { url in
                     guard url.scheme == "deenly" else { return }
                     if url.host == "family-call" {
-                        if #available(iOS 26.0, *) {
-                            NotificationCenter.default.post(name: .openFamily, object: nil)
-                        } else {
-                            showingFamily = true
-                        }
+                        NotificationCenter.default.post(name: .openFamily, object: nil)
                         if let id = FamilyCallLink().callId(input: url.absoluteString) {
                             Task { if !(await FamilyStore.shared.resumeForPush(id)) { FamilyStore.shared.message = "This call is no longer ringing. Open Family to call back." } }
                         }

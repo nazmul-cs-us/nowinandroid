@@ -58,6 +58,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     @Published private(set) var call: FamilyCallInfo?
     @Published var message: String?
     @Published private(set) var callMessage: String?
+    @Published private(set) var backgroundCallsRegistered = false
     @Published private(set) var pushRegistrationMessage: String?
     @Published private(set) var muted = false
     @Published private(set) var cameraEnabled = true
@@ -77,6 +78,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     @Published private(set) var chatError: String?
     private var retryMessage: (id: String, text: String)?
     private var chatGeneration = 0
+    private var pushRegistrationEpoch = 0
     private var receiptVersion = 0
     private var deliverySync: Task<Void, Never>?
     private var inboxVersion: Int64 = 0
@@ -225,7 +227,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         receiptVersion = 0; deliverySync?.cancel(); deliverySync = nil
         inboxVersion = 0; conversations = []; notifications = []; unreadCount = 0; closeChat()
         presenceCache.clear(); webPairing = nil
-        callMessage = nil; pushRegistrationMessage = nil
+        callMessage = nil; pushRegistrationMessage = nil; backgroundCallsRegistered = false
         if let id = call?.id { FamilySystemCalls.shared.end(id) }
         let socket = stream
         if let current = call, let socket, socket.isAuthenticated,
@@ -438,6 +440,9 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         else if call?.kind == "video", cameraEnabled { camera() }
     }
     func registerPushToken() {
+        pushRegistrationEpoch += 1
+        let epoch = pushRegistrationEpoch
+        backgroundCallsRegistered = false
         guard connected, let token = FamilySystemCalls.shared.token else { return }
         let environment = Bundle.main.object(forInfoDictionaryKey: "FamilyAPNSEnvironment") as? String == "development" ? "sandbox" : "production"
         let activeStream = stream
@@ -445,13 +450,20 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
             do {
                 _ = try await self.request("register_device", ["deviceId": FamilyCredentials.deviceID,
                     "platform": "ios", "token": token, "environment": environment])
-                if activeStream === stream { pushRegistrationMessage = nil }
+                if activeStream === stream && epoch == pushRegistrationEpoch && token == FamilySystemCalls.shared.token {
+                    pushRegistrationMessage = nil; backgroundCallsRegistered = true
+                }
             } catch {
-                if activeStream === stream { pushRegistrationMessage = "Background call registration is unavailable. Calls can still work while both apps are open." }
+                if activeStream === stream && epoch == pushRegistrationEpoch {
+                    backgroundCallsRegistered = false
+                    pushRegistrationMessage = "Background call registration is unavailable. Calls can still work while both apps are open."
+                }
             }
         }
     }
     func unregisterPushToken() {
+        pushRegistrationEpoch += 1
+        backgroundCallsRegistered = false
         guard let socket = stream, socket.isAuthenticated,
               let data = try? JSONSerialization.data(withJSONObject: ["v": 1, "action": "unregister_device", "deviceId": FamilyCredentials.deviceID]) else { return }
         let child = DDXMLElement(name: "family", xmlns: Self.namespace)

@@ -28,7 +28,6 @@ struct ComposePrayerTimesView: UIViewControllerRepresentable {
     }
 }
 
-@available(iOS 26.0, *)
 private final class ComposeTabHostController: UIViewController {
     init(compose: () -> UIViewController) {
         super.init(nibName: nil, bundle: nil)
@@ -55,7 +54,6 @@ private final class ComposeTabHostController: UIViewController {
     }
 }
 
-@available(iOS 26.0, *)
 struct ComposePrayerTimesTabView: UIViewControllerRepresentable {
     let tabIndex: Int
     let onSelectTab: (Int) -> Void
@@ -126,7 +124,6 @@ struct NudgePayload: Identifiable {
 
 /// Surfaces of the bot, in Android's VoiceAssistantSurface order. The quiz
 /// lives in shared Compose, so it is absent here.
-@available(iOS 26.0, *)
 enum NowNudgeSurface {
     case button
     case composer
@@ -136,7 +133,6 @@ enum NowNudgeSurface {
 }
 
 @MainActor
-@available(iOS 26.0, *)
 final class NowNudgeBotModel: ObservableObject {
     @Published var composerOpen = false
     @Published var busGenerating = false
@@ -362,7 +358,6 @@ final class NowNudgeBotModel: ObservableObject {
 /// nudge card) anchored bottom-trailing above the native tab bar. The idle
 /// affordance is the tab bar's trailing Voice item — the slot Android's
 /// app-shell bar gives its voice button.
-@available(iOS 26.0, *)
 private struct NowNudgeBotLayer: View {
     @ObservedObject var model: NowNudgeBotModel
     @Environment(\.colorScheme) private var colorScheme
@@ -546,7 +541,6 @@ private struct NowNudgeBotLayer: View {
 }
 
 /// "Ask Now Nudge" — the typed-question composer with Fortress chapter chips.
-@available(iOS 26.0, *)
 private struct ComposerSurface: View {
     @ObservedObject var model: NowNudgeBotModel
     let gradient: LinearGradient
@@ -667,7 +661,6 @@ private struct ComposerSurface: View {
 
 /// The suggestion card: action thumbnail, NOW NUDGE header, label, verified
 /// quote, and the source chip that performs the action.
-@available(iOS 26.0, *)
 private struct NudgeCardSurface: View {
     let payload: NudgePayload?
     let gradient: LinearGradient
@@ -814,10 +807,9 @@ extension String {
     }
 }
 
-@available(iOS 26.0, *)
 struct NativePrayerTabsView: View {
     @ObservedObject private var familyStore = FamilyStore.shared
-    @State private var selectedTab = 0
+    @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--start-family") ? 7 : 0
     @State private var morePath: [Int] = []
     @State private var lastSelectedTab = 0
     @State private var destinationChrome: [Int: Bool] = [:]
@@ -827,34 +819,22 @@ struct NativePrayerTabsView: View {
     }
 
     private var activeOwner: Int { selectedTab == 5 ? (morePath.last ?? 5) : selectedTab }
+    private var preferClassicTabs: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--classic-tabs")
+        #else
+        return false
+        #endif
+    }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab("Home", systemImage: "house", value: 0) {
-                tabContent(0)
+        Group {
+            if #available(iOS 26.0, *) {
+                if preferClassicTabs { classicTabs } else { modernTabs }
             }
-            Tab("Saved", systemImage: "bookmark", value: 2) {
-                tabContent(2)
-            }
-            Tab("Family", systemImage: "person.2", value: 7) {
-                NavigationStack {
-                    FamilyView(onBackToApp: { selectedTab = 0 })
-                }
-            }.badge(familyStore.unreadCount)
-            Tab("More", systemImage: "ellipsis", value: 5) {
-                MorePrayerTabsView(path: $morePath, onSelectTab: selectContentTab)
-            }
-            Tab(value: 6, role: .search) {
-                Color.clear
-            } label: {
-                Label("Voice", systemImage: bot.isGeneratingNudge ? "sparkles" : "waveform")
-            }
+            else { classicTabs }
         }
-        // Extend the tab container too: extending only its Compose child leaves
-        // the status-bar and home-indicator regions outside the rendered bounds.
         .ignoresSafeArea(.container, edges: .all)
-        .tabBarMinimizeBehavior(.automatic)
-        .scrollEdgeEffectHidden(true, for: .all)
         .tint(Color.accentColor)
         .overlay(alignment: .bottomTrailing) {
             if selectedTab != 7 && !insightImmersive && destinationChrome[activeOwner] != true {
@@ -864,6 +844,7 @@ struct NativePrayerTabsView: View {
             }
         }
         .onAppear {
+            lastSelectedTab = selectedTab
             bot.start()
             NativeAppearanceBridge.shared.select(activeOwner)
         }
@@ -888,10 +869,10 @@ struct NativePrayerTabsView: View {
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("insightImmersiveChanged"))) { notification in
             insightImmersive = (notification.object as? String) == "true"
         }
-        .onChange(of: morePath) { _, _ in
+        .onChange(of: morePath) { _ in
             if selectedTab == 5 { NativeAppearanceBridge.shared.select(activeOwner) }
         }
-        .onChange(of: selectedTab) { _, newValue in
+        .onChange(of: selectedTab) { newValue in
             if newValue == 6 {
                 if bot.showNudge {
                     bot.performNudgeAction()
@@ -910,14 +891,45 @@ struct NativePrayerTabsView: View {
         }
     }
 
-    private func tabContent(_ index: Int) -> some View {
-        ComposePrayerTimesTabView(tabIndex: index, onSelectTab: selectContentTab)
-            // Paint artwork behind system bars; Compose applies safeDrawing
-            // insets to interactive content inside this full-screen surface.
+    @available(iOS 26.0, *)
+    private var modernTabs: some View {
+        TabView(selection: $selectedTab) {
+            Tab("Home", systemImage: "house", value: 0) { tabContent(0) }
+            Tab("Saved", systemImage: "bookmark", value: 2) { tabContent(2) }
+            Tab("Family", systemImage: "person.2", value: 7) { familyTab }.badge(familyStore.unreadCount)
+            Tab("More", systemImage: "ellipsis", value: 5) { moreTab }
+            Tab(value: 6, role: .search) { Color.clear } label: {
+                Label("Voice", systemImage: bot.isGeneratingNudge ? "sparkles" : "waveform")
+            }
+        }.tabBarMinimizeBehavior(.automatic).scrollEdgeEffectHidden(true, for: .all)
+    }
+
+    private var classicTabs: some View {
+        TabView(selection: $selectedTab) {
+            tabContent(0).tabItem { Label("Home", systemImage: "house") }.tag(0)
+            tabContent(2).tabItem { Label("Saved", systemImage: "bookmark") }.tag(2)
+            familyTab.tabItem { Label("Family", systemImage: "person.2") }.tag(7).badge(familyStore.unreadCount)
+            moreTab.tabItem { Label("More", systemImage: "ellipsis") }.tag(5)
+            Color.clear.tabItem { Label("Voice", systemImage: bot.isGeneratingNudge ? "sparkles" : "waveform") }.tag(6)
+        }
+    }
+
+    private var familyTab: some View {
+        NavigationStack { FamilyView(onBackToApp: { selectedTab = 0 }) }
+    }
+
+    private var moreTab: some View {
+        MorePrayerTabsView(path: $morePath, onSelectTab: selectContentTab)
+            .toolbar((insightImmersive || destinationChrome[activeOwner] == true) ? .hidden : .visible, for: .tabBar)
+    }
+
+    @ViewBuilder private func tabContent(_ index: Int) -> some View {
+        let content = ComposePrayerTimesTabView(tabIndex: index, onSelectTab: selectContentTab)
             .ignoresSafeArea(.container, edges: .all)
-            .scrollEdgeEffectHidden(true, for: .all)
             .toolbarBackground(.hidden, for: .tabBar)
             .toolbar((insightImmersive || destinationChrome[activeOwner] == true) ? .hidden : .visible, for: .tabBar)
+        if #available(iOS 26.0, *) { content.scrollEdgeEffectHidden(true, for: .all) }
+        else { content }
     }
 
     private func selectContentTab(_ index: Int) {
@@ -935,7 +947,6 @@ struct NativePrayerTabsView: View {
     }
 }
 
-@available(iOS 26.0, *)
 private struct VoiceNudgeBarsGlyph: View {
     let generating: Bool
     var color: Color = .accentColor
@@ -966,7 +977,6 @@ private struct VoiceNudgeBarsGlyph: View {
 
 /// Full-sparkle glyph used by the thinking pill; mirrors Android's
 /// `VoiceNudgeSparkles(morph = 1f)`.
-@available(iOS 26.0, *)
 private struct VoiceNudgeSparkleGlyph: View {
     let color: Color
 
@@ -983,7 +993,6 @@ private struct VoiceNudgeSparkleGlyph: View {
     }
 }
 
-@available(iOS 26.0, *)
 private struct VoiceNudgeBarsShape: Shape {
     func path(in rect: CGRect) -> Path {
         let rest: [CGFloat] = [0.40, 0.62, 1.0, 0.62, 0.40]
@@ -1001,7 +1010,6 @@ private struct VoiceNudgeBarsShape: Shape {
     }
 }
 
-@available(iOS 26.0, *)
 private struct VoiceNudgeSparklesShape: Shape {
     var morph: CGFloat
     let phase: CGFloat
@@ -1095,7 +1103,6 @@ private let NowNudgeThinkingVerbs = [
     "Whisking", "Wibbling", "Working", "Wrangling", "Zesting", "Zigzagging",
 ]
 
-@available(iOS 26.0, *)
 private struct MorePrayerTabsView: View {
     @Binding var path: [Int]
     let onSelectTab: (Int) -> Void

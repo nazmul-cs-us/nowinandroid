@@ -65,6 +65,20 @@ final class SettingsParityUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Close search"].waitForExistence(timeout: 10))
     }
 
+    func testPrayerFocusGuideExplainsUserControlledScheduling() {
+        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 30))
+        let notifications = app.staticTexts["Notifications"]
+        scrollToHittable(notifications)
+        notifications.tap()
+        let setup = app.buttons["Set up prayer Focus"]
+        scrollToHittable(setup)
+        setup.tap()
+        XCTAssertTrue(app.staticTexts["Prayer Focus on iPhone"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "do not follow Deenly")).firstMatch.exists)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(setup.exists)
+    }
+
     func testMoreHubKeepsCourseAndNudgeBotAvailable() {
         app.terminate()
         app.launchArguments = []

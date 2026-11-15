@@ -21,7 +21,6 @@ final class AndroidParityUITests: XCTestCase {
     }
 
     func testFamilyIsReachableFromTheNativeTabBar() throws {
-        guard #available(iOS 26.0, *) else { throw XCTSkip("Native tabs require iOS 26") }
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launch()
@@ -36,6 +35,21 @@ final class AndroidParityUITests: XCTestCase {
         let homeSelected = NSPredicate { _, _ in app.tabBars.buttons["Home"].isSelected }
         expectation(for: homeSelected, evaluatedWith: nil)
         waitForExpectations(timeout: 10)
+    }
+
+    func testFamilyCanLaunchDirectlyAndReturnHome() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--start-family", "--classic-tabs"]
+        app.launch()
+        let family = app.tabBars.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Family")).firstMatch
+        let back = app.buttons["family-back-to-app"]
+        XCTAssertTrue(back.waitForExistence(timeout: 30), app.debugDescription)
+        if family.exists { XCTAssertTrue(family.isSelected, app.debugDescription) }
+        XCTAssertFalse(app.sheets.firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(back.waitForExistence(timeout: 10), app.debugDescription)
+        back.tap()
+        XCTAssertTrue(app.tabBars.buttons["Home"].isSelected, app.debugDescription)
     }
 
     func testSettingsHidesNativeTabBar() {

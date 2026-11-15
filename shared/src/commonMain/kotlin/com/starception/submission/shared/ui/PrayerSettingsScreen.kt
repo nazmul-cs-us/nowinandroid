@@ -56,6 +56,7 @@ import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.settings.ThemeSettingsState
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
+import com.starception.submission.settings.components.PrayerFocusGuide
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SalahTrainingSection
@@ -102,6 +103,7 @@ fun PrayerSettingsScreen(
     contentStorageState: ContentStorageState = ContentStorageState(),
     contentStorageActions: ContentStorageActions = ContentStorageActions(),
     initialReciterStorageExpanded: Boolean = false,
+    onOpenAppNotificationSettings: () -> Unit = {},
 ) {
     // One section open at a time, as on Android: the sections are long enough
     // that several open at once buries the one being read.
@@ -213,6 +215,7 @@ fun PrayerSettingsScreen(
                                 ImageRes.drawable.flaticon_sound_14925198,
                             ),
                         )
+                        PrayerFocusGuide(onOpenAppSettings = onOpenAppNotificationSettings)
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,

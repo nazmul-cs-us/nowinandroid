@@ -137,6 +137,13 @@ The source changes have not been built with Xcode in the Linux workspace.
 
 ## Push configuration
 
+Family call provisioning, the shared contact profile, older-iOS native tabs,
+voice-call layout and prayer Focus guidance are documented in the
+[15 November parity follow-up](../docs/ANDROID_IOS_PARITY_2026_11_15.md).
+The normal project uses in-app calls; native background incoming calls require
+the optional `project-push.yml` build and server APNs configuration. Family
+settings distinguish device registration from verified push delivery.
+
 No APNs provider key, certificate, or backend credential belongs in this app.
 The app only registers with APNs, stores token snapshots in `UserDefaults` under
 `ios_prayer_push_token_snapshot`, and optionally sends the snapshot to an HTTPS
