@@ -29,6 +29,7 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
     var pauseImages: CompletableDeferred<Unit>? = null
     var corruptImages = false
     var oversizedImages = false
+    var landscapeImages = false
     var natureMetadataFailure: Exception? = null
     var pauseNatureMetadata: CompletableDeferred<Unit>? = null
     override suspend fun download(url: String, maximumBytes: Int): ByteArray {
@@ -53,7 +54,7 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
         pauseImages?.await()
         if (corruptImages) return byteArrayOf(1, 2, 3)
         return ByteArrayOutputStream().use { output ->
-            val bitmap = Bitmap.createBitmap(if (oversizedImages) 2000 else 1000, 1000, Bitmap.Config.ARGB_8888)
+            val bitmap = Bitmap.createBitmap(if (oversizedImages) 2000 else if (landscapeImages) 1600 else 1000, if (landscapeImages) 1000 else 1600, Bitmap.Config.ARGB_8888)
             bitmap.eraseColor(Color.rgb(40 + (url.hashCode() and 127), 60 + ((url.hashCode() ushr 8) and 127), 80))
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
             bitmap.recycle()
@@ -67,6 +68,15 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
 @Config(application = Application::class, sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ArtworkReviewRepositoryTest {
+    @Test fun landscapeResultsAreRejectedEvenWhenTheProviderIgnoresThePortraitRequest() = runTest {
+        val platform = ReviewPlatformFixture().apply { landscapeImages = true }
+        val repository = ArtworkReviewRepository(platform, this, dispatcher = StandardTestDispatcher(testScheduler))
+        repository.fetch(ArtworkTheme.NATURE, allowUnreviewed = true)
+        advanceUntilIdle()
+        assertTrue(repository.state.value.candidates.isEmpty())
+        assertTrue(repository.state.value.error.orEmpty().contains("No portrait images"))
+    }
+
     @Test fun picsumMetadataTimeoutFallsBackToAnIndependentNatureSource() = runTest {
         val platform = ReviewPlatformFixture().apply { natureMetadataFailure = SocketTimeoutException("Synthetic timeout") }
         val repository = ArtworkReviewRepository(platform, this, dispatcher = StandardTestDispatcher(testScheduler))
@@ -76,7 +86,7 @@ class ArtworkReviewRepositoryTest {
         assertNull(repository.state.value.error)
         assertTrue(repository.state.value.notice.orEmpty().contains("Openverse"))
         assertTrue(repository.state.value.candidates.all { it.artwork.id.startsWith("openverse-") && it.artwork.bitmap != null })
-        assertTrue(platform.requests.any { it.startsWith("https://api.openverse.org/v1/images/?") })
+        assertTrue(platform.requests.any { it.startsWith("https://api.openverse.org/v1/images/?") && it.contains("aspect_ratio=tall") })
         assertTrue(platform.requests.any { it.startsWith("https://live.staticflickr.com/") })
         assertFalse(platform.requests.any { it.startsWith("https://picsum.photos/id/") })
     }

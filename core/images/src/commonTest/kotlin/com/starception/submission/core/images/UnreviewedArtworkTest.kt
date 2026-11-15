@@ -38,7 +38,7 @@ class UnreviewedArtworkTest {
         assertEquals("picsum-88", rows.single().id)
         assertTrue(rows.single().artist.contains("Photographer"))
         assertEquals("Unsplash License", rows.single().licenseName)
-        assertEquals("https://picsum.photos/id/88/900/1200", rows.single().imageUrl)
+        assertEquals("https://picsum.photos/id/88/900/1600", rows.single().imageUrl)
         // The runtime feed parser still rejects a candidate without explicit approval.
         assertTrue(parseReviewedArtworkFeed("""{"schemaVersion":1,"artworks":[{"approved":false,"id":"picsum-88"}]}""").isEmpty())
     }
@@ -54,6 +54,15 @@ class UnreviewedArtworkTest {
         assertTrue(artworkReviewMetadataUrl(metadata))
         assertTrue(allowedArtworkReviewDownload(metadata))
         assertFalse(allowedArtworkDownload(metadata))
+    }
+
+    @Test fun knownLandscapeMetadataIsExcludedBeforeDownloadingNatureImages() {
+        val picsum = """[{"id":"88","author":"Photographer","url":"https://unsplash.com/photos/example","width":1600,"height":900}]"""
+        assertTrue(parseArtworkReviewCandidates(ArtworkTheme.NATURE, picsum).isEmpty())
+        val openverse = """{"results":[{"id":"photo","title":"Nature","creator":"Photographer","license":"cc0","width":1600,"height":900}]}"""
+        assertTrue(parseArtworkReviewCandidates(ArtworkTheme.NATURE, openverse).isEmpty())
+        assertEquals(1, parseArtworkReviewCandidates(ArtworkTheme.NATURE,
+            openverse.replace("\"width\":1600,\"height\":900", "\"width\":900,\"height\":1600")).size)
     }
 
     @Test fun unsafeCandidateIdsAndSourceLinksAreRejected() {

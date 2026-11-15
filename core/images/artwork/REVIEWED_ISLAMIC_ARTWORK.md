@@ -40,6 +40,13 @@ keeps its existing cover treatment.
 
 ### Personal artwork gallery
 
+New chooser batches contain portrait images only. Nature discovery asks Openverse
+for `aspect_ratio=tall`, excludes known landscape/square source metadata, and
+requests Picsum renditions at 900×1600. Every downloaded preview is checked again:
+its height must exceed its width, including results from other themes or providers
+that ignore orientation filters. Existing approved collections remain stored;
+approve new portrait images to replace their landscape artwork.
+
 Settings → Appearance → Home artwork has a **Choose artwork** action. Opening it
 starts the preview gallery directly and fetches candidates from Picsum (Nature,
 with an independent Openverse fallback),

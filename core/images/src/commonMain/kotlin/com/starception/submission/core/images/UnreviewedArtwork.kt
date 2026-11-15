@@ -134,6 +134,7 @@ class ArtworkReviewRepository(
                         .filter { it.id !in approved && it.id !in previouslySeen }
                     val loaded = mutableListOf<UnreviewedArtwork>()
                     var failures = 0
+                    var nonPortrait = 0
                     for (candidate in discoveries.take(15)) {
                         ensureActive()
                         try {
@@ -141,6 +142,7 @@ class ArtworkReviewRepository(
                             val digest = artworkSha256(bytes)
                             if (digest in previousHashes || loaded.any { it.sha256 == digest }) continue
                             val bitmap = decodeArtworkReviewPreview(bytes)
+                            if (bitmap.height <= bitmap.width) { nonPortrait++; continue }
                             loaded += UnreviewedArtwork(candidate.copy(bitmap = bitmap), digest)
                         } catch (cancelled: CancellationException) { throw cancelled }
                         catch (_: Exception) { failures++ }
@@ -151,6 +153,7 @@ class ArtworkReviewRepository(
                             candidates = loaded,
                             error = when {
                                 discoveries.isEmpty() -> "No more candidates on this page. Tap Fetch more to search another page."
+                                loaded.isEmpty() && nonPortrait > 0 -> "No portrait images on this page. Try again to search another page."
                                 loaded.isEmpty() && failures == 0 -> "No new preview images on this page. Tap Fetch more to search another page."
                                 loaded.isEmpty() -> "Could not download the candidate previews. Check your connection and try again."
                                 else -> null
@@ -184,7 +187,7 @@ class ArtworkReviewRepository(
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { /* An independent source keeps Nature discovery available. */ }
             coroutineContext.ensureActive()
-            val fallback = platform.download("https://api.openverse.org/v1/images/?q=nature%20landscape&license=cc0&page_size=20&page=$page", 2_000_000)
+            val fallback = platform.download("https://api.openverse.org/v1/images/?q=nature&aspect_ratio=tall&license=cc0&page_size=20&page=$page", 2_000_000)
             return Discovery(parseArtworkReviewCandidates(theme, fallback.decodeToString()), "Nature previews supplied by Openverse.")
         }
         val url = when (theme) {
@@ -228,11 +231,17 @@ internal fun parseArtworkReviewCandidates(theme: ArtworkTheme, text: String): Li
         ArtworkTheme.NATURE -> if (root is JsonArray) root.mapNotNull { value ->
             val row = value.jsonObject
             val id = row.string("id")
+            val width = row["width"]?.jsonPrimitive?.intOrNull
+            val height = row["height"]?.jsonPrimitive?.intOrNull
+            if (width != null && height != null && height <= width) return@mapNotNull null
             candidate("picsum-$id", "Nature candidate $id", row.string("author") + " · via Lorem Picsum",
-                row.string("url"), "https://picsum.photos/id/$id/900/1200", "Unsplash License", "https://unsplash.com/license")
+                row.string("url"), "https://picsum.photos/id/$id/900/1600", "Unsplash License", "https://unsplash.com/license")
         } else root.jsonObject["results"]?.jsonArray.orEmpty().mapNotNull { value ->
             val row = value.jsonObject
             if (row.string("license") != "cc0") return@mapNotNull null
+            val width = row["width"]?.jsonPrimitive?.intOrNull
+            val height = row["height"]?.jsonPrimitive?.intOrNull
+            if (width != null && height != null && height <= width) return@mapNotNull null
             val id = row.string("id")
             val thumbnail = row.string("thumbnail").takeIf { allowedArtworkDownload(it) && !artworkReviewMetadataUrl(it) }
                 ?: "https://api.openverse.org/v1/images/$id/thumb/"
