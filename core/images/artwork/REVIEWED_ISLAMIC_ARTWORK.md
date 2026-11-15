@@ -35,7 +35,8 @@ scrolls on compact screens or with larger text; **Done** stays in the header.
 ### Personal artwork gallery
 
 Settings → Appearance → Home artwork has a **Choose artwork** action. Opening it
-starts the preview gallery directly and fetches candidates from Picsum (Nature),
+starts the preview gallery directly and fetches candidates from Picsum (Nature,
+with an independent Openverse fallback),
 NASA (Space), or the Cleveland open-access API (Islamic). There is no Restricted
 mode switch, preview-consent dialog, or Restrict action. Opening Settings alone
 does not start preview requests. The gallery does not wait for a GitHub feed update.
@@ -76,6 +77,17 @@ and the discovery tool now accept these preview links and validate the actual
 downloaded image, while retaining byte/dimension bounds and rejection of
 explicitly oversized results. This corrects a Space discovery bug; it does not
 establish the cause of an individual Nature/Picsum request failure.
+
+The reported Android trace showed the GitHub feed returning HTTP 200 followed
+by repeated `SocketTimeoutException` failures from `picsum.photos`, before any
+provider HTTP response. Nature discovery now falls back to Openverse CC0 results
+when Picsum fails or returns no candidates. It uses allowed image CDNs and keeps
+normal preview validation and explicit approval. Android metadata requests use
+8-second connection / 10-second read limits; iOS uses a 10-second request /
+15-second resource limit. Image downloads retain their existing larger limits.
+Cancellation closes the request without starting a fallback after the gallery
+has been dismissed. A real-device retry still verifies whether the alternative
+source is reachable on the phone's network.
 Android preview-network diagnostics use the `ArtworkReview` logcat tag.
 
 ## Providers and rights

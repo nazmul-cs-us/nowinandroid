@@ -43,6 +43,19 @@ class UnreviewedArtworkTest {
         assertTrue(parseReviewedArtworkFeed("""{"schemaVersion":1,"artworks":[{"approved":false,"id":"picsum-88"}]}""").isEmpty())
     }
 
+    @Test fun openverseNatureFallbackPreservesCreditAndFiltersOutOtherLicenses() {
+        val text = """{"results":[{"id":"nature-1","title":"Quiet valley","creator":"Photographer","license":"cc0","thumbnail":"https://upload.wikimedia.org/wikipedia/commons/example.jpg"},{"id":"nature-2","title":"Other license","license":"by"}]}"""
+        val image = parseArtworkReviewCandidates(ArtworkTheme.NATURE, text).single()
+        assertEquals("openverse-nature-1", image.id)
+        assertTrue(image.artist.contains("Photographer"))
+        assertEquals("https://upload.wikimedia.org/wikipedia/commons/example.jpg", image.imageUrl)
+        assertEquals("CC0", image.licenseName)
+        val metadata = "https://api.openverse.org/v1/images/?q=nature&license=cc0"
+        assertTrue(artworkReviewMetadataUrl(metadata))
+        assertTrue(allowedArtworkReviewDownload(metadata))
+        assertFalse(allowedArtworkDownload(metadata))
+    }
+
     @Test fun unsafeCandidateIdsAndSourceLinksAreRejected() {
         assertTrue(parseArtworkReviewCandidates(ArtworkTheme.NATURE,
             """[{"id":"../bad","author":"Photographer","url":"https://unsplash.com/photos/example"}]""").isEmpty())

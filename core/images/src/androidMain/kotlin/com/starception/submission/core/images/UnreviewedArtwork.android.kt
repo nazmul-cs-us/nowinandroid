@@ -30,8 +30,9 @@ internal class AndroidArtworkReviewPlatform : ArtworkReviewPlatform {
             require(target.protocol == "https" && target.userInfo == null && target.port in listOf(-1, 443))
             val connection = target.openConnection() as HttpsURLConnection
             Log.i("ArtworkReview", "Starting preview request host=${target.host}")
-            connection.connectTimeout = 15_000
-            connection.readTimeout = 20_000
+            val metadata = artworkReviewMetadataUrl(address)
+            connection.connectTimeout = if (metadata) 8_000 else 15_000
+            connection.readTimeout = if (metadata) 10_000 else 20_000
             connection.instanceFollowRedirects = false
             connection.useCaches = false
             connection.setRequestProperty("User-Agent", "StarceptionArtworkReview/1.0 (+https://github.com/nazmul-cs-us/nowinandroid)")

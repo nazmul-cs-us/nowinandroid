@@ -47,8 +47,9 @@ private class IosArtworkReviewPlatform : ArtworkReviewPlatform {
         val target = requireNotNull(NSURL.URLWithString(url))
         require(safeReviewUrl(target))
         val configuration = NSURLSessionConfiguration.ephemeralSessionConfiguration
-        configuration.timeoutIntervalForRequest = 20.0
-        configuration.timeoutIntervalForResource = 30.0
+        val metadata = artworkReviewMetadataUrl(url)
+        configuration.timeoutIntervalForRequest = if (metadata) 10.0 else 20.0
+        configuration.timeoutIntervalForResource = if (metadata) 15.0 else 30.0
         val session = NSURLSession.sessionWithConfiguration(configuration, ReviewRedirects(), null)
         val request = NSMutableURLRequest(uRL = target)
         request.setValue(if (artworkReviewMetadataUrl(url)) "application/json" else "image/jpeg", "Accept")

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
+import kotlin.coroutines.coroutineContext
 import kotlin.random.Random
 
 /** Deliberately not a ReviewedHomeArtwork: previews cannot enter Home's approved collection. */
@@ -55,6 +56,7 @@ internal fun artworkReviewFailureMessage(theme: ArtworkTheme, failure: Exception
 
 internal fun artworkReviewMetadataUrl(url: String): Boolean = url == HOME_ARTWORK_FEED_URL ||
     url.startsWith("https://picsum.photos/v2/list?") ||
+    url.startsWith("https://api.openverse.org/v1/images/?") ||
     url.startsWith("https://images-api.nasa.gov/search?") ||
     url.startsWith("https://openaccess-api.clevelandart.org/api/artworks/?")
 
@@ -71,6 +73,7 @@ class ArtworkReviewRepository(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     initialPageOffset: Int = Random.nextInt(20),
 ) {
+    private data class Discovery(val candidates: List<OnlineHomeArtwork>, val notice: String? = null)
     private val mutable = MutableStateFlow(ArtworkReviewState())
     val state = mutable.asStateFlow()
     private val seen = mutableSetOf<String>()
@@ -117,7 +120,8 @@ class ArtworkReviewRepository(
                             .map { it.artwork.id }.toSet()
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { approvedFeedUnavailable = true; emptySet() }
-                    val discoveries = discover(theme, page).distinctBy { it.id }
+                    val discovery = discover(theme, page)
+                    val discoveries = discovery.candidates.distinctBy { it.id }
                         .filter { it.id !in approved && it.id !in previouslySeen }
                     val loaded = mutableListOf<UnreviewedArtwork>()
                     var failures = 0
@@ -143,6 +147,7 @@ class ArtworkReviewRepository(
                                 else -> null
                             },
                             notice = listOfNotNull(
+                                discovery.notice,
                                 if (failures > 0) "$failures candidate preview(s) could not be loaded." else null,
                                 if (approvedFeedUnavailable) "The approved-feed check was unavailable; some candidates may already have been reviewed." else null,
                              ).joinToString(" ").takeIf(String::isNotBlank),
@@ -161,7 +166,18 @@ class ArtworkReviewRepository(
         }
     }
 
-    private suspend fun discover(theme: ArtworkTheme, page: Int): List<OnlineHomeArtwork> {
+    private suspend fun discover(theme: ArtworkTheme, page: Int): Discovery {
+        if (theme == ArtworkTheme.NATURE) {
+            try {
+                val primary = platform.download("https://picsum.photos/v2/list?page=$page&limit=20", 2_000_000).decodeToString()
+                val candidates = parseArtworkReviewCandidates(theme, primary)
+                if (candidates.isNotEmpty()) return Discovery(candidates)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { /* An independent source keeps Nature discovery available. */ }
+            coroutineContext.ensureActive()
+            val fallback = platform.download("https://api.openverse.org/v1/images/?q=nature%20landscape&license=cc0&page_size=20&page=$page", 2_000_000)
+            return Discovery(parseArtworkReviewCandidates(theme, fallback.decodeToString()), "Nature previews supplied by Openverse.")
+        }
         val url = when (theme) {
             ArtworkTheme.NATURE -> "https://picsum.photos/v2/list?page=$page&limit=20"
             ArtworkTheme.SPACE -> "https://images-api.nasa.gov/search?q=nebula&media_type=image&page_size=20&page=$page"
@@ -185,7 +201,7 @@ class ArtworkReviewRepository(
                 text = platform.download(url.substringBeforeLast("skip=") + "skip=$offset", 2_000_000).decodeToString()
             }
         }
-        return parseArtworkReviewCandidates(theme, text)
+        return Discovery(parseArtworkReviewCandidates(theme, text))
     }
 }
 
@@ -200,11 +216,20 @@ internal fun parseArtworkReviewCandidates(theme: ArtworkTheme, text: String): Li
         return OnlineHomeArtwork(id, title, credit, source, image, licenseName = license, licenseUrl = rights)
     }
     return when (theme) {
-        ArtworkTheme.NATURE -> root.jsonArray.mapNotNull { value ->
+        ArtworkTheme.NATURE -> if (root is JsonArray) root.mapNotNull { value ->
             val row = value.jsonObject
             val id = row.string("id")
             candidate("picsum-$id", "Nature candidate $id", row.string("author") + " · via Lorem Picsum",
                 row.string("url"), "https://picsum.photos/id/$id/900/1200", "Unsplash License", "https://unsplash.com/license")
+        } else root.jsonObject["results"]?.jsonArray.orEmpty().mapNotNull { value ->
+            val row = value.jsonObject
+            if (row.string("license") != "cc0") return@mapNotNull null
+            val id = row.string("id")
+            val thumbnail = row.string("thumbnail").takeIf { allowedArtworkDownload(it) && !artworkReviewMetadataUrl(it) }
+                ?: "https://api.openverse.org/v1/images/$id/thumb/"
+            candidate("openverse-$id", row.string("title").ifBlank { "Nature photograph" },
+                row.string("creator").ifBlank { "Creator listed at source" } + " · via Openverse",
+                "https://openverse.org/image/$id", thumbnail, "CC0", "https://creativecommons.org/publicdomain/zero/1.0/")
         }
         ArtworkTheme.SPACE -> root.jsonObject["collection"]?.jsonObject?.get("items")?.jsonArray.orEmpty().mapNotNull { value ->
             val row = value.jsonObject

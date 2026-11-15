@@ -7,6 +7,7 @@ import com.starception.submission.core.images.*
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.URI
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -28,14 +29,26 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
     var pauseImages: CompletableDeferred<Unit>? = null
     var corruptImages = false
     var oversizedImages = false
+    var natureMetadataFailure: Exception? = null
+    var pauseNatureMetadata: CompletableDeferred<Unit>? = null
     override suspend fun download(url: String, maximumBytes: Int): ByteArray {
         requests += url
         if (offline) throw IOException("Offline fixture")
         if (url == HOME_ARTWORK_FEED_URL) return """{"schemaVersion":1,"artworks":[]}""".encodeToByteArray()
         if (url.startsWith("https://picsum.photos/v2/list?")) {
+            pauseNatureMetadata?.await()
+            natureMetadataFailure?.let { throw it }
             val page = URI(url).query.split('&').first { it.startsWith("page=") }.substringAfter('=').toInt()
             return JSONArray((1..20).map { n -> JSONObject().put("id", (page * 20 + n).toString())
                 .put("author", "Fixture photographer").put("url", "https://unsplash.com/photos/fixture-$n") }).toString().encodeToByteArray()
+        }
+        if (url.startsWith("https://api.openverse.org/v1/images/?")) {
+            val page = URI(url).query.split('&').first { it.startsWith("page=") }.substringAfter('=').toInt()
+            return JSONObject().put("results", JSONArray((1..20).map { n ->
+                JSONObject().put("id", "$page-$n").put("title", "Landscape $n").put("license", "cc0")
+                    .put("creator", "Fixture photographer")
+                    .put("thumbnail", "https://live.staticflickr.com/fixture/$page-$n.jpg")
+            })).toString().encodeToByteArray()
         }
         pauseImages?.await()
         if (corruptImages) return byteArrayOf(1, 2, 3)
@@ -54,6 +67,32 @@ internal class ReviewPlatformFixture : ArtworkReviewPlatform {
 @Config(application = Application::class, sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ArtworkReviewRepositoryTest {
+    @Test fun picsumMetadataTimeoutFallsBackToAnIndependentNatureSource() = runTest {
+        val platform = ReviewPlatformFixture().apply { natureMetadataFailure = SocketTimeoutException("Synthetic timeout") }
+        val repository = ArtworkReviewRepository(platform, this, dispatcher = StandardTestDispatcher(testScheduler))
+        repository.fetch(ArtworkTheme.NATURE, allowUnreviewed = true)
+        advanceUntilIdle()
+        assertEquals(5, repository.state.value.candidates.size)
+        assertNull(repository.state.value.error)
+        assertTrue(repository.state.value.notice.orEmpty().contains("Openverse"))
+        assertTrue(repository.state.value.candidates.all { it.artwork.id.startsWith("openverse-") && it.artwork.bitmap != null })
+        assertTrue(platform.requests.any { it.startsWith("https://api.openverse.org/v1/images/?") })
+        assertTrue(platform.requests.any { it.startsWith("https://live.staticflickr.com/") })
+        assertFalse(platform.requests.any { it.startsWith("https://picsum.photos/id/") })
+    }
+
+    @Test fun closingDuringNatureDiscoveryDoesNotStartTheFallback() = runTest {
+        val platform = ReviewPlatformFixture().apply { pauseNatureMetadata = CompletableDeferred() }
+        val repository = ArtworkReviewRepository(platform, this, dispatcher = StandardTestDispatcher(testScheduler))
+        repository.fetch(ArtworkTheme.NATURE, allowUnreviewed = true)
+        runCurrent()
+        assertTrue(repository.state.value.loading)
+        repository.clear()
+        advanceUntilIdle()
+        assertFalse(repository.state.value.loading)
+        assertTrue(repository.state.value.candidates.isEmpty())
+        assertFalse(platform.requests.any { it.startsWith("https://api.openverse.org/") })
+    }
     @Test fun explicitlyApprovedImageIsSavedPrivatelyAndRestoredOfflineWithoutPublishing() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val homePlatform = OnlineHomeArtworkTest.Platform()
