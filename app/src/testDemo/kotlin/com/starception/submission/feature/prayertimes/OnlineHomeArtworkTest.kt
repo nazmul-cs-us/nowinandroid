@@ -255,7 +255,8 @@ class OnlineHomeArtworkTest {
         advanceUntilIdle()
         assertEquals(old, repository.state.value.artworks.map { it.id })
         assertEquals(requests, platform.requests.size)
-        assertTrue(repository.state.value.error.orEmpty().contains("No new reviewed Islamic artwork"))
+        assertNull(repository.state.value.error)
+        assertTrue(repository.state.value.notice.orEmpty().contains("No new reviewed Islamic artwork"))
         assertTrue(platform.requests.all { it.startsWith("https://images.metmuseum.org/") })
     }
 
@@ -369,8 +370,9 @@ class OnlineHomeArtworkTest {
         assertEquals(original, repository.state.value.artworks.map { it.id })
         assertEquals(5, platform.imageRequests)
         assertEquals(2, platform.requests.count { it == HOME_ARTWORK_FEED_URL })
-        assertTrue(repository.state.value.error.orEmpty().contains("No new reviewed"))
-        assertNull(repository.state.value.notice)
+        assertNull(repository.state.value.error)
+        assertTrue(repository.state.value.notice.orEmpty().contains("No new reviewed"))
+        assertTrue(repository.state.value.notice.orEmpty().contains("Use Choose artwork"))
         platform.remoteCatalog = platform.catalog.take(10)
         repository.update(2, frozen = true, manualRevision = 2)
         advanceUntilIdle()

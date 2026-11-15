@@ -139,10 +139,13 @@ class HomeArtworkRepository(
                 } catch (failure: Exception) {
                     if (version == generation) {
                         lastFailure = clock.now()
-                        mutable.value = previous.copy(loading = false,
-                            error = if (failure is ReviewedArtworkExhausted) {
-                                "No new reviewed ${theme.label} artwork is available yet. Your current collection is unchanged. Newly discovered images must be approved before download."
-                            } else "Couldn't download reviewed artwork. Your current collection is unchanged. Try Refresh now when you're online.")
+                        mutable.value = if (failure is ReviewedArtworkExhausted) {
+                            previous.copy(loading = false, error = null,
+                                notice = "No new reviewed ${theme.label} artwork is available yet. Your current collection is unchanged. Use Choose artwork to find and approve new images for Home.")
+                        } else {
+                            previous.copy(loading = false,
+                                error = "Couldn't download reviewed artwork. Your current collection is unchanged. Try Refresh now when you're online.")
+                        }
                     }
                 } finally {
                     withContext(NonCancellable + ioDispatcher) {

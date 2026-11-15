@@ -18,8 +18,8 @@ Islamic/Space/Nature theme, downloads and verifies the exact approved image byte
 and atomically publishes the set only after every image succeeds. Feed/network/disk
 failures retain the last-good set. Successfully downloaded images and their approved
 catalog are stored privately for offline use. Legacy cached images require validation
-against the new feed before reuse. No new approved entries means a clear error and
-the current set stays; there is no silent shuffle or unrestricted random-photo fallback.
+against the new feed before reuse. No new approved entries means an informational notice directing users to
+Choose artwork, and the current set stays; there is no silent shuffle or unrestricted random-photo fallback.
 **Refresh now** bypasses the retry delay and HTTP cache to check the latest feed,
 but never substitutes previously viewed images for new artwork. Explicitly changing
 the theme may revisit that theme's reviewed collection; this is labelled separately.
