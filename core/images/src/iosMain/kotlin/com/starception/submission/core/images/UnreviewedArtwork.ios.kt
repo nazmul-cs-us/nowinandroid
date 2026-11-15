@@ -57,7 +57,9 @@ private class IosArtworkReviewPlatform : ArtworkReviewPlatform {
         val task = session.dataTaskWithRequest(request) { data, response, error ->
             if (continuation.isActive) {
                 runCatching {
-                    check(error == null && (response as? NSHTTPURLResponse)?.statusCode == 200L)
+                    check(error == null)
+                    val status = (response as? NSHTTPURLResponse)?.statusCode?.toInt() ?: 0
+                    if (status != 200) throw ArtworkReviewHttpException(status)
                     require(safeReviewUrl(response?.URL))
                     val body = requireNotNull(data)
                     require(body.length > 0u && body.length <= maximumBytes.toULong())

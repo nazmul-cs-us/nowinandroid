@@ -55,6 +55,27 @@ collection. Explicitly approved images are stored separately from the preview se
 Previews are bounded to five images, resized to at most 720 pixels on
 their longest side; the original image remains available through the full-image link.
 Downloads use a separate HTTPS endpoint/redirect allowlist and byte/dimension limits.
+
+### Diagnosing a failed fetch
+
+**Refresh now** uses the published reviewed feed and needs five unseen images
+for the selected theme. An exhausted theme reports that no new reviewed artwork
+is available and keeps the current collection. This is different from a failed
+HTTPS request. At the 15 November source check, the published feed contained
+25 Islamic images, five Space images and five Nature images.
+
+**Choose artwork** discovers previews directly from the theme's provider. A
+failure before any image loads can come from the provider's metadata request.
+HTTP rejections, rate limiting and provider outages now have separate messages
+instead of always suggesting the phone is offline. On Android, tap **Try again**,
+wait for the result, and inspect `adb logcat -d -v brief -s ArtworkReview` for
+the public provider hostname, HTTP status and exception category.
+
+NASA search preview links can omit `width` and `height`. Both the in-app gallery
+and the discovery tool now accept these preview links and validate the actual
+downloaded image, while retaining byte/dimension bounds and rejection of
+explicitly oversized results. This corrects a Space discovery bug; it does not
+establish the cause of an individual Nature/Picsum request failure.
 Android preview-network diagnostics use the `ArtworkReview` logcat tag.
 
 ## Providers and rights

@@ -32,6 +32,27 @@ fun interface ArtworkReviewPlatform {
     suspend fun download(url: String, maximumBytes: Int): ByteArray
 }
 
+internal class ArtworkReviewHttpException(val status: Int) : Exception("Artwork provider returned HTTP $status")
+
+internal fun artworkReviewFailureMessage(theme: ArtworkTheme, failure: Exception): String {
+    val provider = when (theme) {
+        ArtworkTheme.NATURE -> "The Nature image service"
+        ArtworkTheme.SPACE -> "The NASA image service"
+        ArtworkTheme.ISLAMIC -> "The museum image service"
+    }
+    return when {
+        failure is ArtworkReviewHttpException && failure.status == 429 ->
+            "$provider is busy. Wait a moment before trying again."
+        failure is ArtworkReviewHttpException && failure.status in setOf(401, 403) ->
+            "$provider blocked this request. Try again later or choose another artwork theme."
+        failure is ArtworkReviewHttpException ->
+            "$provider is temporarily unavailable. Try again later or choose another artwork theme."
+        failure is kotlinx.serialization.SerializationException ->
+            "$provider returned an unreadable response. Try again later."
+        else -> "Could not reach ${provider.replaceFirstChar { it.lowercase() }}. Check your connection and try again."
+    }
+}
+
 internal fun artworkReviewMetadataUrl(url: String): Boolean = url == HOME_ARTWORK_FEED_URL ||
     url.startsWith("https://picsum.photos/v2/list?") ||
     url.startsWith("https://images-api.nasa.gov/search?") ||
@@ -134,8 +155,8 @@ class ArtworkReviewRepository(
                     mutable.value = result
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) {
-                if (version == generation) mutable.value = ArtworkReviewState(error = "Could not fetch unreviewed images. Check your connection and try again.")
+            catch (failure: Exception) {
+                if (version == generation) mutable.value = ArtworkReviewState(error = artworkReviewFailureMessage(theme, failure))
             }
         }
     }
@@ -190,8 +211,13 @@ internal fun parseArtworkReviewCandidates(theme: ArtworkTheme, text: String): Li
             val data = row["data"]?.jsonArray?.firstOrNull()?.jsonObject ?: return@mapNotNull null
             if (data.string("copyright").isNotBlank()) return@mapNotNull null
             val image = row["links"]?.jsonArray.orEmpty().map { it.jsonObject }.filter {
-                it.string("render") == "image" && (it["width"]?.jsonPrimitive?.intOrNull ?: 0) in 100..1800 &&
-                    (it["height"]?.jsonPrimitive?.intOrNull ?: 0) in 100..1800
+                // NASA preview links can omit dimensions. Validate the downloaded
+                // image as usual instead of treating absent size fields as zero.
+                val width = it["width"]?.jsonPrimitive?.intOrNull
+                val height = it["height"]?.jsonPrimitive?.intOrNull
+                it.string("render") == "image" &&
+                    (width == null || width in 100..1800) && (height == null || height in 100..1800) &&
+                    ((width != null && height != null) || it.string("rel") == "preview")
             }.maxByOrNull { (it["width"]?.jsonPrimitive?.intOrNull ?: 0) * (it["height"]?.jsonPrimitive?.intOrNull ?: 0) }
                 ?: return@mapNotNull null
             val id = data.string("nasa_id")

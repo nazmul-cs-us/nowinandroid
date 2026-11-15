@@ -1,8 +1,27 @@
 package com.starception.submission.core.images
 
 import kotlin.test.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 
 class UnreviewedArtworkTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun discoveryRejectionsAreNotMisreportedAsAnOfflinePhone() = runTest {
+        for ((status, expected) in listOf(403 to "blocked this request", 429 to "is busy", 503 to "temporarily unavailable")) {
+            val platform = ArtworkReviewPlatform { url, _ ->
+                if (url == HOME_ARTWORK_FEED_URL) """{"schemaVersion":1,"artworks":[]}""".encodeToByteArray()
+                else throw ArtworkReviewHttpException(status)
+            }
+            val repository = ArtworkReviewRepository(platform, this, dispatcher = StandardTestDispatcher(testScheduler))
+            repository.fetch(ArtworkTheme.NATURE, allowUnreviewed = true)
+            advanceUntilIdle()
+            assertFalse(repository.state.value.loading)
+            assertTrue(repository.state.value.candidates.isEmpty())
+            assertTrue(repository.state.value.error.orEmpty().contains(expected))
+        }
+    }
     @Test fun reviewEndpointsAreSeparateAndCannotExtendHomesApprovedFeedAllowlist() {
         val metadata = "https://picsum.photos/v2/list?page=2&limit=20"
         assertTrue(artworkReviewMetadataUrl(metadata))
@@ -46,5 +65,12 @@ class UnreviewedArtworkTest {
         assertTrue(parseArtworkReviewCandidates(ArtworkTheme.SPACE, text.replace("\"width\":640", "\"width\":9000")).isEmpty())
         assertTrue(parseArtworkReviewCandidates(ArtworkTheme.SPACE,
             text.replace("\"nasa_id\":\"TEST\"", "\"copyright\":\"Third party\",\"nasa_id\":\"TEST\"")).isEmpty())
+    }
+
+    @Test fun nasaPreviewLinksWithoutOptionalDimensionsAreDiscoverable() {
+        val text = """{"collection":{"items":[{"data":[{"nasa_id":"TEST","title":"Nebula"}],"links":[{"href":"https://images-assets.nasa.gov/image/TEST/TEST~thumb.jpg","rel":"preview","render":"image"}]}]}}"""
+        assertEquals("nasa-TEST", parseArtworkReviewCandidates(ArtworkTheme.SPACE, text).single().id)
+        assertTrue(parseArtworkReviewCandidates(ArtworkTheme.SPACE, text.replace("\"preview\"", "\"original\"")).isEmpty())
+        assertTrue(parseArtworkReviewCandidates(ArtworkTheme.SPACE, text.replace("\"render\":\"image\"", "\"render\":\"image\",\"width\":9000")).isEmpty())
     }
 }

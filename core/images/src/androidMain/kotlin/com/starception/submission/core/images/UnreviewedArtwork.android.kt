@@ -44,7 +44,7 @@ internal class AndroidArtworkReviewPlatform : ArtworkReviewPlatform {
                     target = URL(target, requireNotNull(connection.getHeaderField("Location")))
                     return@repeat
                 }
-                check(status == 200) { "Artwork review request failed" }
+                if (status != 200) throw ArtworkReviewHttpException(status)
                 require(connection.contentLengthLong <= maximumBytes)
                 return@withContext connection.inputStream.use { input ->
                     val output = ByteArrayOutputStream()

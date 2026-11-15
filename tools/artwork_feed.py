@@ -37,11 +37,15 @@ def discover(source, query, limit, fetch=get_json, page=1):
         rows = fetch("https://images-api.nasa.gov/search?" + urlencode(dict(q=query, media_type="image", page_size=limit, page=page)))
         for item in rows["collection"]["items"]:
             meta = item["data"][0]
+            # Search preview links do not always include dimensions. The actual
+            # image dimensions are checked after the bounded preview download.
             links = [x for x in item.get("links", []) if x.get("render") == "image"
-                     and 100 <= x.get("width", 0) <= 1800 and 100 <= x.get("height", 0) <= 1800]
+                     and all(x.get(d) is None or isinstance(x[d], int) and 100 <= x[d] <= 1800
+                             for d in ("width", "height"))
+                     and (all(x.get(d) is not None for d in ("width", "height")) or x.get("rel") == "preview")]
             if not links or meta.get("copyright"):
                 continue
-            image = max(links, key=lambda x: x["width"] * x["height"])["href"]
+            image = max(links, key=lambda x: (x.get("width") or 0) * (x.get("height") or 0))["href"]
             id = meta["nasa_id"]
             yield candidate("nasa-" + id, meta["title"], meta.get("secondary_creator", "NASA; verify full credit"),
                             "https://images.nasa.gov/details/" + id, image, "SPACE",

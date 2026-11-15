@@ -10,6 +10,15 @@ class FakeProvider:
                 "href": "https://images-assets.nasa.gov/image/TEST/TEST~small.jpg"}]}]}}
 
 class ArtworkFeedTest(unittest.TestCase):
+    def test_nasa_search_preview_links_can_omit_dimensions(self):
+        def fetch(url):
+            return {"collection": {"items": [{"data": [{"nasa_id": "TEST", "title": "Nebula"}],
+                "links": [{"render": "image", "rel": "preview",
+                    "href": "https://images-assets.nasa.gov/image/TEST/TEST~thumb.jpg"}]}]}}
+        rows = list(artwork_feed.discover("nasa", "nebula", 1, fetch=fetch))
+        self.assertEqual(["nasa-TEST"], [row["id"] for row in rows])
+        self.assertIs(rows[0]["approved"], False)
+
     def test_cleveland_candidates_require_cc0_and_the_islamic_department(self):
         def fetch(url):
             valid = dict(accession_number="2004.70", share_license_status="CC0", department="Islamic Art",
