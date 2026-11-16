@@ -16,7 +16,7 @@ Storage:
 - iOS: the existing key/value store, `quran_reciter_catalog` and
   `quran_reciter_catalog_updated_at`.
 
-Portraits for seven reciters ship in `core/images` as small WebP resources. They
+Portraits for nine reciters ship in `core/images` as small WebP resources. They
 are available offline immediately, survive restarts and normal cache cleanup, and
 need no network fetch. Other names show initials. Portrait source credits and
 coverage are recorded in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
@@ -35,3 +35,16 @@ cached list stays selectable offline and bundled portraits are rendered.
 On iOS, fetch the catalog once, quit the app, disconnect the network, and reopen
 the picker and search. Names and bundled portraits should remain visible. A new
 installation with no previously fetched catalog still needs a first connection.
+
+## Complete-Quran catalog policy
+
+New reciter choices and search results require every surah from 1 through 114 in
+that recording's catalog metadata. Having the currently opened surah, or simply
+114 entries with an invalid/missing number, is insufficient. This is catalog
+coverage; it does not require downloading all files before selecting a voice.
+
+A person appears once if at least one complete recording is available. Incomplete
+variants are excluded from new choices. Old locally saved partial recordings stay
+in the library (under a labelled legacy section if no complete variant exists).
+They can be previewed or removed, but cannot be newly selected or downloaded.
+Grouping and filtering do not delete those files or change an existing selection.

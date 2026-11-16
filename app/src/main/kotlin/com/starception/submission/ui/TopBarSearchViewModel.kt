@@ -110,7 +110,8 @@ class TopBarSearchViewModel @Inject constructor(
     val reciterResults: StateFlow<List<ReciterCatalog.Reciter>> =
         combine(_searchQuery, reciterCatalog) { query, catalog ->
             if (query.trim().length < SEARCH_QUERY_MIN_LENGTH) emptyList()
-            else catalog.filter { ReciterCatalog.matchesSearch(it, query) }.take(8)
+            else catalog.filter { com.starception.submission.feature.quran.hasCompleteQuran(it.surahs) && ReciterCatalog.matchesSearch(it, query) }
+                .distinctBy { com.starception.submission.core.images.reciterPersonKey(it.name) }.take(8)
         }.flowOn(Dispatchers.Default).stateIn(
             viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList(),
         )

@@ -64,12 +64,10 @@ fun ReciterChoiceRow(
         ) {
             ReciterAvatar(name)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(name, style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(name, style = MaterialTheme.typography.titleSmall)
                 if (description.isNotBlank()) Text(description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (onPreview != null) ReciterPreviewButton(name, onPreview, previewing, previewLoading, enabled)
             RadioButton(selected = selected, onClick = null, enabled = enabled,

@@ -37,8 +37,8 @@ class ReciterSelectionTest {
 
     @Test
     fun pickerFiltersUnavailableAndDuplicateReciters() {
-        val available = QuranReciterSource("a", "Alpha", "https://example.org/a", setOf(2))
-        val unavailable = QuranReciterSource("b", "Beta", "https://example.org/b", setOf(1))
+        val available = QuranReciterSource("a", "Alpha", "https://example.org/a", (1..114).toSet())
+        val unavailable = QuranReciterSource("b", "Beta", "https://example.org/b", (1..113).toSet())
         assertEquals(
             listOf(available),
             selectableQuranReciters(2, listOf(unavailable, available, available)),

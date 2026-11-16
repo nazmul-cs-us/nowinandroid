@@ -136,6 +136,8 @@ not designated CC0/public domain by Deenly.
 | Muhammad Siddiq Al-Minshawi | `9.jpg` | `reciter_minshawi.webp` |
 | Saud Al-Shuraim | `10.jpg` | `reciter_shuraim.webp` |
 | Maher Al-Muaiqly | `12.jpg` | `reciter_maher.webp` |
+| Abu Bakr Al-Shatri | `4.jpg` | `reciter_abu_bakr_shatri.webp` |
+| Hani Ar-Rifai | `5.jpg` | `reciter_hani_rifai.webp` |
 
 Images are resized proportionally to a maximum of 192 pixels and compressed to
 WebP (quality 85). They ship in `core/images` for offline Android/iOS use.
@@ -144,6 +146,14 @@ than an unrelated person's photo.
 
 Selection lists remove repeated IDs and equivalent recordings (same person,
 server, style and surah coverage). Different riwayat/styles or recording servers
-remain selectable. Existing selected/downloaded IDs remain accessible; deduplication
+remain selectable when their catalog contains all 114 surahs. Existing selected/downloaded IDs remain accessible; deduplication
 never deletes audio. The bundled Alafasy default and MP3Quran recordings are
 separate audio sources, labelled as default versus the catalog's recording style.
+
+Reciter pickers and the offline library now render one person per row. All eligible complete
+recordings, including Alafasy's separate default/CDN option, remain in that
+person's recording selector. Known names use one consistent display spelling.
+Full recording labels wrap; unsupported names still use initials. Library
+recording changes only change the preview/download target. In a selection picker,
+choosing a recording selects that original source ID. Existing saved files stay
+under their original recording IDs and are never migrated or deleted by grouping.

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -23,6 +24,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performClick
@@ -48,7 +51,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, qualifiers = "w320dp-h640dp", sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
+@OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class, androidx.compose.ui.test.ExperimentalTestApi::class)
 class ReciterDownloadUiTest {
     @get:Rule val compose = createComposeRule()
     @org.junit.Before fun disableUnrelatedFirstUseTips() {
@@ -62,7 +65,7 @@ class ReciterDownloadUiTest {
         org.robolectric.Shadows.shadowOf(connectivity).setActiveNetworkInfo(null)
         context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).edit().clear()
             .putString("catalog_json", """{"reciters":[{"id":1,"name":"Abdul Basit Abdul Samad","moshaf":[
-                {"id":2,"name":"Hafs - Murattal","server":"https://example.org/audio/","surah_list":"1,2"}
+                {"id":2,"name":"Hafs - Murattal","server":"https://example.org/audio/","surah_list":"${(1..114).joinToString(",")}"}
             ]}]}""").commit()
         var selections = 0
         val height = mutableStateOf(480.dp)
@@ -98,16 +101,15 @@ class ReciterDownloadUiTest {
         org.robolectric.Shadows.shadowOf(connectivity).setActiveNetworkInfo(null)
         context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).edit().clear()
             .putString("catalog_json", """{"reciters":[
-                {"id":991,"name":"Offline Voice","moshaf":[{"id":992,"name":"Hafs","server":"https://example.org/audio/","surah_list":"1,2"}]},
-                {"id":993,"name":"Online Voice","moshaf":[{"id":994,"name":"Hafs","server":"https://example.org/audio/","surah_list":"1,2"}]}
+                {"id":991,"name":"Offline Voice","moshaf":[{"id":992,"name":"Hafs","server":"https://example.org/audio/","surah_list":"${(1..114).joinToString(",")}"}]},
+                {"id":993,"name":"Online Voice","moshaf":[{"id":994,"name":"Hafs","server":"https://example.org/audio/","surah_list":"${(1..114).joinToString(",")}"}]}
             ]}""").commit()
-        val reciter = ReciterCatalog.Reciter("991-992", "Offline Voice", "https://example.org/audio/", setOf(1, 2), "Hafs")
+        val reciter = ReciterCatalog.Reciter("991-992", "Offline Voice", "https://example.org/audio/", (1..114).toSet(), "Hafs")
         val directory = File(context.filesDir, "quran/reciters/${reciter.id}")
         val showPicker = mutableStateOf(false)
         try {
             directory.mkdirs()
-            File(directory, "001.mp3").writeText("audio")
-            File(directory, "002.mp3").writeText("audio")
+            (1..114).forEach { File(directory, "%03d.mp3".format(it)).writeText("audio") }
             compose.setContent {
             CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
                 org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
@@ -125,7 +127,7 @@ class ReciterDownloadUiTest {
                 compose.onAllNodes(hasText("Downloaded reciters")).fetchSemanticsNodes().isNotEmpty()
             }
             compose.onNodeWithText("Offline Voice").assertIsDisplayed()
-            compose.onNodeWithText("Available offline · 2 surahs").assertIsDisplayed()
+            compose.onNodeWithText("Available offline · 114 surahs").assertIsDisplayed()
             compose.onNodeWithTag("reciter-list").performScrollToNode(hasText("More reciters"))
             compose.onNodeWithTag("reciter-list").performScrollToNode(hasText("Offline Voice"))
             compose.onNodeWithContentDescription("Show offline details for Offline Voice").performClick()
@@ -147,9 +149,9 @@ class ReciterDownloadUiTest {
         org.robolectric.Shadows.shadowOf(connectivity).setActiveNetworkInfo(null)
         context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).edit().clear()
             .putString("catalog_json", """{"reciters":[
-                {"id":54,"name":"Abdulrahman Alsudaes","moshaf":[{"id":54,"name":"Hafs - Murattal","server":"https://example.org/sudais/","surah_list":"1,2"}]},
-                {"id":1,"name":"Abdul Basit Abdul Samad","moshaf":[{"id":2,"name":"Hafs - Murattal","server":"https://example.org/basit/","surah_list":"1,2"}]},
-                {"id":3,"name":"Maher Al-Muaiqly","moshaf":[{"id":3,"name":"Hafs - Murattal","server":"https://example.org/maher/","surah_list":"1,2"}]}
+                {"id":54,"name":"Abdulrahman Alsudaes","moshaf":[{"id":54,"name":"Hafs - Murattal","server":"https://example.org/sudais/","surah_list":"${(1..114).joinToString(",")}"}]},
+                {"id":1,"name":"Abdul Basit Abdul Samad","moshaf":[{"id":2,"name":"Hafs - Murattal","server":"https://example.org/basit/","surah_list":"${(1..114).joinToString(",")}"}]},
+                {"id":3,"name":"Maher Al-Muaiqly","moshaf":[{"id":3,"name":"Hafs - Murattal","server":"https://example.org/maher/","surah_list":"${(1..114).joinToString(",")}"}]}
             ]}""").commit()
         compose.setContent {
             CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
@@ -170,9 +172,9 @@ class ReciterDownloadUiTest {
             .assertHeightIsAtLeast(48.dp).performClick()
         // Opening download details must not change the selected voice.
         assertEquals(null, com.starception.submission.feature.quran.ReciterSelectionStore(context).current().id)
-        compose.onNodeWithText("0 of 2 surahs saved").assertIsDisplayed()
+        compose.onNodeWithText("0 of 114 surahs saved").assertIsDisplayed()
         compose.onNodeWithContentDescription("Hide downloads for Abdul Rahman Al-Sudais").performClick()
-        compose.onNodeWithText("0 of 2 surahs saved").assertDoesNotExist()
+        compose.onNodeWithText("0 of 114 surahs saved").assertDoesNotExist()
         compose.onNodeWithContentDescription("Close reciters").performClick()
         compose.onNodeWithTag("reciter-list").assertDoesNotExist()
     }
@@ -292,4 +294,146 @@ class ReciterDownloadUiTest {
         compose.onNodeWithText("Retry download").performClick()
         assertEquals(1, downloads)
     }
+    private fun installGroupedCatalog(): Context {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+        org.robolectric.Shadows.shadowOf(connectivity).setActiveNetworkInfo(null)
+        context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).edit().clear()
+            .putString("catalog_json", """{"reciters":[
+                {"id":1,"name":"Abdulbasit Abdulsamad","moshaf":[
+                    {"id":11,"name":"Rewayat Hafs A'n Assem - Murattal","server":"https://example.org/hafs/","surah_list":"${(1..114).joinToString(",")}"},
+                    {"id":12,"name":"Rewayat Hafs A'n Assem - Almushaf Al Mojawwad","server":"https://example.org/mujawwad/","surah_list":"${(1..114).joinToString(",")}"},
+                    {"id":13,"name":"Rewayat Warsh A'n Nafi'","server":"https://example.org/warsh/","surah_list":"${(1..114).joinToString(",")}"}]},
+                {"id":123,"name":"Mshari Al Afasi","moshaf":[
+                    {"id":321,"name":"Hafs - Murattal","server":"https://example.org/afasy/","surah_list":"${(1..114).joinToString(",")}"}]}
+            ]}""").commit()
+        return context
+    }
+
+    @Test fun pickerShowsOnePersonAndSelectingWarshKeepsTheRecordingId() {
+        val context = installGroupedCatalog()
+        var selections = 0
+        compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
+            MaterialTheme { Surface { ReciterStorageSection(initiallyExpanded = true, manageDownloads = false,
+                onReciterSelected = { selections++ }, modifier = Modifier.heightIn(max = 620.dp)) } }
+        }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Abdul Basit Abdul Samad")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(hasText("Abdul Basit Abdul Samad")).assertCountEquals(1)
+        compose.onAllNodes(hasText("Mishary Rashid Al-Alafasy")).assertCountEquals(1)
+        compose.onNodeWithTag("reciter-list").performScrollToNode(hasTestTag("reciterRecordings_abdul-basit"))
+        compose.onNodeWithTag("reciterRecordings_abdul-basit").performClick()
+        compose.onNodeWithTag("reciterRecording_1-11").assertIsDisplayed()
+        compose.onNodeWithTag("reciterRecording_1-12").assertIsDisplayed()
+        compose.onNodeWithTag("reciterRecording_1-13").assertIsDisplayed()
+        compose.onNodeWithTag("reciterRecordingMenu_abdul-basit").captureRoboImage("src/testDemo/screenshots/reciter_recording_menu.png")
+        compose.onNodeWithTag("reciterRecording_1-13").performClick()
+        compose.waitForIdle()
+        assertEquals(1, selections)
+        assertEquals("1-13", com.starception.submission.feature.quran.ReciterSelectionStore(context).current().id)
+        compose.onAllNodes(hasText("Abdul Basit Abdul Samad")).assertCountEquals(1)
+    }
+
+    @Test fun librarySwitchesRecordingWithoutSelectingItOrDeletingSavedAudio() {
+        val context = installGroupedCatalog()
+        val saved = ReciterCatalog.Reciter("1-12", "Abdulbasit Abdulsamad", "https://example.org/mujawwad/", (1..114).toSet(), "Hafs - Mujawwad")
+        val chosen = ReciterCatalog.Reciter("1-13", "Abdulbasit Abdulsamad", "https://example.org/warsh/", (1..114).toSet(), "Warsh")
+        val directory = File(context.filesDir, "quran/reciters/${saved.id}")
+        val manager = com.starception.submission.feature.quran.ReciterDownloadManager.get(context)
+        try {
+            directory.mkdirs(); (1..114).forEach { File(directory, "%03d.mp3".format(it)).writeText("audio") }
+            ReciterCatalog.rememberDownloaded(context, saved)
+            com.starception.submission.feature.quran.ReciterSelectionStore(context).select(chosen)
+            compose.setContent {
+                CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                    org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+                }
+                MaterialTheme { Surface { ReciterStorageSection(initiallyExpanded = true, manageDownloads = true,
+                    modifier = Modifier.heightIn(max = 620.dp)) } }
+            }
+            compose.waitUntil(5_000) { compose.onAllNodes(hasText("Abdul Basit Abdul Samad")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onAllNodes(hasText("Abdul Basit Abdul Samad")).assertCountEquals(1)
+            compose.onNodeWithTag("reciter-list").performScrollToNode(hasTestTag("reciterRecordings_abdul-basit"))
+            compose.onNodeWithTag("reciterRecordings_abdul-basit").performClick()
+            compose.onNodeWithTag("reciterRecording_1-12").performClick()
+            compose.waitUntil(5_000) { compose.onAllNodes(hasText("Available offline · 114 surahs")).fetchSemanticsNodes().isNotEmpty() }
+            assertEquals("1-13", com.starception.submission.feature.quran.ReciterSelectionStore(context).current().id)
+            assertEquals(114, manager.snapshot(saved).downloadedSurahs)
+            compose.onRoot().captureRoboImage("src/testDemo/screenshots/reciter_grouped_library.png")
+        } finally { manager.delete(saved) }
+    }
+
+    @Test fun browsedRecordingSurvivesStateRestorationWithoutChangingTheActiveVoice() {
+        val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
+        val person = com.starception.submission.feature.quran.ReciterPerson("voice", "Reciter", listOf("hafs", "warsh"))
+        restoration.setContent {
+            MaterialTheme {
+                com.starception.submission.feature.quran.ReciterRecordingChooser(person,
+                    id = { it }, style = { it }, subtitle = { "114 surahs" }, preferredId = "hafs",
+                    savedIds = emptySet(), onChange = {}) { Text("Current recording: $it") }
+            }
+        }
+        compose.onNodeWithTag("reciterRecordings_voice").performClick()
+        compose.onNodeWithTag("reciterRecording_warsh").performClick()
+        compose.onNodeWithText("Current recording: warsh").assertIsDisplayed()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithText("Current recording: warsh").assertIsDisplayed()
+    }
+
+    @Test fun pickerExcludesPartialVoicesAndPartialVariantsOfCompleteVoices() {
+        val context = installGroupedCatalog()
+        context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).edit().putString("catalog_json", """{"reciters":[
+            {"id":1,"name":"Abdulbasit Abdulsamad","moshaf":[
+                {"id":11,"name":"Hafs","server":"https://example.org/full/","surah_list":"${(1..114).joinToString(",")}"},
+                {"id":13,"name":"Warsh","server":"https://example.org/partial/","surah_list":"${(1..113).joinToString(",")}"}]},
+            {"id":222,"name":"Incomplete Voice","moshaf":[
+                {"id":223,"name":"Hafs","server":"https://example.org/incomplete/","surah_list":"${(1..113).joinToString(",")}"}]}
+        ]}""").commit()
+        compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
+            MaterialTheme { Surface { ReciterStorageSection(initiallyExpanded = true, manageDownloads = false,
+                modifier = Modifier.heightIn(max = 620.dp)) } }
+        }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Abdul Basit Abdul Samad")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Incomplete Voice").assertDoesNotExist()
+        compose.onNodeWithTag("reciterRecordings_abdul-basit").assertDoesNotExist()
+        compose.onNodeWithText("Abdul Basit Abdul Samad").performClick()
+        assertEquals("1-11", com.starception.submission.feature.quran.ReciterSelectionStore(context).current().id)
+    }
+
+    @Test fun savedPartialAudioStaysManageableButIsNotOfferedForNewSelection() {
+        val context = installGroupedCatalog()
+        val legacy = ReciterCatalog.Reciter("888-889", "Old Voice", "https://example.org/old/", setOf(1, 2), "Hafs")
+        val directory = File(context.filesDir, "quran/reciters/${legacy.id}")
+        val manager = com.starception.submission.feature.quran.ReciterDownloadManager.get(context)
+        val picker = mutableStateOf(false)
+        try {
+            directory.mkdirs(); File(directory, "001.mp3").writeText("audio"); File(directory, "002.mp3").writeText("audio")
+            ReciterCatalog.rememberDownloaded(context, legacy)
+            compose.setContent {
+                CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                    org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+                }
+                MaterialTheme { Surface { ReciterStorageSection(initiallyExpanded = true, manageDownloads = !picker.value,
+                    modifier = Modifier.heightIn(max = 620.dp)) } }
+            }
+            compose.waitUntil(5_000) { compose.onAllNodes(hasText("Old Voice")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("reciter-list").performScrollToNode(hasText("Old Voice"))
+            compose.onNodeWithText("Previously saved partial recordings").assertExists()
+            compose.onNodeWithText("Old Voice").assertIsNotEnabled()
+            compose.onNodeWithContentDescription("Show offline details for Old Voice").performClick()
+            compose.onNodeWithText("Remove audio").assertIsDisplayed()
+            compose.onNodeWithText("Download all").assertDoesNotExist()
+            compose.onNodeWithText("Download remaining").assertDoesNotExist()
+            compose.runOnIdle { picker.value = true }
+            compose.waitForIdle()
+            compose.onNodeWithText("Old Voice").assertDoesNotExist()
+            assertEquals(2, manager.snapshot(legacy).downloadedSurahs)
+        } finally { manager.delete(legacy) }
+    }
+
 }

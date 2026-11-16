@@ -17,6 +17,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -40,9 +43,15 @@ internal fun ReciterDownloadSheet(reciter: ReciterCatalog.Reciter, onDismiss: ()
     val manager = remember(context) { ReciterDownloadManager.get(context.applicationContext) }
     val store = remember(context) { ReciterSelectionStore(context) }
     val selection by store.selections.collectAsStateWithLifecycle(initialValue = store.current())
-    val status by produceState(ReciterDownloadManager.DownloadStatus(totalSurahs = reciter.surahs.size), reciter.id) {
-        withContext(Dispatchers.IO) { manager.observe(reciter).collect { value = it } }
+    var recordings by remember(reciter.id) { mutableStateOf(listOf(reciter).filter { com.starception.submission.feature.quran.hasCompleteQuran(it.surahs) }) }
+    LaunchedEffect(reciter.id) {
+        val key = com.starception.submission.core.images.reciterPersonKey(reciter.name)
+        recordings = (listOf(reciter) + ReciterCatalog.cached(context).orEmpty()).filter {
+            com.starception.submission.feature.quran.hasCompleteQuran(it.surahs) &&
+                com.starception.submission.core.images.reciterPersonKey(it.name) == key
+        }.distinctBy { it.id }
     }
+    val person = com.starception.submission.feature.quran.groupReciters(recordings, { it.id }, { it.name }).firstOrNull() ?: return
     ModalBottomSheet(onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -54,11 +63,21 @@ internal fun ReciterDownloadSheet(reciter: ReciterCatalog.Reciter, onDismiss: ()
                     Icon(Icons.Filled.Close, contentDescription = "Close reciter downloads")
                 }
             }
-            ReciterChoiceRow(name = reciter.name, description = reciter.riwaya,
-                selected = selection.id == reciter.id, onSelect = { store.select(reciter) })
-            ReciterOfflineActions(status,
-                onDownload = { manager.download(reciter) }, onCancel = { manager.cancel(reciter.id) },
-                onRemove = { manager.delete(reciter) })
+            com.starception.submission.feature.quran.ReciterRecordingChooser(person,
+                id = { it.id }, style = { it.riwaya }, subtitle = { "114 surahs" }, preferredId = reciter.id,
+                savedIds = emptySet(), onChange = {}) { recording ->
+                val current = recording.copy(name = person.name)
+                val status by produceState(ReciterDownloadManager.DownloadStatus(totalSurahs = 114), current.id) {
+                    withContext(Dispatchers.IO) { manager.observe(current).collect { value = it } }
+                }
+                Column {
+                    ReciterChoiceRow(name = person.name, description = com.starception.submission.feature.quran.reciterRecordingLabel(current.riwaya),
+                        selected = selection.id == current.id, onSelect = { store.select(current) })
+                    ReciterOfflineActions(status,
+                        onDownload = { manager.download(current) }, onCancel = { manager.cancel(current.id) },
+                        onRemove = { manager.delete(current) })
+                }
+            }
         }
     }
 }

@@ -1382,12 +1382,12 @@ private fun renderSuggestions(
                     imageTintList = ColorStateList.valueOf(accentColor)
                 }
                 row.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
-                    text = reciter.name
+                    text = com.starception.submission.core.images.reciterDisplayName(reciter.name)
                     setTextColor(titleColor)
                     typeface = appSearchTypeface(ctx)
                 }
                 row.findViewById<TextView>(R.id.app_search_suggestion_subtitle).apply {
-                    text = "${reciter.riwaya} · ${reciter.surahs.size} surahs · Download audio"
+                    text = "Complete Quran · 114 surahs · Choose recording"
                     setTextColor(subtitleColor)
                     typeface = appSearchTypeface(ctx)
                 }

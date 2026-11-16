@@ -36,4 +36,28 @@ class ReciterRecordingsTest {
         assertEquals("alafasy", reciterPersonKey("Mishary Rashid Al-Alafasy"))
         assertEquals("sudais", reciterPersonKey("Abdulrahman Alsudaes"))
     }
+    @Test fun onePersonKeepsAllThreeStylesAndTheirOriginalIds() {
+        val rows = listOf(Recording("1-1", "Abdulbasit Abdulsamad"),
+            Recording("1-2", "Abdelbasset Abdessamad", style = "Hafs · Mujawwad"),
+            Recording("1-3", "Abdul Basit Abdul Samad", style = "Warsh"))
+        val people = com.starception.submission.feature.quran.groupReciters(rows, { it.id }, { it.name })
+        assertEquals(1, people.size)
+        assertEquals("Abdul Basit Abdul Samad", people.single().name)
+        assertEquals(rows, people.single().recordings)
+    }
+    @Test fun defaultAndCatalogAlafasyAreOnePersonWithTwoChoices() {
+        val rows = listOf(Recording("default-cdn"), Recording("123-321", name = "Mshari Al Afasi"))
+        val people = com.starception.submission.feature.quran.groupReciters(rows, { it.id }, { it.name })
+        assertEquals(1, people.size)
+        assertEquals(setOf("default-cdn", "123-321"), people.single().recordings.map { it.id }.toSet())
+    }
+
+    @Test fun fullQuranEligibilityRequiresEverySurahNotJust114Entries() {
+        val full = (1..114).toSet()
+        assertTrue(com.starception.submission.feature.quran.hasCompleteQuran(full))
+        assertFalse(com.starception.submission.feature.quran.hasCompleteQuran(full - 114))
+        assertFalse(com.starception.submission.feature.quran.hasCompleteQuran((full - 50) + 115))
+        assertFalse(com.starception.submission.feature.quran.hasCompleteQuran(emptySet()))
+    }
+
 }

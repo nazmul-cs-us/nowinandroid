@@ -156,7 +156,7 @@ object ReciterCatalog {
         val aliases = if (reciter.id.substringBefore('-') == "54") {
             " Abdulrahman Alsudaes Abdur Rahman As Sudais Sudays"
         } else ""
-        val searchable = (reciter.name + " " + reciter.riwaya + aliases)
+        val searchable = (reciter.name + " " + com.starception.submission.core.images.reciterDisplayName(reciter.name) + " " + reciter.riwaya + aliases)
             .lowercase().filter(Char::isLetterOrDigit)
         return query.lowercase().split(' ', '-', '\'', '’')
             .map { it.filter(Char::isLetterOrDigit) }

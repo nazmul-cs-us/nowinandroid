@@ -62,13 +62,13 @@ fun selectableQuranReciters(
     sources: List<QuranReciterSource>,
 ): List<QuranReciterSource> =
     if (surah !in 1..114) emptyList()
-    else sources.filter { surah in it.availableSurahs && it.baseUrl.startsWith("https://") }
+    else sources.filter { com.starception.submission.feature.quran.hasCompleteQuran(it.availableSurahs) && it.baseUrl.startsWith("https://") }
         .distinctBy { it.id }
         .sortedBy { it.displayName }
 
 /** Match familiar spelling and punctuation without changing the API identity. */
 fun matchesQuranReciterSearch(source: QuranReciterSource, query: String): Boolean {
     val aliases = if (source.id.substringBefore('-') == "54") " Abdulrahman Alsudaes Abdur Rahman As Sudais Sudays" else ""
-    val searchable = (source.displayName + " " + source.riwaya + aliases).lowercase().filter(Char::isLetterOrDigit)
+    val searchable = (source.displayName + " " + com.starception.submission.core.images.reciterDisplayName(source.displayName) + " " + source.riwaya + aliases).lowercase().filter(Char::isLetterOrDigit)
     return query.lowercase().split(' ', '-', '\'', '’').map { it.filter(Char::isLetterOrDigit) }.all(searchable::contains)
 }

@@ -33,20 +33,26 @@ internal fun ReciterSearchResults(query: String) {
         }
     }
     val matches = remember(query, catalog) {
-        if (query.trim().length < 2) emptyList() else
-            com.starception.submission.feature.quran.distinctReciterRecordings(catalog,
+        if (query.trim().length < 2) emptyList() else {
+            val recordings = com.starception.submission.feature.quran.distinctReciterRecordings(catalog,
                 id = { it.id }, name = { it.displayName }, server = { it.baseUrl },
                 style = { it.riwaya }, surahs = { it.availableSurahs })
-                .filter { matchesQuranReciterSearch(it, query) }.take(8)
+                .filter { com.starception.submission.feature.quran.hasCompleteQuran(it.availableSurahs) && matchesQuranReciterSearch(it, query) }
+            com.starception.submission.feature.quran.groupReciters(recordings, { it.id }, { it.displayName }).take(8)
+        }
     }
     if (matches.isNotEmpty()) {
         Text("RECITERS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(vertical = 12.dp))
-        matches.forEach { source ->
-            ListItem(headlineContent = { Text(source.displayName) },
-                leadingContent = { com.starception.submission.feature.quran.ReciterAvatar(source.displayName) },
-                supportingContent = { Text("${source.riwaya} · ${source.availableSurahs.size} surahs · Download audio") },
-                modifier = Modifier.clickable { focus.clearFocus(); opened = source })
+        matches.forEach { person ->
+            com.starception.submission.feature.quran.ReciterRecordingChooser(person,
+                id = { it.id }, style = { it.riwaya }, subtitle = { "${it.availableSurahs.size} surahs" },
+                preferredId = null, savedIds = emptySet(), onChange = {}) { source ->
+                ListItem(headlineContent = { Text(person.name) },
+                    leadingContent = { com.starception.submission.feature.quran.ReciterAvatar(person.name) },
+                    supportingContent = { Text("${com.starception.submission.feature.quran.reciterRecordingLabel(source.riwaya)} · ${source.availableSurahs.size} surahs · Download audio") },
+                    modifier = Modifier.clickable { focus.clearFocus(); opened = source.copy(displayName = person.name) })
+            }
         }
     }
     opened?.let { source -> ReciterDownloadDetails(source, onDismiss = { opened = null }) }
