@@ -11,6 +11,12 @@
       "commit": "2f1e46477916abb5386276bb41dd7b3371f1ddd2",
       "identity": "named source filenames",
       "terms": "MIT"
+    },
+    "Assabile": {
+      "url": "https://www.assabile.com",
+      "identity": "Exact unique Arabic catalog/profile name matches, or explicitly reviewed full-name variants. Current profile og:image metadata supplies the URL.",
+      "checkedAt": "2026-11-16",
+      "terms": "Copyright respective rights holders; attribution retained. Not designated CC0 or public domain."
     }
   },
   "portraits": [
@@ -555,5 +561,1946 @@
       "file": "reciter49.jpg / reciter50.jpg",
       "reason": "Identical photo bytes assigned to different people"
     }
+  ],
+  "assabileProfiles": [
+    {
+      "id": 1,
+      "en": "Ibrahim Al-Akdar",
+      "ar": "إبراهيم الأخضر",
+      "profile": "https://www.assabile.com/ibrahim-al-akhdar-16/ibrahim-al-akhdar.htm",
+      "sourceName": "Ibrahim Al Akhdar",
+      "sourceArabicName": "إبراهيم الأخضر",
+      "image": "https://www.assabile.com/media/portraits/16-200.webp",
+      "sha256": "668a9a62b6423c07f26f522bd535a1056d8012b1fc57a695a914ea5d1b5bdf37",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "ibrahim-akhdar",
+      "resource": "reciter_ibrahim_akhdar.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "c1b9823b840527cc1816ac8cf1e98cb6baf0e7b969f6a4f557c428df88ce6c33"
+    },
+    {
+      "id": 10,
+      "en": "Akram Alalaqmi",
+      "ar": "أكرم العلاقمي",
+      "profile": "https://www.assabile.com/akram-al-aalakmi-80/akram-al-aalakmi.htm",
+      "sourceName": "Akram Al Aalakmi",
+      "sourceArabicName": "أكرم العلاقمي",
+      "image": "https://www.assabile.com/media/portraits/80-200.webp",
+      "sha256": "93256c45d7f8158a726ac64d795c0b20c792034b0452e6afffbf36a778f61663",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-10",
+      "resource": "reciter_catalog_10.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "af75c08b6d8a29b464a6c669a959c8e0813a97aeeff2deb7e9c896b1f3ad7c00"
+    },
+    {
+      "id": 102,
+      "en": "Maher Al Meaqli",
+      "ar": "ماهر المعيقلي",
+      "profile": "https://www.assabile.com/maher-al-mueaqly-33/maher-al-mueaqly.htm",
+      "sourceName": "Maher Al Mueaqly",
+      "sourceArabicName": "ماهر المعيقلي",
+      "image": "https://www.assabile.com/media/portraits/33-200.webp",
+      "sha256": "9e4cc00e1f7ca0edc25f7923a4dd885d8ee6e2bb9816f10654f231975b8fb796",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "maher",
+      "resource": "reciter_maher.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "d28455f97b73292e56e5299bccaeea076a31c3bd46495c00b88acfa4cdb2f17d"
+    },
+    {
+      "id": 106,
+      "en": "Mohammad Al-Tablaway",
+      "ar": "محمد الطبلاوي",
+      "profile": "https://www.assabile.com/mohamed-tablawi-31/mohamed-tablawi.htm",
+      "sourceName": "Mohamed Tablawi",
+      "sourceArabicName": "محمد الطبلاوي",
+      "image": "https://www.assabile.com/media/portraits/31-200.webp",
+      "sha256": "1d5b81c037e79d4aa219138053a29029c18ffdc08335cec400141434ebb935d7",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-106",
+      "resource": "reciter_catalog_106.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "e87a0435d07bc046eda8e40d5488bfdc9d6d945e6775daeef5af6040754b3b6a"
+    },
+    {
+      "id": 107,
+      "en": "Mohammed Al-Lohaidan",
+      "ar": "محمد اللحيدان",
+      "profile": "https://www.assabile.com/muhammad-al-luhaidan-95/muhammad-al-luhaidan.htm",
+      "sourceName": "Muhammad Al-Luhaidan",
+      "sourceArabicName": "محمد اللحيدان",
+      "image": "https://www.assabile.com/media/portraits/95-200.webp",
+      "sha256": "f1d8f15d0305d7a94abdcf13e550429adb6a2f4bbf2c04b2559bc37e7c45461f",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-107",
+      "resource": "reciter_catalog_107.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "f1d8f15d0305d7a94abdcf13e550429adb6a2f4bbf2c04b2559bc37e7c45461f"
+    },
+    {
+      "id": 109,
+      "en": "Mohammed Ayyub",
+      "ar": "محمد أيوب",
+      "profile": "https://www.assabile.com/muhammad-ayyub-14/muhammad-ayyub.htm",
+      "sourceName": "Muhammad Ayyub",
+      "sourceArabicName": "محمد أيوب",
+      "image": "https://www.assabile.com/media/portraits/14-200.webp",
+      "sha256": "bbf25a4d5c45489cb1b2ca3e8f062ba7ac5417e7cc9637c2cf70a81bc9937c52",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "muhammad-ayyub",
+      "resource": "reciter_muhammad_ayyub.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "cd43c3753ee1b683711e6b9ab932bc9edcc77c4a6ac07f04dbcd138f7127ab2f"
+    },
+    {
+      "id": 110,
+      "en": "Mohammad Saleh Alim Shah",
+      "ar": "محمد صالح عالم شاه",
+      "profile": "https://www.assabile.com/muhammad-saleh-alim-shah-79/muhammad-saleh-alim-shah.htm",
+      "sourceName": "Muhammad Saleh Alim Shah",
+      "sourceArabicName": "محمد صالح عالم شاه",
+      "image": "https://www.assabile.com/media/portraits/79-200.webp",
+      "sha256": "1d333563c3d4b7f0bdc597950216dcedb9d111f38b836cb8456faa44636ff784",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-110",
+      "resource": "reciter_catalog_110.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "1d333563c3d4b7f0bdc597950216dcedb9d111f38b836cb8456faa44636ff784"
+    },
+    {
+      "id": 111,
+      "en": "Mohammed Jibreel",
+      "ar": "محمد جبريل",
+      "profile": "https://www.assabile.com/muhammad-jibreel-59/muhammad-jibreel.htm",
+      "sourceName": "Muhammad Jibreel",
+      "sourceArabicName": "محمد جبريل",
+      "image": "https://www.assabile.com/media/portraits/59-200.webp",
+      "sha256": "c996700632c311eaa44e3b7b8ab23e1fb3c89a571033f315dcd857b7a671926e",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "muhammad-jibril",
+      "resource": "reciter_muhammad_jibril.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "859642e4b811224e98bb844eb76d0f212a5a64b8f9cdedc1a3be28f036fa82f1"
+    },
+    {
+      "id": 112,
+      "en": "Mohammed Siddiq Al-Minshawi",
+      "ar": "محمد صديق المنشاوي",
+      "profile": "https://www.assabile.com/mohamed-siddiq-el-minshawi-3/mohamed-siddiq-el-minshawi.htm",
+      "sourceName": "Mohamed Siddiq El-Minshawi",
+      "sourceArabicName": "محمد صديق المنشاوي",
+      "image": "https://www.assabile.com/media/portraits/3-200.webp",
+      "sha256": "7de733e23f7103cee4adf627a9d135fb22ed1aea49f5bcc013873c62299546c0",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "minshawi",
+      "resource": "reciter_minshawi.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "68116f00c2cb1e39e1fa0ae7643c360afd0f01a9060f76825f9d9dbd51008921"
+    },
+    {
+      "id": 115,
+      "en": "Mohammad Abdullkarem",
+      "ar": "محمد عبدالكريم",
+      "profile": "https://www.assabile.com/muhammad-abdulkareem-50/muhammad-abdulkareem.htm",
+      "sourceName": "Muhammad Abdulkareem",
+      "sourceArabicName": "محمد عبد الكريم",
+      "image": "https://www.assabile.com/media/portraits/50-200.webp",
+      "sha256": "622225d3250de1e6fd5b8b0043c49409e5b00e984a3d0d8a186448284130e22d",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-115",
+      "resource": "reciter_catalog_115.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "70a443bc0958ca2d383530435ab4d798c53cce7abf4e1de537d645b52ba2c627"
+    },
+    {
+      "id": 116,
+      "en": "Mohammad Al-Abdullah",
+      "ar": "محمد عبدالحكيم سعيد العبدالله",
+      "profile": "https://www.assabile.com/mohamed-abdel-hakim-saad-al-abdullah-96/mohamed-abdel-hakim-saad-al-abdullah.htm",
+      "sourceName": "Mohamed Abdel Hakim Saad Al Abdullah",
+      "sourceArabicName": "محمد عبد الحكيم سعيد العبد الله",
+      "image": "https://www.assabile.com/media/portraits/96-200.webp",
+      "sha256": "ae5247be54007e7d09885697e8c510abca33fa8dcb3d4ff3f851ad401dde40a8",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-116",
+      "resource": "reciter_catalog_116.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "ae5247be54007e7d09885697e8c510abca33fa8dcb3d4ff3f851ad401dde40a8"
+    },
+    {
+      "id": 118,
+      "en": "Mahmoud Khalil Al-Hussary",
+      "ar": "محمود خليل الحصري",
+      "profile": "https://www.assabile.com/mahmoud-khalil-al-hussary-27/mahmoud-khalil-al-hussary.htm",
+      "sourceName": "Mahmoud Khalil Al Hussary",
+      "sourceArabicName": "محمود خليل الحصري",
+      "image": "https://www.assabile.com/media/portraits/27-200.webp",
+      "sha256": "aed4beb5e82493e4f212fc44c06e13df35c598c84f823abb4dd16da81b910a16",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "husary",
+      "resource": "reciter_husary.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "d8100277ba8607c565dbbf6dfeb86b217bf786c200c6c4dfe9af671dfc1d508b"
+    },
+    {
+      "id": 12,
+      "en": "Idrees Abkr",
+      "ar": "إدريس أبكر",
+      "profile": "https://www.assabile.com/idriss-abkar-90/idriss-abkar.htm",
+      "sourceName": "Idriss Abkar",
+      "sourceArabicName": "إدريس أبكر",
+      "image": "https://www.assabile.com/media/portraits/90-200.webp",
+      "sha256": "9f5fdf02e5cad1fabe6dfbb97e91e93507da01c876f14ff1c6b13f4ac3411d78",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-12",
+      "resource": "reciter_catalog_12.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "9f5fdf02e5cad1fabe6dfbb97e91e93507da01c876f14ff1c6b13f4ac3411d78"
+    },
+    {
+      "id": 121,
+      "en": "Mahmoud Ali  Albanna",
+      "ar": "محمود علي البنا",
+      "profile": "https://www.assabile.com/mahmoud-ali-al-banna-25/mahmoud-ali-al-banna.htm",
+      "sourceName": "Mahmoud Ali Al banna",
+      "sourceArabicName": "محمود علي البنا",
+      "image": "https://www.assabile.com/media/portraits/25-200.webp",
+      "sha256": "da306f04b545ae51f24fe6b2797718b7dc5b016d234dc7d6317991ae1ff6f006",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-121",
+      "resource": "reciter_catalog_121.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "e5f8370416408b922c3c8247883630f98f35e9ec29fe3c1c315387d5739d7220"
+    },
+    {
+      "id": 125,
+      "en": "Mustafa Ismail",
+      "ar": "مصطفى إسماعيل",
+      "profile": "https://www.assabile.com/mustafa-ismail-48/mustafa-ismail.htm",
+      "sourceName": "Mustafa Ismail",
+      "sourceArabicName": "مصطفى إسماعيل",
+      "image": "https://www.assabile.com/media/portraits/48-200.webp",
+      "sha256": "13fcfa4dfddf0d4c595dc5bcf75ae041eb687b4526abcb398c702cbdbd242943",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-125",
+      "resource": "reciter_catalog_125.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "13fcfa4dfddf0d4c595dc5bcf75ae041eb687b4526abcb398c702cbdbd242943"
+    },
+    {
+      "id": 126,
+      "en": "Mustafa Al-Lahoni",
+      "ar": "مصطفى اللاهوني",
+      "profile": "https://www.assabile.com/mustafa-al-lahouni-49/mustafa-al-lahouni.htm",
+      "sourceName": "Mustafa Al Lahouni",
+      "sourceArabicName": "مصطفى اللاهوني",
+      "image": "https://www.assabile.com/media/portraits/49-200.webp",
+      "sha256": "fd0d81a26b3b316982d6daa1744f32e0cab3aed97bbeca1e2f9e26000c6e43e9",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-126",
+      "resource": "reciter_catalog_126.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "b428b9384109482fb324fd0fa84cde3d3cb9580cb485e180d2e5f4b6f723e3bb"
+    },
+    {
+      "id": 127,
+      "en": "Mustafa raad Alazawy",
+      "ar": "مصطفى رعد العزاوي",
+      "profile": "https://www.assabile.com/mustafa-raad-al-azzawi-35/mustafa-raad-al-azzawi.htm",
+      "sourceName": "Mustafa Raad Al Azzawi",
+      "sourceArabicName": "مصطفى رعد العزاوي",
+      "image": "https://www.assabile.com/media/portraits/35-200.webp",
+      "sha256": "666193e1b03673b947c8d45c7c47d747f26603eba90d81fd377a50456ebe797c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-127",
+      "resource": "reciter_catalog_127.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "666193e1b03673b947c8d45c7c47d747f26603eba90d81fd377a50456ebe797c"
+    },
+    {
+      "id": 129,
+      "en": "Muftah Alsaltany",
+      "ar": "مفتاح السلطني",
+      "profile": "https://www.assabile.com/muftah-alsaltany-259/muftah-alsaltany.htm",
+      "sourceName": "Muftah Alsaltany",
+      "sourceArabicName": "مفتاح السلطني",
+      "image": "https://www.assabile.com/media/portraits/259-200.webp",
+      "sha256": "25307f05c3eaa178f82efba541eab1e4e635af392b22d1f56884b072a662ffc6",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-129",
+      "resource": "reciter_catalog_129.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "7139d10faa7b31f09be7c257ab65347425397528de746cccdb32c144379a2ed6"
+    },
+    {
+      "id": 13,
+      "en": "Alzain Mohammad Ahmad",
+      "ar": "الزين محمد أحمد",
+      "profile": "https://www.assabile.com/alzain-mohamed-ahmed-76/alzain-mohamed-ahmed.htm",
+      "sourceName": "Alzain Mohamed Ahmed",
+      "sourceArabicName": "الزين محمد أحمد",
+      "image": "https://www.assabile.com/media/portraits/76-200.webp",
+      "sha256": "7debf521046ec8f5a0de911c83c2df85423c779f53de394f214c0ba0a2cd014c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-13",
+      "resource": "reciter_catalog_13.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "7debf521046ec8f5a0de911c83c2df85423c779f53de394f214c0ba0a2cd014c"
+    },
+    {
+      "id": 139,
+      "en": "Majed Al-Zamil",
+      "ar": "ماجد الزامل",
+      "profile": "https://www.assabile.com/majed-al-zamil-238/majed-al-zamil.htm",
+      "sourceName": "Majed Al-Zamil",
+      "sourceArabicName": "ماجد الزامل",
+      "image": "https://www.assabile.com/media/portraits/238-200.webp",
+      "sha256": "824eeaea05c46ff2302ca31bd9127c91f864517bde1a34a7eb028be6df8b62d7",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-139",
+      "resource": "reciter_catalog_139.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "824eeaea05c46ff2302ca31bd9127c91f864517bde1a34a7eb028be6df8b62d7"
+    },
+    {
+      "id": 151,
+      "en": "Mahmood AlSheimy",
+      "ar": "محمود الشيمي",
+      "profile": "https://www.assabile.com/mahmoud-el-sheimy-247/mahmoud-el-sheimy.htm",
+      "sourceName": "Mahmoud El Sheimy",
+      "sourceArabicName": "محمود الشيمي",
+      "image": "https://www.assabile.com/media/portraits/247-200.webp",
+      "sha256": "b0d5c054718665caf01b2098f9a8a1b89b40a852d77101ea1c0066a7a74e21b7",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-151",
+      "resource": "reciter_catalog_151.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "040f852b0716d4d47f1c1a80d9c168b5f33826fb9d6786a06d6a1de88d38ca2b"
+    },
+    {
+      "id": 152,
+      "en": "Yasser Salamah",
+      "ar": "ياسر سلامة",
+      "profile": "https://www.assabile.com/yasser-salama-314/yasser-salama.htm",
+      "sourceName": "Yasser Salama",
+      "sourceArabicName": "ياسر سلامه",
+      "image": "https://www.assabile.com/media/portraits/314-200.webp",
+      "sha256": "b8dc417fd07cf94bd7592462a5ea5e1047a3d15be8b9b221e1c956a94d33eb78",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-152",
+      "resource": "reciter_catalog_152.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "b8dc417fd07cf94bd7592462a5ea5e1047a3d15be8b9b221e1c956a94d33eb78"
+    },
+    {
+      "id": 159,
+      "en": "Khalid Almohana",
+      "ar": "خالد المهنا",
+      "profile": "https://www.assabile.com/khalid-al-mohanna-216/khalid-al-mohanna.htm",
+      "sourceName": "Khalid Al Mohanna",
+      "sourceArabicName": "خالد المهنا",
+      "image": "https://www.assabile.com/media/portraits/216-200.webp",
+      "sha256": "26dfe6daee2c6041ebcc5370e04f288e849bf9ec0beeb1f5cddcfc6a294f9998",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-159",
+      "resource": "reciter_catalog_159.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "26dfe6daee2c6041ebcc5370e04f288e849bf9ec0beeb1f5cddcfc6a294f9998"
+    },
+    {
+      "id": 16,
+      "en": "Aloyoon Al-Koshi",
+      "ar": "العيون الكوشي",
+      "profile": "https://www.assabile.com/laayoun-el-kouchi-22/laayoun-el-kouchi.htm",
+      "sourceName": "Laayoun El Kouchi",
+      "sourceArabicName": "العيون الكوشي",
+      "image": "https://www.assabile.com/media/portraits/22-200.webp",
+      "sha256": "1e4b7822d095f1881ac2cfecfebf15226916e95e662a3204a27320b9d19903cc",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-16",
+      "resource": "reciter_catalog_16.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "1e4b7822d095f1881ac2cfecfebf15226916e95e662a3204a27320b9d19903cc"
+    },
+    {
+      "id": 160,
+      "en": "Adel Al-Khalbany",
+      "ar": "عادل الكلباني",
+      "profile": "https://www.assabile.com/adel-al-kalbani-44/adel-al-kalbani.htm",
+      "sourceName": "Adel Al Kalbani",
+      "sourceArabicName": "عادل الكلباني",
+      "image": "https://www.assabile.com/media/portraits/44-200.webp",
+      "sha256": "2bf5b6ff8221e51161f3b7ea5b5685419e89842825a5f5649a4b37b03951d3a1",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-160",
+      "resource": "reciter_catalog_160.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "2bf5b6ff8221e51161f3b7ea5b5685419e89842825a5f5649a4b37b03951d3a1"
+    },
+    {
+      "id": 163,
+      "en": "Hatem Fareed Alwaer",
+      "ar": "حاتم فريد الواعر",
+      "profile": "https://www.assabile.com/hatem-fareed-alwaer-213/hatem-fareed-alwaer.htm",
+      "sourceName": "Hatem Fareed Alwaer",
+      "sourceArabicName": "حاتم فريد الواعر",
+      "image": "https://www.assabile.com/media/portraits/213-200.webp",
+      "sha256": "48dad641f275376f338529c3249c8fbb9b5a76263f731871a1f7f2e3dc0a122d",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-163",
+      "resource": "reciter_catalog_163.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "48dad641f275376f338529c3249c8fbb9b5a76263f731871a1f7f2e3dc0a122d"
+    },
+    {
+      "id": 164,
+      "en": "Ibrahim Aljormy",
+      "ar": "إبراهيم الجرمي",
+      "profile": "https://www.assabile.com/ibrahim-aljormy-395/ibrahim-aljormy.htm",
+      "sourceName": "Ibrahim Aljormy",
+      "sourceArabicName": "إبراهيم الجرمي",
+      "image": "https://www.assabile.com/media/portraits/395-200.webp",
+      "sha256": "ebde6eef4d5ea8c8814482ea6800756323e16e1b5ea915b4f30a21b2813a2c29",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-164",
+      "resource": "reciter_catalog_164.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "ebde6eef4d5ea8c8814482ea6800756323e16e1b5ea915b4f30a21b2813a2c29"
+    },
+    {
+      "id": 165,
+      "en": "Mahmood Al rifai",
+      "ar": "محمود الرفاعي",
+      "profile": "https://www.assabile.com/mahmood-al-rifai-246/mahmood-al-rifai.htm",
+      "sourceName": "Mahmood Al rifai",
+      "sourceArabicName": "محمود الرفاعي",
+      "image": "https://www.assabile.com/media/portraits/246-200.webp",
+      "sha256": "8c27164270404d99bf5ba29cd7ca57109357df64bfd79eac23b995fdea69ce41",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-165",
+      "resource": "reciter_catalog_165.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "8c27164270404d99bf5ba29cd7ca57109357df64bfd79eac23b995fdea69ce41"
+    },
+    {
+      "id": 17,
+      "en": "Tawfeeq As-Sayegh",
+      "ar": "توفيق الصايغ",
+      "profile": "https://www.assabile.com/tawfeeq-as-sayegh-32/tawfeeq-as-sayegh.htm",
+      "sourceName": "Tawfeeq As Sayegh",
+      "sourceArabicName": "توفيق الصايغ",
+      "image": "https://www.assabile.com/media/portraits/32-200.webp",
+      "sha256": "f49a749ab0e9bccc0afbcd33df05b972b0a59299c65baf3d02a1a026a9878e88",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-17",
+      "resource": "reciter_catalog_17.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "6f8fc2acc4ea2cbb7a082ccc74561f208045519bcda6ef242037a5e18f84d58f"
+    },
+    {
+      "id": 18,
+      "en": "Jamal Shaker Abdullah",
+      "ar": "جمال شاكر عبدالله",
+      "profile": "https://www.assabile.com/jamal-shaker-abdullah-43/jamal-shaker-abdullah.htm",
+      "sourceName": "Jamal Shaker Abdullah",
+      "sourceArabicName": "جمال شاكر عبد الله",
+      "image": "https://www.assabile.com/media/portraits/43-200.webp",
+      "sha256": "0eedeafac03083abcbbae21658d64d8158b4160307f18fcd61735ad777cd2f8c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-18",
+      "resource": "reciter_catalog_18.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "0eedeafac03083abcbbae21658d64d8158b4160307f18fcd61735ad777cd2f8c"
+    },
+    {
+      "id": 181,
+      "en": "Jamaan Alosaimi",
+      "ar": "جمعان العصيمي",
+      "profile": "https://www.assabile.com/jamaan-alosaimi-212/jamaan-alosaimi.htm",
+      "sourceName": "Jamaan Alosaimi",
+      "sourceArabicName": "جمعان العصيمي",
+      "image": "https://www.assabile.com/media/portraits/212-200.webp",
+      "sha256": "93efa1a69d6c0bfbd1514ce6afee50be912b07a361f593b0a0eddb5ce4e65d80",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-181",
+      "resource": "reciter_catalog_181.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "9e457645d42b553749b807c786ef34353438b773d4c6bb1c6ee1b8b0d5dcb73e"
+    },
+    {
+      "id": 198,
+      "en": "Mohammad Rashad Alshareef",
+      "ar": "محمد رشاد الشريف",
+      "profile": "https://www.assabile.com/mohammad-rachad-al-shareef-112/mohammad-rachad-al-shareef.htm",
+      "sourceName": "Mohammad Rachad Al Shareef",
+      "sourceArabicName": "محمد رشاد الشريف",
+      "image": "https://www.assabile.com/media/portraits/112-200.webp",
+      "sha256": "3fd1edc76486258f7c4e5a09682fe8959691a8c09129251d65f2122211b2f9a6",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-198",
+      "resource": "reciter_catalog_198.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "3fd1edc76486258f7c4e5a09682fe8959691a8c09129251d65f2122211b2f9a6"
+    },
+    {
+      "id": 20,
+      "en": "Khalid Al-Jileel",
+      "ar": "خالد الجليل",
+      "profile": "https://www.assabile.com/khalid-al-jalil-307/khalid-al-jalil.htm",
+      "sourceName": "Khalid Al Jalil",
+      "sourceArabicName": "خالد الجليل",
+      "image": "https://www.assabile.com/media/portraits/307-200.webp",
+      "sha256": "28823ce6d6015827443ff5b14c3ee55e085e4451fc9dd2cfe42d8d93b717d91c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-20",
+      "resource": "reciter_catalog_20.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "28823ce6d6015827443ff5b14c3ee55e085e4451fc9dd2cfe42d8d93b717d91c"
+    },
+    {
+      "id": 203,
+      "en": "Ahmed Amer",
+      "ar": "أحمد عامر",
+      "profile": "https://www.assabile.com/ahmed-amer-203/ahmed-amer.htm",
+      "sourceName": "Ahmed Amer",
+      "sourceArabicName": "أحمد عامر",
+      "image": "https://www.assabile.com/media/portraits/203-200.webp",
+      "sha256": "bf36a8f6e614845a005f2d7b7de45c0483757583b065b0da2138619d88738396",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-203",
+      "resource": "reciter_catalog_203.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "bf36a8f6e614845a005f2d7b7de45c0483757583b065b0da2138619d88738396"
+    },
+    {
+      "id": 21,
+      "en": "Khaled Al-Qahtani",
+      "ar": "خالد القحطاني",
+      "profile": "https://www.assabile.com/khaled-al-qahtani-46/khaled-al-qahtani.htm",
+      "sourceName": "Khaled Al Qahtani",
+      "sourceArabicName": "خالد القحطاني",
+      "image": "https://www.assabile.com/media/portraits/46-200.webp",
+      "sha256": "f9476277cf2b15e9739c3ec51e687232615436ea501e81295c3095a4fe4137fd",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-21",
+      "resource": "reciter_catalog_21.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "06372d5c16316d4d04857ca373380f0ab1c152d6ebde9edcfde4d432d4764e60"
+    },
+    {
+      "id": 211,
+      "en": "Alfateh Alzubair",
+      "ar": "الفاتح محمد الزبير",
+      "profile": "https://www.assabile.com/alfateh-muhammad-zubair-210/alfateh-muhammad-zubair.htm",
+      "sourceName": "AlFateh Muhammad Zubair",
+      "sourceArabicName": "الفاتح محمد الزبير",
+      "image": "https://www.assabile.com/media/portraits/210-200.webp",
+      "sha256": "d68b8cde0fd7a58a8c806c9b8f171fdb19084db4abab1b091387c9d6f16c9837",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-211",
+      "resource": "reciter_catalog_211.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "d68b8cde0fd7a58a8c806c9b8f171fdb19084db4abab1b091387c9d6f16c9837"
+    },
+    {
+      "id": 21204,
+      "en": "Mustapha Gharbi",
+      "ar": "مصطفى غربي",
+      "profile": "https://www.assabile.com/mustapha-gharbi-101/mustapha-gharbi.htm",
+      "sourceName": "Mustapha Gharbi",
+      "sourceArabicName": "مصطفى غربي",
+      "image": "https://www.assabile.com/media/portraits/101-200.webp",
+      "sha256": "22bfb7280c3f54105219228a87556f0b59105c44cd8aea80d051d67101ac1705",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-21204",
+      "resource": "reciter_catalog_21204.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "22bfb7280c3f54105219228a87556f0b59105c44cd8aea80d051d67101ac1705"
+    },
+    {
+      "id": 217,
+      "en": "Bandar Balilah",
+      "ar": "بندر بليله",
+      "profile": "https://www.assabile.com/bandar-balila-358/bandar-balila.htm",
+      "sourceName": "Bandar Balila",
+      "sourceArabicName": "بندر بليلة",
+      "image": "https://www.assabile.com/media/portraits/358-200.webp",
+      "sha256": "42256bce05fdd738011d2c6e26d664c620ca0e4bd49a00201c7e5d2de4900acd",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-217",
+      "resource": "reciter_catalog_217.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "42256bce05fdd738011d2c6e26d664c620ca0e4bd49a00201c7e5d2de4900acd"
+    },
+    {
+      "id": 22,
+      "en": "Khalid Abdulkafi",
+      "ar": "خالد عبدالكافي",
+      "profile": "https://www.assabile.com/khalid-abdulkafi-69/khalid-abdulkafi.htm",
+      "sourceName": "Khalid Abdulkafi",
+      "sourceArabicName": "خالد عبد الكافي",
+      "image": "https://www.assabile.com/media/portraits/69-200.webp",
+      "sha256": "833dcfed8fde005c29c2b7e547673bf8268b779fca933769e0f0443863577446",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-22",
+      "resource": "reciter_catalog_22.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "833dcfed8fde005c29c2b7e547673bf8268b779fca933769e0f0443863577446"
+    },
+    {
+      "id": 24,
+      "en": "Khalifa Altunaiji",
+      "ar": "خليفة الطنيجي",
+      "profile": "https://www.assabile.com/khalifa-al-tunaiji-73/khalifa-al-tunaiji.htm",
+      "sourceName": "Khalifa Al Tunaiji",
+      "sourceArabicName": "خليفة الطنيجي",
+      "image": "https://www.assabile.com/media/portraits/73-200.webp",
+      "sha256": "ac09e57811cda8bfa4b3aaa406b70c7cd1384764ebfae198dc0c1309ada3d226",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-24",
+      "resource": "reciter_catalog_24.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "ac09e57811cda8bfa4b3aaa406b70c7cd1384764ebfae198dc0c1309ada3d226"
+    },
+    {
+      "id": 267,
+      "en": "Abdullah Kamel",
+      "ar": "عبدالله كامل",
+      "profile": "https://www.assabile.com/abdallah-kamel-318/abdallah-kamel.htm",
+      "sourceName": "Abdallah Kamel",
+      "sourceArabicName": "عبد الله كامل",
+      "image": "https://www.assabile.com/media/portraits/318-200.webp",
+      "sha256": "9eeaf4a27e27e23640c241b5896459bbd97db5c61c50cb6026efbadcacafd52d",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-267",
+      "resource": "reciter_catalog_267.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "9eeaf4a27e27e23640c241b5896459bbd97db5c61c50cb6026efbadcacafd52d"
+    },
+    {
+      "id": 274,
+      "en": "Muhammad Abu Sneina",
+      "ar": "محمد أبو سنينة",
+      "profile": "https://www.assabile.com/muhamad-abu-snina-554/muhamad-abu-snina.htm",
+      "sourceName": "Muhamad Abu Snina",
+      "sourceArabicName": "محمد أبو سنينة",
+      "image": "https://www.assabile.com/media/portraits/554-200.webp",
+      "sha256": "a33e95333feca4ca2d7da4cffed912c9ab079d9a8b6665c7325b0e3a8d6b53d0",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-274",
+      "resource": "reciter_catalog_274.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "a33e95333feca4ca2d7da4cffed912c9ab079d9a8b6665c7325b0e3a8d6b53d0"
+    },
+    {
+      "id": 277,
+      "en": "Mahmoud Abdul Hakam",
+      "ar": "محمود عبدالحكم",
+      "profile": "https://www.assabile.com/mahmoud-abdulhakam-564/mahmoud-abdulhakam.htm",
+      "sourceName": "Mahmoud Abdulhakam",
+      "sourceArabicName": "محمود عبد الحكم",
+      "image": "https://www.assabile.com/media/portraits/564-200.webp",
+      "sha256": "4925acc66d05c7114986939fc6a47adc0476be2064f1ed7d5547a5aff3e3fdc5",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-277",
+      "resource": "reciter_catalog_277.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "4925acc66d05c7114986939fc6a47adc0476be2064f1ed7d5547a5aff3e3fdc5"
+    },
+    {
+      "id": 278,
+      "en": "Ahmad Issa Al Maasaraawi",
+      "ar": "أحمد عيسى المعصراوي",
+      "profile": "https://www.assabile.com/ahmed-aissa-el-masarawi-309/ahmed-aissa-el-masarawi.htm",
+      "sourceName": "Ahmed Aissa El Masarawi",
+      "sourceArabicName": "أحمد عيسى المعصراوي",
+      "image": "https://www.assabile.com/media/portraits/309-200.webp",
+      "sha256": "e062f932a89d96478d29baf915dd075d4a18dfa7c6d59e8569a155a2d5172b30",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-278",
+      "resource": "reciter_catalog_278.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "e062f932a89d96478d29baf915dd075d4a18dfa7c6d59e8569a155a2d5172b30"
+    },
+    {
+      "id": 279,
+      "en": "Ibrahim Kshidan",
+      "ar": "إبراهيم كشيدان",
+      "profile": "https://www.assabile.com/ibrahim-kishidan-503/ibrahim-kishidan.htm",
+      "sourceName": "Ibrahim Kishidan",
+      "sourceArabicName": "إبراهيم كشيدان",
+      "image": "https://www.assabile.com/media/portraits/503-200.webp",
+      "sha256": "dc298a1a33e219d7c139257431e1e49bd589315774b681b242fdc1730057b27b",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-279",
+      "resource": "reciter_catalog_279.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "dc298a1a33e219d7c139257431e1e49bd589315774b681b242fdc1730057b27b"
+    },
+    {
+      "id": 286,
+      "en": "Hasan Saleh",
+      "ar": "حسن صالح",
+      "profile": "https://www.assabile.com/hassan-saleh-111/hassan-saleh.htm",
+      "sourceName": "Hassan Saleh",
+      "sourceArabicName": "حسن صالح",
+      "image": "https://www.assabile.com/media/portraits/111-200.webp",
+      "sha256": "3c7e611e48c343311d091b6ea076f56ab9acbbbd15ded726d39b13dc5c17fb39",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-286",
+      "resource": "reciter_catalog_286.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "3c7e611e48c343311d091b6ea076f56ab9acbbbd15ded726d39b13dc5c17fb39"
+    },
+    {
+      "id": 287,
+      "en": "Abdulrahman Alshahhat",
+      "ar": "عبدالرحمن الشحات",
+      "profile": "https://www.assabile.com/abderrahman-shahat-521/abderrahman-shahat.htm",
+      "sourceName": "Abderrahman Shahat",
+      "sourceArabicName": "عبد الرحمن الشحات",
+      "image": "https://www.assabile.com/media/portraits/521-200.webp",
+      "sha256": "25a214925ffd21201ee6d1f3f8b3dd12eba872a8cabcb6e7b0a64def317276f8",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-287",
+      "resource": "reciter_catalog_287.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "25a214925ffd21201ee6d1f3f8b3dd12eba872a8cabcb6e7b0a64def317276f8"
+    },
+    {
+      "id": 30,
+      "en": "Saad Al-Ghamdi",
+      "ar": "سعد الغامدي",
+      "profile": "https://www.assabile.com/saad-el-ghamidi-4/saad-el-ghamidi.htm",
+      "sourceName": "Saad El Ghamidi",
+      "sourceArabicName": "سعد الغامدي",
+      "image": "https://www.assabile.com/media/portraits/4-200.webp",
+      "sha256": "6117c73466b8b96cb04ab022938741abb7bdecadb34018865b88b1a375827868",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-30",
+      "resource": "reciter_catalog_30.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "b5953546be79a369e8d1c3994c020c0021cca6abb369e97073448259fb49458e"
+    },
+    {
+      "id": 302,
+      "en": "Anas Alemadi",
+      "ar": "أنس العمادي",
+      "profile": "https://www.assabile.com/anas-al-emadi-402/anas-al-emadi.htm",
+      "sourceName": "Anas Al Emadi",
+      "sourceArabicName": "أنس العمادي",
+      "image": "https://www.assabile.com/media/portraits/402-200.webp",
+      "sha256": "33754b91fe5bf1a528bbec3bf42f5a991cbcb10016d34e1f4d069ab1abb764d8",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-302",
+      "resource": "reciter_catalog_302.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "33754b91fe5bf1a528bbec3bf42f5a991cbcb10016d34e1f4d069ab1abb764d8"
+    },
+    {
+      "id": 31,
+      "en": "Saud Al-Shuraim",
+      "ar": "سعود الشريم",
+      "profile": "https://www.assabile.com/saud-shuraim-11/saud-shuraim.htm",
+      "sourceName": "Saud Shuraim",
+      "sourceArabicName": "سعود الشريم",
+      "image": "https://www.assabile.com/media/portraits/11-200.webp",
+      "sha256": "7f053fb1f257a03e29af40f381e14ac7e306c9c69f2133899c6844d186d83970",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "shuraim",
+      "resource": "reciter_shuraim.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "1cce5b3f690c230a9862e9c0b580b2762d09861ccd8d8f426dd71949e253ddfc"
+    },
+    {
+      "id": 32,
+      "en": "Sahl Yassin",
+      "ar": "سهل ياسين",
+      "profile": "https://www.assabile.com/sahl-yasin-20/sahl-yasin.htm",
+      "sourceName": "Sahl Yasin",
+      "sourceArabicName": "سهل ياسين",
+      "image": "https://www.assabile.com/media/portraits/20-200.webp",
+      "sha256": "68bb999b22f7ca71da18ddf3d0f7fc626cbe7b2052d8d841f25e6d215ceaa33c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-32",
+      "resource": "reciter_catalog_32.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "3ff6ac760b299e454a2ad8dc1bc63eb438617af499686ca660ef14da38007c13"
+    },
+    {
+      "id": 33,
+      "en": "Zaki Daghistani",
+      "ar": "زكي داغستاني",
+      "profile": "https://www.assabile.com/zaki-daghistani-47/zaki-daghistani.htm",
+      "sourceName": "Zaki Daghistani",
+      "sourceArabicName": "زكي داغستاني",
+      "image": "https://www.assabile.com/media/portraits/47-200.webp",
+      "sha256": "4a44d69abb381a2b120de079bfb7d5b9947a5ce7f0e76397933c5ddff5657396",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-33",
+      "resource": "reciter_catalog_33.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "76da076113490e424b1764ffeef033b685700043cc9c532cda7d5107483036d3"
+    },
+    {
+      "id": 38,
+      "en": "Shirazad Taher",
+      "ar": "شيرزاد عبدالرحمن طاهر",
+      "profile": "https://www.assabile.com/shirazad-taher-70/shirazad-taher.htm",
+      "sourceName": "Shirazad Taher",
+      "sourceArabicName": "شيرزاد عبد الرحمن طاهر",
+      "image": "https://www.assabile.com/media/portraits/70-200.webp",
+      "sha256": "6c4bc866cba067caf1d408e2eb02391e6f2ece2fd50fe85f6047e1616d0985e7",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-38",
+      "resource": "reciter_catalog_38.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "6c4bc866cba067caf1d408e2eb02391e6f2ece2fd50fe85f6047e1616d0985e7"
+    },
+    {
+      "id": 39,
+      "en": "Saber Abdulhakm",
+      "ar": "صابر عبدالحكم",
+      "profile": "https://www.assabile.com/saber-abdul-hakam-77/saber-abdul-hakam.htm",
+      "sourceName": "Saber Abdul Hakam",
+      "sourceArabicName": "صابر عبد الحكم",
+      "image": "https://www.assabile.com/media/portraits/77-200.webp",
+      "sha256": "2fc6a0b64d0abdaeb1bbe9c35302d7f013970815326c499209a3b74559639dbf",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-39",
+      "resource": "reciter_catalog_39.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "2802e9d0c7a6317765ccdecaf49bf5c51a48bbf44be9c2a0d884448edecb7e38"
+    },
+    {
+      "id": 42,
+      "en": "Saleh Al-Habdan",
+      "ar": "صالح الهبدان",
+      "profile": "https://www.assabile.com/saleh-al-habdan-566/saleh-al-habdan.htm",
+      "sourceName": "Saleh Al-Habdan",
+      "sourceArabicName": "صالح الهبدان",
+      "image": "https://www.assabile.com/media/portraits/566-200.webp",
+      "sha256": "57b2a34c848e4f6ecf2ee8347b670536c694412f9b4133f1dc7ac6f3ae051d03",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-42",
+      "resource": "reciter_catalog_42.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "57b2a34c848e4f6ecf2ee8347b670536c694412f9b4133f1dc7ac6f3ae051d03"
+    },
+    {
+      "id": 43,
+      "en": "Salah Albudair",
+      "ar": "صلاح البدير",
+      "profile": "https://www.assabile.com/salah-al-budair-17/salah-al-budair.htm",
+      "sourceName": "Salah Al Budair",
+      "sourceArabicName": "صلاح البدير",
+      "image": "https://www.assabile.com/media/portraits/17-200.webp",
+      "sha256": "ece5fb92d6ff8a18a75f16d075d132c8ca914a0ee3e7a08747fa6b009d61e0cc",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-43",
+      "resource": "reciter_catalog_43.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "3999570e100431da25f0d592646b21c9909ceb64b0eadc708e7ad6fe1cf0cc79"
+    },
+    {
+      "id": 44,
+      "en": "Salah Alhashim",
+      "ar": "صلاح الهاشم",
+      "profile": "https://www.assabile.com/salah-al-hashem-68/salah-al-hashem.htm",
+      "sourceName": "Salah Al Hashem",
+      "sourceArabicName": "صلاح الهاشم",
+      "image": "https://www.assabile.com/media/portraits/68-200.webp",
+      "sha256": "2239b08ef0d1cbd2cd220565f9f417be764c0723303967853e27c31501246d92",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-44",
+      "resource": "reciter_catalog_44.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "8914bb364fa03a14e1a77c918070510c8e14fc6311be6b1c4d26f67252cc651d"
+    },
+    {
+      "id": 46,
+      "en": "Slaah Bukhatir",
+      "ar": "صلاح بو خاطر",
+      "profile": "https://www.assabile.com/salah-bukhatir-23/salah-bukhatir.htm",
+      "sourceName": "Salah Bukhatir",
+      "sourceArabicName": "صلاح بو خاطر",
+      "image": "https://www.assabile.com/media/portraits/23-200.webp",
+      "sha256": "e25a31d5ba5adc107e7b462e6ad5638f6086220eba02ab6b1f5aa32d7c6c543a",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-46",
+      "resource": "reciter_catalog_46.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "91126f5eb99c20bc439190c6a15e801e8626edeae4f32f4609a5bef598d1cbaa"
+    },
+    {
+      "id": 48,
+      "en": "Adel Ryyan",
+      "ar": "عادل ريان",
+      "profile": "https://www.assabile.com/adel-rayane-54/adel-rayane.htm",
+      "sourceName": "Adel Rayane",
+      "sourceArabicName": "عادل ريان",
+      "image": "https://www.assabile.com/media/portraits/54-200.webp",
+      "sha256": "d0faa297408625eacee7002828e6cfc3d79337ed8ec00ccb9d2185aff1f50df1",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-48",
+      "resource": "reciter_catalog_48.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "237465ff7359cf2770f061f476d92f09d185240956833f60358e2f75d6d08267"
+    },
+    {
+      "id": 49,
+      "en": "Abdelbari Al-Toubayti",
+      "ar": "عبدالبارئ الثبيتي",
+      "profile": "https://www.assabile.com/abdul-bari-ath-thobaity-38/abdul-bari-ath-thobaity.htm",
+      "sourceName": "Abdul Bari Ath Thobaity",
+      "sourceArabicName": "عبدالبارئ الثبيتي",
+      "image": "https://www.assabile.com/media/portraits/38-200.webp",
+      "sha256": "51a4e053cb15dd39205e5ff24cbb34028b89420679b0885588e597cbb8ed630e",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-49",
+      "resource": "reciter_catalog_49.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "7f97c9b9807809fa967110b33097e244945ce1598b6269a7d8bb055c5fb4cba9"
+    },
+    {
+      "id": 5,
+      "en": "Ahmad Al-Ajmy",
+      "ar": "أحمد بن علي العجمي",
+      "profile": "https://www.assabile.com/ahmed-al-ajmi-13/ahmed-al-ajmi.htm",
+      "sourceName": "Ahmed Al Ajmi",
+      "sourceArabicName": "أحمد بن علي العجمي",
+      "image": "https://www.assabile.com/media/portraits/13-200.webp",
+      "sha256": "cfaf0d00f6f28b5c965b8b893e168a0cd4c578396644aa59f6056c96ffa87eb8",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-5",
+      "resource": "reciter_catalog_5.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "cfaf0d00f6f28b5c965b8b893e168a0cd4c578396644aa59f6056c96ffa87eb8"
+    },
+    {
+      "id": 50,
+      "en": "Abdulbari Mohammad",
+      "ar": "عبدالبارئ محمد",
+      "profile": "https://www.assabile.com/abdul-bari-mohammed-82/abdul-bari-mohammed.htm",
+      "sourceName": "Abdul Bari Mohammed",
+      "sourceArabicName": "عبد البارئ محمد",
+      "image": "https://www.assabile.com/media/portraits/82-200.webp",
+      "sha256": "ef4554b8d1c8123799a9cffc3ff19ae4358e5f51b579f11702b80d7bdb754521",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-50",
+      "resource": "reciter_catalog_50.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "ef4554b8d1c8123799a9cffc3ff19ae4358e5f51b579f11702b80d7bdb754521"
+    },
+    {
+      "id": 51,
+      "en": "Abdulbasit Abdulsamad",
+      "ar": "عبدالباسط عبدالصمد",
+      "profile": "https://www.assabile.com/abdulbasit-abdusamad-2/abdulbasit-abdusamad.htm",
+      "sourceName": "Abdulbasit Abdusamad",
+      "sourceArabicName": "عبد الباسط عبد الصمد",
+      "image": "https://www.assabile.com/media/portraits/2-200.webp",
+      "sha256": "d42d5db09699ab5c32e86d83be6ed4f2ba0ecff32d01a146b246a2f2f9d15ae6",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "abdul-basit",
+      "resource": "reciter_abdul_basit.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "9cc9c95afbe646e93adec51f1d88ab8f6e995d13785187269ff378af7a50699c"
+    },
+    {
+      "id": 54,
+      "en": "Abdulrahman Alsudaes",
+      "ar": "عبدالرحمن السديس",
+      "profile": "https://www.assabile.com/abdul-rahman-al-sudais-12/abdul-rahman-al-sudais.htm",
+      "sourceName": "Abdul Rahman Al Sudais",
+      "sourceArabicName": "عبد الرحمن السديس",
+      "image": "https://www.assabile.com/media/portraits/12-200.webp",
+      "sha256": "33517aa3289d67a98b1e5ffbd952596855949855a53e53d7da3104e7cde5b9fc",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "sudais",
+      "resource": "reciter_sudais.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "a89f562288620dcda8a8d8aadcf907e289043d82fc53909e83b4c9cf65420940"
+    },
+    {
+      "id": 55,
+      "en": "Abdul Aziz Al-Ahmad",
+      "ar": "عبدالعزيز الأحمد",
+      "profile": "https://www.assabile.com/abdul-aziz-al-ahmed-29/abdul-aziz-al-ahmed.htm",
+      "sourceName": "Abdul Aziz Al Ahmed",
+      "sourceArabicName": "عبد العزيز الأحمد",
+      "image": "https://www.assabile.com/media/portraits/29-200.webp",
+      "sha256": "5e950664e6e4b8e0f6718c45fc95e8e2c9993b1a57a86be565c630fb20b11579",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-55",
+      "resource": "reciter_catalog_55.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "5e950664e6e4b8e0f6718c45fc95e8e2c9993b1a57a86be565c630fb20b11579"
+    },
+    {
+      "id": 62,
+      "en": "Abdullah Al-Johany",
+      "ar": "عبدالله عواد الجهني",
+      "profile": "https://www.assabile.com/abdullah-awad-al-juhani-93/abdullah-awad-al-juhani.htm",
+      "sourceName": "Abdullah Awad Al Juhani",
+      "sourceArabicName": "عبد الله عواد الجهني",
+      "image": "https://www.assabile.com/media/portraits/93-200.webp",
+      "sha256": "a6aa4d951a2216486b03318ea0c418d1c03eeccd3bccea99972ee32a5be5e61c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-62",
+      "resource": "reciter_catalog_62.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "a6aa4d951a2216486b03318ea0c418d1c03eeccd3bccea99972ee32a5be5e61c"
+    },
+    {
+      "id": 63,
+      "en": "Abdullah Qaulan",
+      "ar": "عبدالله غيلان",
+      "profile": "https://www.assabile.com/abdullah-ghailan-231/abdullah-ghailan.htm",
+      "sourceName": "Abdullah Ghailan",
+      "sourceArabicName": "عبدالله غيلان",
+      "image": "https://www.assabile.com/media/portraits/231-200.webp",
+      "sha256": "e1367e563aa6bf30cb0d5d5efc4301307bdf76114f4bd7a64477d1d91cc7dde0",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-63",
+      "resource": "reciter_catalog_63.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "e1367e563aa6bf30cb0d5d5efc4301307bdf76114f4bd7a64477d1d91cc7dde0"
+    },
+    {
+      "id": 66,
+      "en": "Abdulmohsin Al-Harthy",
+      "ar": "عبدالمحسن الحارثي",
+      "profile": "https://www.assabile.com/abdulmohsen-al-harthy-233/abdulmohsen-al-harthy.htm",
+      "sourceName": "Abdulmohsen Al-Harthy",
+      "sourceArabicName": "عبد المحسن الحارثي",
+      "image": "https://www.assabile.com/media/portraits/233-200.webp",
+      "sha256": "0e1602d4914e282413fbaccb26cd66c498b45ebc749e07863463d8d8e137ffdb",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-66",
+      "resource": "reciter_catalog_66.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "0e1602d4914e282413fbaccb26cd66c498b45ebc749e07863463d8d8e137ffdb"
+    },
+    {
+      "id": 67,
+      "en": "Abdulmohsen Al-Qasim",
+      "ar": "عبدالمحسن القاسم",
+      "profile": "https://www.assabile.com/abdulmohsen-al-qasim-45/abdulmohsen-al-qasim.htm",
+      "sourceName": "Abdulmohsen Al Qasim",
+      "sourceArabicName": "عبد المحسن القاسم",
+      "image": "https://www.assabile.com/media/portraits/45-200.webp",
+      "sha256": "73b99a983d9f63fc5d95f5368266e9bcd3d6d0bd4ae6c5737372b4fdffad4fe1",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-67",
+      "resource": "reciter_catalog_67.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "73b99a983d9f63fc5d95f5368266e9bcd3d6d0bd4ae6c5737372b4fdffad4fe1"
+    },
+    {
+      "id": 69,
+      "en": "Abdulmohsin Al-Obaikan",
+      "ar": "عبدالمحسن العبيكان",
+      "profile": "https://www.assabile.com/abdel-mohsen-al-obeikan-234/abdel-mohsen-al-obeikan.htm",
+      "sourceName": "Abdul Mohsen Al-Obeikan",
+      "sourceArabicName": "عبد المحسن العبيكان",
+      "image": "https://www.assabile.com/media/portraits/234-200.webp",
+      "sha256": "f5664e9f49947fe38767f74688875108092587ff0c1456acd0b457e27837d086",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-69",
+      "resource": "reciter_catalog_69.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "f5664e9f49947fe38767f74688875108092587ff0c1456acd0b457e27837d086"
+    },
+    {
+      "id": 71,
+      "en": "Abdulwadood Haneef",
+      "ar": "عبدالودود حنيف",
+      "profile": "https://www.assabile.com/abdul-wadud-haneef-30/abdul-wadud-haneef.htm",
+      "sourceName": "Abdul Wadud Haneef",
+      "sourceArabicName": "عبد الودود حنيف",
+      "image": "https://www.assabile.com/media/portraits/30-200.webp",
+      "sha256": "07f7d96a70a0ef3f9ca78b2733a4da2ef5ff1b64283f462b3a710244e6dfee0b",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-71",
+      "resource": "reciter_catalog_71.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "07f7d96a70a0ef3f9ca78b2733a4da2ef5ff1b64283f462b3a710244e6dfee0b"
+    },
+    {
+      "id": 72,
+      "en": "Abdulwali Al-Arkani",
+      "ar": "عبدالولي الأركاني",
+      "profile": "https://www.assabile.com/abdul-wali-al-arkani-92/abdul-wali-al-arkani.htm",
+      "sourceName": "Abdul Wali Al Arkani",
+      "sourceArabicName": "عبد الولي الأركاني",
+      "image": "https://www.assabile.com/media/portraits/92-200.webp",
+      "sha256": "201141b6d0d51a57fbedc8a580579a8d1c8fd5bb26c58c5e632615833cd90f7c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-72",
+      "resource": "reciter_catalog_72.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "201141b6d0d51a57fbedc8a580579a8d1c8fd5bb26c58c5e632615833cd90f7c"
+    },
+    {
+      "id": 76,
+      "en": "Ali Jaber",
+      "ar": "علي جابر",
+      "profile": "https://www.assabile.com/ali-jaber-28/ali-jaber.htm",
+      "sourceName": "Ali Jaber",
+      "sourceArabicName": "علي جابر",
+      "image": "https://www.assabile.com/media/portraits/28-200.webp",
+      "sha256": "aa1ee573e0da7d4bce1735f1fdd4ce3010ee6a70d7c7d8281e4510b87b69d6fa",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-76",
+      "resource": "reciter_catalog_76.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "aa1ee573e0da7d4bce1735f1fdd4ce3010ee6a70d7c7d8281e4510b87b69d6fa"
+    },
+    {
+      "id": 77,
+      "en": "Ali Hajjaj Alsouasi",
+      "ar": "علي حجاج السويسي",
+      "profile": "https://www.assabile.com/ali-hajjaj-souissi-78/ali-hajjaj-souissi.htm",
+      "sourceName": "Ali Hajjaj Souissi",
+      "sourceArabicName": "علي حجاج السويسي",
+      "image": "https://www.assabile.com/media/portraits/78-200.webp",
+      "sha256": "bb27362fd2a505016ab659105294206289c5bdc39d4ecb6f31b565dbe8762527",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-77",
+      "resource": "reciter_catalog_77.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "bb27362fd2a505016ab659105294206289c5bdc39d4ecb6f31b565dbe8762527"
+    },
+    {
+      "id": 78,
+      "en": "Emad Hafez",
+      "ar": "عماد زهير حافظ",
+      "profile": "https://www.assabile.com/imad-zuhair-hafez-24/imad-zuhair-hafez.htm",
+      "sourceName": "Imad Zuhair Hafez",
+      "sourceArabicName": "عماد زهير حافظ",
+      "image": "https://www.assabile.com/media/portraits/24-200.webp",
+      "sha256": "4564deaa53299291a37111a31d9607efef1bff673abbda0d64c8f4f884d9df0c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-78",
+      "resource": "reciter_catalog_78.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "4564deaa53299291a37111a31d9607efef1bff673abbda0d64c8f4f884d9df0c"
+    },
+    {
+      "id": 8,
+      "en": "Ahmad Saber",
+      "ar": "أحمد صابر",
+      "profile": "https://www.assabile.com/ahmed-saber-51/ahmed-saber.htm",
+      "sourceName": "Ahmed Saber",
+      "sourceArabicName": "أحمد صابر",
+      "image": "https://www.assabile.com/media/portraits/51-200.webp",
+      "sha256": "5c659e13bb7726f34a177907ff4c6937852f7a679ee528f205bdefef53787ac6",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-8",
+      "resource": "reciter_catalog_8.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "5c659e13bb7726f34a177907ff4c6937852f7a679ee528f205bdefef53787ac6"
+    },
+    {
+      "id": 80,
+      "en": "Omar Al-Qazabri",
+      "ar": "عمر القزابري",
+      "profile": "https://www.assabile.com/omar-al-kazabri-15/omar-al-kazabri.htm",
+      "sourceName": "Omar Al Kazabri",
+      "sourceArabicName": "عمر القزابري",
+      "image": "https://www.assabile.com/media/portraits/15-200.webp",
+      "sha256": "b1987993bb5f675ffaacff7088c64005ef8516a216befbe9de6e779e84166a3c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-80",
+      "resource": "reciter_catalog_80.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "b1987993bb5f675ffaacff7088c64005ef8516a216befbe9de6e779e84166a3c"
+    },
+    {
+      "id": 81,
+      "en": "Fares Abbad",
+      "ar": "فارس عباد",
+      "profile": "https://www.assabile.com/fares-abbad-18/fares-abbad.htm",
+      "sourceName": "Fares Abbad",
+      "sourceArabicName": "فارس عباد",
+      "image": "https://www.assabile.com/media/portraits/18-200.webp",
+      "sha256": "c39e753499737fb26081e12e57e760a70adcc1dece4adb5489433b5a4988d5b4",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-81",
+      "resource": "reciter_catalog_81.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "a99a33fc0aa4b2b823d419f6283a678ee581255ec8af9e2cd68ee74263487988"
+    },
+    {
+      "id": 86,
+      "en": "Nasser Alqatami",
+      "ar": "ناصر القطامي",
+      "profile": "https://www.assabile.com/nasser-al-qatami-61/nasser-al-qatami.htm",
+      "sourceName": "Nasser Al Qatami",
+      "sourceArabicName": "ناصر القطامي",
+      "image": "https://www.assabile.com/media/portraits/61-200.webp",
+      "sha256": "1ad06f171c488acc3471e3359865978c6630c797b62097b224d6551706d0bf0c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-86",
+      "resource": "reciter_catalog_86.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "b043ebfeb61e320975253bdc369af083e4d333ef7d0dc789498446d0a037a430"
+    },
+    {
+      "id": 87,
+      "en": "Nabil Al Rifay",
+      "ar": "نبيل الرفاعي",
+      "profile": "https://www.assabile.com/nabil-ar-rifai-36/nabil-ar-rifai.htm",
+      "sourceName": "Nabil Ar Rifai",
+      "sourceArabicName": "نبيل الرفاعي",
+      "image": "https://www.assabile.com/media/portraits/36-200.webp",
+      "sha256": "836868681432d82c4f7d38eef8e1e0854e3663ba66e47c43858403f7292c27b4",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-87",
+      "resource": "reciter_catalog_87.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "76dd6218a5c154a0b5c89cd44ed716a2060846be0dbff0f06a115ebae0a65d7f"
+    },
+    {
+      "id": 89,
+      "en": "Hani Arrifai",
+      "ar": "هاني الرفاعي",
+      "profile": "https://www.assabile.com/hani-ar-rifai-86/hani-ar-rifai.htm",
+      "sourceName": "Hani Ar Rifai",
+      "sourceArabicName": "هاني الرفاعي",
+      "image": "https://www.assabile.com/media/portraits/86-200.webp",
+      "sha256": "98d865bece7908e59ea7aacccf6843c2cc8b0ab4298e372bd7dc63aea24f6635",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "hani-rifai",
+      "resource": "reciter_hani_rifai.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "ecc9989e0be3c2a3e07b2f9c591e23b6b771c40b49412bc44f27f642929cf368"
+    },
+    {
+      "id": 9,
+      "en": "Ahmad Nauina",
+      "ar": "أحمد نعينع",
+      "profile": "https://www.assabile.com/ahmed-nuinaa-75/ahmed-nuinaa.htm",
+      "sourceName": "Ahmed Nuinaa",
+      "sourceArabicName": "أحمد نعينع",
+      "image": "https://www.assabile.com/media/portraits/75-200.webp",
+      "sha256": "e0e24705c800dcd3e3f1d15bc9f6b297518512f18ea5c1fb724cbbfb58d9a7c2",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-9",
+      "resource": "reciter_catalog_9.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "0677c5748065ada6bc5bd97f73d810596acaec349b041ee8644d261d345510ac"
+    },
+    {
+      "id": 92,
+      "en": "Yasser Al-Dosari",
+      "ar": "ياسر الدوسري",
+      "profile": "https://www.assabile.com/yasser-al-dosari-52/yasser-al-dosari.htm",
+      "sourceName": "Yasser Al-Dosari",
+      "sourceArabicName": "ياسر الدوسري",
+      "image": "https://www.assabile.com/media/portraits/52-200.webp",
+      "sha256": "ab09a4d749cafc44a5eb000b058cb86a2214e362d5af075a411f9499bd961d3d",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-92",
+      "resource": "reciter_catalog_92.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "f6838e78530b0862d46e4eb93c0929d5782764b596289c1b23e7929f3a3d9e2e"
+    },
+    {
+      "id": 93,
+      "en": "Yasser Al-Qurashi",
+      "ar": "ياسر القرشي",
+      "profile": "https://www.assabile.com/yasser-qureshi-83/yasser-qureshi.htm",
+      "sourceName": "Yasser Qureshi",
+      "sourceArabicName": "ياسر القرشي",
+      "image": "https://www.assabile.com/media/portraits/83-200.webp",
+      "sha256": "ec5000f74a233e5a1140bb8513f5e8f197492e3ca876f752e228df649e37f6d4",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-93",
+      "resource": "reciter_catalog_93.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "ec5000f74a233e5a1140bb8513f5e8f197492e3ca876f752e228df649e37f6d4"
+    },
+    {
+      "id": 123,
+      "en": "Mishary Alafasi",
+      "ar": "مشاري العفاسي",
+      "profile": "https://www.assabile.com/mishary-rashid-alafasy-1/mishary-rashid-alafasy.htm",
+      "sourceName": "Mishary Rashid Alafasy",
+      "sourceArabicName": "مشاري بن راشد العفاسي",
+      "image": "https://www.assabile.com/media/portraits/1-200.webp",
+      "sha256": "82242b1a407b40c5d0220e5a51a11ffd2336994af4757de0be912462a95a3de1",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "alafasy",
+      "resource": "reciter_alafasy.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "c9f963df900f2ebe02140339e19286f3e13e12865c613965cb0feb043a38d76c"
+    },
+    {
+      "id": 21203,
+      "en": "Ayman Rushdi Swaid",
+      "ar": "أيمن رشدي سويد",
+      "profile": "https://www.assabile.com/ayman-swed-345/ayman-swed.htm",
+      "sourceName": "Ayman Swed",
+      "sourceArabicName": "أيمن سويد",
+      "image": "https://www.assabile.com/media/portraits/345-200.webp",
+      "sha256": "f0a8b4bbc5ae93e8dd1db164a64a13e55aeca9b0b4b10da9fcbe4876799de52c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "ayman-suwaid",
+      "resource": "reciter_ayman_suwaid.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "550dff661ee7900ad5616bfd93370563bf5bc51d7eb9693cb4e80f6d2fae5d1e"
+    },
+    {
+      "id": 4,
+      "en": "Shaik Abu Bakr Al Shatri",
+      "ar": "شيخ أبو بكر الشاطري",
+      "profile": "https://www.assabile.com/abu-bakr-al-shatri-34/abu-bakr-al-shatri.htm",
+      "sourceName": "Abu Bakr Al Shatri",
+      "sourceArabicName": "أبو بكر الشاطري",
+      "image": "https://www.assabile.com/media/portraits/34-200.webp",
+      "sha256": "ec6b6d375b200228059845de18d9b97b6aea4180a5447c550ef481fc89527edf",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "abu-bakr-shatri",
+      "resource": "reciter_abu_bakr_shatri.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "301f2c7d5d1002651122dc6210ade1c026ea288fd3e70175a03973085f2d3fec"
+    },
+    {
+      "id": 6,
+      "en": "Ahmad Al-Hawashi",
+      "ar": "أحمد الحواشي",
+      "profile": "https://www.assabile.com/ahmad-al-hawashy-71/ahmad-al-hawashy.htm",
+      "sourceName": "Ahmad Al Hawashy",
+      "sourceArabicName": "أحمد بن محمد الحواشي",
+      "image": "https://www.assabile.com/media/portraits/71-200.webp",
+      "sha256": "3a86087fcb4b3910614df9e56f8c048e184ba57d28ee6e5a0cbfb0bb6e5b4845",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-6",
+      "resource": "reciter_catalog_6.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "a7856c56d208c736a2b4a55e1cea91faedab57d1a1f6aee7a64f49c659537aa5"
+    },
+    {
+      "id": 60,
+      "en": "Abdullah Basfer",
+      "ar": "عبدالله بصفر",
+      "profile": "https://www.assabile.com/abdullah-ibn-ali-basfar-6/abdullah-ibn-ali-basfar.htm",
+      "sourceName": "Abdullah Ibn Ali Basfar",
+      "sourceArabicName": "عبد الله بن علي بصفر",
+      "image": "https://www.assabile.com/media/portraits/6-200.webp",
+      "sha256": "d9857905bd34a14210754cd8f0713e26dba810cf8b777352211cccbcf6d3788c",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "abdullah-basfar",
+      "resource": "reciter_abdullah_basfar.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "f1e7ad626b6b09f991bbdbdd30c4392705c657f3ffd18b2992e93667081cc0b6"
+    },
+    {
+      "id": 61,
+      "en": "Abdullah Khayyat",
+      "ar": "عبدالله خياط",
+      "profile": "https://www.assabile.com/abdullah-al-khayat-21/abdullah-al-khayat.htm",
+      "sourceName": "Abdullah Al Khayat",
+      "sourceArabicName": "عبد الله الخياط",
+      "image": "https://www.assabile.com/media/portraits/21-200.webp",
+      "sha256": "52b5054c5e11972a09217b29f65a6b5f5feb7f4bd5542e593bfa2629274f363a",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-61",
+      "resource": "reciter_catalog_61.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "52b5054c5e11972a09217b29f65a6b5f5feb7f4bd5542e593bfa2629274f363a"
+    },
+    {
+      "id": 64,
+      "en": "Abdulrasheed Soufi",
+      "ar": "عبدالرشيد صوفي",
+      "profile": "https://www.assabile.com/abdul-rashid-ali-sufi-26/abdul-rashid-ali-sufi.htm",
+      "sourceName": "Abdul Rashid Ali Sufi",
+      "sourceArabicName": "عبد الرشيد علي صوفي",
+      "image": "https://www.assabile.com/media/portraits/26-200.webp",
+      "sha256": "962d344cab2c3ffdcb334ecd8d5e8dfc3f093c090381e2f1bb853b2bdca34fc1",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-64",
+      "resource": "reciter_catalog_64.webp",
+      "retainedExisting": true,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "58ec8413e830970489e623ac7f85f5d15a17814c64b34c39f82c16306d288971"
+    },
+    {
+      "id": 70,
+      "en": "Abdulhadi Kanakeri",
+      "ar": "عبدالهادي أحمد كناكري",
+      "profile": "https://www.assabile.com/abdulhadi-kanakeri-53/abdulhadi-kanakeri.htm",
+      "sourceName": "Abdulhadi Kanakeri",
+      "sourceArabicName": "عبد الهادي كناكري",
+      "image": "https://www.assabile.com/media/portraits/53-200.webp",
+      "sha256": "0959309e9453348d3a8c5073cdae1ed3a5689f48993ba80149532d3dccf095bd",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-70",
+      "resource": "reciter_catalog_70.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "0959309e9453348d3a8c5073cdae1ed3a5689f48993ba80149532d3dccf095bd"
+    },
+    {
+      "id": 74,
+      "en": "Ali Alhuthaifi",
+      "ar": "علي بن عبدالرحمن الحذيفي",
+      "profile": "https://www.assabile.com/ali-al-huthaify-19/ali-al-huthaify.htm",
+      "sourceName": "Ali Al huthaify",
+      "sourceArabicName": "علي الحذيفي",
+      "image": "https://www.assabile.com/media/portraits/19-200.webp",
+      "sha256": "ae5ad76d2ff2c847c175bf9b788a26b9314b5d78d30a889b82840c9b32a2116e",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-74",
+      "resource": "reciter_catalog_74.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "ae5ad76d2ff2c847c175bf9b788a26b9314b5d78d30a889b82840c9b32a2116e"
+    },
+    {
+      "id": 96,
+      "en": "Yahya Hawwa",
+      "ar": "يحيى حوا",
+      "profile": "https://www.assabile.com/yahya-hawwa-74/yahya-hawwa.htm",
+      "sourceName": "Yahya Hawwa",
+      "sourceArabicName": "يحيى حوى",
+      "image": "https://www.assabile.com/media/portraits/74-200.webp",
+      "sha256": "60f06958d2b5e3110ac843b8677916d2cf5775bcbdef9dbed3d00d72f3d08788",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-96",
+      "resource": "reciter_catalog_96.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "60f06958d2b5e3110ac843b8677916d2cf5775bcbdef9dbed3d00d72f3d08788"
+    },
+    {
+      "id": 108,
+      "en": "Mohammed Al-Muhasny",
+      "ar": "محمد المحيسني",
+      "profile": "https://www.assabile.com/muhammad-al-mohaisany",
+      "sourceName": "Muhammad Al-Mohaisany",
+      "sourceArabicName": "محمد بن سليمان المحيسني",
+      "image": "https://www.assabile.com/media/portraits/66-200.webp",
+      "sha256": "14868ff9c28ce3e7cc08846257b0407127e578b86bbd2b518e0119de1a318cf6",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-108",
+      "resource": "reciter_catalog_108.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "14868ff9c28ce3e7cc08846257b0407127e578b86bbd2b518e0119de1a318cf6"
+    },
+    {
+      "id": 134,
+      "en": "Mohammad Saayed",
+      "ar": "محمد سايد",
+      "profile": "https://www.assabile.com/mohamed-sayed",
+      "sourceName": "Mohamed Sayed",
+      "sourceArabicName": "محمد سايد",
+      "image": "https://www.assabile.com/media/portraits/428-200.webp",
+      "sha256": "4fbc56983885f4355e5a827fe94138e2dc306936d7ff26caac61917ec6639f49",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-134",
+      "resource": "reciter_catalog_134.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "4fbc56983885f4355e5a827fe94138e2dc306936d7ff26caac61917ec6639f49"
+    },
+    {
+      "id": 201,
+      "en": "Ahmed Al-trabulsi",
+      "ar": "أحمد الطرابلسي",
+      "profile": "https://www.assabile.com/ahmed-al-tarabulsi",
+      "sourceName": "Ahmed Al-Tarabulsi",
+      "sourceArabicName": "أحمد خضر الطرابلسي",
+      "image": "https://www.assabile.com/media/portraits/202-200.webp",
+      "sha256": "cdc7613dd4d3cb5f8110d6f08008314d524ba2456ce6388db6e7bc309360b4e5",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-201",
+      "resource": "reciter_catalog_201.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "cdc7613dd4d3cb5f8110d6f08008314d524ba2456ce6388db6e7bc309360b4e5"
+    },
+    {
+      "id": 21183,
+      "en": "Hassan Aldaghriri",
+      "ar": "حسن الدغريري",
+      "profile": "https://www.assabile.com/hassan-bin-muhammad-bin-yahya-al-daghriri",
+      "sourceName": "Hassan Bin Muhammad Bin Yahya Al-Daghriri",
+      "sourceArabicName": "حسن بن محمد بن يحيى الدغريري",
+      "image": "https://www.assabile.com/media/portraits/486-200.webp",
+      "sha256": "db6c0236e5032794e4c83763a4fdce379cff155cfda0089b4e34077454c47d53",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-21183",
+      "resource": "reciter_catalog_21183.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "db6c0236e5032794e4c83763a4fdce379cff155cfda0089b4e34077454c47d53"
+    },
+    {
+      "id": 256,
+      "en": "Ahmad Shaheen",
+      "ar": "أحمد خليل شاهين",
+      "profile": "https://www.assabile.com/ahmad-khalil-shaheen",
+      "sourceName": "Ahmad Khalil Shaheen",
+      "sourceArabicName": "أحمد خليل شاهين",
+      "image": "https://www.assabile.com/media/portraits/563-200.webp",
+      "sha256": "26b8b8672e705c275871f4c2506b1abc9d099e7748cbc18b914d5aad80e75e2f",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-256",
+      "resource": "reciter_catalog_256.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "26b8b8672e705c275871f4c2506b1abc9d099e7748cbc18b914d5aad80e75e2f"
+    },
+    {
+      "id": 265,
+      "en": "Ahmad Deban",
+      "ar": "أحمد ديبان",
+      "profile": "https://www.assabile.com/ahmad-mohammad-deeban",
+      "sourceName": "Ahmad Mohammad Deeban",
+      "sourceArabicName": "أحمد محمد ديبان",
+      "image": "https://www.assabile.com/media/portraits/529-200.webp",
+      "sha256": "56144755585b88b886dcfb9cf44a75323488ff5fb2af800f16cdea78b94fe378",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-265",
+      "resource": "reciter_catalog_265.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "56144755585b88b886dcfb9cf44a75323488ff5fb2af800f16cdea78b94fe378"
+    },
+    {
+      "id": 3,
+      "en": "Ibrahim Al-Asiri",
+      "ar": "إبراهيم العسيري",
+      "profile": "https://www.assabile.com/ibrahim-al-asiri",
+      "sourceName": "Ibrahim Al Asiri",
+      "sourceArabicName": "ابراهيم العسيري",
+      "image": "https://www.assabile.com/media/portraits/207-200.webp",
+      "sha256": "40dc35070707cf7d69abe2c7b0bd46c3754c78670ea59058118ae9b014d914ed",
+      "size": [
+        192,
+        192
+      ],
+      "portraitKey": "catalog-3",
+      "resource": "reciter_catalog_3.webp",
+      "retainedExisting": false,
+      "checkedAt": "2026-11-16",
+      "downloadSha256": "40dc35070707cf7d69abe2c7b0bd46c3754c78670ea59058118ae9b014d914ed"
+    }
+  ],
+  "excludedSourcePlaceholders": [
+    25,
+    27,
+    36,
+    40,
+    56,
+    91,
+    95,
+    97,
+    149,
+    161,
+    178,
+    193,
+    197,
+    206,
+    212,
+    230,
+    281,
+    21199
   ]
 }

@@ -29,3 +29,5 @@ Copyright: respective contributors. README reuse permission:
 You can use it free for Islamic Apps Only >>> ( FREE ISLAMIC APPS ONLY)
 يمكنكم استخدام جميع الملفات في البرامج الاسلامية المجانية فقط !!
 Deenly is an entirely free Islamic app. Retain this restriction when redistributing these assets.
+
+Additional identification portraits: Assabile (https://www.assabile.com). Copyright respective rights holders. Profile/image URLs and identity mappings are recorded in docs/reciter-portrait-sources.json. These photographs are not designated CC0/public domain.

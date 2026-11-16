@@ -69,7 +69,21 @@ class ReciterRecordingsTest {
         assertNotEquals(reciterPersonKey("Muhammad Ayyub"), reciterPersonKey("Mohammed Ayoub Abu Mazen"))
         assertNotEquals(reciterPersonKey("Saad Al-Ghamdi"), reciterPersonKey("Khalid Al-Ghamdi"))
         assertNotEquals("catalog-40", reciterPersonKey("Saleh Alsahood"))
-        assertNotEquals("catalog-72", reciterPersonKey("Abdulwali Al-Arkani"))
+        // A named Assabile profile now resolves the formerly conflicting legacy image.
+        assertEquals("catalog-72", reciterPersonKey("Abdulwali Al-Arkani"))
+        assertNotEquals("catalog-72", reciterPersonKey("Kamil Behtimi"))
+    }
+
+    @Test fun newPortraitNamesHandleCatalogSpellingsWithoutBorrowingSimilarNames() {
+        assertEquals("catalog-70", reciterPersonKey("Abdulhadi Kanakeri"))
+        assertEquals("catalog-70", reciterPersonKey("عبدالهادي أحمد كناكري"))
+        assertEquals("catalog-74", reciterPersonKey("Ali Alhuthaifi"))
+        assertEquals("catalog-74", reciterPersonKey("علي بن عبدالرحمن الحذيفي"))
+        assertEquals("ayman-suwaid", reciterPersonKey("Ayman Rushdi Swaid"))
+        assertEquals("muhammad-ayyub", reciterPersonKey("Mohammed Ayyub"))
+        assertNotEquals(reciterPersonKey("Raad Al Kurdi"), reciterPersonKey("Mustafa Raad Al-Azzawi"))
+        assertNotEquals(reciterPersonKey("Okasha Kameny"), reciterPersonKey("Abdul Aziz Okocha"))
+        assertNotEquals(reciterPersonKey("Abdul Rahman bin Abdul Razzaq Al Badr"), reciterPersonKey("Abdul Razzaq Al Badr"))
     }
 
 }

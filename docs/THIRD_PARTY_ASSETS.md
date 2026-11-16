@@ -160,7 +160,7 @@ under their original recording IDs and are never migrated or deleted by grouping
 
 ### Additional offline reciter portraits
 
-The collection now contains 44 bundled portraits (35 added). Android and iOS use
+The initial expansion contained 44 bundled portraits (35 added). Android and iOS use
 these same local resources, with no image request needed during browsing.
 Full-name aliases are shared with person grouping; they do not change recording IDs
 or the requirement for all 114 surahs.
@@ -179,10 +179,33 @@ image IDs as current catalog IDs. A conflicting bilingual label (`reciter35.jpg`
 and an identical image assigned to two people (`reciter49.jpg`, `reciter50.jpg`)
 are excluded. Existing portraits are retained.
 
-[Coverage research](reciter-portrait-coverage.json) lists all 168 people with at
-least one complete recording in a public catalog snapshot: 40 have bundled
-portraits and 128 still need a verified source. This is not the live catalog.
-Assabile candidate links are metadata leads only: their image bytes and reuse
-terms have not been verified, and the app does not load those URLs. Unmatched
-people retain initials. In particular Ahmed Al-Hudhaifi is not mapped to Ali
-Al-Hudhaifi, and Muhammad Ayyub is not mapped to Mohammed Ayoub Abu Mazen.
+### Live portrait coverage, 2026-11-16
+
+The collection now has **105** bundled portraits, including **61** additional
+portraits obtained from named Assabile profiles. The live MP3Quran catalog has
+174 people with at least one complete 114-surah recording; **103** now resolve to
+bundled photos, and **71** still need a reliable portrait. Two bundled people do
+not currently have an eligible complete recording and are not offered merely
+because a portrait is available.
+
+[Coverage report](reciter-portrait-coverage.json) records every eligible person's
+actual coverage. [Source manifest](reciter-portrait-sources.json) records profile
+names, current image URLs, hashes, mappings, and retained existing images. New
+Assabile photos use the current profile's `og:image` URL; the old `/media/person/`
+links no longer work. Attribution is included in the bundled portrait notices.
+Photos remain copyright their respective rights holders and are not designated
+CC0 or public domain.
+
+A unique exact Arabic full-name match supplies most mappings. Additional explicit
+full-name variants (including Abdulhadi Ahmad Kanakeri and Ali Abdul Rahman
+Al-Hudhaifi) were reviewed using the named profiles. Source name/logo cards are
+excluded, as are conflicting identities. Existing photos remain unchanged.
+Unknown names keep initials. Search suggestions are discovery leads, never an
+identity match by themselves: they often suggest a different person. In particular,
+Raad Al-Kurdi must not receive Mustafa Raad Al-Azzawi's photo, Ahmed Al-Hudhaifi
+must not receive Ali Al-Hudhaifi's, and Okasha Kameny must not receive Abdul Aziz
+Okocha's. Full-name aliases handle both Arabic and English catalog spellings.
+
+Google search returned HTTP 429 during this research. The source profile pages
+and live MP3Quran API were used directly; no search-engine thumbnail URLs are
+loaded by the app. All shipped photos decode locally, at a maximum of 192px.
