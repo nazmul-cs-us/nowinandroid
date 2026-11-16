@@ -154,17 +154,18 @@ internal fun ReciterSettingsSection(
                 (surahNumber == null || surahNumber in it.availableSurahs) &&
             (group == null || reciterGroup(it.displayName) == group) && matchesQuranReciterSearch(it, query) }
             .sortedWith(compareByDescending<QuranReciterSource> { it.id in completedIds }
-                .thenByDescending { it.id == selected }.thenBy { it.displayName })
+                .thenBy { it.displayName })
     }
     val defaultReciter = remember { QuranReciterSource("default-cdn", "Mishary Rashid Al-Alafasy",
         "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/", (1..114).toSet(), "Default recording · Hafs · Murattal") }
     val showDefault = (group == null || group == ReciterGroup.CONTEMPORARY) && matchesQuranReciterSearch(defaultReciter, query)
     val savedIds = storage.filterValues { it.first > 0 }.keys
+    // Selecting a voice must not reorder rows or move the scroll anchor.
     val people = com.starception.submission.feature.quran.groupReciters(
         (if (showDefault) listOf(defaultReciter) else emptyList()) + filtered, { it.id }, { it.displayName })
         .sortedWith(compareByDescending<com.starception.submission.feature.quran.ReciterPerson<QuranReciterSource>> { person -> person.recordings.any { com.starception.submission.feature.quran.hasCompleteQuran(it.availableSurahs) } }
             .thenByDescending { person -> person.recordings.any { it.id in completedIds } }
-            .thenByDescending { person -> person.recordings.any { it.id == (selected ?: "default-cdn") } }.thenBy { it.name })
+            .thenBy { it.name })
     val downloadedCount = people.count { person -> person.recordings.any { com.starception.submission.feature.quran.hasCompleteQuran(it.availableSurahs) } && person.recordings.any { it.id in completedIds } }
     val legacyStart = people.indexOfFirst { person -> person.recordings.none { com.starception.submission.feature.quran.hasCompleteQuran(it.availableSurahs) } }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()

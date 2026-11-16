@@ -294,6 +294,34 @@ class ReciterDownloadUiTest {
         compose.onNodeWithText("Retry download").performClick()
         assertEquals(1, downloads)
     }
+    @Test fun selectingAReciterKeepsTheAlphabeticalOrderAndRowPosition() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+        org.robolectric.Shadows.shadowOf(connectivity).setActiveNetworkInfo(null)
+        context.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).edit().clear()
+            .putString("catalog_json", """{"reciters":[
+                {"id":1,"name":"Abdulbasit Abdulsamad","moshaf":[{"id":1,"name":"Hafs","server":"https://example.org/basit/","surah_list":"${(1..114).joinToString(",")}"}]},
+                {"id":54,"name":"Abdulrahman Alsudaes","moshaf":[{"id":54,"name":"Hafs","server":"https://example.org/sudais/","surah_list":"${(1..114).joinToString(",")}"}]}
+            ]}""").commit()
+        compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
+            MaterialTheme { Surface { ReciterStorageSection(initiallyExpanded = true, manageDownloads = false,
+                modifier = Modifier.heightIn(max = 620.dp)) } }
+        }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Abdul Rahman Al-Sudais")).fetchSemanticsNodes().isNotEmpty() }
+        val basit = compose.onNodeWithText("Abdul Basit Abdul Samad")
+        val sudais = compose.onNodeWithText("Abdul Rahman Al-Sudais")
+        val before = sudais.fetchSemanticsNode().boundsInRoot.top
+        org.junit.Assert.assertTrue(basit.fetchSemanticsNode().boundsInRoot.top < before)
+        sudais.assertIsDisplayed().performClick()
+        compose.waitForIdle()
+        assertEquals("54-54", com.starception.submission.feature.quran.ReciterSelectionStore(context).current().id)
+        assertEquals(before, sudais.fetchSemanticsNode().boundsInRoot.top)
+        org.junit.Assert.assertTrue(basit.fetchSemanticsNode().boundsInRoot.top < sudais.fetchSemanticsNode().boundsInRoot.top)
+    }
+
     private fun installGroupedCatalog(): Context {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)

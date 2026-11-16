@@ -243,18 +243,18 @@ private fun ReciterBrowser(
                 (surahNumber == null || surahNumber in it.surahs) &&
             (group == null || reciterGroup(it.name) == group) && ReciterCatalog.matchesSearch(it, query) }
             .sortedWith(compareByDescending<ReciterCatalog.Reciter> { it.id in completedIds }
-                .thenByDescending { it.id == selection.id }
                 .thenBy { it.name })
     }
     val defaultReciter = remember { ReciterCatalog.Reciter("default-cdn", "Mishary Rashid Al-Alafasy",
         "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/", (1..114).toSet(), "Default recording · Hafs · Murattal") }
     val showDefault = (group == null || group == ReciterGroup.CONTEMPORARY) && ReciterCatalog.matchesSearch(defaultReciter, query)
     val savedIds = offlineReciters.mapTo(mutableSetOf()) { it.id }
+    // Selecting a voice must not reorder rows or move the scroll anchor.
     val people = com.starception.submission.feature.quran.groupReciters(
         (if (showDefault) listOf(defaultReciter) else emptyList()) + filtered, { it.id }, { it.name })
         .sortedWith(compareByDescending<com.starception.submission.feature.quran.ReciterPerson<ReciterCatalog.Reciter>> { person -> person.recordings.any { com.starception.submission.feature.quran.hasCompleteQuran(it.surahs) } }
             .thenByDescending { person -> person.recordings.any { it.id in completedIds } }
-            .thenByDescending { person -> person.recordings.any { it.id == (selection.id ?: "default-cdn") } }.thenBy { it.name })
+            .thenBy { it.name })
     val downloadedCount = people.count { person -> person.recordings.any { com.starception.submission.feature.quran.hasCompleteQuran(it.surahs) } && person.recordings.any { it.id in completedIds } }
     val legacyStart = people.indexOfFirst { person -> person.recordings.none { com.starception.submission.feature.quran.hasCompleteQuran(it.surahs) } }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
