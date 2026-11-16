@@ -131,10 +131,9 @@ internal fun ReciterSettingsSection(
                     Json.decodeFromString<List<QuranReciterSource>>(store.getString("quran_reciter_catalog").orEmpty())
                 }.getOrDefault(emptyList())
             }
-            val result = withContext(Dispatchers.Default) { library.catalog() }
+            val result = withContext(Dispatchers.Default) { if (refresh > 0) library.refreshCatalog() else library.catalog() }
             check(result.isNotEmpty()) { "Couldn’t load reciters. Check your connection and try again." }
             catalog = result
-            withContext(Dispatchers.Default) { store.putString("quran_reciter_catalog", Json.encodeToString(result)) }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { error = "Couldn’t load reciters. Check your connection and try again." }
         finally { loading = false }

@@ -84,29 +84,41 @@ object ReciterCatalog {
         available
     }
 
-    suspend fun fetch(context: Context? = null): List<Reciter> = withContext(Dispatchers.IO) {
-        if (context != null) {
+    private var cache: Pair<Context, ReciterCatalogCache<Reciter>>? = null
+
+    private fun persistentCache(context: Context): ReciterCatalogCache<Reciter> = synchronized(this) {
+        val application = context.applicationContext
+        cache?.takeIf { it.first === application }?.second ?: run {
+            val preferences = application.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+            ReciterCatalogCache(
+                read = { preferences.getString("catalog_json", null) },
+                write = { preferences.edit().putString("catalog_json", it).apply() },
+                readUpdatedAt = { if (preferences.contains("catalog_updated_at")) preferences.getLong("catalog_updated_at", 0L) else null },
+                writeUpdatedAt = { preferences.edit().putLong("catalog_updated_at", it).apply() },
+                parse = ::parse,
+            ).also { cache = application to it }
+        }
+    }
+
+    suspend fun fetch(context: Context? = null, forceRefresh: Boolean = false): List<Reciter> = withContext(Dispatchers.IO) {
+        if (context == null) return@withContext parse(downloadCatalog())
+        persistentCache(context).load(forceRefresh) {
             val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
             val capabilities = connectivity?.getNetworkCapabilities(connectivity.activeNetwork)
-            if (capabilities?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) != true) {
-                return@withContext cached(context) ?: throw java.io.IOException("Connect to load the reciter catalogue.")
+            check(capabilities?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true) {
+                "Connect to load the reciter catalogue."
             }
+            downloadCatalog()
         }
-        val preferences = context?.getSharedPreferences("quran_reciter", Context.MODE_PRIVATE)
+    }
+
+    private fun downloadCatalog(): String {
         val connection = URL("https://www.mp3quran.net/api/v3/reciters?language=eng")
             .openConnection() as HttpURLConnection
-        try {
+        return try {
             connection.connectTimeout = 12000
             connection.readTimeout = 15000
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            val parsed = parse(body)
-            preferences?.edit()?.putString("catalog_json", body)?.apply()
-            parsed
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
-            val cached = preferences?.getString("catalog_json", null)
-            if (cached != null) parse(cached) else throw failure
+            connection.inputStream.bufferedReader().use { it.readText() }
         } finally { connection.disconnect() }
     }
 

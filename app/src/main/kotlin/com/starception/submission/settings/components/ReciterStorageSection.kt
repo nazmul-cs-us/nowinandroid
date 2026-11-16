@@ -210,7 +210,7 @@ private fun ReciterBrowser(
         try {
             if (reciters.isEmpty()) reciters = (ReciterCatalog.offline(context) +
                 ReciterCatalog.cached(context).orEmpty()).distinctBy(ReciterCatalog.Reciter::id)
-            val latest = ReciterCatalog.fetch(context)
+            val latest = ReciterCatalog.fetch(context, forceRefresh = refresh > 0)
             reciters = (latest + ReciterCatalog.offline(context, latest)).distinctBy(ReciterCatalog.Reciter::id)
         } catch (cancelled: CancellationException) {
             throw cancelled

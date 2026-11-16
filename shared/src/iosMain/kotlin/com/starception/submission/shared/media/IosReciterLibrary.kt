@@ -11,7 +11,22 @@ object IosReciterLibrary : ReciterLibrary {
         else IosReciterAudioStore.cachedUrl(source.id, sample) ?: source.urlForSurah(sample)
     }
     override fun createPreviewPlayer(): ReciterPreviewPlayback = IosReciterPreviewPlayback()
-    override suspend fun catalog(): List<QuranReciterSource> = IosReciterCatalog.fetch()
+    private val catalogCache by lazy {
+        val store = com.starception.submission.shared.storage.platformKeyValueStore()
+        com.starception.submission.feature.quran.ReciterCatalogCache<QuranReciterSource>(
+            read = { store.getString("quran_reciter_catalog") },
+            write = { store.putString("quran_reciter_catalog", it) },
+            readUpdatedAt = { store.getString("quran_reciter_catalog_updated_at")?.toLongOrNull() },
+            writeUpdatedAt = { store.putString("quran_reciter_catalog_updated_at", it.toString()) },
+            parse = { kotlinx.serialization.json.Json.decodeFromString<List<QuranReciterSource>>(it) },
+        )
+    }
+    private suspend fun loadCatalog(forceRefresh: Boolean): List<QuranReciterSource> =
+        catalogCache.load(forceRefresh) {
+            kotlinx.serialization.json.Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(QuranReciterSource.serializer()), IosReciterCatalog.fetch())
+        }
+    override suspend fun catalog(): List<QuranReciterSource> = loadCatalog(false)
+    override suspend fun refreshCatalog(): List<QuranReciterSource> = loadCatalog(true)
     override suspend fun download(source: QuranReciterSource, onCompleted: (Int, Int) -> Unit) {
         val expected = source.availableSurahs.size
         val completed = withContext(Dispatchers.Default) {

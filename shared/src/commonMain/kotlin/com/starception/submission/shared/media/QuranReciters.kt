@@ -8,6 +8,7 @@ interface ReciterLibrary {
         else source?.urlForSurah(surahNumber) ?: previewUrl(null)
     fun createPreviewPlayer(): ReciterPreviewPlayback? = null
     suspend fun catalog(): List<QuranReciterSource>
+    suspend fun refreshCatalog(): List<QuranReciterSource> = catalog()
     suspend fun download(source: QuranReciterSource, onCompleted: (Int, Int) -> Unit)
     suspend fun offline(catalog: List<QuranReciterSource>): List<QuranReciterSource> = catalog.filter { count(it) > 0 }
     fun count(source: QuranReciterSource): Int
