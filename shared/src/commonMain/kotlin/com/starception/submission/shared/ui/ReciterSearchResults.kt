@@ -33,13 +33,18 @@ internal fun ReciterSearchResults(query: String) {
         }
     }
     val matches = remember(query, catalog) {
-        if (query.trim().length < 2) emptyList() else catalog.filter { matchesQuranReciterSearch(it, query) }.take(8)
+        if (query.trim().length < 2) emptyList() else
+            com.starception.submission.feature.quran.distinctReciterRecordings(catalog,
+                id = { it.id }, name = { it.displayName }, server = { it.baseUrl },
+                style = { it.riwaya }, surahs = { it.availableSurahs })
+                .filter { matchesQuranReciterSearch(it, query) }.take(8)
     }
     if (matches.isNotEmpty()) {
         Text("RECITERS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(vertical = 12.dp))
         matches.forEach { source ->
             ListItem(headlineContent = { Text(source.displayName) },
+                leadingContent = { com.starception.submission.feature.quran.ReciterAvatar(source.displayName) },
                 supportingContent = { Text("${source.riwaya} · ${source.availableSurahs.size} surahs · Download audio") },
                 modifier = Modifier.clickable { focus.clearFocus(); opened = source })
         }

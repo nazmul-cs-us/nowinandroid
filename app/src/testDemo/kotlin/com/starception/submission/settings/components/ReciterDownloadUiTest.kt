@@ -48,6 +48,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, qualifiers = "w320dp-h640dp", sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 class ReciterDownloadUiTest {
     @get:Rule val compose = createComposeRule()
 
@@ -62,6 +63,9 @@ class ReciterDownloadUiTest {
         var selections = 0
         val height = mutableStateOf(480.dp)
         compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
             MaterialTheme {
                 Surface {
                     ReciterStorageSection(initiallyExpanded = true, manageDownloads = false,
@@ -78,6 +82,7 @@ class ReciterDownloadUiTest {
         compose.runOnIdle { height.value = 220.dp }
         compose.onNodeWithTag("reciter-list").performScrollToNode(hasText("Abdul Basit Abdul Samad"))
         compose.onNodeWithText("Search reciters").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Portrait of Abdul Basit Abdul Samad", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("Abdul Basit Abdul Samad").assertIsDisplayed().performClick()
         assertEquals(1, selections)
         assertEquals("1-2", com.starception.submission.feature.quran.ReciterSelectionStore(context).current().id)
@@ -99,7 +104,11 @@ class ReciterDownloadUiTest {
             directory.mkdirs()
             File(directory, "001.mp3").writeText("audio")
             File(directory, "002.mp3").writeText("audio")
-            compose.setContent { MaterialTheme { Surface {
+            compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
+            MaterialTheme { Surface {
                 if (showPicker.value) ReciterStorageSection(initiallyExpanded = true, manageDownloads = false)
                 else ReciterStorageSection()
             } } }
@@ -138,7 +147,11 @@ class ReciterDownloadUiTest {
                 {"id":1,"name":"Abdul Basit Abdul Samad","moshaf":[{"id":2,"name":"Hafs - Murattal","server":"https://example.org/basit/","surah_list":"1,2"}]},
                 {"id":3,"name":"Maher Al-Muaiqly","moshaf":[{"id":3,"name":"Hafs - Murattal","server":"https://example.org/maher/","surah_list":"1,2"}]}
             ]}""").commit()
-        compose.setContent { MaterialTheme { Surface { ReciterStorageSection() } } }
+        compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
+            MaterialTheme { Surface { ReciterStorageSection() } } }
         compose.onNodeWithTag("reciter-list").assertDoesNotExist()
         compose.onNodeWithText("Quran recitations").performClick()
         compose.waitUntil(5_000) {
@@ -166,6 +179,9 @@ class ReciterDownloadUiTest {
         var retried = 0
         var removed = 0
         compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
             MaterialTheme {
                 CompositionLocalProvider(LocalDensity provides Density(1f, 1.6f)) {
                     Surface(Modifier.fillMaxSize()) {
@@ -196,6 +212,9 @@ class ReciterDownloadUiTest {
         val reciter = ReciterCatalog.Reciter("54-54", "Abdul Rahman Al-Sudais",
             "https://example.org/", setOf(1, 2), "Hafs")
         compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
             MaterialTheme {
                 ReciterLibraryRow(reciter, DownloadStatus(totalSurahs = 2), false, false,
                     onSelect = { selections++ },
@@ -227,6 +246,9 @@ class ReciterDownloadUiTest {
         var selections = 0
         var previews = 0
         compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(Modifier.fillMaxSize()) {
                     Column {
@@ -253,6 +275,9 @@ class ReciterDownloadUiTest {
             required = false, isComplete = false, isDownloading = true, progress = .25f))
         var downloads = 0
         compose.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
+                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
+            }
             MaterialTheme {
                 Surface { ContentCategoryRow(state.value, { downloads++ }, null) }
             }

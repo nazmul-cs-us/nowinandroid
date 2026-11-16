@@ -145,8 +145,11 @@ internal fun ReciterSettingsSection(
     val all = (catalog + offlineCatalog).distinctBy { it.id }
     val completedIds = all.filter { it.availableSurahs.isNotEmpty() &&
         (storage[it.id]?.first ?: 0) >= it.availableSurahs.size }.mapTo(mutableSetOf()) { it.id }
-    val filtered = remember(all, completedIds, surahNumber, query, group, selected) {
-        all.filter { (surahNumber == null || surahNumber in it.availableSurahs) &&
+    val filtered = remember(all, completedIds, storage, surahNumber, query, group, selected) {
+        com.starception.submission.feature.quran.distinctReciterRecordings(all,
+            id = { it.id }, name = { it.displayName }, server = { it.baseUrl }, style = { it.riwaya }, surahs = { it.availableSurahs },
+            selectedId = selected, downloadedIds = storage.filterValues { it.first > 0 }.keys)
+            .filter { (surahNumber == null || surahNumber in it.availableSurahs) &&
             (group == null || reciterGroup(it.displayName) == group) && matchesQuranReciterSearch(it, query) }
             .sortedWith(compareByDescending<QuranReciterSource> { it.id in completedIds }
                 .thenByDescending { it.id == selected }.thenBy { it.displayName })
@@ -281,7 +284,7 @@ internal fun ReciterLibraryRow(
                 Row(Modifier.weight(1f).selectable(selected, role = Role.RadioButton, onClick = onSelect)
                     .padding(start = 14.dp, top = 14.dp, bottom = 14.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    RadioButton(selected, onClick = null, modifier = Modifier.size(24.dp))
+                    com.starception.submission.feature.quran.ReciterAvatar(reciter.displayName)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(reciter.displayName, style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)

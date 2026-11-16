@@ -233,8 +233,11 @@ private fun ReciterBrowser(
             }.map(ReciterCatalog.Reciter::id).toSet()
         }
     }
-    val filtered = remember(allReciters, completedIds, surahNumber, query, group, selection.id) {
-        allReciters.filter { (surahNumber == null || surahNumber in it.surahs) &&
+    val filtered = remember(allReciters, completedIds, offlineReciters, surahNumber, query, group, selection.id) {
+        com.starception.submission.feature.quran.distinctReciterRecordings(allReciters,
+            id = { it.id }, name = { it.name }, server = { it.server }, style = { it.riwaya }, surahs = { it.surahs },
+            selectedId = selection.id, downloadedIds = offlineReciters.mapTo(mutableSetOf()) { it.id })
+            .filter { (surahNumber == null || surahNumber in it.surahs) &&
             (group == null || reciterGroup(it.name) == group) && ReciterCatalog.matchesSearch(it, query) }
             .sortedWith(compareByDescending<ReciterCatalog.Reciter> { it.id in completedIds }
                 .thenByDescending { it.id == selection.id }
@@ -389,7 +392,7 @@ internal fun ReciterLibraryRow(
                 Row(Modifier.weight(1f).selectable(selected, role = Role.RadioButton, onClick = onSelect)
                     .padding(start = 14.dp, top = 14.dp, bottom = 14.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    RadioButton(selected, onClick = null, modifier = Modifier.size(24.dp))
+                    com.starception.submission.feature.quran.ReciterAvatar(reciter.name)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(reciter.name, style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)

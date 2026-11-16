@@ -2,13 +2,13 @@ package com.starception.submission.feature.quran
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -17,6 +17,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import com.starception.submission.core.images.reciterPortrait
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -59,14 +62,7 @@ fun ReciterChoiceRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (onPreview != null) {
-                ReciterPreviewButton(name, onPreview, previewing, previewLoading, enabled)
-            } else Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Headphones, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                }
-            }
+            ReciterAvatar(name)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(name, style = MaterialTheme.typography.titleSmall,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -75,6 +71,7 @@ fun ReciterChoiceRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
+            if (onPreview != null) ReciterPreviewButton(name, onPreview, previewing, previewLoading, enabled)
             RadioButton(selected = selected, onClick = null, enabled = enabled,
                 modifier = Modifier.size(24.dp))
         }
@@ -99,6 +96,22 @@ fun ReciterPreviewButton(
         } else {
             Icon(if (previewing) Icons.Filled.Stop else Icons.Filled.PlayArrow,
                 contentDescription = null)
+        }
+    }
+}
+
+/** A real portrait where verified; initials make missing coverage explicit without an unrelated face. */
+@Composable
+fun ReciterAvatar(name: String, modifier: Modifier = Modifier) {
+    val portrait = reciterPortrait(name)
+    Surface(modifier.size(48.dp).clip(CircleShape), shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer) {
+        if (portrait != null) Image(portrait, contentDescription = "Portrait of $name",
+            modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(name.split(' ', '-').filter(String::isNotBlank).take(2)
+                .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString(""),
+                style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
         }
     }
 }

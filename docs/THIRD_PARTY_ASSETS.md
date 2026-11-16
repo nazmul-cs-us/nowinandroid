@@ -117,3 +117,33 @@ record's license and image digest before rebuilding. Review the complete source 
 before setting `reviewed: true`; category or keyword matching alone is insufficient.
 There is no automatic image-classification or religious-compliance claim. No Getty
 endorsement is implied.
+
+## Reciter identification portraits
+
+The compact reciter portraits come from Quran.com's public frontend image set,
+[pinned revision aff1a035b09b66f28047b3216edcae4c5c949a49](https://github.com/quran/quran.com-frontend-next/tree/aff1a035b09b66f28047b3216edcae4c5c949a49/public/images/reciters).
+They are identification photos, separate from Home's reviewed artwork feed.
+Source credit: Quran.com / Quran Foundation. The source repository does not supply
+individual photographer credits or per-image license metadata; these photos are
+not designated CC0/public domain by Deenly.
+
+| Reciter | Source file | Bundled resource |
+| --- | --- | --- |
+| Abdul Basit Abdul Samad | `1.jpg` | `reciter_abdul_basit.webp` |
+| Abdul Rahman Al-Sudais | `3.jpeg` | `reciter_sudais.webp` |
+| Mahmoud Khalil Al-Husary | `6.jpg` | `reciter_husary.webp` |
+| Mishary Rashid Al-Alafasy | `7.jpg` | `reciter_alafasy.webp` |
+| Muhammad Siddiq Al-Minshawi | `9.jpg` | `reciter_minshawi.webp` |
+| Saud Al-Shuraim | `10.jpg` | `reciter_shuraim.webp` |
+| Maher Al-Muaiqly | `12.jpg` | `reciter_maher.webp` |
+
+Images are resized proportionally to a maximum of 192 pixels and compressed to
+WebP (quality 85). They ship in `core/images` for offline Android/iOS use.
+Explicit name aliases select portraits; unmatched names display initials rather
+than an unrelated person's photo.
+
+Selection lists remove repeated IDs and equivalent recordings (same person,
+server, style and surah coverage). Different riwayat/styles or recording servers
+remain selectable. Existing selected/downloaded IDs remain accessible; deduplication
+never deletes audio. The bundled Alafasy default and MP3Quran recordings are
+separate audio sources, labelled as default versus the catalog's recording style.
