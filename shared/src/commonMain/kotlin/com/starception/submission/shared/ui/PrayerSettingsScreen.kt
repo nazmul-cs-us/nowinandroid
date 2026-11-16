@@ -156,6 +156,8 @@ fun PrayerSettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    com.starception.submission.settings.components.AppGuideSettings()
+
                     SettingsGroupLabel("Prayer & personalization")
 
                     SettingsSection(

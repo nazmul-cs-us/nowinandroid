@@ -1488,6 +1488,8 @@ internal fun SwipeableBigTiles(
     } else {
         rememberSaveable { mutableStateOf(persistedExpandedPage) }
     }
+    com.starception.submission.settings.components.AppGuideRecordVisit(
+        com.starception.submission.settings.components.GuideSection.READING, expandedLogicalPage == 2)
     var expansionExtent by if (immersiveHome) {
         remember { mutableFloatStateOf(0f) }
     } else {

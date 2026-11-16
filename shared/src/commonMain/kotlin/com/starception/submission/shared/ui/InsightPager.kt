@@ -298,6 +298,8 @@ fun InsightPager(
     } else {
         null
     }
+    com.starception.submission.settings.components.AppGuideRecordVisit(
+        com.starception.submission.settings.components.GuideSection.READING, expandedLogicalPage == 2)
     LaunchedEffect(collapseExpanded) {
         if (collapseExpanded) {
             isAutomaticallySized = true

@@ -255,6 +255,7 @@ fun NiaApp(
             appState.navigateToTopLevelDestination(TopLevelDestination.HOME)
     }
     val familyOwnsAudio by com.starception.submission.family.FamilyAudioSession.state.collectAsStateWithLifecycle()
+    val guideCallActive = familyClient?.state?.collectAsStateWithLifecycle()?.value?.call != null
     LaunchedEffect(familyOwnsAudio) {
         if (familyOwnsAudio && mainViewModel?.globalMedia?.controllerState?.value?.playback?.isPlaying == true) {
             mainViewModel.globalMedia.pause()
@@ -302,6 +303,7 @@ fun NiaApp(
             // NiaMainContent) rather than as a bottom snackbar.
 
             CompositionLocalProvider(
+                com.starception.submission.settings.components.LocalAppGuideEnabled provides (!guideCallActive && !familyOwnsAudio && !showProfileSheet && pendingCountrySwitch == null),
                 LocalProfileClick provides { showProfileSheet = true },
                 LocalProfileAvatarUrl provides (authUiState as? AuthUiState.LoggedIn)?.avatarUrl,
             ) {
@@ -317,6 +319,19 @@ fun NiaApp(
                     familySignedIn = familyClient?.state?.collectAsStateWithLifecycle()?.value?.let { it.connected || it.reconnecting } == true,
                 )
             }
+
+            val guideDestination = appState.currentDestination
+            val guideSection = when {
+                guideDestination?.hasRoute<com.starception.submission.feature.surah.navigation.SurahRoute>() == true -> com.starception.submission.settings.components.GuideSection.READING
+                guideDestination?.hasRoute<com.starception.submission.settings.navigation.SettingsRoute>() == true -> com.starception.submission.settings.components.GuideSection.SETTINGS
+                guideDestination?.hasRoute<com.starception.submission.feature.search.navigation.SearchRoute>() == true -> com.starception.submission.settings.components.GuideSection.SEARCH
+                selectedDestination == TopLevelDestination.HOME -> com.starception.submission.settings.components.GuideSection.HOME
+                selectedDestination == TopLevelDestination.BOOKMARKS -> com.starception.submission.settings.components.GuideSection.SAVED
+                selectedDestination == TopLevelDestination.FAMILY -> com.starception.submission.settings.components.GuideSection.FAMILY
+                else -> null
+            }
+            com.starception.submission.settings.components.AppGuideHost(guideSection,
+                enabled = !showProfileSheet && pendingCountrySwitch == null && !familyOwnsAudio && !guideCallActive)
 
             if (showProfileSheet) {
                 ProfileSheet(

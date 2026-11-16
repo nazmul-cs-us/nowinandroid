@@ -75,6 +75,7 @@ struct FamilyView: View {
     @State private var account = ""
     @State private var password = ""
     #endif
+    @State private var showGuideTip = false
     @State private var invitation = ""
     @State private var search = ""
     @State private var passwordVisible = false
@@ -161,7 +162,39 @@ struct FamilyView: View {
         .sheet(isPresented: $inbox) { notificationInbox }
         .sheet(isPresented: $settings) { familySettings }
         .refreshable { store.refresh() }
-        .onAppear { suggestPeer(); NativeAppearanceBridge.shared.update(owner: 7, lightIcons: store.signedIn || colorScheme == .dark) }
+        .overlay(alignment: .bottom) {
+            if showGuideTip && store.chatPeer == nil && store.call == nil {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Image(systemName: "heart").foregroundStyle(colors.accent)
+                        Text("Family").font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Button { showGuideTip = false } label: {
+                            Image(systemName: "xmark").font(.system(size: 14)).frame(width: 40, height: 40)
+                        }.accessibilityLabel("Dismiss tip")
+                    }
+                    Text("Accept a family invitation before starting a chat or call.")
+                        .font(.subheadline).foregroundStyle(colors.muted)
+                    HStack { Spacer(); Button("Got it") { showGuideTip = false }.font(.subheadline.weight(.medium)) }
+                }
+                .padding(16).foregroundStyle(colors.ink).tint(colors.accent)
+                .background(colors.panel, in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(colors.muted.opacity(0.2)))
+                .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+                .frame(maxWidth: 460).padding(.horizontal, 16).padding(.bottom, 96)
+            }
+        }
+        .onDisappear { showGuideTip = false }
+        .onChange(of: store.call?.id) { _ in showGuideTip = false }
+        .onAppear {
+            let defaults = UserDefaults.standard
+            let firstVisit = !defaults.bool(forKey: "deenly_guide_visited_FAMILY")
+            defaults.set(true, forKey: "deenly_guide_visited_FAMILY")
+            let enabled = defaults.object(forKey: "deenly_guide_tips_enabled") == nil || defaults.bool(forKey: "deenly_guide_tips_enabled")
+            showGuideTip = firstVisit && !defaults.bool(forKey: "deenly_guide_tip_seen_FAMILY") && enabled && store.call == nil
+            if showGuideTip { defaults.set(true, forKey: "deenly_guide_tip_seen_FAMILY") }
+            suggestPeer(); NativeAppearanceBridge.shared.update(owner: 7, lightIcons: store.signedIn || colorScheme == .dark)
+        }
         .onChange(of: colorScheme) { _ in NativeAppearanceBridge.shared.update(owner: 7, lightIcons: store.signedIn || colorScheme == .dark) }
         .onChange(of: store.me) { _ in suggestPeer() }
         .onChange(of: store.signedIn) { connected in

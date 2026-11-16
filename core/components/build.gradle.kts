@@ -47,6 +47,7 @@ kotlin {
             api(compose.materialIconsExtended)
             api(libs.cupertino.adaptive)
             implementation(compose.components.uiToolingPreview)
+            implementation(libs.compose.lifecycle.runtimeCompose)
         }
     }
 }

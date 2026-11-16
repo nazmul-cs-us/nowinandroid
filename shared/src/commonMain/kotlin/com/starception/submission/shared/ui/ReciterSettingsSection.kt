@@ -92,6 +92,7 @@ internal fun ReciterSettingsSection(
         ReciterStorageEntry(manageDownloads, surahNumber, onSelected, initiallyShowLibrary)
         return
     }
+    com.starception.submission.settings.components.AppGuideHost(com.starception.submission.settings.components.GuideSection.RECITERS)
     val library = QuranReciterLibrary.platform ?: return
     val preview = rememberReciterPreview(library)
     val preferences = remember { QuranReciterPreferences() }

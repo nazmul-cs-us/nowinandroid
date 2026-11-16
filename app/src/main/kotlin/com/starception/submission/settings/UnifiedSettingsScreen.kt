@@ -276,6 +276,8 @@ fun UnifiedSettingsScreen(
                         )
                     }
 
+                    item { com.starception.submission.settings.components.AppGuideSettings() }
+
                     item { SettingsGroupLabel("Prayer & personalization") }
 
                     // Appearance Section

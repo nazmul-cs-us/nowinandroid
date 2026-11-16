@@ -173,6 +173,7 @@ private fun ReciterBrowser(
     onPreviewStart: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    com.starception.submission.settings.components.AppGuideHost(com.starception.submission.settings.components.GuideSection.RECITERS)
     val context = LocalContext.current
     val manager = remember(context) { ReciterDownloadManager.get(context.applicationContext) }
     val revision by manager.changes.collectAsStateWithLifecycle()

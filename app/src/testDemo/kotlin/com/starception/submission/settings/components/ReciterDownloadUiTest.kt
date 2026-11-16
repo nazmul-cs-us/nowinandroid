@@ -51,6 +51,10 @@ import java.io.File
 @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 class ReciterDownloadUiTest {
     @get:Rule val compose = createComposeRule()
+    @org.junit.Before fun disableUnrelatedFirstUseTips() {
+        ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("deenly_app_guide", Context.MODE_PRIVATE)
+            .edit().putBoolean("tips_enabled", false).commit()
+    }
 
     @Test fun cachedPickerRemainsSelectableInAShortViewportWhileOffline() {
         val context = ApplicationProvider.getApplicationContext<Context>()
