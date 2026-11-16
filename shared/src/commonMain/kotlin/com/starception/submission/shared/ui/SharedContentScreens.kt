@@ -6029,12 +6029,11 @@ private fun TopLevelScaffold(
                 val effectiveGridState = gridState ?: rememberLazyGridState()
                 Column(
                     modifier = Modifier
-                        .widthIn(max = if (expandedPane != null) 1200.dp else 1100.dp)
                         .fillMaxSize()
                         .align(Alignment.TopCenter)
                         .safeDrawingPadding()
                         .padding(
-                            start = if (useSideRail) 80.dp else 16.dp,
+                            start = if (useSideRail && LocalShowBottomNavigation.current) 80.dp else 16.dp,
                             end = 16.dp,
                         )
                         // Match the home column's breathing room above the header so

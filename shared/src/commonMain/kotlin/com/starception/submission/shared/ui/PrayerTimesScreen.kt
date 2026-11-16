@@ -495,6 +495,7 @@ fun PrayerTimesScreen(
                 // Match Android: the floating bottom pill in portrait, the side
                 // rail only in landscape two-pane layouts.
                 val useSideNavigation = useTwoPaneLayout
+                val sideNavigationVisible = useSideNavigation && LocalShowBottomNavigation.current
                 // iOS has taller status/navigation safe areas than Android. Reserving
                 // their measured space keeps the location card above the floating bar.
                 val portraitInsightHeight = if (isTablet) {
@@ -525,7 +526,8 @@ fun PrayerTimesScreen(
                 val paneContentHeight = layoutHeight - 150.dp
                 // The hero pane is 5/11 of the row; keep the card's 288/250
                 // aspect instead of stretching it to an arbitrary height.
-                val heroPaneWidth = (maxWidth - 124.dp) * (5f / 11f)
+                val dashboardStartInset = if (sideNavigationVisible) 80.dp else 24.dp
+                val heroPaneWidth = (maxWidth - dashboardStartInset - 24.dp - 20.dp) * (5f / 11f)
                 val landscapeInsightHeight = if (isTablet) {
                     minOf(
                         // Pane minus the "Insights" title row (44), location
@@ -656,8 +658,9 @@ fun PrayerTimesScreen(
                     )
                 }
                 Box(
+                    // Dashboards use the available tablet/Mac window; the
+                    // child panes handle their own readable card dimensions.
                     modifier = Modifier
-                        .widthIn(max = 1200.dp)
                         .fillMaxSize()
                         .align(Alignment.TopCenter)
                         .onGloballyPositioned { backdropTopInWindow.floatValue = it.positionInWindow().y }
@@ -724,7 +727,7 @@ fun PrayerTimesScreen(
                                 // Phone feed shading paints before its own
                                 // gutters, like Android. Tablet/rail layouts
                                 // retain their existing outer content margins.
-                                start = if (useSideNavigation) 80.dp else if (isPhoneHome) 0.dp else 24.dp,
+                                start = if (sideNavigationVisible) 80.dp else if (isPhoneHome) 0.dp else 24.dp,
                                 end = if (isPhoneHome) 0.dp else 24.dp,
                             )
                             .padding(top = if (isPhoneHome) homeTopGap else 8.dp),
@@ -780,7 +783,7 @@ fun PrayerTimesScreen(
                                             landscapeInsightHeight,
                                             true,
                                             if (isTablet) {
-                                                if (isInsightImmersive) 720.dp else 520.dp
+                                                if (isInsightImmersive) 720.dp else heroPaneWidth
                                             } else {
                                                 null
                                             },

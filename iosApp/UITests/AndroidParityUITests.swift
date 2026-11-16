@@ -20,6 +20,28 @@ final class AndroidParityUITests: XCTestCase {
         add(image)
     }
 
+    func testHomeUsesTheAvailableWideWindow() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        let profile = app.buttons["Open local profile"]
+        let settings = app.buttons["Prayer settings"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        let window = app.windows.firstMatch.frame
+        guard window.width >= 1300 else {
+            throw XCTSkip("Run on a landscape iPad or Mac window at least 1300 points wide.")
+        }
+        // Allow the side-navigation gutter and ordinary safe-area/panel padding.
+        // A centered 1200-point dashboard fails this on a wide window.
+        XCTAssertGreaterThan(settings.frame.maxX - profile.frame.minX, window.width - 180,
+                             "Home should expand with its window instead of staying in a centered column.")
+        let image = XCTAttachment(screenshot: app.screenshot())
+        image.name = "Home wide window"
+        image.lifetime = .keepAlways
+        add(image)
+    }
+
     func testFamilyIsReachableFromTheNativeTabBar() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -72,6 +72,15 @@ provide the iPhone motion sensors or compass; posture recording and compass
 heading need to handle unavailable hardware. Live Activities are subject to
 the host's availability checks.
 
+Home and the shared top-level tabs fill the available window, with safe-area
+and navigation gutters. Home's two dashboard panes scale with the window;
+article/detail readers retain their reading-width limits. Check a landscape
+iPad and a Mac window wider than 1300 points when changing this layout.
+`AndroidParityUITests.testHomeUsesTheAvailableWideWindow` checks that the Home
+header spans the window instead of remaining inside the old 1200-point cap.
+Run this test on a wide landscape iPad simulator or a supported Mac test host;
+smaller windows skip the check.
+
 For distribution, upload the signed iOS archive and enable Apple Silicon Mac
 availability under **Pricing and Availability → iPhone and iPad Apps on Apple
 Silicon Macs** in App Store Connect. This account setting must be checked
