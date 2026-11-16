@@ -1,0 +1,559 @@
+{
+  "sources": {
+    "MP3Quran-V2": {
+      "url": "https://github.com/abodehq/MP3Quran-V2",
+      "commit": "db5c37e60dc189d2d7e151911f2da07442baafb1",
+      "identity": "assets/book_db reciters_translation Arabic/English labels joined to reciters.image",
+      "terms": "FREE ISLAMIC APPS ONLY"
+    },
+    "quran-app-reciters": {
+      "url": "https://github.com/abdoul-so/quran-app-reciters",
+      "commit": "2f1e46477916abb5386276bb41dd7b3371f1ddd2",
+      "identity": "named source filenames",
+      "terms": "MIT"
+    }
+  },
+  "portraits": [
+    {
+      "key": "catalog-6",
+      "names": [
+        "Ahmad Al-Hawashi",
+        "أحمد الحواشي",
+        "احمد الحواشي",
+        "Ahmad al hawashi"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter16.jpg",
+      "resource": "reciter_catalog_6.webp",
+      "sha256": "3a86087fcb4b3910614df9e56f8c048e184ba57d28ee6e5a0cbfb0bb6e5b4845"
+    },
+    {
+      "key": "catalog-9",
+      "names": [
+        "Ahmad Nauina",
+        "أحمد نعينع",
+        "أحمد نعينع",
+        "Ahmad Nauina"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter17.jpg",
+      "resource": "reciter_catalog_9.webp",
+      "sha256": "e0e24705c800dcd3e3f1d15bc9f6b297518512f18ea5c1fb724cbbfb58d9a7c2"
+    },
+    {
+      "key": "catalog-10",
+      "names": [
+        "Akram Alalaqmi",
+        "أكرم العلاقمي",
+        "أكرم العلاقمي",
+        "Akram Alalaqmi"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter18.jpg",
+      "resource": "reciter_catalog_10.webp",
+      "sha256": "93256c45d7f8158a726ac64d795c0b20c792034b0452e6afffbf36a778f61663"
+    },
+    {
+      "key": "catalog-17",
+      "names": [
+        "Tawfeeq As-Sayegh",
+        "توفيق الصايغ",
+        "توفيق الصايغ ",
+        "Tawfeeq As Sayegh"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter46.jpg",
+      "resource": "reciter_catalog_17.webp",
+      "sha256": "f49a749ab0e9bccc0afbcd33df05b972b0a59299c65baf3d02a1a026a9878e88"
+    },
+    {
+      "key": "catalog-21",
+      "names": [
+        "Khaled Al-Qahtani",
+        "خالد القحطاني",
+        "خالد القحطاني",
+        "Khaled Al Qahtani"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter28.jpg",
+      "resource": "reciter_catalog_21.webp",
+      "sha256": "f9476277cf2b15e9739c3ec51e687232615436ea501e81295c3095a4fe4137fd"
+    },
+    {
+      "key": "catalog-30",
+      "names": [
+        "Saad Al-Ghamdi",
+        "سعد الغامدي",
+        "سعد الغامدي",
+        "Saad alghamdy"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter9.jpg",
+      "resource": "reciter_catalog_30.webp",
+      "sha256": "6117c73466b8b96cb04ab022938741abb7bdecadb34018865b88b1a375827868"
+    },
+    {
+      "key": "shuraim",
+      "names": [
+        "Saud Al-Shuraim",
+        "سعود الشريم",
+        "سعود الشريم",
+        "Soud el shreem"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter3.jpg",
+      "resource": "reciter_shuraim.webp",
+      "sha256": "7f053fb1f257a03e29af40f381e14ac7e306c9c69f2133899c6844d186d83970"
+    },
+    {
+      "key": "catalog-32",
+      "names": [
+        "Sahl Yassin",
+        "سهل ياسين",
+        "سهل ياسين",
+        "Sahil yassin"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter39.jpg",
+      "resource": "reciter_catalog_32.webp",
+      "sha256": "68bb999b22f7ca71da18ddf3d0f7fc626cbe7b2052d8d841f25e6d215ceaa33c"
+    },
+    {
+      "key": "catalog-33",
+      "names": [
+        "Zaki Daghistani",
+        "زكي داغستاني",
+        "زكي داغستاني",
+        "Zaki daghistani"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter38.jpg",
+      "resource": "reciter_catalog_33.webp",
+      "sha256": "4a44d69abb381a2b120de079bfb7d5b9947a5ce7f0e76397933c5ddff5657396"
+    },
+    {
+      "key": "catalog-39",
+      "names": [
+        "Saber Abdulhakm",
+        "صابر عبدالحكم",
+        "صابر عبد الحكم",
+        "Saber abdul hakam"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter20.jpg",
+      "resource": "reciter_catalog_39.webp",
+      "sha256": "2fc6a0b64d0abdaeb1bbe9c35302d7f013970815326c499209a3b74559639dbf"
+    },
+    {
+      "key": "catalog-43",
+      "names": [
+        "Salah Albudair",
+        "صلاح البدير",
+        "صلاح البدير",
+        "Salah al budair"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter21.jpg",
+      "resource": "reciter_catalog_43.webp",
+      "sha256": "ece5fb92d6ff8a18a75f16d075d132c8ca914a0ee3e7a08747fa6b009d61e0cc"
+    },
+    {
+      "key": "catalog-44",
+      "names": [
+        "Salah Alhashim",
+        "صلاح الهاشم",
+        "صلاح الهاشم",
+        "Salah Al Hashem"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter40.jpg",
+      "resource": "reciter_catalog_44.webp",
+      "sha256": "2239b08ef0d1cbd2cd220565f9f417be764c0723303967853e27c31501246d92"
+    },
+    {
+      "key": "catalog-46",
+      "names": [
+        "Slaah Bukhatir",
+        "صلاح بو خاطر",
+        "صلاح بو خاطر",
+        "Salah bu khater"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter1.jpg",
+      "resource": "reciter_catalog_46.webp",
+      "sha256": "e25a31d5ba5adc107e7b462e6ad5638f6086220eba02ab6b1f5aa32d7c6c543a"
+    },
+    {
+      "key": "catalog-48",
+      "names": [
+        "Adel Ryyan",
+        "عادل ريان",
+        "عادل ريان",
+        "Adel rayan"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter42.jpg",
+      "resource": "reciter_catalog_48.webp",
+      "sha256": "d0faa297408625eacee7002828e6cfc3d79337ed8ec00ccb9d2185aff1f50df1"
+    },
+    {
+      "key": "catalog-49",
+      "names": [
+        "Abdelbari Al-Toubayti",
+        "عبدالبارئ الثبيتي",
+        "عبدالبارئ الثبيتي",
+        "Abdul Bari Thobaity"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter41.jpg",
+      "resource": "reciter_catalog_49.webp",
+      "sha256": "51a4e053cb15dd39205e5ff24cbb34028b89420679b0885588e597cbb8ed630e"
+    },
+    {
+      "key": "abdul-basit",
+      "names": [
+        "Abdulbasit Abdulsamad",
+        "عبدالباسط عبدالصمد",
+        "عبد الباسط عبد الصمد",
+        "Abed albase6 abed alsamad"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter4.jpg",
+      "resource": "reciter_abdul_basit.webp",
+      "sha256": "d42d5db09699ab5c32e86d83be6ed4f2ba0ecff32d01a146b246a2f2f9d15ae6"
+    },
+    {
+      "key": "sudais",
+      "names": [
+        "Abdulrahman Alsudaes",
+        "عبدالرحمن السديس",
+        "عبدالرحمن السديس",
+        "Abed alrahman el sudays"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter7.jpg",
+      "resource": "reciter_sudais.webp",
+      "sha256": "33517aa3289d67a98b1e5ffbd952596855949855a53e53d7da3104e7cde5b9fc"
+    },
+    {
+      "key": "catalog-59",
+      "names": [
+        "Abdullah Al-Mattrod",
+        "عبدالله المطرود",
+        "عبدالله المطرود",
+        "AbdAllah Almatroud"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter51.jpg",
+      "resource": "reciter_catalog_59.webp",
+      "sha256": "ce87c90bdb97880bcac36a0387a98e60e046d9f0a4f43c08f7234d96451c89b0"
+    },
+    {
+      "key": "catalog-64",
+      "names": [
+        "Abdulrasheed Soufi",
+        "عبدالرشيد صوفي",
+        "عبد الرشيد صوفي",
+        "Abdul rashid sufi"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter22.jpg",
+      "resource": "reciter_catalog_64.webp",
+      "sha256": "962d344cab2c3ffdcb334ecd8d5e8dfc3f093c090381e2f1bb853b2bdca34fc1"
+    },
+    {
+      "key": "catalog-81",
+      "names": [
+        "Fares Abbad",
+        "فارس عباد",
+        "فارس عباد",
+        "Fares abbad"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter11.jpg",
+      "resource": "reciter_catalog_81.webp",
+      "sha256": "c39e753499737fb26081e12e57e760a70adcc1dece4adb5489433b5a4988d5b4"
+    },
+    {
+      "key": "catalog-86",
+      "names": [
+        "Nasser Alqatami",
+        "ناصر القطامي",
+        "ناصر القطامي",
+        "Nasser Al Qatami"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter44.jpg",
+      "resource": "reciter_catalog_86.webp",
+      "sha256": "1ad06f171c488acc3471e3359865978c6630c797b62097b224d6551706d0bf0c"
+    },
+    {
+      "key": "catalog-87",
+      "names": [
+        "Nabil Al Rifay",
+        "نبيل الرفاعي",
+        "نبيل الرفاعي",
+        "Nabil ar rifai"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter23.jpg",
+      "resource": "reciter_catalog_87.webp",
+      "sha256": "836868681432d82c4f7d38eef8e1e0854e3663ba66e47c43858403f7292c27b4"
+    },
+    {
+      "key": "hani-rifai",
+      "names": [
+        "Hani Arrifai",
+        "هاني الرفاعي",
+        "هاني الرفاعي",
+        "Hani ar rifai"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter29.jpg",
+      "resource": "reciter_hani_rifai.webp",
+      "sha256": "98d865bece7908e59ea7aacccf6843c2cc8b0ab4298e372bd7dc63aea24f6635"
+    },
+    {
+      "key": "catalog-92",
+      "names": [
+        "Yasser Al-Dosari",
+        "ياسر الدوسري",
+        "ياسر الدوسري",
+        "Yasser al dosari"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter10.jpg",
+      "resource": "reciter_catalog_92.webp",
+      "sha256": "ab09a4d749cafc44a5eb000b058cb86a2214e362d5af075a411f9499bd961d3d"
+    },
+    {
+      "key": "maher",
+      "names": [
+        "Maher Al Meaqli",
+        "ماهر المعيقلي",
+        "ماهر المعيقلي",
+        "Mahir Al Muayqali"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter12.jpg",
+      "resource": "reciter_maher.webp",
+      "sha256": "9e4cc00e1f7ca0edc25f7923a4dd885d8ee6e2bb9816f10654f231975b8fb796"
+    },
+    {
+      "key": "catalog-106",
+      "names": [
+        "Mohammad Al-Tablaway",
+        "محمد الطبلاوي",
+        "محمد الطبلاوي",
+        "Mohamed Tablawi"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter43.jpg",
+      "resource": "reciter_catalog_106.webp",
+      "sha256": "1d5b81c037e79d4aa219138053a29029c18ffdc08335cec400141434ebb935d7"
+    },
+    {
+      "key": "catalog-115",
+      "names": [
+        "Mohammad Abdullkarem",
+        "محمد عبدالكريم",
+        "محمد عبدالكريم",
+        "Muhammad Abdul Kareem"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter33.jpg",
+      "resource": "reciter_catalog_115.webp",
+      "sha256": "622225d3250de1e6fd5b8b0043c49409e5b00e984a3d0d8a186448284130e22d"
+    },
+    {
+      "key": "catalog-121",
+      "names": [
+        "Mahmoud Ali  Albanna",
+        "محمود علي البنا",
+        "محمود على البنا",
+        "Mahmoud ali albanna"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter25.jpg",
+      "resource": "reciter_catalog_121.webp",
+      "sha256": "da306f04b545ae51f24fe6b2797718b7dc5b016d234dc7d6317991ae1ff6f006"
+    },
+    {
+      "key": "alafasy",
+      "names": [
+        "Mishary Alafasi",
+        "مشاري العفاسي",
+        "مشاري العفاسي",
+        "Mshary el3afasy"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter6.jpg",
+      "resource": "reciter_alafasy.webp",
+      "sha256": "82242b1a407b40c5d0220e5a51a11ffd2336994af4757de0be912462a95a3de1"
+    },
+    {
+      "key": "catalog-126",
+      "names": [
+        "Mustafa Al-Lahoni",
+        "مصطفى اللاهوني",
+        "مصطفى اللاهوني",
+        "Mustafa allahuni"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter31.jpg",
+      "resource": "reciter_catalog_126.webp",
+      "sha256": "fd0d81a26b3b316982d6daa1744f32e0cab3aed97bbeca1e2f9e26000c6e43e9"
+    },
+    {
+      "key": "catalog-129",
+      "names": [
+        "Muftah Alsaltany",
+        "مفتاح السلطني",
+        "مفتاح السلطني",
+        "Moftah Assultany"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter30.jpg",
+      "resource": "reciter_catalog_129.webp",
+      "sha256": "25307f05c3eaa178f82efba541eab1e4e635af392b22d1f56884b072a662ffc6"
+    },
+    {
+      "key": "catalog-151",
+      "names": [
+        "Mahmood AlSheimy",
+        "محمود الشيمي",
+        "محمود الشيمي",
+        "Mahmoud al shaymi"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter32.jpg",
+      "resource": "reciter_catalog_151.webp",
+      "sha256": "b0d5c054718665caf01b2098f9a8a1b89b40a852d77101ea1c0066a7a74e21b7"
+    },
+    {
+      "key": "catalog-161",
+      "names": [
+        "Mousa Bilal",
+        "موسى بلال",
+        "موسى بلال",
+        "Musa Belal"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter53.jpg",
+      "resource": "reciter_catalog_161.webp",
+      "sha256": "f6f0661e63575337d3092a61831181156047c76a7a208713dd409486012b9ccc"
+    },
+    {
+      "key": "catalog-181",
+      "names": [
+        "Jamaan Alosaimi",
+        "جمعان العصيمي",
+        "جمعان العصيمي",
+        "Jamaan Alosaimi"
+      ],
+      "source": "MP3Quran-V2",
+      "file": "reciter47.jpg",
+      "resource": "reciter_catalog_181.webp",
+      "sha256": "93efa1a69d6c0bfbd1514ce6afee50be912b07a361f593b0a0eddb5ce4e65d80"
+    },
+    {
+      "key": "ibrahim-akhdar",
+      "names": [
+        "Ibrahim Al-Akdar",
+        "Ibrahim Al Akhdar",
+        "إبراهيم الأخضر"
+      ],
+      "source": "quran-app-reciters",
+      "file": "ibrahim-al-akhdar.webp",
+      "resource": "reciter_ibrahim_akhdar.webp",
+      "sha256": "668a9a62b6423c07f26f522bd535a1056d8012b1fc57a695a914ea5d1b5bdf37"
+    },
+    {
+      "key": "abdullah-basfar",
+      "names": [
+        "Abdullah Basfer",
+        "Abdullah Basfar",
+        "Abdullah Ibn Ali Basfar",
+        "عبدالله بصفر",
+        "عبد الله بن علي بصفر"
+      ],
+      "source": "quran-app-reciters",
+      "file": "abdullah-basfar.webp",
+      "resource": "reciter_abdullah_basfar.webp",
+      "sha256": "d9857905bd34a14210754cd8f0713e26dba810cf8b777352211cccbcf6d3788c"
+    },
+    {
+      "key": "muhammad-ayyub",
+      "names": [
+        "Mohamed Ayoub",
+        "Mohammed Ayyoub",
+        "Muhammad Ayyub",
+        "محمد أيوب"
+      ],
+      "source": "quran-app-reciters",
+      "file": "mohamed-ayoub.webp",
+      "resource": "reciter_muhammad_ayyub.webp",
+      "sha256": "bbf25a4d5c45489cb1b2ca3e8f062ba7ac5417e7cc9637c2cf70a81bc9937c52"
+    },
+    {
+      "key": "muhammad-jibril",
+      "names": [
+        "Muhammad Jibril",
+        "Mohammed Jibreel",
+        "Muhammad Jibreel",
+        "محمد جبريل"
+      ],
+      "source": "quran-app-reciters",
+      "file": "muhammad-jibril.webp",
+      "resource": "reciter_muhammad_jibril.webp",
+      "sha256": "c996700632c311eaa44e3b7b8ab23e1fb3c89a571033f315dcd857b7a671926e"
+    },
+    {
+      "key": "ayman-suwaid",
+      "names": [
+        "Ayman Suwaid",
+        "Ayman Swed",
+        "أيمن سويد"
+      ],
+      "source": "quran-app-reciters",
+      "file": "ayman-suwaid.webp",
+      "resource": "reciter_ayman_suwaid.webp",
+      "sha256": "f0a8b4bbc5ae93e8dd1db164a64a13e55aeca9b0b4b10da9fcbe4876799de52c"
+    },
+    {
+      "key": "ahmed-hudhaifi",
+      "names": [
+        "Ahmed Ali Al Hudhaifi",
+        "Ahmad Alhuthaifi",
+        "Ahmed Al Hodaifi",
+        "أحمد الحذيفي"
+      ],
+      "source": "quran-app-reciters",
+      "file": "ahmed-ali-al-hudhaifi.webp",
+      "resource": "reciter_ahmed_hudhaifi.webp",
+      "sha256": "b8089754ca28a0a8e3c8393cbf3b5fab5eb88c44c96b002b18a5096955fa432a"
+    },
+    {
+      "key": "shahriar-parhizgar",
+      "names": [
+        "Shahriar Parhizgar",
+        "Shahryar Parhizgar",
+        "شهريار برهيزكار"
+      ],
+      "source": "quran-app-reciters",
+      "file": "shahriar-parhizgar.webp",
+      "resource": "reciter_shahriar_parhizgar.webp",
+      "sha256": "c22ca71a66f058f4a30562b1f787f1d6edf4008e8862bf28abc4f1d593756152"
+    }
+  ],
+  "excluded": [
+    {
+      "file": "reciter35.jpg",
+      "reason": "Arabic and English labels name different people"
+    },
+    {
+      "file": "reciter49.jpg / reciter50.jpg",
+      "reason": "Identical photo bytes assigned to different people"
+    }
+  ]
+}

@@ -1,0 +1,1373 @@
+{
+  "note": "Research snapshot from uthumany/Quran-Fast-Api-json data/quran_reciters.json, not the live app catalog. Eligibility requires actual surah IDs 1..114. Candidate URLs are not used by the app.",
+  "reciters": [
+    {
+      "catalogId": 1,
+      "name": "Ibrahim Al-Akdar",
+      "arabicName": "إبراهيم الأخضر",
+      "status": "bundled",
+      "portraitKey": "ibrahim-akhdar",
+      "candidateProfile": "https://www.assabile.com/ibrahim-al-akhdar-16/ibrahim-al-akhdar.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ibrahim-al-akhdar.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 3,
+      "name": "Ibrahim Al-Asiri",
+      "arabicName": "إبراهيم العسيري",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 4,
+      "name": "Shaik Abu Bakr Al Shatri",
+      "arabicName": "شيخ أبو بكر الشاطري",
+      "status": "bundled",
+      "portraitKey": "abu-bakr-shatri"
+    },
+    {
+      "catalogId": 5,
+      "name": "Ahmad Al-Ajmy",
+      "arabicName": "أحمد بن علي العجمي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/ahmed-al-ajmi-13/ahmed-al-ajmi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ahmed-al-ajmi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 6,
+      "name": "Ahmad Al-Hawashi",
+      "arabicName": "أحمد الحواشي",
+      "status": "bundled",
+      "portraitKey": "catalog-6"
+    },
+    {
+      "catalogId": 8,
+      "name": "Ahmad Saber",
+      "arabicName": "أحمد صابر",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/ahmed-saber-51/ahmed-saber.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ahmed-saber.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 9,
+      "name": "Ahmad Nauina",
+      "arabicName": "أحمد نعينع",
+      "status": "bundled",
+      "portraitKey": "catalog-9",
+      "candidateProfile": "https://www.assabile.com/ahmed-nuinaa-75/ahmed-nuinaa.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ahmed-nuinaa.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 10,
+      "name": "Akram Alalaqmi",
+      "arabicName": "أكرم العلاقمي",
+      "status": "bundled",
+      "portraitKey": "catalog-10",
+      "candidateProfile": "https://www.assabile.com/akram-al-aalakmi-80/akram-al-aalakmi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/akram-al-aalakmi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 12,
+      "name": "Idrees Abkr",
+      "arabicName": "إدريس أبكر",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/idriss-abkar-90/idriss-abkar.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/idriss-abkar.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 13,
+      "name": "Alzain Mohammad Ahmad",
+      "arabicName": "الزين محمد أحمد",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/alzain-mohamed-ahmed-76/alzain-mohamed-ahmed.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/alzain-mohamed-ahmed.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 14,
+      "name": "Al-Qaria Yassen",
+      "arabicName": "القارئ ياسين",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 16,
+      "name": "Aloyoon Al-Koshi",
+      "arabicName": "العيون الكوشي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/laayoun-el-kouchi-22/laayoun-el-kouchi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/laayoun-el-kouchi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 17,
+      "name": "Tawfeeq As-Sayegh",
+      "arabicName": "توفيق الصايغ",
+      "status": "bundled",
+      "portraitKey": "catalog-17",
+      "candidateProfile": "https://www.assabile.com/tawfeeq-as-sayegh-32/tawfeeq-as-sayegh.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/tawfik-as-sayegh.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 18,
+      "name": "Jamal Shaker Abdullah",
+      "arabicName": "جمال شاكر عبدالله",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/jamal-shaker-abdullah-43/jamal-shaker-abdullah.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/jamal-shaker-abdullah.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 20,
+      "name": "Khalid Al-Jileel",
+      "arabicName": "خالد الجليل",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/khalid-al-jalil-307/khalid-al-jalil.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/khalid-al-jalil.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 21,
+      "name": "Khaled Al-Qahtani",
+      "arabicName": "خالد القحطاني",
+      "status": "bundled",
+      "portraitKey": "catalog-21",
+      "candidateProfile": "https://www.assabile.com/khaled-al-qahtani-46/khaled-al-qahtani.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/khaled-al-qahtani.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 22,
+      "name": "Khalid Abdulkafi",
+      "arabicName": "خالد عبدالكافي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/khalid-abdulkafi-69/khalid-abdulkafi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/khaled-abdelkafi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 24,
+      "name": "Khalifa Altunaiji",
+      "arabicName": "خليفة الطنيجي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/khalifa-al-tunaiji-73/khalifa-al-tunaiji.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/khalifa-al-tunaiji.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 25,
+      "name": "Dawood Hamza",
+      "arabicName": "داود حمزة",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/dawood-hamza-97/dawood-hamza.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/daoud-hamza.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 27,
+      "name": "Rachid Belalya",
+      "arabicName": "رشيد بلعالية",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/rachid-belalia-219/rachid-belalia.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/rachid-belalia.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 30,
+      "name": "Saad Al-Ghamdi",
+      "arabicName": "سعد الغامدي",
+      "status": "bundled",
+      "portraitKey": "catalog-30",
+      "candidateProfile": "https://www.assabile.com/saad-el-ghamidi-4/saad-el-ghamidi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/saad-el-ghamidi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 31,
+      "name": "Saud Al-Shuraim",
+      "arabicName": "سعود الشريم",
+      "status": "bundled",
+      "portraitKey": "shuraim",
+      "candidateProfile": "https://www.assabile.com/saud-shuraim-11/saud-shuraim.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/saoud-shuraim.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 32,
+      "name": "Sahl Yassin",
+      "arabicName": "سهل ياسين",
+      "status": "bundled",
+      "portraitKey": "catalog-32",
+      "candidateProfile": "https://www.assabile.com/sahl-yasin-20/sahl-yasin.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/sahl-yassin.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 33,
+      "name": "Zaki Daghistani",
+      "arabicName": "زكي داغستاني",
+      "status": "bundled",
+      "portraitKey": "catalog-33",
+      "candidateProfile": "https://www.assabile.com/zaki-daghistani-47/zaki-daghistani.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/zaki-daghistani.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 36,
+      "name": "Sayeed Ramadan",
+      "arabicName": "سيد رمضان",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/sayed-ramadan-81/sayed-ramadan.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/sayed-ramadan.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 38,
+      "name": "Shirazad Taher",
+      "arabicName": "شيرزاد عبدالرحمن طاهر",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/shirazad-taher-70/shirazad-taher.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/shirazad-taher.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 39,
+      "name": "Saber Abdulhakm",
+      "arabicName": "صابر عبدالحكم",
+      "status": "bundled",
+      "portraitKey": "catalog-39",
+      "candidateProfile": "https://www.assabile.com/saber-abdul-hakam-77/saber-abdul-hakam.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/saber-abdul-hakam.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 40,
+      "name": "Saleh Alsahood",
+      "arabicName": "صالح الصاهود",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/saleh-alsahood-225/saleh-alsahood.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/saleh-alsahood.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 42,
+      "name": "Saleh Al-Habdan",
+      "arabicName": "صالح الهبدان",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/saleh-al-habdan-566/saleh-al-habdan.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/saleh-al-habdan.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 43,
+      "name": "Salah Albudair",
+      "arabicName": "صلاح البدير",
+      "status": "bundled",
+      "portraitKey": "catalog-43",
+      "candidateProfile": "https://www.assabile.com/salah-al-budair-17/salah-al-budair.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/salah-al-budair.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 44,
+      "name": "Salah Alhashim",
+      "arabicName": "صلاح الهاشم",
+      "status": "bundled",
+      "portraitKey": "catalog-44",
+      "candidateProfile": "https://www.assabile.com/salah-al-hashem-68/salah-al-hashem.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/salah-al-hashem.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 46,
+      "name": "Slaah Bukhatir",
+      "arabicName": "صلاح بو خاطر",
+      "status": "bundled",
+      "portraitKey": "catalog-46",
+      "candidateProfile": "https://www.assabile.com/salah-bukhatir-23/salah-bukhatir.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/salah-bukhatir.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 47,
+      "name": "Mukhtar Al-Haj",
+      "arabicName": "مختار الحاج",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 48,
+      "name": "Adel Ryyan",
+      "arabicName": "عادل ريان",
+      "status": "bundled",
+      "portraitKey": "catalog-48",
+      "candidateProfile": "https://www.assabile.com/adel-rayane-54/adel-rayane.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/adel-rayane.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 49,
+      "name": "Abdelbari Al-Toubayti",
+      "arabicName": "عبدالبارئ الثبيتي",
+      "status": "bundled",
+      "portraitKey": "catalog-49",
+      "candidateProfile": "https://www.assabile.com/abdul-bari-ath-thobaity-38/abdul-bari-ath-thobaity.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdul-bari-ath-thobaity.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 50,
+      "name": "Abdulbari Mohammad",
+      "arabicName": "عبدالبارئ محمد",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdul-bari-mohammed-82/abdul-bari-mohammed.htm",
+      "candidateImage": "https://www.assabile.com/media/person/280x219/akram-al-aalakmi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 51,
+      "name": "Abdulbasit Abdulsamad",
+      "arabicName": "عبدالباسط عبدالصمد",
+      "status": "bundled",
+      "portraitKey": "abdul-basit",
+      "candidateProfile": "https://www.assabile.com/abdulbasit-abdusamad-2/abdulbasit-abdusamad.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/abdelbasset-abdessamad.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 54,
+      "name": "Abdulrahman Alsudaes",
+      "arabicName": "عبدالرحمن السديس",
+      "status": "bundled",
+      "portraitKey": "sudais",
+      "candidateProfile": "https://www.assabile.com/abdul-rahman-al-sudais-12/abdul-rahman-al-sudais.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdul-rahman-al-sudais.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 55,
+      "name": "Abdul Aziz Al-Ahmad",
+      "arabicName": "عبدالعزيز الأحمد",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdul-aziz-al-ahmed-29/abdul-aziz-al-ahmed.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/abdel-aziz-al-ahmed.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 56,
+      "name": "Abdulaziz Az-Zahrani",
+      "arabicName": "عبدالعزيز الزهراني",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdulaziz-az-zahrani-227/abdulaziz-az-zahrani.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdulaziz-az-zahrani.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 58,
+      "name": "Abdullah Albuajan",
+      "arabicName": "عبدالله البعيجان",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdullah-albuajan-230/abdullah-albuajan.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdullah-albuajan.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 59,
+      "name": "Abdullah Al-Mattrod",
+      "arabicName": "عبدالله المطرود",
+      "status": "bundled",
+      "portraitKey": "catalog-59"
+    },
+    {
+      "catalogId": 60,
+      "name": "Abdullah Basfer",
+      "arabicName": "عبدالله بصفر",
+      "status": "bundled",
+      "portraitKey": "abdullah-basfar"
+    },
+    {
+      "catalogId": 61,
+      "name": "Abdullah Khayyat",
+      "arabicName": "عبدالله خياط",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 62,
+      "name": "Abdullah Al-Johany",
+      "arabicName": "عبدالله عواد الجهني",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdullah-awad-al-juhani-93/abdullah-awad-al-juhani.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdullah-awad-al-juhani.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 63,
+      "name": "Abdullah Qaulan",
+      "arabicName": "عبدالله غيلان",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdullah-ghailan-231/abdullah-ghailan.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdullah-ghailan.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 64,
+      "name": "Abdulrasheed Soufi",
+      "arabicName": "عبدالرشيد صوفي",
+      "status": "bundled",
+      "portraitKey": "catalog-64"
+    },
+    {
+      "catalogId": 66,
+      "name": "Abdulmohsin Al-Harthy",
+      "arabicName": "عبدالمحسن الحارثي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdulmohsen-al-harthy-233/abdulmohsen-al-harthy.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdulmohsen-al-harthy.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 67,
+      "name": "Abdulmohsen Al-Qasim",
+      "arabicName": "عبدالمحسن القاسم",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdulmohsen-al-qasim-45/abdulmohsen-al-qasim.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdulmohsen-al-qasim.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 69,
+      "name": "Abdulmohsin Al-Obaikan",
+      "arabicName": "عبدالمحسن العبيكان",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdel-mohsen-al-obeikan-234/abdel-mohsen-al-obeikan.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdel-mohsen-al-obeikan.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 70,
+      "name": "Abdulhadi Kanakeri",
+      "arabicName": "عبدالهادي أحمد كناكري",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 71,
+      "name": "Abdulwadood Haneef",
+      "arabicName": "عبدالودود حنيف",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdul-wadud-haneef-30/abdul-wadud-haneef.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdul-wadud-haneef.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 72,
+      "name": "Abdulwali Al-Arkani",
+      "arabicName": "عبدالولي الأركاني",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdul-wali-al-arkani-92/abdul-wali-al-arkani.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdul-wali-al-arkani.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 74,
+      "name": "Ali Alhuthaifi",
+      "arabicName": "علي بن عبدالرحمن الحذيفي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 76,
+      "name": "Ali Jaber",
+      "arabicName": "علي جابر",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/ali-jaber-28/ali-jaber.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ali-jaber.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 77,
+      "name": "Ali Hajjaj Alsouasi",
+      "arabicName": "علي حجاج السويسي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/ali-hajjaj-souissi-78/ali-hajjaj-souissi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ali-hajjaj-souissi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 78,
+      "name": "Emad Hafez",
+      "arabicName": "عماد زهير حافظ",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/imad-zuhair-hafez-24/imad-zuhair-hafez.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/imad-zuhair-hafez.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 79,
+      "name": "Abdulaziz Alturki",
+      "arabicName": "عبدالعزيز التركي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 80,
+      "name": "Omar Al-Qazabri",
+      "arabicName": "عمر القزابري",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/omar-al-kazabri-15/omar-al-kazabri.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/omar-al-kazabri.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 81,
+      "name": "Fares Abbad",
+      "arabicName": "فارس عباد",
+      "status": "bundled",
+      "portraitKey": "catalog-81",
+      "candidateProfile": "https://www.assabile.com/fares-abbad-18/fares-abbad.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/fares-abbad.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 86,
+      "name": "Nasser Alqatami",
+      "arabicName": "ناصر القطامي",
+      "status": "bundled",
+      "portraitKey": "catalog-86",
+      "candidateProfile": "https://www.assabile.com/nasser-al-qatami-61/nasser-al-qatami.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/nasser-al-qatami.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 87,
+      "name": "Nabil Al Rifay",
+      "arabicName": "نبيل الرفاعي",
+      "status": "bundled",
+      "portraitKey": "catalog-87",
+      "candidateProfile": "https://www.assabile.com/nabil-ar-rifai-36/nabil-ar-rifai.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/nabil-ar-rifai.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 88,
+      "name": "Neamah Al-Hassan",
+      "arabicName": "نعمة الحسان",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/neamah-al-hassan-252/neamah-al-hassan.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/neamah-al-hassan.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 89,
+      "name": "Hani Arrifai",
+      "arabicName": "هاني الرفاعي",
+      "status": "bundled",
+      "portraitKey": "hani-rifai",
+      "candidateProfile": "https://www.assabile.com/hani-ar-rifai-86/hani-ar-rifai.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/hani-ar-rifai.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 91,
+      "name": "Waleed Alnaehi",
+      "arabicName": "وليد النائحي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/waleed-naehi-85/waleed-naehi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/waleed-naehi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 92,
+      "name": "Yasser Al-Dosari",
+      "arabicName": "ياسر الدوسري",
+      "status": "bundled",
+      "portraitKey": "catalog-92",
+      "candidateProfile": "https://www.assabile.com/yasser-al-dosari-52/yasser-al-dosari.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/yasser-al-dossari.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 93,
+      "name": "Yasser Al-Qurashi",
+      "arabicName": "ياسر القرشي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/yasser-qureshi-83/yasser-qureshi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/yasser-qureshi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 95,
+      "name": "Yasser Al-Mazroyee",
+      "arabicName": "ياسر المزروعي ",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 96,
+      "name": "Yahya Hawwa",
+      "arabicName": "يحيى حوا",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 97,
+      "name": "Yousef Alshoaey",
+      "arabicName": "يوسف الشويعي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/yousef-alshoaey-257/yousef-alshoaey.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/yousef-alshoaey.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 98,
+      "name": "Abdullah Abdal",
+      "arabicName": "عبدالله عبدل",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 102,
+      "name": "Maher Al Meaqli",
+      "arabicName": "ماهر المعيقلي",
+      "status": "bundled",
+      "portraitKey": "maher",
+      "candidateProfile": "https://www.assabile.com/maher-al-mueaqly-33/maher-al-mueaqly.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/maher-al-mueaqly.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 106,
+      "name": "Mohammad Al-Tablaway",
+      "arabicName": "محمد الطبلاوي",
+      "status": "bundled",
+      "portraitKey": "catalog-106",
+      "candidateProfile": "https://www.assabile.com/mohamed-tablawi-31/mohamed-tablawi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/mohamed-tablawi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 107,
+      "name": "Mohammed Al-Lohaidan",
+      "arabicName": "محمد اللحيدان",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/muhammad-al-luhaidan-95/muhammad-al-luhaidan.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/mohamed-al-haidan.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 108,
+      "name": "Mohammed Al-Muhasny",
+      "arabicName": "محمد المحيسني",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 109,
+      "name": "Mohammed Ayyub",
+      "arabicName": "محمد أيوب",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/muhammad-ayyub-14/muhammad-ayyub.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/mohamed-ayoub.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 110,
+      "name": "Mohammad Saleh Alim Shah",
+      "arabicName": "محمد صالح عالم شاه",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/muhammad-saleh-alim-shah-79/muhammad-saleh-alim-shah.htm",
+      "candidateImage": "https://www.assabile.com/media/person/280x219/sadaqat-ali.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 111,
+      "name": "Mohammed Jibreel",
+      "arabicName": "محمد جبريل",
+      "status": "bundled",
+      "portraitKey": "muhammad-jibril",
+      "candidateProfile": "https://www.assabile.com/muhammad-jibreel-59/muhammad-jibreel.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/muhammad-jebril.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 112,
+      "name": "Mohammed Siddiq Al-Minshawi",
+      "arabicName": "محمد صديق المنشاوي",
+      "status": "bundled",
+      "portraitKey": "minshawi",
+      "candidateProfile": "https://www.assabile.com/mohamed-siddiq-el-minshawi-3/mohamed-siddiq-el-minshawi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/mohamed-seddik-el-menchaoui.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 115,
+      "name": "Mohammad Abdullkarem",
+      "arabicName": "محمد عبدالكريم",
+      "status": "bundled",
+      "portraitKey": "catalog-115",
+      "candidateProfile": "https://www.assabile.com/muhammad-abdulkareem-50/muhammad-abdulkareem.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/muhammad-abdulkareem.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 116,
+      "name": "Mohammad Al-Abdullah",
+      "arabicName": "محمد عبدالحكيم سعيد العبدالله",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/mohamed-abdel-hakim-saad-al-abdullah-96/mohamed-abdel-hakim-saad-al-abdullah.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/mohamed-abdel-hakim-saad-al-abdullah.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 118,
+      "name": "Mahmoud Khalil Al-Hussary",
+      "arabicName": "محمود خليل الحصري",
+      "status": "bundled",
+      "portraitKey": "husary",
+      "candidateProfile": "https://www.assabile.com/mahmoud-khalil-al-hussary-27/mahmoud-khalil-al-hussary.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/mahmoud-khalil-al-hussary.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 121,
+      "name": "Mahmoud Ali  Albanna",
+      "arabicName": "محمود علي البنا",
+      "status": "bundled",
+      "portraitKey": "catalog-121",
+      "candidateProfile": "https://www.assabile.com/mahmoud-ali-al-banna-25/mahmoud-ali-al-banna.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/mahmud-ali-al-banna.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 123,
+      "name": "Mishary Alafasi",
+      "arabicName": "مشاري العفاسي",
+      "status": "bundled",
+      "portraitKey": "alafasy"
+    },
+    {
+      "catalogId": 125,
+      "name": "Mustafa Ismail",
+      "arabicName": "مصطفى إسماعيل",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/mustafa-ismail-48/mustafa-ismail.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/mustapha-ismail.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 126,
+      "name": "Mustafa Al-Lahoni",
+      "arabicName": "مصطفى اللاهوني",
+      "status": "bundled",
+      "portraitKey": "catalog-126",
+      "candidateProfile": "https://www.assabile.com/mustafa-al-lahouni-49/mustafa-al-lahouni.htm",
+      "candidateImage": "https://www.assabile.com/media/person/280x219/abdelbasset-abdessamad.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 127,
+      "name": "Mustafa raad Alazawy",
+      "arabicName": "مصطفى رعد العزاوي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/mustafa-raad-al-azzawi-35/mustafa-raad-al-azzawi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/mustafa-raad-al-azzawi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 129,
+      "name": "Muftah Alsaltany",
+      "arabicName": "مفتاح السلطني",
+      "status": "bundled",
+      "portraitKey": "catalog-129",
+      "candidateProfile": "https://www.assabile.com/muftah-alsaltany-259/muftah-alsaltany.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/muftah-alsaltany.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 134,
+      "name": "Mohammad Saayed",
+      "arabicName": "محمد سايد",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 136,
+      "name": "Abdulelah bin Aoun",
+      "arabicName": "عبدالإله بن عون",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 138,
+      "name": "Noreen Mohammad Siddiq",
+      "arabicName": "نورين محمد صديق",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 139,
+      "name": "Majed Al-Zamil",
+      "arabicName": "ماجد الزامل",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/majed-al-zamil-238/majed-al-zamil.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/majed-al-zamil.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 149,
+      "name": "Maher Shakhashero",
+      "arabicName": "ماهر شخاشيرو",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/maher-shakhashiro-239/maher-shakhashiro.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/maher-shakhashiro.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 151,
+      "name": "Mahmood AlSheimy",
+      "arabicName": "محمود الشيمي",
+      "status": "bundled",
+      "portraitKey": "catalog-151",
+      "candidateProfile": "https://www.assabile.com/mahmoud-el-sheimy-247/mahmoud-el-sheimy.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/mahmoud-el-sheimy.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 152,
+      "name": "Yasser Salamah",
+      "arabicName": "ياسر سلامة",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/yasser-salama-314/yasser-salama.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/yasser-salama.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 159,
+      "name": "Khalid Almohana",
+      "arabicName": "خالد المهنا",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/khalid-al-mohanna-216/khalid-al-mohanna.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/khalid-al-mohanna.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 160,
+      "name": "Adel Al-Khalbany",
+      "arabicName": "عادل الكلباني",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/adel-al-kalbani-44/adel-al-kalbani.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/adel-al-kalbani.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 161,
+      "name": "Mousa Bilal",
+      "arabicName": "موسى بلال",
+      "status": "bundled",
+      "portraitKey": "catalog-161",
+      "candidateProfile": "https://www.assabile.com/musa-bilal-250/musa-bilal.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/musa-bilal.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 163,
+      "name": "Hatem Fareed Alwaer",
+      "arabicName": "حاتم فريد الواعر",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/hatem-fareed-alwaer-213/hatem-fareed-alwaer.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/hatem-fareed-alwaer.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 164,
+      "name": "Ibrahim Aljormy",
+      "arabicName": "إبراهيم الجرمي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/ibrahim-aljormy-395/ibrahim-aljormy.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/ibrahim-el-jormi.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 165,
+      "name": "Mahmood Al rifai",
+      "arabicName": "محمود الرفاعي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/mahmood-al-rifai-246/mahmood-al-rifai.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/mahmood-al-rifai.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 178,
+      "name": "Ibrahim Aldosari",
+      "arabicName": "إبراهيم الدوسري",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/ibrahim-al-dossari-206/ibrahim-al-dossari.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ibrahim-al-dossari.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 181,
+      "name": "Jamaan Alosaimi",
+      "arabicName": "جمعان العصيمي",
+      "status": "bundled",
+      "portraitKey": "catalog-181",
+      "candidateProfile": "https://www.assabile.com/jamaan-alosaimi-212/jamaan-alosaimi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/jamaan-alosaimi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 193,
+      "name": "Yousef Bin Noah Ahmad",
+      "arabicName": "يوسف بن نوح أحمد",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/yousef-bin-noah-ahmad-258/yousef-bin-noah-ahmad.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/yousef-bin-noah-ahmad.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 197,
+      "name": "Moeedh Alharthi",
+      "arabicName": "معيض الحارثي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/moeedh-alharthi-249/moeedh-alharthi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/moeedh-alharthi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 198,
+      "name": "Mohammad Rashad Alshareef",
+      "arabicName": "محمد رشاد الشريف",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/mohammad-rachad-al-shareef-112/mohammad-rachad-al-shareef.htm",
+      "candidateImage": "https://www.assabile.com/media/person/720x200/mohamed-rachad-al-sharif.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 201,
+      "name": "Ahmed Al-trabulsi",
+      "arabicName": "أحمد الطرابلسي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 202,
+      "name": "Abdullah Al-Kandari",
+      "arabicName": "عبدالله الكندري",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 203,
+      "name": "Ahmed Amer",
+      "arabicName": "أحمد عامر",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/ahmed-amer-203/ahmed-amer.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ahmed-amer.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 206,
+      "name": "Mohammed Osman Khan",
+      "arabicName": "محمد عثمان خان",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/mohamed-osman-khan-245/mohamed-osman-khan.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/mohamed-osman-khan.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 208,
+      "name": "Addokali Mohammad Alalim",
+      "arabicName": "الدوكالي محمد العالم",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/al-duqale-muhammad-al-alam-580/al-duqale-muhammad-al-alam.htm",
+      "candidateImage": "https://www.assabile.com/media/person/280x219/akram-al-aalakmi.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 211,
+      "name": "Alfateh Alzubair",
+      "arabicName": "الفاتح محمد الزبير",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/alfateh-muhammad-zubair-210/alfateh-muhammad-zubair.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/alfateh-muhammad-zubair.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 212,
+      "name": "Tareq Abdulgani daawob",
+      "arabicName": "طارق عبدالغني دعوب",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/tareq-abdulgani-daawob-226/tareq-abdulgani-daawob.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/tareq-abdulgani-daawob.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 217,
+      "name": "Bandar Balilah",
+      "arabicName": "بندر بليله",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/bandar-balila-358/bandar-balila.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/bandar-balila.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 219,
+      "name": "Wadeea Al-Yamani",
+      "arabicName": "وديع اليمني",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 221,
+      "name": "Raad Al Kurdi",
+      "arabicName": "رعد محمد الكردي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 225,
+      "name": "Abdulrahman Aloosi",
+      "arabicName": "عبدالرحمن العوسي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 229,
+      "name": "Mohammad Khalil Al-Qari",
+      "arabicName": "محمد خليل القارئ",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 230,
+      "name": "Rami Aldeais",
+      "arabicName": "رامي الدعيس",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 236,
+      "name": "Abdulrahman Al-Majed",
+      "arabicName": "عبدالرحمن الماجد",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 237,
+      "name": "Marwan Alakri",
+      "arabicName": "مروان العكري",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 243,
+      "name": "Abdullah Al-Mousa",
+      "arabicName": "عبدالله الموسى",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 244,
+      "name": "Abdullah Al-Khalaf",
+      "arabicName": "عبدالله الخلف",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 245,
+      "name": "Mansour Al-Salemi",
+      "arabicName": "منصور السالمي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 248,
+      "name": "Nasser Alosfor",
+      "arabicName": "ناصر العصفور",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 250,
+      "name": "Mohammad Albukheet",
+      "arabicName": "محمد البخيت",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 251,
+      "name": "Nasser Almajed",
+      "arabicName": "ناصر الماجد",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 252,
+      "name": "Ahmed Al-Swailem",
+      "arabicName": "أحمد السويلم",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 254,
+      "name": "Bader Alturki",
+      "arabicName": "بدر التركي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 256,
+      "name": "Ahmad Shaheen",
+      "arabicName": "أحمد خليل شاهين",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 257,
+      "name": "Saad Almqren",
+      "arabicName": "سعد المقرن",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 259,
+      "name": "Ahmad Al Nufais",
+      "arabicName": "أحمد النفيس",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 265,
+      "name": "Ahmad Deban",
+      "arabicName": "أحمد ديبان",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 267,
+      "name": "Abdullah Kamel",
+      "arabicName": "عبدالله كامل",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdallah-kamel-318/abdallah-kamel.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdallah-kamel.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 268,
+      "name": "Peshawa Qadr Al-Kurdi",
+      "arabicName": "بيشه وا قادر الكردي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 271,
+      "name": "Nathier Almalki",
+      "arabicName": "نذير المالكي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 272,
+      "name": "Okasha Kameny",
+      "arabicName": "عكاشة كميني",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 273,
+      "name": "Haitham Aldukhain",
+      "arabicName": "هيثم الدخين",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 274,
+      "name": "Muhammad Abu Sneina",
+      "arabicName": "محمد أبو سنينة",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/muhamad-abu-snina-554/muhamad-abu-snina.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/muhamad-abu-snina.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 275,
+      "name": "Mohammed Al-Amin Qeniwa",
+      "arabicName": "محمد الأمين قنيوة",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 277,
+      "name": "Mahmoud Abdul Hakam",
+      "arabicName": "محمود عبدالحكم",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/mahmoud-abdulhakam-564/mahmoud-abdulhakam.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/mahmoud-abdulhakam.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 278,
+      "name": "Ahmad Issa Al Maasaraawi",
+      "arabicName": "أحمد عيسى المعصراوي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/ahmed-aissa-el-masarawi-309/ahmed-aissa-el-masarawi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ahmed-aissa-el-masarawi.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 279,
+      "name": "Ibrahim Kshidan",
+      "arabicName": "إبراهيم كشيدان",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/ibrahim-kishidan-503/ibrahim-kishidan.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/ibrahim-kishidan.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 280,
+      "name": "Hashim Abu Dalal",
+      "arabicName": "هاشم أبو دلال",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 281,
+      "name": "Fouad Alkhamery",
+      "arabicName": "فؤاد الخامري",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/fouad-al-khamiri-339/fouad-al-khamiri.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/fouad-al-khamiri.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 282,
+      "name": "Sayed Ahmad Hashemi",
+      "arabicName": "سيد أحمد هاشمي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 283,
+      "name": "Khalid Mohammadi",
+      "arabicName": "خالد كريم محمدي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 284,
+      "name": "Mal-Allah Abdulrhman Aljaber",
+      "arabicName": "مال الله عبدالرحمن الجابر",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/mal-allah-abdul-rahman-al-jaber-714/mal-allah-abdul-rahman-al-jaber.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/default.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 285,
+      "name": "Salman Alsadeiq",
+      "arabicName": "سلمان الصديق",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 286,
+      "name": "Hasan Saleh",
+      "arabicName": "حسن صالح",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/hassan-saleh-111/hassan-saleh.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/hassan-saleh.png",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 287,
+      "name": "Abdulrahman Alshahhat",
+      "arabicName": "عبدالرحمن الشحات",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abderrahman-shahat-521/abderrahman-shahat.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abderrahman-shahat.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 288,
+      "name": "Issa Omar Sanankoua",
+      "arabicName": "عيسى عمر سناكو",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 290,
+      "name": "Saleh Alquraishi",
+      "arabicName": "صالح القريشي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 300,
+      "name": "Saleh Alshamrani",
+      "arabicName": "صالح الشمراني",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 301,
+      "name": "Faisal Al-Hajry",
+      "arabicName": "فيصل الهاجري",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 302,
+      "name": "Anas Alemadi",
+      "arabicName": "أنس العمادي",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/anas-al-emadi-402/anas-al-emadi.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/anas-al-emadi.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    },
+    {
+      "catalogId": 304,
+      "name": "Abdulkareem Alhazmi",
+      "arabicName": "عبدالكريم الحازمي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21136,
+      "name": "عبدالله القرافي",
+      "arabicName": "عبدالله القرافي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21148,
+      "name": "Abdulbadi Ghailan",
+      "arabicName": "عبدالبديع غيلان",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21181,
+      "name": "Muhammad Burhaji",
+      "arabicName": "محمد برهجي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21183,
+      "name": "Hassan Aldaghriri",
+      "arabicName": "حسن الدغريري",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21184,
+      "name": "Muhammad Al Faqih",
+      "arabicName": "محمد الفقيه",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21186,
+      "name": "Junaid Adam Abdullah",
+      "arabicName": "جنيد آدم عبدالله",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21187,
+      "name": "خالد الزيادي",
+      "arabicName": "خالد الزيادي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21193,
+      "name": "Abdul Rahman bin Abdul Razzaq Al Badr",
+      "arabicName": "عبدالرحمن بن عبدالرزاق البدر",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21196,
+      "name": "Alijon Qori",
+      "arabicName": "عليجان قوري حمدان",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21197,
+      "name": "Mohammed Al-Zubaidi",
+      "arabicName": "محمد الزبيدي",
+      "status": "needs-photo"
+    },
+    {
+      "catalogId": 21199,
+      "name": "Abdelmoujib Benkirane",
+      "arabicName": "عبد المجيب بنكيران",
+      "status": "needs-photo",
+      "candidateProfile": "https://www.assabile.com/abdelmoujib-benkirane-310/abdelmoujib-benkirane.htm",
+      "candidateImage": "https://www.assabile.com/media/person/200x256/abdelmoujib-benkirane.jpg",
+      "candidateStatus": "Metadata only; image bytes and reuse rights unverified"
+    }
+  ],
+  "catalogSource": {
+    "url": "https://github.com/uthumany/Quran-Fast-Api-json",
+    "commit": "6b9a220fa1d0805cfc3e88e3221ef7a1cfbb7033",
+    "file": "data/quran_reciters.json"
+  },
+  "candidateSource": {
+    "url": "https://github.com/BlankMediator/assabile-local",
+    "commit": "319505719700374fe7de788a00158d177b0672f2",
+    "file": "data/catalog.json",
+    "metadataGeneratedAt": "2026-06-29T10:03:28Z"
+  }
+}

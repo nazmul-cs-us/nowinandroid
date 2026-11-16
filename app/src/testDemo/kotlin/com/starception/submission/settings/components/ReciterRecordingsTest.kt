@@ -60,4 +60,16 @@ class ReciterRecordingsTest {
         assertFalse(com.starception.submission.feature.quran.hasCompleteQuran(emptySet()))
     }
 
+    @Test fun portraitAliasesUseFullNamesAndKeepRelativesDistinct() {
+        assertEquals(reciterPersonKey("Abdullah Basfer"), reciterPersonKey("عبدالله بصفر"))
+        assertEquals(reciterPersonKey("Saad Al-Ghamdi"), reciterPersonKey("Saad alghamdy"))
+        assertEquals("maher", reciterPersonKey("Maher Al Meaqli"))
+        assertEquals("ahmed-hudhaifi", reciterPersonKey("Ahmad Alhuthaifi"))
+        assertNotEquals(reciterPersonKey("Ahmad Alhuthaifi"), reciterPersonKey("Ali Alhuthaifi"))
+        assertNotEquals(reciterPersonKey("Muhammad Ayyub"), reciterPersonKey("Mohammed Ayoub Abu Mazen"))
+        assertNotEquals(reciterPersonKey("Saad Al-Ghamdi"), reciterPersonKey("Khalid Al-Ghamdi"))
+        assertNotEquals("catalog-40", reciterPersonKey("Saleh Alsahood"))
+        assertNotEquals("catalog-72", reciterPersonKey("Abdulwali Al-Arkani"))
+    }
+
 }

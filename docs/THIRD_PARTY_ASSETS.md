@@ -157,3 +157,32 @@ Full recording labels wrap; unsupported names still use initials. Library
 recording changes only change the preview/download target. In a selection picker,
 choosing a recording selects that original source ID. Existing saved files stay
 under their original recording IDs and are never migrated or deleted by grouping.
+
+### Additional offline reciter portraits
+
+The collection now contains 44 bundled portraits (35 added). Android and iOS use
+these same local resources, with no image request needed during browsing.
+Full-name aliases are shared with person grouping; they do not change recording IDs
+or the requirement for all 114 surahs.
+
+[Source manifest](reciter-portrait-sources.json) records source filenames, exact name
+aliases, asset hashes and pinned revisions. Seven additional named photos come from
+[abdoul-so/quran-app-reciters](https://github.com/abdoul-so/quran-app-reciters)
+under its MIT license. The other 28 added photos come from
+[abodehq/MP3Quran-V2](https://github.com/abodehq/MP3Quran-V2), whose README allows
+reuse only in free Islamic apps. Deenly's owner confirmed the app is entirely free.
+Both notices are bundled in `composeResources/files/reciter_portrait_notices.txt`.
+Reassess those restricted assets before introducing paid features.
+
+Identity mappings use the legacy database's Arabic/English names, never its numeric
+image IDs as current catalog IDs. A conflicting bilingual label (`reciter35.jpg`)
+and an identical image assigned to two people (`reciter49.jpg`, `reciter50.jpg`)
+are excluded. Existing portraits are retained.
+
+[Coverage research](reciter-portrait-coverage.json) lists all 168 people with at
+least one complete recording in a public catalog snapshot: 40 have bundled
+portraits and 128 still need a verified source. This is not the live catalog.
+Assabile candidate links are metadata leads only: their image bytes and reuse
+terms have not been verified, and the app does not load those URLs. Unmatched
+people retain initials. In particular Ahmed Al-Hudhaifi is not mapped to Ali
+Al-Hudhaifi, and Muhammad Ayyub is not mapped to Mohammed Ayoub Abu Mazen.
