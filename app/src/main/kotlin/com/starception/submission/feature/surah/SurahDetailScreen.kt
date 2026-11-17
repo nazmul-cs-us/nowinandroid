@@ -19,7 +19,9 @@ package com.starception.submission.feature.surah
 import androidx.compose.foundation.horizontalScroll
 
 import com.starception.submission.feature.quran.BengaliIbnKathir
-import com.starception.submission.feature.quran.BengaliIbnKathirContent
+import com.starception.submission.feature.quran.PublishedTafsirContent
+import com.starception.submission.feature.quran.PublishedTafsirPicker
+import com.starception.submission.feature.quran.PublishedTafsirs
 
 import androidx.compose.foundation.basicMarquee
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -865,6 +867,17 @@ fun SurahDetailScreen(
     var previousItemIndex by remember { mutableStateOf(0) }
     var showReciterPicker by remember { mutableStateOf(false) }
     var showFloatingToolbar by remember { mutableStateOf(false) } // Floating toolbar hidden initially, shown via More menu
+    val openHeaderTafsir: () -> Unit = {
+        val loaded = uiState as? SurahDetailUiState.Success
+        if (loaded != null) {
+            showFloatingToolbar = false
+            val visibleAyahs = surahCache[currentPlayingSurahNumber]?.second ?: loaded.ayahs
+            val ayah = currentRecitingAyah?.takeIf { candidate -> visibleAyahs.any { it.numberInSurah == candidate } } ?: 1
+            viewModel.loadTafseer(currentPlayingSurahNumber, ayah)
+            showTafseerDialog = true
+        }
+    }
+
     var isFloatingToolbarExpanded by remember { mutableStateOf(true) } // When shown, starts expanded
     var showFabVisible by remember { mutableStateOf(true) } // FAB visible by default
 
@@ -1347,6 +1360,7 @@ fun SurahDetailScreen(
                 onReciterClick = {
                     showReciterPicker = true
                 },
+                onTafsirClick = openHeaderTafsir.takeIf { uiState is SurahDetailUiState.Success },
                 selectedReciterName = if (currentAudioLanguage == AudioLanguage.ARABIC_ONLY) {
                     reciterSelection.name
                 } else {
@@ -1822,6 +1836,12 @@ fun SurahDetailScreen(
                             playSelectedArabicReciter()
                         },
                     )
+
+                    TextButton(onClick = openHeaderTafsir, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.MenuBook, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Tafsir · Choose commentary and language")
+                    }
 
                     // Arabic font — value + chevron row.
                     Row(
@@ -2319,7 +2339,7 @@ fun SurahDetailScreen(
 }
 
 @Composable
-private fun AlbumPlayerTopBar(
+internal fun AlbumPlayerTopBar(
     collapseProgress: Float,
     isCollapsed: Boolean,
     surahName: String,
@@ -2335,6 +2355,7 @@ private fun AlbumPlayerTopBar(
     onBookmarkClick: () -> Unit = {},
     onMoreClick: () -> Unit = {},
     onReciterClick: () -> Unit = {},
+    onTafsirClick: (() -> Unit)? = null,
     selectedReciterName: String = "Mishary Rashid Al-Alafasy",
     onAllSurahsClick: () -> Unit = onBackClick,
     modifier: Modifier = Modifier,
@@ -2402,8 +2423,8 @@ private fun AlbumPlayerTopBar(
     val moreButtonSize = 44.dp
     val backButtonSize = 44.dp
     val bookmarkButtonSize = 44.dp
-    val reciterButtonWidth = if (screenWidthDp < 360.dp) 96.dp else 112.dp
-    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - bookmarkButtonSize - moreButtonSize - reciterButtonWidth)
+    val reciterButtonWidth = if (screenWidthDp < 360.dp) 72.dp else 112.dp
+    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - bookmarkButtonSize - moreButtonSize - reciterButtonWidth - 48.dp)
         .coerceAtLeast(0.dp)
     val maxIconsThatFit = (remainingWidth / iconButtonSize).toInt()
     val showTranslation = true
@@ -2551,6 +2572,14 @@ private fun AlbumPlayerTopBar(
                         Text(selectedReciterName, style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(horizontal = 10.dp).basicMarquee(),
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                IconButton(onClick = { onTafsirClick?.invoke() }, enabled = onTafsirClick != null,
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = "Tafsir" }) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.MenuBook, contentDescription = null, tint = contentColor,
+                            modifier = Modifier.size(18.dp))
+                        Text("Tafsir", color = contentColor, fontSize = 10.sp, lineHeight = 12.sp, maxLines = 1)
                     }
                 }
                 // More options menu - always shown (floating toolbar has all options)
@@ -3830,7 +3859,10 @@ private fun BottomSheetTafseerContent(
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
     val tafsirContext = LocalContext.current.applicationContext
-    val bengaliRepository = remember(tafsirContext) { createBengaliIbnKathirRepository(tafsirContext) }
+    val publishedEdition = PublishedTafsirs.forBook(selectedTafseerBook)
+    val publishedRepository = remember(tafsirContext, publishedEdition?.bookKey) {
+        publishedEdition?.let { createPublishedTafsirRepository(tafsirContext, it) }
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -3917,7 +3949,7 @@ private fun BottomSheetTafseerContent(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
-                    if (isTranslating && selectedTafseerBook != BengaliIbnKathir.BOOK_KEY) {
+                    if (isTranslating && publishedEdition == null) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(14.dp),
                             strokeWidth = 2.dp,
@@ -3985,7 +4017,6 @@ private fun BottomSheetTafseerContent(
                     "saadi" to "As-Sa'di",
                     "moysar" to "Al-Moyassar",
                     "baghawi" to "Al-Baghawi",
-                    BengaliIbnKathir.BOOK_KEY to BengaliIbnKathir.LABEL,
                 ).forEach { (code, name) ->
                     val isSelected = selectedTafseerBook == code
                     Surface(
@@ -4017,9 +4048,12 @@ private fun BottomSheetTafseerContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (selectedTafseerBook == BengaliIbnKathir.BOOK_KEY) {
-            BengaliIbnKathirContent(tafseerData.surahNumber, tafseerData.ayahNumber, bengaliRepository)
+        PublishedTafsirPicker(selectedTafseerBook) { onTafseerBookSelected(it.bookKey) }
+        if (publishedEdition != null) {
+            PublishedTafsirContent(tafseerData.surahNumber, tafseerData.ayahNumber, publishedEdition, requireNotNull(publishedRepository))
         } else {
+        if (selectedLanguage != "ar") Text("Automatic translation of Arabic commentary",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         // Get the appropriate text - translated or original
         val originalText = when (selectedTafseerBook) {
             "saadi" -> tafseerData.tafseerSaadi
@@ -4078,7 +4112,7 @@ private fun BottomSheetTafseerContent(
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.primary,
                                 )
-                                if (isTranslating && selectedTafseerBook != BengaliIbnKathir.BOOK_KEY) {
+                                if (isTranslating && publishedEdition == null) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(12.dp),
                                         strokeWidth = 1.5.dp,
@@ -4154,7 +4188,7 @@ private fun BottomSheetTafseerContent(
                         .heightIn(max = 450.dp),
                 ) {
                     // Bengali uses its published edition; providers apply only to automatic translation.
-                    if (selectedLanguage != "bn") {
+                    if (PublishedTafsirs.forLanguage(selectedLanguage) == null) {
                     item {
                         Text(
                             text = "Translation Provider",
@@ -9407,7 +9441,10 @@ fun TafseerDialog(
     onDismiss: () -> Unit,
 ) {
     val tafsirContext = LocalContext.current.applicationContext
-    val bengaliRepository = remember(tafsirContext) { createBengaliIbnKathirRepository(tafsirContext) }
+    val publishedEdition = PublishedTafsirs.forBook(selectedTafseerBook)
+    var chosenPublishedBook by remember {
+        mutableStateOf(publishedEdition?.bookKey ?: BengaliIbnKathir.BOOK_KEY)
+    }
     var selectedTabIndex by remember {
         mutableStateOf(
             when (selectedTafseerBook) {
@@ -9415,7 +9452,7 @@ fun TafseerDialog(
                 "moysar" -> 1
                 "baghawi" -> 2
                 BengaliIbnKathir.BOOK_KEY -> 3
-                else -> 0
+                else -> if (publishedEdition != null) 3 else 0
             },
         )
     }
@@ -9426,7 +9463,7 @@ fun TafseerDialog(
             0 -> "saadi"
             1 -> "moysar"
             2 -> "baghawi"
-            3 -> BengaliIbnKathir.BOOK_KEY
+            3 -> chosenPublishedBook
             else -> "saadi"
         }
         onTafseerBookSelected(book)
@@ -9575,7 +9612,10 @@ fun TafseerDialog(
                         },
                     )
                     Tab(selected = selectedTabIndex == 3, onClick = { selectedTabIndex = 3 },
-                        text = { Text("Ibn Kathir\nবাংলা") })
+                        text = { PublishedTafsirPicker(if (selectedTabIndex == 3) chosenPublishedBook else null) {
+                            chosenPublishedBook = it.bookKey
+                            selectedTabIndex = 3; onTafseerBookSelected(it.bookKey)
+                        } })
                 }
 
                 // Content with pager
@@ -9588,8 +9628,8 @@ fun TafseerDialog(
                     pagerState.animateScrollToPage(selectedTabIndex)
                 }
 
-                LaunchedEffect(pagerState.currentPage) {
-                    selectedTabIndex = pagerState.currentPage
+                LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+                    if (!pagerState.isScrollInProgress) selectedTabIndex = pagerState.currentPage
                 }
 
                 HorizontalPager(
@@ -9610,7 +9650,9 @@ fun TafseerDialog(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         if (page == 3) item {
-                            BengaliIbnKathirContent(tafseerData.surahNumber, tafseerData.ayahNumber, bengaliRepository)
+                            val edition = PublishedTafsirs.forBook(chosenPublishedBook) ?: PublishedTafsirs.bengali
+                            val repository = remember(edition.bookKey) { createPublishedTafsirRepository(tafsirContext, edition) }
+                            PublishedTafsirContent(tafseerData.surahNumber, tafseerData.ayahNumber, edition, repository)
                         }
                         if (tafseerText.isNotEmpty()) {
                             item {

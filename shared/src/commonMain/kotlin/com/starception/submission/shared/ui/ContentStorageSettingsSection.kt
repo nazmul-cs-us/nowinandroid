@@ -411,7 +411,9 @@ private fun storageStatusText(state: ContentStorageCategoryState): String = when
     else -> "${formatStorageSize(state.totalSize)} / ${state.fileCount} files"
 }
 
-internal fun storageCategoryDisplayName(category: String): String = when (category) {
+internal fun storageCategoryDisplayName(category: String): String = com.starception.submission.feature.quran.PublishedTafsirs.forCategory(category)?.let {
+        "${it.englishLanguageName} tafsir · ${it.title}"
+    } ?: when (category) {
     "quran_core" -> "Quran (Arabic + Tafseer)"
     "quran_translation" -> "Quran Translations"
     "quran_tafsir_bn" -> "Bengali Tafsir Ibn Kathir"
@@ -448,7 +450,9 @@ internal fun storageCategoryDisplayName(category: String): String = when (catego
     else -> category.replace('_', ' ').replaceFirstChar { it.uppercase() }
 }
 
-internal fun storageCategoryDescription(category: String): String = when (category) {
+internal fun storageCategoryDescription(category: String): String = com.starception.submission.feature.quran.PublishedTafsirs.forCategory(category)?.let {
+        "Published commentary · All 114 surahs · ${it.attribution}"
+    } ?: when (category) {
     "quran_core" -> "Arabic text, Tafseer, and word meanings"
     "quran_translation" -> "Translations in 11 languages"
     "quran_tafsir_bn" -> "Tawheed Publication · All 114 surahs"
@@ -477,7 +481,7 @@ internal fun storageCategoryDescription(category: String): String = when (catego
 }
 
 private fun storageCategoryGroup(category: String): String = when {
-    category == "quran_core" || category == "quran_translation" || category == "quran_tafsir_bn" -> "Holy Quran"
+    category == "quran_core" || category == "quran_translation" || category.startsWith("quran_tafsir_") -> "Holy Quran"
     category.startsWith("hadith_") -> "Hadith Collections"
     category.startsWith("quran_audio_") || category.endsWith("_audio_bn") ||
         category.startsWith("fortress_audio_") -> "Audio Recitations"

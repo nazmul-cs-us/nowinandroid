@@ -95,11 +95,15 @@ internal fun DetailToolbar(
     var showOptionsSheet by remember { mutableStateOf(false) }
     val allActions = inlineActions + sheetActions
 
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+    val hasTafsir = inlineActions.any { it.id == "tafsir" }
+    val visibleInline = if (hasTafsir && maxWidth < 360.dp) inlineActions.filterNot { it.id == "reciter" } else inlineActions
+    val collapsedActions = inlineActions.filterNot { it in visibleInline }
     AdaptiveWidget(
         material = {
             MaterialDetailToolbar(
                 onBack = onBack,
-                inlineActions = inlineActions,
+                inlineActions = visibleInline,
                 allActions = allActions,
                 contentColor = contentColor,
                 toolbarTitle = toolbarTitle,
@@ -112,8 +116,9 @@ internal fun DetailToolbar(
         cupertino = {
             CupertinoDetailToolbar(
                 onBack = onBack,
-                inlineActions = inlineActions,
-                sheetActions = sheetActions,
+                inlineActions = visibleInline,
+                sheetActions = sheetActions + collapsedActions,
+                compactReciter = hasTafsir && maxWidth < 420.dp,
                 contentColor = contentColor,
                 toolbarTitle = toolbarTitle,
                 includeStatusBarInset = includeStatusBarInset,
@@ -123,6 +128,7 @@ internal fun DetailToolbar(
             )
         },
     )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -300,6 +306,7 @@ private fun MaterialDetailToolbar(
 @Composable
 private fun CupertinoDetailToolbar(
     onBack: () -> Unit,
+    compactReciter: Boolean = false,
     inlineActions: List<DetailAction>,
     sheetActions: List<DetailAction>,
     contentColor: Color,
@@ -376,7 +383,7 @@ private fun CupertinoDetailToolbar(
                         inlineActions.forEach { action ->
                             IconButton(
                                 onClick = action.onClick,
-                                modifier = (if (action.id == "reciter") Modifier.width(112.dp).height(52.dp)
+                                modifier = (if (action.id == "reciter") Modifier.width(if (compactReciter) 64.dp else 112.dp).height(52.dp)
                                     else Modifier.size(52.dp)).semantics { contentDescription = action.label },
                             ) {
                                 action.icon?.let { icon ->

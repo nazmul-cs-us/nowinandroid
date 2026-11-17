@@ -445,7 +445,9 @@ class AssetDownloadViewModel @Inject constructor(
     companion object {
         private const val TAG = "AssetDownloadVM"
 
-        fun formatCategoryName(category: String): String = when (category) {
+        fun formatCategoryName(category: String): String = com.starception.submission.feature.quran.PublishedTafsirs.forCategory(category)?.let {
+        "${it.englishLanguageName} tafsir · ${it.title}"
+    } ?: when (category) {
             "quran_core" -> "Quran (Arabic + Tafseer)"
             "quran_translation" -> "Quran Translations"
             "quran_tafsir_bn" -> "Bengali Tafsir Ibn Kathir"
@@ -486,7 +488,7 @@ class AssetDownloadViewModel @Inject constructor(
          * Returns a display group for organizing categories in the UI.
          */
         fun categoryGroup(category: String): String = when {
-            category == "quran_core" || category == "quran_translation" || category == "quran_tafsir_bn" -> "Holy Quran"
+            category == "quran_core" || category == "quran_translation" || category.startsWith("quran_tafsir_") -> "Holy Quran"
             category.startsWith("hadith_") -> "Hadith Collections"
             category.startsWith("quran_audio_") || category == "bukhari_audio_bn" -> "Audio Recitations"
             category.startsWith("model_tts_") -> "Text-to-Speech"
@@ -525,7 +527,9 @@ class AssetDownloadViewModel @Inject constructor(
             else -> 6
         }
 
-        fun categoryDescription(category: String): String = when (category) {
+        fun categoryDescription(category: String): String = com.starception.submission.feature.quran.PublishedTafsirs.forCategory(category)?.let {
+        "Published commentary · All 114 surahs · ${it.attribution}"
+    } ?: when (category) {
             "quran_core" -> "Arabic text, Tafseer, and word meanings"
             "quran_translation" -> "11 languages including English and Bengali"
             "quran_tafsir_bn" -> "Tawheed Publication · All 114 surahs · Published Bengali commentary"

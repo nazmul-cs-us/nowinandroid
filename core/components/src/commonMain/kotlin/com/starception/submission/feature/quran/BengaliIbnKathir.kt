@@ -26,7 +26,7 @@ object BengaliIbnKathir {
 }
 
 /** The platform reader resolves a SHA-256-verified CDN file, reusing its persistent offline cache. */
-class BengaliIbnKathirRepository(private val readChapter: suspend (Int) -> String) {
+class PublishedTafsirRepository(private val readChapter: suspend (Int) -> String) {
     private val mutex = Mutex()
     private val chapters = linkedMapOf<Int, List<String>>()
 
@@ -61,3 +61,6 @@ class BengaliIbnKathirRepository(private val readChapter: suspend (Int) -> Strin
         return refs.map(passages::get)
     }
 }
+
+/** Source compatibility for the original Bengali reader and saved data. */
+typealias BengaliIbnKathirRepository = PublishedTafsirRepository

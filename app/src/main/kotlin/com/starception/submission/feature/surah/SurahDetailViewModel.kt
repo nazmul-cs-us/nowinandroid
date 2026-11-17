@@ -16,7 +16,7 @@
 
 package com.starception.submission.feature.surah
 
-import com.starception.submission.feature.quran.BengaliIbnKathir
+import com.starception.submission.feature.quran.PublishedTafsirs
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -529,9 +529,9 @@ class SurahDetailViewModel @Inject constructor(
     val tafseerData: StateFlow<com.starception.submission.core.qurandatabase.QuranAyahTafseer?> = _tafseerData.asStateFlow()
 
     private val initialTafsirLanguage = prefs.getString("tafseer_translation_lang",
-        if (prefs.getString("quran_translation", "ar") == "bn") "bn" else "ar") ?: "ar"
+        prefs.getString("quran_translation", "ar") ?: "ar") ?: "ar"
     private val _selectedTafseerBook = MutableStateFlow(
-        if (initialTafsirLanguage == "bn") BengaliIbnKathir.BOOK_KEY else "saadi")
+        PublishedTafsirs.forLanguage(initialTafsirLanguage)?.bookKey ?: "saadi")
     val selectedTafseerBook: StateFlow<String> = _selectedTafseerBook.asStateFlow()
 
     // Tafseer translation states
@@ -572,14 +572,15 @@ class SurahDetailViewModel @Inject constructor(
         _tafseerData.value = null
         tafseerLoadJob = viewModelScope.launch {
             val current = _uiState.value as? SurahDetailUiState.Success
-            val original = if (_selectedTafseerBook.value == BengaliIbnKathir.BOOK_KEY) null
+            val original = if (PublishedTafsirs.forBook(_selectedTafseerBook.value) != null) null
                 else try { quranEnhancedRepository.getTafseerForAyah(surahNumber, ayahNumber) }
                 catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                 catch (_: Exception) { null } // Bengali remains accessible when the separate Arabic database is absent.
             val tafseer = original ?: com.starception.submission.core.qurandatabase.QuranAyahTafseer(
                 id = 0, surahNumber = surahNumber, ayahNumber = ayahNumber,
-                surahNameArabic = current?.surah?.nameArabic.orEmpty(),
-                ayahText = current?.ayahs?.firstOrNull { it.numberInSurah == ayahNumber }?.text?.substringBefore("\n\n").orEmpty(),
+                surahNameArabic = current?.surah?.takeIf { it.number == surahNumber }?.nameArabic
+                    ?: com.starception.submission.feature.quran.QuranData.surahs.firstOrNull { it.number == surahNumber }?.nameArabic.orEmpty(),
+                ayahText = current?.takeIf { it.surah.number == surahNumber }?.ayahs?.firstOrNull { it.numberInSurah == ayahNumber }?.text?.substringBefore("\n\n").orEmpty(),
                 tafseerSaadi = "", tafseerMoysar = "", tafseerBaghawi = "", ayahMeanings = "",
                 grammaticalAnalysis = "", revelationReasons = "")
             _tafseerData.value = tafseer
@@ -597,10 +598,11 @@ class SurahDetailViewModel @Inject constructor(
 
     fun selectTafseerBook(book: String) {
         _selectedTafseerBook.value = book
-        if (book == BengaliIbnKathir.BOOK_KEY) {
-            _tafseerTranslationLanguage.value = "bn"
-            prefs.edit().putString("tafseer_translation_lang", "bn").apply()
-        } else if (_tafseerTranslationLanguage.value == "bn") {
+        val published = PublishedTafsirs.forBook(book)
+        if (published != null) {
+            _tafseerTranslationLanguage.value = published.languageCode
+            prefs.edit().putString("tafseer_translation_lang", published.languageCode).apply()
+        } else if (PublishedTafsirs.forLanguage(_tafseerTranslationLanguage.value) != null) {
             _tafseerTranslationLanguage.value = "ar"
             prefs.edit().putString("tafseer_translation_lang", "ar").apply()
             val current = _tafseerData.value
@@ -613,12 +615,13 @@ class SurahDetailViewModel @Inject constructor(
             _tafseerTranslationLanguage.value = languageCode
             prefs.edit().putString("tafseer_translation_lang", languageCode).apply()
 
-            if (languageCode == "bn") {
-                _selectedTafseerBook.value = BengaliIbnKathir.BOOK_KEY
+            val published = PublishedTafsirs.forLanguage(languageCode)
+            if (published != null) {
+                _selectedTafseerBook.value = published.bookKey
                 _isTafseerTranslating.value = false
                 return@launch
             }
-            if (_selectedTafseerBook.value == BengaliIbnKathir.BOOK_KEY) {
+            if (PublishedTafsirs.forBook(_selectedTafseerBook.value) != null) {
                 _selectedTafseerBook.value = "saadi"
                 _tafseerData.value?.let { loadTafseer(it.surahNumber, it.ayahNumber) }
             }
@@ -639,7 +642,7 @@ class SurahDetailViewModel @Inject constructor(
     }
 
     private fun translateTafseer(tafseer: com.starception.submission.core.qurandatabase.QuranAyahTafseer, targetLang: String) {
-        if (targetLang == "bn") return // Published Bengali Ibn Kathir is loaded separately, never machine translated.
+        if (PublishedTafsirs.forLanguage(targetLang) != null) return // Published editions never use machine translation.
         viewModelScope.launch {
             _isTafseerTranslating.value = true
             try {
@@ -677,13 +680,14 @@ class SurahDetailViewModel @Inject constructor(
     }
 
     fun getAvailableTafseerTranslations(): List<String> = listOf(
-        "ar", "en", "bn", "zh", "es", "fr", "id", "ru", "sv", "tr", "ur",
+        "ar", "en", "bn", "hi", "zh", "es", "fr", "id", "ru", "sv", "tr", "ur",
     )
 
     fun getTafseerTranslationName(code: String): String = when (code) {
         "ar" -> "Arabic (Original)"
         "en" -> "English"
         "bn" -> "Bengali"
+        "hi" -> "Hindi"
         "zh" -> "Chinese"
         "es" -> "Spanish"
         "fr" -> "French"

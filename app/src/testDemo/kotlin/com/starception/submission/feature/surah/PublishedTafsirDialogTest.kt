@@ -1,0 +1,38 @@
+package com.starception.submission.feature.surah
+
+import android.app.Application
+import android.content.Context
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.core.app.ApplicationProvider
+import com.starception.submission.core.qurandatabase.QuranAyahTafseer
+import com.starception.submission.feature.quran.PublishedTafsirs
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class, qualifiers = "w393dp-h900dp", sdk = [35])
+class PublishedTafsirDialogTest {
+    @get:Rule val compose = createComposeRule()
+    @Test fun choosingFrenchInTheFullScreenDialogDoesNotSnapBackToBengali() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+        org.robolectric.Shadows.shadowOf(connectivity).setActiveNetworkInfo(null)
+        val selected = mutableStateOf("saadi")
+        val data = QuranAyahTafseer(0, 1, "الفاتحة", 1, "بسم الله", "Arabic Saadi", "Arabic Moyassar", "Arabic Baghawi", "", "", "")
+        compose.setContent { MaterialTheme {
+            TafseerDialog(data, selected.value, onTafseerBookSelected = { selected.value = it }, onDismiss = {})
+        } }
+        compose.onNodeWithTag("published-tafsir-picker").performClick()
+        compose.onNodeWithText("Français").performScrollTo().performClick()
+        compose.waitForIdle()
+        assertEquals(PublishedTafsirs.forLanguage("fr")!!.bookKey, selected.value)
+        compose.onNodeWithText("Français · QUL / Tarteel").assertIsDisplayed()
+    }
+}

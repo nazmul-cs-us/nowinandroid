@@ -1,0 +1,10 @@
+{
+  "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
+  "active": true,
+  "excluded_turkish_listing": "Upstream tr-tafsir-ibne-kathir appears to contain verse translation without commentary. Its unregistered staging objects were removed; complete Turkish Al-Mukhtasar is used.",
+  "manifest_version": 3,
+  "manifest_sha256": "fdc35aa5ef2d37ecf193e16e914c34e2dd9de0b2b4cee51c6fb5792b7ce658ee",
+  "previous_assets_preserved": 7284,
+  "new_files": 1044,
+  "verified_at": "2026-11-17"
+}

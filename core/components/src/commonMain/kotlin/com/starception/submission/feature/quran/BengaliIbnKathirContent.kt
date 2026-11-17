@@ -16,7 +16,18 @@ import kotlinx.coroutines.launch
 
 /** Published Bengali text only: errors never fall back to Arabic or machine-generated Bengali. */
 @Composable
-fun BengaliIbnKathirContent(surah: Int, ayah: Int, repository: BengaliIbnKathirRepository, modifier: Modifier = Modifier) {
+fun BengaliIbnKathirContent(surah: Int, ayah: Int, repository: BengaliIbnKathirRepository, modifier: Modifier = Modifier) =
+    PublishedTafsirContent(surah, ayah, PublishedTafsirs.bengali, repository, modifier)
+
+@Composable
+fun PublishedTafsirContent(surah: Int, ayah: Int, edition: PublishedTafsirEdition,
+    repository: PublishedTafsirRepository, modifier: Modifier = Modifier) {
+    key(edition.bookKey) { PublishedTafsirReader(surah, ayah, edition, repository, modifier) }
+}
+
+@Composable
+private fun PublishedTafsirReader(surah: Int, ayah: Int, edition: PublishedTafsirEdition,
+    repository: PublishedTafsirRepository, modifier: Modifier) {
     var text by remember(surah, ayah) { mutableStateOf<String?>(null) }
     var failed by remember(surah, ayah) { mutableStateOf(false) }
     var retry by remember { mutableIntStateOf(0) }
@@ -35,22 +46,25 @@ fun BengaliIbnKathirContent(surah: Int, ayah: Int, repository: BengaliIbnKathirR
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
-                Text(BengaliIbnKathir.TITLE, style = MaterialTheme.typography.titleMedium,
+                Text(edition.title, style = MaterialTheme.typography.titleMedium,
                     fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold)
-                Text("বাংলা · ${BengaliIbnKathir.PUBLISHER}", style = MaterialTheme.typography.bodySmall,
+                Text("${edition.languageName} · ${edition.attribution}", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            TextButton(onClick = { uri.openUri(BengaliIbnKathir.SOURCE_URL) }) { Text("Source") }
+            TextButton(onClick = { uri.openUri(edition.sourceUrl) }) { Text("Source") }
         }
         when {
             failed -> {
-                Text("Could not load this Bengali tafsir. Connect to download it, or try again if already saved.", color = MaterialTheme.colorScheme.error)
+                Text("Could not load this published tafsir. Connect to download it, or try again if already saved.", color = MaterialTheme.colorScheme.error)
                 TextButton(onClick = { retry++ }) { Text("Try again") }
             }
             text == null -> LinearProgressIndicator(Modifier.fillMaxWidth())
             else -> SelectionContainer {
                 Text(text.orEmpty(), style = MaterialTheme.typography.bodyLarge.copy(
-                    fontFamily = FontFamily.SansSerif, fontSize = 18.sp, lineHeight = 30.sp),
+                    fontFamily = FontFamily.SansSerif, fontSize = 18.sp, lineHeight = 30.sp,
+                    textDirection = androidx.compose.ui.text.style.TextDirection.Content,
+                    textAlign = if (edition.languageCode == "ur") androidx.compose.ui.text.style.TextAlign.Right
+                        else androidx.compose.ui.text.style.TextAlign.Start),
                     modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)
                         .verticalScroll(textScroll))
             }

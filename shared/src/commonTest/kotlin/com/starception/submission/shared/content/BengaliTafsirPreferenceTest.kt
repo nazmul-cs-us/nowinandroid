@@ -22,7 +22,24 @@ class BengaliTafsirPreferenceTest {
     @Test fun invalidStoredBooksRecoverToALanguageAppropriateDefault() {
         val values = InMemoryKeyValueStore()
         values.putString("quran_tafsir_book", "unknown")
-        assertEquals(0, SharedContentStore(values).quranTafsirBook())
+        assertEquals(5, SharedContentStore(values).quranTafsirBook())
         assertFailsWith<IllegalArgumentException> { SharedContentStore(values).saveQuranTafsirBook(99) }
+    }
+    @Test fun allPublishedLanguagesDefaultToTheirOwnEditionAndPersistAnExplicitChoice() {
+        for (edition in com.starception.submission.feature.quran.PublishedTafsirs.editions) {
+            val values = InMemoryKeyValueStore(); val store = SharedContentStore(values)
+            store.saveQuranTranslationLanguage(edition.languageCode)
+            assertEquals(edition.storageIndex, store.quranTafsirBook())
+            store.saveQuranTafsirBook(edition.storageIndex)
+            store.saveQuranTranslationLanguage("sv")
+            assertEquals(edition.storageIndex, SharedContentStore(values).quranTafsirBook())
+        }
+    }
+    @Test fun legacyArabicAndBengaliIndexesAreNotRemappedWhenTheTranslationChanges() {
+        val values = InMemoryKeyValueStore(); val store = SharedContentStore(values)
+        values.putString("quran_tafsir_book", "4"); store.saveQuranTranslationLanguage("zh")
+        assertEquals(4, SharedContentStore(values).quranTafsirBook())
+        store.saveQuranTafsirBook(0)
+        assertEquals(0, SharedContentStore(values).quranTafsirBook())
     }
 }

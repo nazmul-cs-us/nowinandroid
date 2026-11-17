@@ -17,7 +17,9 @@
 package com.starception.submission.shared.ui
 
 import com.starception.submission.feature.quran.BengaliIbnKathir
-import com.starception.submission.feature.quran.BengaliIbnKathirContent
+import com.starception.submission.feature.quran.PublishedTafsirContent
+import com.starception.submission.feature.quran.PublishedTafsirPicker
+import com.starception.submission.feature.quran.PublishedTafsirs
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
@@ -556,7 +558,6 @@ internal fun QuranDetailScreen(
     }
     var loadAttempt by remember(number) { mutableStateOf(0) }
     val tafseerRepository = remember { com.starception.submission.shared.quran.createQuranTafseerRepository() }
-    val bengaliTafsirRepository = remember { com.starception.submission.shared.quran.createBengaliIbnKathirRepository() }
     val tafseerScope = androidx.compose.runtime.rememberCoroutineScope()
     var tafseerRequest by remember {
         mutableStateOf<com.starception.submission.shared.quran.AyahTafseer?>(null)
@@ -636,6 +637,35 @@ internal fun QuranDetailScreen(
     ) { showReciterPicker = true }
     // Android's toolbar translation chip — the two-letter code (EN/BN/…) that
     // opens the reading settings' translation picker.
+    val openTafsir: (Int, Int) -> Unit = { verseId, preselectBook ->
+        tafseerLoadJob?.cancel()
+        tafseerSelectedBook = if (preselectBook == 3) 3
+            else store.quranTafsirBook().takeIf { it != 3 } ?: 0
+        val placeholder = com.starception.submission.shared.quran.AyahTafseer.EMPTY.copy(
+            surahNumber = number, ayahNumber = verseId)
+        // Retain the requested address even when switching to Bengali before Arabic finishes.
+        tafseerRequest = placeholder
+        if (PublishedTafsirs.forStorageIndex(tafseerSelectedBook) != null) {
+            tafseerLoading = false
+        } else {
+            tafseerLoading = true
+            tafseerLoadJob = tafseerScope.launch {
+                try {
+                    tafseerRequest = tafseerRepository.getTafseer(number, verseId) ?: placeholder
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    tafseerRequest = placeholder
+                } finally {
+                    if (tafseerRequest?.surahNumber == number && tafseerRequest?.ayahNumber == verseId)
+                        tafseerLoading = false
+                }
+            }
+        }
+    }
+    val tafsirAction = DetailAction(id = "tafsir", label = "Tafsir", trailingText = "Tafsir") {
+        openTafsir(1, 0)
+    }
     val translationChipAction = DetailAction(
         id = "translation_chip",
         label = "Translation",
@@ -716,6 +746,7 @@ internal fun QuranDetailScreen(
                         onBack = onBack,
                         inlineActions = listOf(
                             translationChipAction,
+                            tafsirAction,
                             reciterAction,
                             bookmarkAction,
                         ),
@@ -788,6 +819,7 @@ internal fun QuranDetailScreen(
                                 onBack = onBack,
                                 inlineActions = listOf(
                                     translationChipAction,
+                                    tafsirAction,
                                     reciterAction,
                                     bookmarkAction,
                                 ),
@@ -976,7 +1008,7 @@ internal fun QuranDetailScreen(
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
                         ) {
-                            listOf("As-Sa'di" to 0, "Al-Moyassar" to 1, "Al-Baghawi" to 2, "Word meanings" to 3, BengaliIbnKathir.LABEL to 4).forEach { (label, index) ->
+                            listOf("As-Sa'di" to 0, "Al-Moyassar" to 1, "Al-Baghawi" to 2, "Word meanings" to 3).forEach { (label, index) ->
                                 androidx.compose.material3.FilterChip(
                                     selected = tafseerSelectedBook == index,
                                     onClick = { tafseerSelectedBook = index; store.saveQuranTafsirBook(index) },
@@ -985,8 +1017,15 @@ internal fun QuranDetailScreen(
                             }
                         }
                         Spacer(Modifier.height(10.dp))
-                        if (tafseerSelectedBook == 4) {
-                            BengaliIbnKathirContent(number, tafseerSheet.ayahNumber, bengaliTafsirRepository)
+                        val publishedEdition = PublishedTafsirs.forStorageIndex(tafseerSelectedBook)
+                        PublishedTafsirPicker(publishedEdition?.bookKey) {
+                            tafseerSelectedBook = it.storageIndex; store.saveQuranTafsirBook(it.storageIndex)
+                        }
+                        if (publishedEdition != null) {
+                            val repository = remember(publishedEdition.bookKey) {
+                                com.starception.submission.shared.quran.createPublishedTafsirRepository(publishedEdition)
+                            }
+                            PublishedTafsirContent(number, tafseerSheet.ayahNumber, publishedEdition, repository)
                         } else if (tafseerLoading) {
                             androidx.compose.foundation.layout.Box(
                                 modifier = Modifier
@@ -1154,32 +1193,7 @@ internal fun QuranDetailScreen(
                                         showTranslation = !showTranslation
                                         store.saveQuranShowTranslation(showTranslation)
                                     },
-                                    onOpenTafseer = { verseId, preselectBook ->
-                                        tafseerLoadJob?.cancel()
-                                        tafseerSelectedBook = if (preselectBook == 3) 3
-                                            else store.quranTafsirBook().takeIf { it != 3 } ?: 0
-                                        val placeholder = com.starception.submission.shared.quran.AyahTafseer.EMPTY.copy(
-                                            surahNumber = number, ayahNumber = verseId)
-                                        // Retain the requested address even when switching to Bengali before Arabic finishes.
-                                        tafseerRequest = placeholder
-                                        if (tafseerSelectedBook == 4) {
-                                            tafseerLoading = false
-                                        } else {
-                                            tafseerLoading = true
-                                            tafseerLoadJob = tafseerScope.launch {
-                                                try {
-                                                    tafseerRequest = tafseerRepository.getTafseer(number, verseId) ?: placeholder
-                                                } catch (cancelled: CancellationException) {
-                                                    throw cancelled
-                                                } catch (_: Exception) {
-                                                    tafseerRequest = placeholder
-                                                } finally {
-                                                    if (tafseerRequest?.surahNumber == number && tafseerRequest?.ayahNumber == verseId)
-                                                        tafseerLoading = false
-                                                }
-                                            }
-                                        }
-                                    },
+                                    onOpenTafseer = openTafsir,
                                 )
                             }
                         }
@@ -1322,6 +1336,7 @@ internal fun QuranDetailScreen(
                         if (resume) startSelectedAudio() else showAudioPlayer = false
                     }
                 },
+                onOpenTafsir = { showReadingSettings = false; openTafsir(1, 0) },
                 onReciterSelected = {
                     showReadingSettings = false
                     startSelectedAudio("ar")
@@ -1919,6 +1934,7 @@ private fun SurahReadingSettingsSheet(
     onTranslationChange: (Boolean) -> Unit,
     onTajweedChange: (Boolean) -> Unit,
     onTranslationLanguageChange: (com.starception.submission.shared.quran.QuranTranslationLanguage) -> Unit,
+    onOpenTafsir: () -> Unit,
     onReciterSelected: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1926,6 +1942,9 @@ private fun SurahReadingSettingsSheet(
     var expandedSection by remember { mutableStateOf<String?>(null) }
     ReadingSettingsModal(onDismiss = onDismiss) {
         ReciterSettingsSection(surahNumber = surahNumber, onSelected = onReciterSelected)
+        SettingsSection(title = "Tafsir") {
+            SettingsPickerRow(label = "Commentary", value = "Choose book and language", expanded = false, onToggle = onOpenTafsir)
+        }
         // Food Truck's grouped-form layout: titled sections on cards.
         SettingsSection(title = "Preview") {
             Text(

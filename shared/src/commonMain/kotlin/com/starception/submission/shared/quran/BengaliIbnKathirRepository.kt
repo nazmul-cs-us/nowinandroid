@@ -1,5 +1,7 @@
 package com.starception.submission.shared.quran
 
-import com.starception.submission.feature.quran.BengaliIbnKathirRepository
+import com.starception.submission.feature.quran.*
 
-internal expect fun createBengaliIbnKathirRepository(): BengaliIbnKathirRepository
+internal expect fun createPublishedTafsirRepository(edition: PublishedTafsirEdition): PublishedTafsirRepository
+internal fun createBengaliIbnKathirRepository(): BengaliIbnKathirRepository =
+    createPublishedTafsirRepository(PublishedTafsirs.bengali)
