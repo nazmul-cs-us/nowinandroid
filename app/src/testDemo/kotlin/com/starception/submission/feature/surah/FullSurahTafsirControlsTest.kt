@@ -2,6 +2,8 @@ package com.starception.submission.feature.surah
 
 import android.app.Application
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.test.*
@@ -40,7 +42,7 @@ class FullSurahTafsirControlsTest {
             val player = rememberSurahTafsirSpeechPlayer(1, "ibn_kathir_en", session,
                 engineFactory = { engine }, loadAyah = { "Ayah $it commentary" })
             if (visible.value) InlineTafsirHeader("ibn_kathir_en", {}, {}, playback = {
-                SurahTafsirPlaybackControls(player) { Text("Download required") }
+                SurahTafsirPlaybackControls(player, surahTitle = "Al-Fatihah") { Text("Download required") }
             })
         } } } }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/full_surah_tafsir.png")
@@ -51,7 +53,9 @@ class FullSurahTafsirControlsTest {
         compose.waitUntil(5000) { engine.spoken.size == 2 }
         compose.runOnIdle { visible.value = true }
         compose.onNodeWithText("Ayah 2 of 7").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/full_surah_tafsir_playing.png")
         compose.onNodeWithText("Pause surah tafsir").performClick()
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/full_surah_tafsir_paused.png")
         compose.onNodeWithText("Resume surah tafsir").performClick()
         compose.onNodeWithContentDescription("Stop surah tafsir").performClick()
         compose.onNodeWithText("Play full surah tafsir").assertIsDisplayed()
@@ -65,7 +69,7 @@ class FullSurahTafsirControlsTest {
             val session = remember { TafsirSpeechSession() }
             val player = rememberSurahTafsirSpeechPlayer(1, book.value, session,
                 engineFactory = { Engine().also(engines::add) }, loadAyah = { "Ayah $it" })
-            SurahTafsirPlaybackControls(player) { Text("Download required") }
+            SurahTafsirPlaybackControls(player, surahTitle = "Al-Fatihah") { Text("Download required") }
         } }
         compose.onNodeWithText("Play full surah tafsir").performClick()
         compose.waitUntil(5000) { engines.first().spoken.isNotEmpty() }
@@ -76,4 +80,35 @@ class FullSurahTafsirControlsTest {
         assertTrue(engines.last().spoken.isEmpty())
         compose.onNodeWithText("Play full surah tafsir").assertIsDisplayed()
     }
+    @Test
+    @Config(qualifiers = "w320dp-h780dp", sdk = [35])
+    fun compactPlayerKeepsPlayAndStopUsableWithLargerTextInBothThemes() {
+        val dark = mutableStateOf(false)
+        val engine = Engine()
+        compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides
+                androidx.compose.ui.unit.Density(density.density, 1.3f)) {
+                MaterialTheme(colorScheme = if (dark.value) darkColorScheme() else lightColorScheme()) {
+                    Surface { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(16.dp)) {
+                        val session = remember { TafsirSpeechSession() }
+                        val player = rememberSurahTafsirSpeechPlayer(2, "ibn_kathir_en", session,
+                            engineFactory = { engine }, loadAyah = { "Ayah $it" })
+                        SurahTafsirPlaybackControls(player, "Al-Baqarah") { Text("Download required") }
+                    } }
+                }
+            }
+        }
+        compose.onNodeWithText("Play full surah tafsir").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/full_surah_tafsir_compact.png")
+        compose.onNodeWithText("Play full surah tafsir").performClick()
+        compose.waitUntil(5000) { engine.spoken.isNotEmpty() }
+        compose.runOnIdle { dark.value = true }
+        compose.onNodeWithText("Pause surah tafsir").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Stop surah tafsir").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/full_surah_tafsir_dark.png")
+        compose.onNodeWithContentDescription("Stop surah tafsir").performClick()
+        compose.onNodeWithText("Play full surah tafsir").assertIsDisplayed()
+    }
+
 }

@@ -1234,7 +1234,7 @@ internal fun QuranDetailScreen(
                                                 store.saveQuranTafsirBook(tafseerSelectedBook)
                                             }, onHide = { showInlineTafsir = false }, playback = {
                                             surahTafsirPlayer?.let { fullPlayer ->
-                                                com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer) { reload ->
+                                                com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer, surahTitle = surah.nameEnglish) { reload ->
                                                     MissingContentDownloadCard(inlineEdition?.category ?: "quran_core",
                                                         inlineEdition?.let { "${it.englishLanguageName} · ${it.title}" } ?: "Arabic tafsir",
                                                         onDownloadComplete = { inlineTafsirRevision++; reload() })

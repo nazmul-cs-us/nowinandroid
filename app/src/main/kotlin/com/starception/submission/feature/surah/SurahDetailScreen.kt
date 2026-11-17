@@ -1160,7 +1160,7 @@ fun SurahDetailScreen(
                                 com.starception.submission.feature.quran.InlineTafsirHeader(selectedTafseerBook,
                                     onSelect = viewModel::selectTafseerBook, onHide = { showInlineTafsir = false }, playback = {
                                         surahTafsirPlayer?.let { fullPlayer ->
-                                            com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer) { reload ->
+                                            com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer, surahTitle = pageSurah.nameEnglish) { reload ->
                                                 MissingTafsirAssetCard(inlineEdition) { inlineTafsirRevision++; reload() }
                                             }
                                         }

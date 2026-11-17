@@ -136,3 +136,9 @@ The queue belongs to Surah Details, so scrolling the selector out of view keeps
 narration running. Starting an individual ayah cancels the full-surah queue, and
 starting the full queue stops individual narration. Hiding tafsir, changing the
 surah or book, leaving the page, or backgrounding stops full-surah playback.
+
+The full-surah player uses a theme-colored reading card with the surah name,
+ready/listening/paused status, ayah-based progress and a prominent playback action.
+The progress bar tracks completed ayah ranges, not an estimated duration. Loading
+uses an indeterminate indicator. Controls adapt to narrow screens and larger text;
+no decorative waveform or invented playback time is shown.

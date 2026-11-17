@@ -1,6 +1,19 @@
 package com.starception.submission.feature.quran
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -111,37 +124,91 @@ fun rememberSurahTafsirSpeechPlayer(surah: Int, book: String, session: TafsirSpe
 }
 
 @Composable
-fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, missingAsset: @Composable (() -> Unit) -> Unit) {
+fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, surahTitle: String? = null,
+    missingAsset: @Composable (() -> Unit) -> Unit) {
     val state by player.state.collectAsState()
     val ayahs by player.currentAyahs.collectAsState()
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton(enabled = state.status != TafsirSpeechStatus.PREPARING, onClick = {
-                when (state.status) {
-                    TafsirSpeechStatus.PLAYING -> player.pause()
-                    TafsirSpeechStatus.PAUSED -> player.resume()
-                    else -> player.start()
+    val colors = MaterialTheme.colorScheme
+    val active = state.status in listOf(TafsirSpeechStatus.PREPARING, TafsirSpeechStatus.PLAYING, TafsirSpeechStatus.PAUSED)
+    val action = when (state.status) {
+        TafsirSpeechStatus.PLAYING -> "Pause surah tafsir"
+        TafsirSpeechStatus.PAUSED -> "Resume surah tafsir"
+        TafsirSpeechStatus.PREPARING -> "Preparing surah…"
+        else -> "Play full surah tafsir"
+    }
+    val progress by animateFloatAsState(
+        if (state.finished) 1f else ((ayahs?.first ?: 1) - 1).toFloat() / player.totalAyahs,
+        label = "Completed tafsir ayahs")
+    Card(modifier = Modifier.fillMaxWidth().animateContentSize().testTag("full-surah-tafsir-player"),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.55f)),
+        colors = CardDefaults.cardColors(containerColor = colors.surface)) {
+        Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(
+            colors.primaryContainer.copy(alpha = 0.45f), colors.surfaceContainerLow)))
+            .padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Headphones, contentDescription = null, tint = colors.primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("SURAH TAFSIR", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 1.sp, color = colors.onSurfaceVariant)
+                Surface(shape = CircleShape, color = colors.surface.copy(alpha = 0.7f)) {
+                    Text(when {
+                        state.finished -> "Complete"
+                        state.status == TafsirSpeechStatus.PLAYING -> "Listening"
+                        state.status == TafsirSpeechStatus.PAUSED -> "Paused"
+                        state.status == TafsirSpeechStatus.PREPARING -> "Preparing"
+                        state.status == TafsirSpeechStatus.ERROR -> "Retry"
+                        else -> "Ready"
+                    }, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelSmall, color = colors.primary)
                 }
-            }) {
-                Icon(if (state.status == TafsirSpeechStatus.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(when (state.status) {
-                    TafsirSpeechStatus.PLAYING -> "Pause surah tafsir"
-                    TafsirSpeechStatus.PAUSED -> "Resume surah tafsir"
-                    TafsirSpeechStatus.PREPARING -> "Preparing surah…"
-                    else -> "Play full surah tafsir"
-                })
             }
-            if (state.status in listOf(TafsirSpeechStatus.PREPARING, TafsirSpeechStatus.PLAYING, TafsirSpeechStatus.PAUSED))
-                IconButton(onClick = player::stop) { Icon(Icons.Default.Stop, contentDescription = "Stop surah tafsir") }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(surahTitle ?: "Listen to tafsir", style = MaterialTheme.typography.headlineSmall,
+                    fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                Text("The full surah, read aloud", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(when {
+                        state.finished -> "Surah tafsir finished."
+                        else -> ayahs?.let {
+                            if (it.first == it.last) "Ayah ${it.first} of ${player.totalAyahs}"
+                            else "Ayahs ${it.first}–${it.last} of ${player.totalAyahs}"
+                        } ?: "Begin with ayah 1"
+                    }, style = MaterialTheme.typography.labelMedium, color = colors.onSurface)
+                    if (ayahs == null && !state.finished) Text("${player.totalAyahs} ayahs",
+                        style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                }
+                if (state.status == TafsirSpeechStatus.PREPARING) LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(3.dp), color = colors.primary, trackColor = colors.outlineVariant.copy(alpha = 0.5f))
+                else LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(3.dp),
+                    color = colors.primary, trackColor = colors.outlineVariant.copy(alpha = 0.5f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(enabled = state.status != TafsirSpeechStatus.PREPARING,
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                    onClick = {
+                        when (state.status) {
+                            TafsirSpeechStatus.PLAYING -> player.pause()
+                            TafsirSpeechStatus.PAUSED -> player.resume()
+                            else -> player.start()
+                        }
+                    }) {
+                    Icon(if (state.status == TafsirSpeechStatus.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(action, style = MaterialTheme.typography.labelLarge)
+                }
+                if (active) FilledTonalIconButton(onClick = player::stop,
+                    modifier = Modifier.size(52.dp), shape = RoundedCornerShape(16.dp)) {
+                    Icon(Icons.Default.Stop, contentDescription = "Stop surah tafsir", modifier = Modifier.size(22.dp))
+                }
+            }
+            if (state.assetMissing) missingAsset { player.stop() }
+            else state.error?.let { Text(it, color = colors.error, style = MaterialTheme.typography.bodySmall) }
         }
-        if (state.finished) Text("Surah tafsir finished.", style = MaterialTheme.typography.bodySmall)
-        else ayahs?.let {
-            Text(if (it.first == it.last) "Ayah ${it.first} of ${player.totalAyahs}"
-                else "Ayahs ${it.first}–${it.last} of ${player.totalAyahs}", style = MaterialTheme.typography.bodySmall)
-        }
-        if (state.assetMissing) missingAsset { player.stop() }
-        else state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }
