@@ -16,6 +16,9 @@
 
 package com.starception.submission.shared.ui
 
+import com.starception.submission.feature.quran.BengaliIbnKathir
+import com.starception.submission.feature.quran.BengaliIbnKathirContent
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -553,12 +556,14 @@ internal fun QuranDetailScreen(
     }
     var loadAttempt by remember(number) { mutableStateOf(0) }
     val tafseerRepository = remember { com.starception.submission.shared.quran.createQuranTafseerRepository() }
+    val bengaliTafsirRepository = remember { com.starception.submission.shared.quran.createBengaliIbnKathirRepository() }
     val tafseerScope = androidx.compose.runtime.rememberCoroutineScope()
     var tafseerRequest by remember {
         mutableStateOf<com.starception.submission.shared.quran.AyahTafseer?>(null)
     }
     var tafseerLoading by remember { mutableStateOf(false) }
-    var tafseerSelectedBook by remember { mutableStateOf(0) }
+    var tafseerLoadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var tafseerSelectedBook by remember { mutableStateOf(store.quranTafsirBook()) }
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
     val repository = remember(loadAttempt) { createQuranVerseRepository() }
     LaunchedEffect(number, translationLanguage, loadAttempt) {
@@ -959,7 +964,7 @@ internal fun QuranDetailScreen(
                                 fontWeight = FontWeight.Bold,
                             )
                             androidx.compose.material3.TextButton(
-                                onClick = { tafseerRequest = null },
+                                onClick = { tafseerLoadJob?.cancel(); tafseerLoading = false; tafseerRequest = null },
                             ) {
                                 Text("Close", style = MaterialTheme.typography.labelMedium)
                             }
@@ -971,16 +976,18 @@ internal fun QuranDetailScreen(
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
                         ) {
-                            listOf("As-Sa'di" to 0, "Al-Moyassar" to 1, "Al-Baghawi" to 2, "Word meanings" to 3).forEach { (label, index) ->
+                            listOf("As-Sa'di" to 0, "Al-Moyassar" to 1, "Al-Baghawi" to 2, "Word meanings" to 3, BengaliIbnKathir.LABEL to 4).forEach { (label, index) ->
                                 androidx.compose.material3.FilterChip(
                                     selected = tafseerSelectedBook == index,
-                                    onClick = { tafseerSelectedBook = index },
+                                    onClick = { tafseerSelectedBook = index; store.saveQuranTafsirBook(index) },
                                     label = { Text(label) },
                                 )
                             }
                         }
                         Spacer(Modifier.height(10.dp))
-                        if (tafseerLoading) {
+                        if (tafseerSelectedBook == 4) {
+                            BengaliIbnKathirContent(number, tafseerSheet.ayahNumber, bengaliTafsirRepository)
+                        } else if (tafseerLoading) {
                             androidx.compose.foundation.layout.Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1148,17 +1155,29 @@ internal fun QuranDetailScreen(
                                         store.saveQuranShowTranslation(showTranslation)
                                     },
                                     onOpenTafseer = { verseId, preselectBook ->
-                                        tafseerSelectedBook = preselectBook
-                                        tafseerLoading = true
-                                        tafseerScope.launch {
-                                            val tafseer = runCatching {
-                                                tafseerRepository.getTafseer(
-                                                    number,
-                                                    verseId,
-                                                )
-                                            }.getOrNull()
-                                            tafseerRequest = tafseer ?: com.starception.submission.shared.quran.AyahTafseer.EMPTY.copy(surahNumber = number, ayahNumber = verseId)
+                                        tafseerLoadJob?.cancel()
+                                        tafseerSelectedBook = if (preselectBook == 3) 3
+                                            else store.quranTafsirBook().takeIf { it != 3 } ?: 0
+                                        val placeholder = com.starception.submission.shared.quran.AyahTafseer.EMPTY.copy(
+                                            surahNumber = number, ayahNumber = verseId)
+                                        // Retain the requested address even when switching to Bengali before Arabic finishes.
+                                        tafseerRequest = placeholder
+                                        if (tafseerSelectedBook == 4) {
                                             tafseerLoading = false
+                                        } else {
+                                            tafseerLoading = true
+                                            tafseerLoadJob = tafseerScope.launch {
+                                                try {
+                                                    tafseerRequest = tafseerRepository.getTafseer(number, verseId) ?: placeholder
+                                                } catch (cancelled: CancellationException) {
+                                                    throw cancelled
+                                                } catch (_: Exception) {
+                                                    tafseerRequest = placeholder
+                                                } finally {
+                                                    if (tafseerRequest?.surahNumber == number && tafseerRequest?.ayahNumber == verseId)
+                                                        tafseerLoading = false
+                                                }
+                                            }
                                         }
                                     },
                                 )

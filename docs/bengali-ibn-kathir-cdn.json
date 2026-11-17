@@ -1,0 +1,12 @@
+{
+  "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
+  "chapter_prefix": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev/tafsir/bn-ibn-kathir/v1",
+  "database_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev/databases/quran/bengali_ibn_kathir.sqlite",
+  "database_size": 100204544,
+  "database_sha256": "4a9daa2323712789cb59083d684204972d2788b435c458dc77f9285a4f9fddd4",
+  "chapter_and_metadata_files": 116,
+  "manifest_version": 2,
+  "manifest_sha256": "8e7443ef5e6e75b9531a8a5a41af447bdca7aece9cb74d33cee86586855e76f2",
+  "verified_at": "2026-11-17",
+  "verification": "Every published object was downloaded from the public CDN and matched its SHA-256. The origin manifest was merged under an If-Match condition; existing entries were preserved."
+}

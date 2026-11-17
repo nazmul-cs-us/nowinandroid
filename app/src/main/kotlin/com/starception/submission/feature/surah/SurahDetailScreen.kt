@@ -16,6 +16,11 @@
 
 package com.starception.submission.feature.surah
 
+import androidx.compose.foundation.horizontalScroll
+
+import com.starception.submission.feature.quran.BengaliIbnKathir
+import com.starception.submission.feature.quran.BengaliIbnKathirContent
+
 import androidx.compose.foundation.basicMarquee
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.feature.quran.ReciterSelectionStore
@@ -3824,6 +3829,8 @@ private fun BottomSheetTafseerContent(
     onBack: () -> Unit,
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
+    val tafsirContext = LocalContext.current.applicationContext
+    val bengaliRepository = remember(tafsirContext) { createBengaliIbnKathirRepository(tafsirContext) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -3910,7 +3917,7 @@ private fun BottomSheetTafseerContent(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
-                    if (isTranslating) {
+                    if (isTranslating && selectedTafseerBook != BengaliIbnKathir.BOOK_KEY) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(14.dp),
                             strokeWidth = 2.dp,
@@ -3970,6 +3977,7 @@ private fun BottomSheetTafseerContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
@@ -3977,6 +3985,7 @@ private fun BottomSheetTafseerContent(
                     "saadi" to "As-Sa'di",
                     "moysar" to "Al-Moyassar",
                     "baghawi" to "Al-Baghawi",
+                    BengaliIbnKathir.BOOK_KEY to BengaliIbnKathir.LABEL,
                 ).forEach { (code, name) ->
                     val isSelected = selectedTafseerBook == code
                     Surface(
@@ -3987,7 +3996,7 @@ private fun BottomSheetTafseerContent(
                         } else {
                             Color.Transparent
                         },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier,
                     ) {
                         Text(
                             text = name,
@@ -4008,6 +4017,9 @@ private fun BottomSheetTafseerContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        if (selectedTafseerBook == BengaliIbnKathir.BOOK_KEY) {
+            BengaliIbnKathirContent(tafseerData.surahNumber, tafseerData.ayahNumber, bengaliRepository)
+        } else {
         // Get the appropriate text - translated or original
         val originalText = when (selectedTafseerBook) {
             "saadi" -> tafseerData.tafseerSaadi
@@ -4066,7 +4078,7 @@ private fun BottomSheetTafseerContent(
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.primary,
                                 )
-                                if (isTranslating) {
+                                if (isTranslating && selectedTafseerBook != BengaliIbnKathir.BOOK_KEY) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(12.dp),
                                         strokeWidth = 1.5.dp,
@@ -4128,18 +4140,21 @@ private fun BottomSheetTafseerContent(
         }
     }
 
+    } // Arabic commentary / automatic translation
+
     // Language and Provider selection dialog
     if (showLanguageDialog) {
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
-            title = { Text("Translation Settings") },
+            title = { Text("Tafsir language") },
             text = {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 450.dp),
                 ) {
-                    // Provider section
+                    // Bengali uses its published edition; providers apply only to automatic translation.
+                    if (selectedLanguage != "bn") {
                     item {
                         Text(
                             text = "Translation Provider",
@@ -4185,6 +4200,7 @@ private fun BottomSheetTafseerContent(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
+                    }
                     // Language section
                     item {
                         Text(
@@ -9390,12 +9406,15 @@ fun TafseerDialog(
     onTafseerBookSelected: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val tafsirContext = LocalContext.current.applicationContext
+    val bengaliRepository = remember(tafsirContext) { createBengaliIbnKathirRepository(tafsirContext) }
     var selectedTabIndex by remember {
         mutableStateOf(
             when (selectedTafseerBook) {
                 "saadi" -> 0
                 "moysar" -> 1
                 "baghawi" -> 2
+                BengaliIbnKathir.BOOK_KEY -> 3
                 else -> 0
             },
         )
@@ -9407,6 +9426,7 @@ fun TafseerDialog(
             0 -> "saadi"
             1 -> "moysar"
             2 -> "baghawi"
+            3 -> BengaliIbnKathir.BOOK_KEY
             else -> "saadi"
         }
         onTafseerBookSelected(book)
@@ -9554,12 +9574,14 @@ fun TafseerDialog(
                             }
                         },
                     )
+                    Tab(selected = selectedTabIndex == 3, onClick = { selectedTabIndex = 3 },
+                        text = { Text("Ibn Kathir\nবাংলা") })
                 }
 
                 // Content with pager
                 val pagerState = rememberPagerState(
                     initialPage = selectedTabIndex,
-                    pageCount = { 3 },
+                    pageCount = { 4 },
                 )
 
                 LaunchedEffect(selectedTabIndex) {
@@ -9587,6 +9609,9 @@ fun TafseerDialog(
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
+                        if (page == 3) item {
+                            BengaliIbnKathirContent(tafseerData.surahNumber, tafseerData.ayahNumber, bengaliRepository)
+                        }
                         if (tafseerText.isNotEmpty()) {
                             item {
                                 Card(
@@ -9610,7 +9635,7 @@ fun TafseerDialog(
                             }
                         }
 
-                        if (tafseerData.ayahMeanings.isNotEmpty()) {
+                        if (page != 3 && tafseerData.ayahMeanings.isNotEmpty()) {
                             item {
                                 Card(
                                     shape = RoundedCornerShape(16.dp),

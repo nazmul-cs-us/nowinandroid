@@ -48,6 +48,7 @@ kotlin {
             api(libs.cupertino.adaptive)
             implementation(compose.components.uiToolingPreview)
             implementation(libs.compose.lifecycle.runtimeCompose)
+            implementation(libs.kotlinx.serialization.json)
         }
     }
 }

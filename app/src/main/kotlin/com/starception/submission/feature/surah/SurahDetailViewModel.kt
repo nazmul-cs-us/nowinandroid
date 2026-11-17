@@ -16,6 +16,8 @@
 
 package com.starception.submission.feature.surah
 
+import com.starception.submission.feature.quran.BengaliIbnKathir
+
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
@@ -526,13 +528,14 @@ class SurahDetailViewModel @Inject constructor(
     private val _tafseerData = MutableStateFlow<com.starception.submission.core.qurandatabase.QuranAyahTafseer?>(null)
     val tafseerData: StateFlow<com.starception.submission.core.qurandatabase.QuranAyahTafseer?> = _tafseerData.asStateFlow()
 
-    private val _selectedTafseerBook = MutableStateFlow("saadi")
+    private val initialTafsirLanguage = prefs.getString("tafseer_translation_lang",
+        if (prefs.getString("quran_translation", "ar") == "bn") "bn" else "ar") ?: "ar"
+    private val _selectedTafseerBook = MutableStateFlow(
+        if (initialTafsirLanguage == "bn") BengaliIbnKathir.BOOK_KEY else "saadi")
     val selectedTafseerBook: StateFlow<String> = _selectedTafseerBook.asStateFlow()
 
     // Tafseer translation states
-    private val _tafseerTranslationLanguage = MutableStateFlow(
-        prefs.getString("tafseer_translation_lang", "ar") ?: "ar",
-    )
+    private val _tafseerTranslationLanguage = MutableStateFlow(initialTafsirLanguage)
     val tafseerTranslationLanguage: StateFlow<String> = _tafseerTranslationLanguage.asStateFlow()
 
     private val _tafseerTranslationProvider = MutableStateFlow(
@@ -562,9 +565,23 @@ class SurahDetailViewModel @Inject constructor(
         }
     }
 
+    private var tafseerLoadJob: kotlinx.coroutines.Job? = null
+
     fun loadTafseer(surahNumber: Int, ayahNumber: Int) {
-        viewModelScope.launch {
-            val tafseer = quranEnhancedRepository.getTafseerForAyah(surahNumber, ayahNumber)
+        tafseerLoadJob?.cancel()
+        _tafseerData.value = null
+        tafseerLoadJob = viewModelScope.launch {
+            val current = _uiState.value as? SurahDetailUiState.Success
+            val original = if (_selectedTafseerBook.value == BengaliIbnKathir.BOOK_KEY) null
+                else try { quranEnhancedRepository.getTafseerForAyah(surahNumber, ayahNumber) }
+                catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (_: Exception) { null } // Bengali remains accessible when the separate Arabic database is absent.
+            val tafseer = original ?: com.starception.submission.core.qurandatabase.QuranAyahTafseer(
+                id = 0, surahNumber = surahNumber, ayahNumber = ayahNumber,
+                surahNameArabic = current?.surah?.nameArabic.orEmpty(),
+                ayahText = current?.ayahs?.firstOrNull { it.numberInSurah == ayahNumber }?.text?.substringBefore("\n\n").orEmpty(),
+                tafseerSaadi = "", tafseerMoysar = "", tafseerBaghawi = "", ayahMeanings = "",
+                grammaticalAnalysis = "", revelationReasons = "")
             _tafseerData.value = tafseer
             // Clear previous translations
             _translatedTafseerSaadi.value = null
@@ -580,6 +597,15 @@ class SurahDetailViewModel @Inject constructor(
 
     fun selectTafseerBook(book: String) {
         _selectedTafseerBook.value = book
+        if (book == BengaliIbnKathir.BOOK_KEY) {
+            _tafseerTranslationLanguage.value = "bn"
+            prefs.edit().putString("tafseer_translation_lang", "bn").apply()
+        } else if (_tafseerTranslationLanguage.value == "bn") {
+            _tafseerTranslationLanguage.value = "ar"
+            prefs.edit().putString("tafseer_translation_lang", "ar").apply()
+            val current = _tafseerData.value
+            if (current != null && current.tafseerSaadi.isBlank()) loadTafseer(current.surahNumber, current.ayahNumber)
+        }
     }
 
     fun changeTafseerTranslationLanguage(languageCode: String) {
@@ -587,6 +613,15 @@ class SurahDetailViewModel @Inject constructor(
             _tafseerTranslationLanguage.value = languageCode
             prefs.edit().putString("tafseer_translation_lang", languageCode).apply()
 
+            if (languageCode == "bn") {
+                _selectedTafseerBook.value = BengaliIbnKathir.BOOK_KEY
+                _isTafseerTranslating.value = false
+                return@launch
+            }
+            if (_selectedTafseerBook.value == BengaliIbnKathir.BOOK_KEY) {
+                _selectedTafseerBook.value = "saadi"
+                _tafseerData.value?.let { loadTafseer(it.surahNumber, it.ayahNumber) }
+            }
             // If Arabic, clear translations
             if (languageCode == "ar") {
                 _translatedTafseerSaadi.value = null
@@ -604,6 +639,7 @@ class SurahDetailViewModel @Inject constructor(
     }
 
     private fun translateTafseer(tafseer: com.starception.submission.core.qurandatabase.QuranAyahTafseer, targetLang: String) {
+        if (targetLang == "bn") return // Published Bengali Ibn Kathir is loaded separately, never machine translated.
         viewModelScope.launch {
             _isTafseerTranslating.value = true
             try {
@@ -632,6 +668,7 @@ class SurahDetailViewModel @Inject constructor(
     }
 
     fun clearTafseer() {
+        tafseerLoadJob?.cancel()
         _tafseerData.value = null
         _translatedTafseerSaadi.value = null
         _translatedTafseerMoysar.value = null

@@ -49,6 +49,14 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
     }
 
     /** Selected Quran translation language code (see [QuranTranslationLanguage]). */
+    fun quranTafsirBook(): Int = store.getString("quran_tafsir_book")?.toIntOrNull()?.takeIf { it in 0..4 }
+        ?: if (quranTranslationLanguage() == "bn") 4 else 0
+
+    fun saveQuranTafsirBook(book: Int) {
+        require(book in 0..4)
+        store.putString("quran_tafsir_book", book.toString())
+    }
+
     fun quranTranslationLanguage(): String =
         store.getString(QURAN_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank)
             ?: preferredContentLanguage()

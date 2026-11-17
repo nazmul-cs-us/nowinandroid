@@ -414,6 +414,7 @@ private fun storageStatusText(state: ContentStorageCategoryState): String = when
 internal fun storageCategoryDisplayName(category: String): String = when (category) {
     "quran_core" -> "Quran (Arabic + Tafseer)"
     "quran_translation" -> "Quran Translations"
+    "quran_tafsir_bn" -> "Bengali Tafsir Ibn Kathir"
     "hadith_sahih_bukhari" -> "Sahih Bukhari"
     "hadith_sahih_muslim" -> "Sahih Muslim"
     "hadith_shamayele_tirmidhi" -> "Shama'il At-Tirmidhi"
@@ -450,6 +451,7 @@ internal fun storageCategoryDisplayName(category: String): String = when (catego
 internal fun storageCategoryDescription(category: String): String = when (category) {
     "quran_core" -> "Arabic text, Tafseer, and word meanings"
     "quran_translation" -> "Translations in 11 languages"
+    "quran_tafsir_bn" -> "Tawheed Publication · All 114 surahs"
     "json_data" -> "Duas, topics, and reference content"
     "news" -> "Islamic news and articles"
     "hadith_shamayele_tirmidhi" -> "Descriptions of the Prophet ﷺ"
@@ -475,7 +477,7 @@ internal fun storageCategoryDescription(category: String): String = when (catego
 }
 
 private fun storageCategoryGroup(category: String): String = when {
-    category == "quran_core" || category == "quran_translation" -> "Holy Quran"
+    category == "quran_core" || category == "quran_translation" || category == "quran_tafsir_bn" -> "Holy Quran"
     category.startsWith("hadith_") -> "Hadith Collections"
     category.startsWith("quran_audio_") || category.endsWith("_audio_bn") ||
         category.startsWith("fortress_audio_") -> "Audio Recitations"
