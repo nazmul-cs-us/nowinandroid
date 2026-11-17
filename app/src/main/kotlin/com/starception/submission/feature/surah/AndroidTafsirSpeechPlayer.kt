@@ -88,7 +88,9 @@ internal class AndroidTafsirSpeechPlayer(context: Context) : TafsirSpeechPlayer 
         override fun onDone(id: String?) { main.post {
             if (id != utteranceId || state.value.status != TafsirSpeechStatus.PLAYING) return@post
             chunk++; offset = 0
-            if (chunk < chunks.size) startChunk() else stop()
+            if (chunk < chunks.size) startChunk() else {
+                stop(); mutableState.value = TafsirSpeechState(finished = true)
+            }
         } }
         @Deprecated("Android callback")
         override fun onError(id: String?) { main.post {

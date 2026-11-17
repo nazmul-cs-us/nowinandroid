@@ -53,6 +53,7 @@ class AndroidTafsirSpeechPlayerTest {
         assertTrue(shadow.spokenTextList.all { it.length <= TextToSpeech.getMaxSpeechInputLength() })
         assertEquals("en", shadow.currentLanguage.language)
         assertEquals(TafsirSpeechStatus.IDLE, player.state.value.status)
+        assertTrue(player.state.value.finished)
         player.release()
     }
 }

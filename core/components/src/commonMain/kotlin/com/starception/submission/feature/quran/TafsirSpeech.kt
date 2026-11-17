@@ -15,7 +15,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.flow.StateFlow
 
 enum class TafsirSpeechStatus { IDLE, PREPARING, PLAYING, PAUSED, ERROR }
-data class TafsirSpeechState(val status: TafsirSpeechStatus = TafsirSpeechStatus.IDLE, val error: String? = null)
+data class TafsirSpeechState(val status: TafsirSpeechStatus = TafsirSpeechStatus.IDLE, val error: String? = null,
+    val finished: Boolean = false, val assetMissing: Boolean = false)
 
 interface TafsirSpeechPlayer {
     val state: StateFlow<TafsirSpeechState>

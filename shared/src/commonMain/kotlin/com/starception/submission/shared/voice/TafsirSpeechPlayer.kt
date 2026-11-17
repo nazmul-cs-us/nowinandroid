@@ -14,14 +14,22 @@ internal class SystemTafsirSpeechPlayer(private val onStart: () -> Unit) : Tafsi
         onStart()
         mutableState.value = TafsirSpeechState(TafsirSpeechStatus.PLAYING)
         val started = synthesizer.speak(text, language = language, onComplete = { error ->
-            mutableState.value = if (error == null) TafsirSpeechState()
+            mutableState.value = if (error == null) TafsirSpeechState(finished = true)
                 else TafsirSpeechState(TafsirSpeechStatus.ERROR, error)
         })
         if (!started) mutableState.value = TafsirSpeechState(TafsirSpeechStatus.ERROR,
             "No ${PublishedTafsirs.forLanguage(language)?.englishLanguageName ?: if (language == "ar") "Arabic" else language} speech voice is available. Check your device’s spoken-content voice settings.")
     }
-    override fun pause() { synthesizer.pause(); mutableState.value = TafsirSpeechState(TafsirSpeechStatus.PAUSED) }
-    override fun resume() { onStart(); synthesizer.resume(); mutableState.value = TafsirSpeechState(TafsirSpeechStatus.PLAYING) }
+    override fun pause() {
+        if (state.value.status == TafsirSpeechStatus.PLAYING) {
+            synthesizer.pause(); mutableState.value = TafsirSpeechState(TafsirSpeechStatus.PAUSED)
+        }
+    }
+    override fun resume() {
+        if (state.value.status == TafsirSpeechStatus.PAUSED) {
+            onStart(); synthesizer.resume(); mutableState.value = TafsirSpeechState(TafsirSpeechStatus.PLAYING)
+        }
+    }
     override fun stop() { synthesizer.stop(); mutableState.value = TafsirSpeechState() }
     override fun release() = stop()
 }

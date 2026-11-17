@@ -588,6 +588,11 @@ fun SurahDetailScreen(
     val inlineSpeechFactory = remember(context) {
         { inlineSpeechSession.createPlayer { AndroidTafsirSpeechPlayer(context) } }
     }
+    val surahTafsirPlayer = if (showInlineTafsir) com.starception.submission.feature.quran.rememberSurahTafsirSpeechPlayer(
+        currentPlayingSurahNumber, selectedTafseerBook, inlineSpeechSession,
+        engineFactory = { AndroidTafsirSpeechPlayer(context) },
+        loadAyah = { verse -> inlineTafsirRepository?.text(currentPlayingSurahNumber, verse)
+            ?: viewModel.inlineTafsirText(currentPlayingSurahNumber, verse, selectedTafseerBook) }) else null
     DisposableEffect(showInlineTafsir, selectedTafseerBook, currentPlayingSurahNumber) {
         onDispose { inlineSpeechSession.stop() }
     }
@@ -1153,7 +1158,13 @@ fun SurahDetailScreen(
                             onTafseerClick = { verse -> inlineTafsirTarget = verse; showInlineTafsir = true },
                             inlineTafsirHeader = if (showInlineTafsir) ({
                                 com.starception.submission.feature.quran.InlineTafsirHeader(selectedTafseerBook,
-                                    onSelect = viewModel::selectTafseerBook, onHide = { showInlineTafsir = false })
+                                    onSelect = viewModel::selectTafseerBook, onHide = { showInlineTafsir = false }, playback = {
+                                        surahTafsirPlayer?.let { fullPlayer ->
+                                            com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer) { reload ->
+                                                MissingTafsirAssetCard(inlineEdition) { inlineTafsirRevision++; reload() }
+                                            }
+                                        }
+                                    })
                             }) else null,
                             inlineTafsirContent = if (showInlineTafsir) ({ chapter, verse ->
                                 com.starception.submission.feature.quran.InlineTafsirCommentary(chapter, verse,

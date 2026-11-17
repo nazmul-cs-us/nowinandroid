@@ -170,7 +170,7 @@ actual class PlatformSpeechSynthesizer actual constructor() {
             synthesizer: AVSpeechSynthesizer,
             didCancelSpeechUtterance: AVSpeechUtterance,
         ) {
-            if (didCancelSpeechUtterance === activeUtterance) complete(null)
+            if (didCancelSpeechUtterance === activeUtterance) complete("Speech was interrupted. Try playback again.")
         }
     }
 

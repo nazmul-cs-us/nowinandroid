@@ -579,6 +579,14 @@ internal fun QuranDetailScreen(
     val tafsirSpeechFactory = remember(player) {
         { inlineSpeechSession.createPlayer { com.starception.submission.shared.voice.SystemTafsirSpeechPlayer { player.pause() } } }
     }
+    val surahTafsirPlayer = if (showInlineTafsir) com.starception.submission.feature.quran.rememberSurahTafsirSpeechPlayer(
+        number, inlineBook, inlineSpeechSession,
+        engineFactory = { com.starception.submission.shared.voice.SystemTafsirSpeechPlayer { player.pause() } },
+        loadAyah = { verse -> inlineRepository?.text(number, verse) ?: run {
+            val data = tafseerRepository.getTafseer(number, verse)
+                ?: throw com.starception.submission.feature.quran.PublishedTafsirAssetMissing()
+            when (inlineBook) { "moysar" -> data.tafseerMoysar; "baghawi" -> data.tafseerBaghawi; else -> data.tafseerSaadi }
+        } }) else null
     DisposableEffect(showInlineTafsir, inlineBook, number) { onDispose { inlineSpeechSession.stop() } }
 
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
@@ -1224,7 +1232,15 @@ internal fun QuranDetailScreen(
                                                     ?: listOf("saadi", "moysar", "baghawi").indexOf(book).coerceAtLeast(0)
                                                 inlineTafsirBookIndex = tafseerSelectedBook
                                                 store.saveQuranTafsirBook(tafseerSelectedBook)
-                                            }, onHide = { showInlineTafsir = false })
+                                            }, onHide = { showInlineTafsir = false }, playback = {
+                                            surahTafsirPlayer?.let { fullPlayer ->
+                                                com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer) { reload ->
+                                                    MissingContentDownloadCard(inlineEdition?.category ?: "quran_core",
+                                                        inlineEdition?.let { "${it.englishLanguageName} · ${it.title}" } ?: "Arabic tafsir",
+                                                        onDownloadComplete = { inlineTafsirRevision++; reload() })
+                                                }
+                                            }
+                                        })
                                     }
                                     QuranAyahReadingBlock(
                                         verse = verse,

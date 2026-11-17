@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 
 @Composable
-fun InlineTafsirHeader(book: String, onSelect: (String) -> Unit, onHide: () -> Unit) {
+fun InlineTafsirHeader(book: String, onSelect: (String) -> Unit, onHide: () -> Unit, playback: (@Composable () -> Unit)? = null) {
     val edition = PublishedTafsirs.forBook(book)
     val uri = LocalUriHandler.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -23,6 +23,7 @@ fun InlineTafsirHeader(book: String, onSelect: (String) -> Unit, onHide: () -> U
             TextButton(onClick = onHide) { Text("Hide tafsir") }
         }
         TafsirBookPicker(book, onSelect)
+        playback?.invoke()
         if (edition != null) Row(Modifier.fillMaxWidth()) {
             Text(edition.attribution, modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -80,12 +81,13 @@ fun InlineTafsirCommentary(surah: Int, ayah: Int, book: String, revision: Int = 
 class TafsirSpeechSession {
     private var active: TafsirSpeechPlayer? = null
     fun stop() { active?.stop(); active = null }
+    fun activate(player: TafsirSpeechPlayer) { if (active !== player) active?.stop(); active = player }
     fun createPlayer(factory: () -> TafsirSpeechPlayer): TafsirSpeechPlayer {
         val delegate = factory()
         return object : TafsirSpeechPlayer by delegate {
             override fun play(text: String, language: String) { activate(); delegate.play(text, language) }
             override fun resume() { activate(); delegate.resume() }
-            private fun activate() { if (active !== this) active?.stop(); active = this }
+            private fun activate() { this@TafsirSpeechSession.activate(this) }
             override fun release() { if (active === this) active = null; delegate.release() }
         }
     }

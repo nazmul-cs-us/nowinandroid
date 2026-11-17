@@ -117,3 +117,22 @@ Speech starts only on a tap. Changing the ayah or edition, closing the reader, o
 backgrounding its screen stops narration. Changing or closing the reader releases
 its speech player.
 The new control is available for both published language editions and Arabic books.
+
+## Full-surah narration
+
+The inline book selector includes **Play full surah tafsir**. It reads the selected
+surah, from ayah 1 to its last ayah, using the selected edition. This is a current-
+surah queue, not automatic playback of all 114 surahs. It preloads that surah's
+verified saved commentary and shows the normal asset card if content is missing.
+It does not silently download anything or begin speaking after a download.
+
+Pause / Resume and Stop control the queue, with the current ayah or grouped ayah
+range displayed. Consecutive ayahs sharing identical commentary are spoken once,
+with their source range retained. Each next passage starts only after confirmed
+speech completion. Voice errors and interruptions stop the queue. Pausing at the
+end of a passage also pauses before the next passage.
+
+The queue belongs to Surah Details, so scrolling the selector out of view keeps
+narration running. Starting an individual ayah cancels the full-surah queue, and
+starting the full queue stops individual narration. Hiding tafsir, changing the
+surah or book, leaving the page, or backgrounding stops full-surah playback.
