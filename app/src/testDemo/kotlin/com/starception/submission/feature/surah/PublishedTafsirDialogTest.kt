@@ -15,9 +15,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import com.github.takahirom.roborazzi.captureRoboImage
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, qualifiers = "w393dp-h900dp", sdk = [35])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PublishedTafsirDialogTest {
     @get:Rule val compose = createComposeRule()
     @Test fun choosingFrenchInTheFullScreenDialogDoesNotSnapBackToBengali() {
@@ -29,10 +32,30 @@ class PublishedTafsirDialogTest {
         compose.setContent { MaterialTheme {
             TafseerDialog(data, selected.value, onTafseerBookSelected = { selected.value = it }, onDismiss = {})
         } }
-        compose.onNodeWithTag("published-tafsir-picker").performClick()
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/tafsir_reader.png")
+        compose.onNodeWithTag("published-tafsir-picker").assertIsDisplayed().performClick()
         compose.onNodeWithText("Français").performScrollTo().performClick()
         compose.waitForIdle()
         assertEquals(PublishedTafsirs.forLanguage("fr")!!.bookKey, selected.value)
         compose.onNodeWithText("Français · QUL / Tarteel").assertIsDisplayed()
+        compose.onNodeWithTag("published-tafsir-picker").performClick()
+        compose.onNodeWithText("Al-Moyassar").performScrollTo().performClick()
+        assertEquals("moysar", selected.value)
+        compose.onNodeWithText("Arabic Moyassar").assertIsDisplayed()
     }
+    @Test
+    @Config(qualifiers = "w393dp-h640dp")
+    fun longCommentaryHasOneScrollAreaWhileTheSelectorAndCloseStayVisible() {
+        val data = QuranAyahTafseer(0, 1, "الفاتحة", 1, "بسم الله", "شرح الآية. ".repeat(500),
+            "", "", "معنى الكلمة", "", "")
+        compose.setContent { MaterialTheme {
+            TafseerDialog(data, "saadi", onTafseerBookSelected = {}, onDismiss = {})
+        } }
+        compose.onAllNodes(hasScrollAction()).assertCountEquals(1)
+        compose.onNodeWithText("Word meanings").performScrollTo()
+        compose.onNodeWithText("Word meanings").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close").assertIsDisplayed()
+        compose.onNodeWithTag("published-tafsir-picker").assertIsDisplayed()
+    }
+
 }

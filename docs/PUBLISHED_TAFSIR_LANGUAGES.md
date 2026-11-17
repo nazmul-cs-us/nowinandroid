@@ -6,8 +6,11 @@ menu first. The top-level control opens the current audio ayah on Android, or ay
 when no verse is active. The shared reader starts with ayah 1. Individual ayah
 actions still open commentary for that exact ayah.
 
-The Android and iOS ayah tafsir readers offer a single **Published tafsir** language
-menu. Selecting an edition changes its title, attribution, source link, chapter
+The Android and iOS ayah tafsir readers offer a single book-and-language selector,
+including the Arabic sources and published language editions. The selector and
+compact header stay visible while the verse and commentary share one scrolling
+reading area. The native toolbar uses a simple Tafsir text button. The iOS reader
+opens in a modal sheet rather than an inline panel above the ayah list. Selecting an edition changes its title, attribution, source link, chapter
 cache and text together. The Quran translation language supplies the default when
 there is no explicit tafsir preference. Existing Arabic book choices and Bengali
 book key / storage index / offline files remain compatible.

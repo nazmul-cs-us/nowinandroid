@@ -21,13 +21,13 @@ fun BengaliIbnKathirContent(surah: Int, ayah: Int, repository: BengaliIbnKathirR
 
 @Composable
 fun PublishedTafsirContent(surah: Int, ayah: Int, edition: PublishedTafsirEdition,
-    repository: PublishedTafsirRepository, modifier: Modifier = Modifier) {
-    key(edition.bookKey) { PublishedTafsirReader(surah, ayah, edition, repository, modifier) }
+    repository: PublishedTafsirRepository, modifier: Modifier = Modifier, scrollInternally: Boolean = true) {
+    key(edition.bookKey) { PublishedTafsirReader(surah, ayah, edition, repository, modifier, scrollInternally) }
 }
 
 @Composable
 private fun PublishedTafsirReader(surah: Int, ayah: Int, edition: PublishedTafsirEdition,
-    repository: PublishedTafsirRepository, modifier: Modifier) {
+    repository: PublishedTafsirRepository, modifier: Modifier, scrollInternally: Boolean) {
     var text by remember(surah, ayah) { mutableStateOf<String?>(null) }
     var failed by remember(surah, ayah) { mutableStateOf(false) }
     var retry by remember { mutableIntStateOf(0) }
@@ -65,8 +65,8 @@ private fun PublishedTafsirReader(surah: Int, ayah: Int, edition: PublishedTafsi
                     textDirection = androidx.compose.ui.text.style.TextDirection.Content,
                     textAlign = if (edition.languageCode == "ur") androidx.compose.ui.text.style.TextAlign.Right
                         else androidx.compose.ui.text.style.TextAlign.Start),
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)
-                        .verticalScroll(textScroll))
+                    modifier = Modifier.fillMaxWidth().then(if (scrollInternally) Modifier.heightIn(max = 320.dp)
+                        .verticalScroll(textScroll) else Modifier))
             }
         }
         if (downloading) {

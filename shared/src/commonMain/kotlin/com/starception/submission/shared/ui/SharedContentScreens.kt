@@ -970,28 +970,26 @@ internal fun QuranDetailScreen(
                 }
             }
             if (showAudioPlayer) Spacer(Modifier.height(10.dp))
-            // Tafseer / word-study sheet. Word study jumps straight to the word
-            // meanings book; Tafseer opens on As-Sa'di. Switching books is instant
-            // since the whole ayah row (all books + meanings) was loaded at once.
+            // A modal reading surface keeps commentary separate from the ayah list.
             val tafseerSheet = tafseerRequest
             if (tafseerSheet != null) {
-                Surface(
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
+                val dismissTafsir: () -> Unit = {
+                    tafseerLoadJob?.cancel(); tafseerLoading = false; tafseerRequest = null
+                }
+                androidx.compose.material3.ModalBottomSheet(
+                    onDismissRequest = dismissTafsir,
+                    sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    sheetMaxWidth = 720.dp,
                 ) {
-                    Column(Modifier.padding(16.dp)) {
+                    Column(Modifier.fillMaxWidth().fillMaxHeight(0.88f).padding(horizontal = 24.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                if (tafseerSelectedBook == 3) "Word meanings" else "Tafseer · Ayah ${tafseerSheet.ayahNumber}",
+                                if (tafseerSelectedBook == 3) "Word meanings" else "Tafsir · Ayah ${tafseerSheet.ayahNumber}",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                             )
@@ -1001,77 +999,77 @@ internal fun QuranDetailScreen(
                                 Text("Close", style = MaterialTheme.typography.labelMedium)
                             }
                         }
-                        Spacer(Modifier.height(6.dp))
-                        androidx.compose.foundation.layout.Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                        ) {
-                            listOf("As-Sa'di" to 0, "Al-Moyassar" to 1, "Al-Baghawi" to 2, "Word meanings" to 3).forEach { (label, index) ->
-                                androidx.compose.material3.FilterChip(
-                                    selected = tafseerSelectedBook == index,
-                                    onClick = { tafseerSelectedBook = index; store.saveQuranTafsirBook(index) },
-                                    label = { Text(label) },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(10.dp))
                         val publishedEdition = PublishedTafsirs.forStorageIndex(tafseerSelectedBook)
-                        PublishedTafsirPicker(publishedEdition?.bookKey) {
-                            tafseerSelectedBook = it.storageIndex; store.saveQuranTafsirBook(it.storageIndex)
-                        }
-                        if (publishedEdition != null) {
-                            val repository = remember(publishedEdition.bookKey) {
-                                com.starception.submission.shared.quran.createPublishedTafsirRepository(publishedEdition)
-                            }
-                            PublishedTafsirContent(number, tafseerSheet.ayahNumber, publishedEdition, repository)
-                        } else if (tafseerLoading) {
-                            androidx.compose.foundation.layout.Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 24.dp),
-                                contentAlignment = Alignment.Center,
-                            ) { CircularProgressIndicator() }
-                        } else {
-                            val body = when (tafseerSelectedBook) {
-                                0 -> tafseerSheet.tafseerSaadi
-                                1 -> tafseerSheet.tafseerMoysar
-                                2 -> tafseerSheet.tafseerBaghawi
-                                else -> tafseerSheet.ayahMeanings
-                            }
-                            if (body.isBlank()) {
-                                Text(
-                                    "Tafseer content is unavailable for this ayah.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                MissingContentDownloadCard("quran_core", "Quran Tafseer and word meanings",
-                                    onDownloadComplete = {
-                                        tafseerLoading = true
-                                        tafseerScope.launch {
-                                            try {
-                                                tafseerRequest = tafseerRepository.getTafseer(number, tafseerSheet.ayahNumber)
-                                                    ?: tafseerSheet
-                                            } catch (cancelled: CancellationException) {
-                                                throw cancelled
-                                            } catch (_: Exception) {
-                                                tafseerRequest = tafseerSheet
-                                            } finally { tafseerLoading = false }
-                                        }
-                                    })
-                            } else {
-                                Text(
-                                    body,
-                                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
+                        val arabicKeys = listOf("saadi", "moysar", "baghawi", "word_meanings")
+                        com.starception.submission.feature.quran.TafsirBookPicker(
+                            selectedBook = publishedEdition?.bookKey ?: arabicKeys[tafseerSelectedBook.coerceIn(0, 3)],
+                            includeWordMeanings = true,
+                            onSelect = { book ->
+                                tafseerSelectedBook = PublishedTafsirs.forBook(book)?.storageIndex
+                                    ?: arabicKeys.indexOf(book).coerceAtLeast(0)
+                                store.saveQuranTafsirBook(tafseerSelectedBook)
+                                // Published editions do not need the Arabic database. Load it when switching back.
+                                if (tafseerSelectedBook in 0..3) openTafsir(tafseerSheet.ayahNumber, tafseerSelectedBook)
+                            },
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        key(tafseerSelectedBook, tafseerSheet.ayahNumber) {
+                            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+                                .padding(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                if (publishedEdition != null) {
+                                    val repository = remember(publishedEdition.bookKey) {
+                                        com.starception.submission.shared.quran.createPublishedTafsirRepository(publishedEdition)
+                                    }
+                                    PublishedTafsirContent(number, tafseerSheet.ayahNumber, publishedEdition, repository, scrollInternally = false)
+                                } else if (tafseerLoading) {
+                                    androidx.compose.foundation.layout.Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 24.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) { CircularProgressIndicator() }
+                                } else {
+                                    val body = when (tafseerSelectedBook) {
+                                        0 -> tafseerSheet.tafseerSaadi
+                                        1 -> tafseerSheet.tafseerMoysar
+                                        2 -> tafseerSheet.tafseerBaghawi
+                                        else -> tafseerSheet.ayahMeanings
+                                    }
+                                    if (body.isBlank()) {
+                                        Text(
+                                            "Tafseer content is unavailable for this ayah.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        MissingContentDownloadCard("quran_core", "Quran Tafseer and word meanings",
+                                            onDownloadComplete = {
+                                                tafseerLoading = true
+                                                tafseerScope.launch {
+                                                    try {
+                                                        tafseerRequest = tafseerRepository.getTafseer(number, tafseerSheet.ayahNumber)
+                                                            ?: tafseerSheet
+                                                    } catch (cancelled: CancellationException) {
+                                                        throw cancelled
+                                                    } catch (_: Exception) {
+                                                        tafseerRequest = tafseerSheet
+                                                    } finally { tafseerLoading = false }
+                                                }
+                                            })
+                                    } else {
+                                        Text(
+                                            body,
+                                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp, lineHeight = 34.sp,
+                                                textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    }
+                                }
                             }
                         }
                         Spacer(Modifier.height(8.dp))
                     }
                 }
-                Spacer(Modifier.height(10.dp))
             }
             when (val state = ayahState) {
                 QuranAyahState.Loading -> Box(
