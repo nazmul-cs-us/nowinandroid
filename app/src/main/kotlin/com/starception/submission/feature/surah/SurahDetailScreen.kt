@@ -89,6 +89,8 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -593,6 +595,11 @@ fun SurahDetailScreen(
         engineFactory = { AndroidTafsirSpeechPlayer(context) },
         loadAyah = { verse -> inlineTafsirRepository?.text(currentPlayingSurahNumber, verse)
             ?: viewModel.inlineTafsirText(currentPlayingSurahNumber, verse, selectedTafseerBook) }) else null
+    val tafsirSpeechStatus = surahTafsirPlayer?.state?.collectAsState()?.value?.status
+    val tafsirNarration = surahTafsirPlayer?.currentAyahs?.collectAsState()?.value?.takeIf {
+        tafsirSpeechStatus == com.starception.submission.feature.quran.TafsirSpeechStatus.PLAYING ||
+            tafsirSpeechStatus == com.starception.submission.feature.quran.TafsirSpeechStatus.PAUSED
+    }
     DisposableEffect(showInlineTafsir, selectedTafseerBook, currentPlayingSurahNumber) {
         onDispose { inlineSpeechSession.stop() }
     }
@@ -1243,6 +1250,7 @@ fun SurahDetailScreen(
                             onNavigateToPreviousSurah = navigateToPreviousSurah,
                             onNavigateToNextSurah = navigateToNextSurah,
                             currentRecitingAyah = currentRecitingAyah,
+                            tafsirNarration = if (num == currentPlayingSurahNumber) tafsirNarration else null,
                             // Highlight + Mushaf snap only on the originating surah —
                             // swiping to a neighbour surah shouldn't drag the tint or
                             // page-jump to its same-numbered ayah.
@@ -2697,6 +2705,7 @@ private fun AlbumPlayerContent(
     onNavigateToNextSurah: () -> Unit = {},
     /** numberInSurah of the ayah currently being recited (audio sync), or null. */
     currentRecitingAyah: Int? = null,
+    tafsirNarration: IntRange? = null,
     /** numberInSurah to softly tint after a search-driven scrollToAyah jump,
      *  so the user can see which verse the link picked. */
     highlightedAyahNumber: Int? = null,
@@ -2708,6 +2717,14 @@ private fun AlbumPlayerContent(
     // Use current playing surah/ayahs if available, otherwise use original
     val displaySurah = currentPlayingSurah ?: surah
     val displayAyahs = currentPlayingAyahs ?: ayahs
+    var inlineHeaderHeight by remember(displaySurah.number, selectedTafseerBook) { mutableIntStateOf(0) }
+    val firstAyahIndex = 1 + if (showBismillahRow) 1 else 0
+    val ayahFling = com.starception.submission.feature.quran.rememberAyahFlingBehavior(
+        scrollState, firstAyahIndex, inlineHeaderHeight, 64.dp)
+    val ayahScrollGuide = com.starception.submission.feature.quran.rememberAyahScrollGuide(
+        scrollState, "${displaySurah.number}:$selectedTafseerBook", inlineTafsirContent != null,
+        tafsirNarration, firstAyahIndex, inlineHeaderHeight, 64.dp)
+
 
     val quranRepository = hiltViewModel<QuranRepositoryHolder>().repository
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -2913,8 +2930,9 @@ private fun AlbumPlayerContent(
         LazyColumn(
             state = scrollState,
             contentPadding = PaddingValues(top = 0.dp), // No padding needed (status bar is hidden)
-            flingBehavior = if (continuousReadingMode) snapFlingBehavior else androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior(),
-            modifier = Modifier.fillMaxSize(),
+            flingBehavior = if (continuousReadingMode) snapFlingBehavior
+                else if (inlineTafsirContent != null) ayahFling else androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior(),
+            modifier = Modifier.fillMaxSize().nestedScroll(ayahScrollGuide.scrollConnection),
         ) {
             // Album Header with either FAB+Info Card OR Music Player Controls
             item {
@@ -3124,7 +3142,11 @@ private fun AlbumPlayerContent(
                     key = { "${displaySurah.number}_${it.numberInSurah}" },
                 ) { ayah ->
                     Column {
-                        if (ayah.numberInSurah == displayAyahs.firstOrNull()?.numberInSurah) inlineTafsirHeader?.invoke()
+                        if (ayah.numberInSurah == displayAyahs.firstOrNull()?.numberInSurah && inlineTafsirHeader != null) {
+                            Box(Modifier.onSizeChanged { inlineHeaderHeight = it.height }) { inlineTafsirHeader() }
+                        }
+                        com.starception.submission.feature.quran.AyahNarrationGroup(ayah.numberInSurah,
+                            tafsirNarration?.contains(ayah.numberInSurah) == true) {
                         AyahTrackItem(
                             ayah = ayah,
                             arabicFont = selectedArabicFont,
@@ -3160,12 +3182,18 @@ private fun AlbumPlayerContent(
                             },
                         )
                         inlineTafsirContent?.invoke(displaySurah.number, ayah.numberInSurah)
+                        }
                     }
                 }
             }
         }
 
+        if (inlineTafsirContent != null) com.starception.submission.feature.quran.AyahScrollHint(
+            ayahScrollGuide, tafsirNarration != null,
+            Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp, vertical = 16.dp).navigationBarsPadding())
+
         // Draggable scrollbar - matches ForYou tab and other pages
+        val thumbScroller = scrollState.rememberDraggableScroller(itemsAvailable = totalItems)
         scrollState.DraggableScrollbar(
             modifier = Modifier
                 .fillMaxHeight()
@@ -3174,9 +3202,12 @@ private fun AlbumPlayerContent(
                 .align(Alignment.CenterEnd),
             state = scrollbarState,
             orientation = Orientation.Vertical,
-            onThumbMoved = scrollState.rememberDraggableScroller(
-                itemsAvailable = totalItems,
-            ),
+            onThumbMoved = { position ->
+                if (inlineTafsirContent != null) ayahScrollGuide.scrollConnection.onPostScroll(
+                    androidx.compose.ui.geometry.Offset(0f, 1f), androidx.compose.ui.geometry.Offset.Zero,
+                    androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput)
+                thumbScroller(position)
+            },
         )
 
         // Material Design 3 Expressive Bottom Sheet for Ayah options (with integrated notes)

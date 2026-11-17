@@ -142,3 +142,19 @@ ready/listening/paused status, ayah-based progress and a prominent playback acti
 The progress bar tracks completed ayah ranges, not an estimated duration. Loading
 uses an indeterminate indicator. Controls adapt to narrow screens and larger text;
 no decorative waveform or invented playback time is shown.
+
+## Ayah scrolling and guidance
+
+Inline tafsir gently settles near ayah boundaries after a swipe. Inside a long
+explanation, scrolling remains free: the reader does not snap back to the start
+or skip the rest of the commentary. A brief hint appears on the first manual
+scroll, explaining how to continue reading a long ayah or move between ayahs.
+
+Full-surah narration follows the current ayah and highlights its reading group;
+a shared explanation highlights all ayahs in its range. Follow positioning keeps
+the Arabic ayah below the toolbar and skips the selector/player above ayah 1.
+Manual scrolling pauses auto-follow, not speech, and displays **Follow ayah**.
+That action returns to the narrated ayah and re-enables following. Stop, completion,
+changing the surah/book, or hiding inline tafsir clears the active highlight.
+Touch dragging, pointer-wheel scrolling, and Android's scrollbar use this guidance;
+programmatic scrolling does not trigger a manual-scroll hint.

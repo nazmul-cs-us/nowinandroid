@@ -187,9 +187,8 @@ fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, surahTitle: Str
                     color = colors.primary, trackColor = colors.outlineVariant.copy(alpha = 0.5f))
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(enabled = state.status != TafsirSpeechStatus.PREPARING,
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(16.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                FilledTonalButton(enabled = state.status != TafsirSpeechStatus.PREPARING,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     onClick = {
                         when (state.status) {
                             TafsirSpeechStatus.PLAYING -> player.pause()
@@ -198,13 +197,12 @@ fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, surahTitle: Str
                         }
                     }) {
                     Icon(if (state.status == TafsirSpeechStatus.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(8.dp))
+                        contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
                     Text(action, style = MaterialTheme.typography.labelLarge)
                 }
-                if (active) FilledTonalIconButton(onClick = player::stop,
-                    modifier = Modifier.size(52.dp), shape = RoundedCornerShape(16.dp)) {
-                    Icon(Icons.Default.Stop, contentDescription = "Stop surah tafsir", modifier = Modifier.size(22.dp))
+                if (active) IconButton(onClick = player::stop, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.Stop, contentDescription = "Stop surah tafsir", modifier = Modifier.size(20.dp))
                 }
             }
             if (state.assetMissing) missingAsset { player.stop() }

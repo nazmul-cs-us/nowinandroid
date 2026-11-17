@@ -21,6 +21,9 @@ import com.starception.submission.feature.quran.PublishedTafsirContent
 import com.starception.submission.feature.quran.PublishedTafsirPicker
 import com.starception.submission.feature.quran.PublishedTafsirs
 
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -587,6 +590,11 @@ internal fun QuranDetailScreen(
                 ?: throw com.starception.submission.feature.quran.PublishedTafsirAssetMissing()
             when (inlineBook) { "moysar" -> data.tafseerMoysar; "baghawi" -> data.tafseerBaghawi; else -> data.tafseerSaadi }
         } }) else null
+    val tafsirSpeechStatus = surahTafsirPlayer?.state?.collectAsState()?.value?.status
+    val tafsirNarration = surahTafsirPlayer?.currentAyahs?.collectAsState()?.value?.takeIf {
+        tafsirSpeechStatus == com.starception.submission.feature.quran.TafsirSpeechStatus.PLAYING ||
+            tafsirSpeechStatus == com.starception.submission.feature.quran.TafsirSpeechStatus.PAUSED
+    }
     DisposableEffect(showInlineTafsir, inlineBook, number) { onDispose { inlineSpeechSession.stop() } }
 
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
@@ -735,14 +743,10 @@ internal fun QuranDetailScreen(
     // The ayah list drives the floating surah name and the play FAB's
     // hide-on-scroll behavior, matching Android's scrollState.
     val ayahListState = rememberLazyListState()
-    LaunchedEffect(showInlineTafsir, inlineTafsirTarget) {
-        val loaded = ayahState as? QuranAyahState.Loaded
-        if (showInlineTafsir && loaded != null) {
-            val bismillah = number != 1 && number != 9 && loaded.verses.firstOrNull()?.arabicText?.let(::hasLeadingBismillah) == true
-            androidx.compose.runtime.withFrameNanos { }
-            ayahListState.scrollToItem(2 + (if (bismillah) 1 else 0) + (inlineTafsirTarget - 1).coerceAtLeast(0))
-        }
-    }
+    var inlineHeaderHeight by remember(number, inlineBook) { mutableIntStateOf(0) }
+    val inlineBismillah = number != 1 && number != 9 && (ayahState as? QuranAyahState.Loaded)
+        ?.verses?.firstOrNull()?.arabicText?.let(::hasLeadingBismillah) == true
+    val firstInlineAyahIndex = 1 + if (inlineBismillah) 1 else 0
 
     // Android's pinned play FAB and the info card share one toggle; both the
     // pinned FAB and the toolbar's play action route through it.
@@ -761,6 +765,21 @@ internal fun QuranDetailScreen(
         0f
     }
     val artworkBottomPx = headerAboveArtworkPx + with(density) { (maxWidth * 2f / 3f).toPx() }
+    val tafsirScrollInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp
+    val ayahFling = com.starception.submission.feature.quran.rememberAyahFlingBehavior(
+        ayahListState, firstInlineAyahIndex, inlineHeaderHeight, tafsirScrollInset)
+    val ayahScrollGuide = com.starception.submission.feature.quran.rememberAyahScrollGuide(
+        ayahListState, "$number:$inlineBook", showInlineTafsir, tafsirNarration,
+        firstInlineAyahIndex, inlineHeaderHeight, tafsirScrollInset,
+        beforeFollow = { headerCollapseOffset.floatValue = -artworkBottomPx })
+    LaunchedEffect(showInlineTafsir, inlineTafsirTarget) {
+        if (showInlineTafsir && ayahState is QuranAyahState.Loaded) {
+            headerCollapseOffset.floatValue = -artworkBottomPx
+            androidx.compose.runtime.withFrameNanos { }
+            ayahListState.scrollToItem(firstInlineAyahIndex + (inlineTafsirTarget - 1).coerceAtLeast(0))
+        }
+    }
+
     ImmersiveDetailScaffold(
         onBack = onBack,
         collapsibleHeader = true,
@@ -1192,7 +1211,8 @@ internal fun QuranDetailScreen(
                     } else {
                         LazyColumn(
                             state = ayahListState,
-                            modifier = Modifier.weight(1f),
+                            flingBehavior = if (showInlineTafsir) ayahFling else androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior(),
+                            modifier = Modifier.weight(1f).nestedScroll(ayahScrollGuide.scrollConnection),
                             verticalArrangement = Arrangement.spacedBy(0.dp),
                             contentPadding = PaddingValues(bottom = 24.dp),
                         ) {
@@ -1226,6 +1246,7 @@ internal fun QuranDetailScreen(
                             items(displayVerses, key = { it.id }) { verse ->
                                 Column {
                                     if (showInlineTafsir && verse.numberInSurah == 1) {
+                                        Box(Modifier.onSizeChanged { inlineHeaderHeight = it.height }) {
                                         com.starception.submission.feature.quran.InlineTafsirHeader(inlineBook,
                                             onSelect = { book ->
                                                 tafseerSelectedBook = PublishedTafsirs.forBook(book)?.storageIndex
@@ -1241,7 +1262,10 @@ internal fun QuranDetailScreen(
                                                 }
                                             }
                                         })
+                                        }
                                     }
+                                    com.starception.submission.feature.quran.AyahNarrationGroup(verse.numberInSurah,
+                                        tafsirNarration?.contains(verse.numberInSurah) == true) {
                                     QuranAyahReadingBlock(
                                         verse = verse,
                                         showTranslation = showTranslation,
@@ -1280,6 +1304,7 @@ internal fun QuranDetailScreen(
                                                     onDownloadComplete = { inlineTafsirRevision++; reload() })
                                             })
                                     }
+                                    }
                                 }
                             }
                         }
@@ -1288,6 +1313,10 @@ internal fun QuranDetailScreen(
             }
         }
     }
+
+    if (showInlineTafsir) com.starception.submission.feature.quran.AyahScrollHint(
+        ayahScrollGuide, tafsirNarration != null,
+        Modifier.align(Alignment.BottomCenter).padding(horizontal = 20.dp, vertical = 16.dp).navigationBarsPadding())
 
     // Android-parity pinned overlays: the floating surah name and the play FAB
     // track the artwork edge and the reader scroll.
