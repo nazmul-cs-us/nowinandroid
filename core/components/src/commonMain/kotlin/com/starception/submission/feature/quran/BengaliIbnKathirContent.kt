@@ -21,14 +21,16 @@ fun BengaliIbnKathirContent(surah: Int, ayah: Int, repository: BengaliIbnKathirR
 
 @Composable
 fun PublishedTafsirContent(surah: Int, ayah: Int, edition: PublishedTafsirEdition,
-    repository: PublishedTafsirRepository, modifier: Modifier = Modifier, scrollInternally: Boolean = true) {
-    key(edition.bookKey) { PublishedTafsirReader(surah, ayah, edition, repository, modifier, scrollInternally) }
+    repository: PublishedTafsirRepository, modifier: Modifier = Modifier, scrollInternally: Boolean = true,
+    missingAssetContent: (@Composable (() -> Unit) -> Unit)? = null) {
+    key(edition.bookKey) { PublishedTafsirReader(surah, ayah, edition, repository, modifier, scrollInternally, missingAssetContent) }
 }
 
 @Composable
 private fun PublishedTafsirReader(surah: Int, ayah: Int, edition: PublishedTafsirEdition,
-    repository: PublishedTafsirRepository, modifier: Modifier, scrollInternally: Boolean) {
+    repository: PublishedTafsirRepository, modifier: Modifier, scrollInternally: Boolean, missingAssetContent: (@Composable (() -> Unit) -> Unit)?) {
     var text by remember(surah, ayah) { mutableStateOf<String?>(null) }
+    var assetMissing by remember(surah, ayah) { mutableStateOf(false) }
     var failed by remember(surah, ayah) { mutableStateOf(false) }
     var retry by remember { mutableIntStateOf(0) }
     var downloading by remember { mutableStateOf(false) }
@@ -38,9 +40,10 @@ private fun PublishedTafsirReader(surah: Int, ayah: Int, edition: PublishedTafsi
     val scope = rememberCoroutineScope()
     val uri = LocalUriHandler.current
     LaunchedEffect(surah, ayah, repository, retry) {
-        text = null; failed = false
+        text = null; failed = false; assetMissing = false
         try { text = repository.text(surah, ayah) }
         catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: PublishedTafsirAssetMissing) { assetMissing = true; failed = true }
         catch (_: Exception) { failed = true }
     }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -54,6 +57,7 @@ private fun PublishedTafsirReader(surah: Int, ayah: Int, edition: PublishedTafsi
             TextButton(onClick = { uri.openUri(edition.sourceUrl) }) { Text("Source") }
         }
         when {
+            assetMissing && missingAssetContent != null -> missingAssetContent { retry++ }
             failed -> {
                 Text("Could not load this published tafsir. Connect to download it, or try again if already saved.", color = MaterialTheme.colorScheme.error)
                 TextButton(onClick = { retry++ }) { Text("Try again") }
@@ -69,21 +73,23 @@ private fun PublishedTafsirReader(surah: Int, ayah: Int, edition: PublishedTafsi
                         .verticalScroll(textScroll) else Modifier))
             }
         }
-        if (downloading) {
-            LinearProgressIndicator(progress = { completed / 114f }, modifier = Modifier.fillMaxWidth())
-            Text("Saving $completed of 114 surahs…", style = MaterialTheme.typography.bodySmall)
-        } else {
-            TextButton(enabled = completed != 114, onClick = {
-                scope.launch {
-                    downloading = true; downloadError = false
-                    try { repository.downloadAll { count, _ -> completed = count } }
-                    catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Exception) { downloadError = true }
-                    finally { downloading = false }
-                }
-            }) { Text(if (completed == 114) "Full tafsir saved offline" else "Download full tafsir for offline reading") }
+        if (missingAssetContent == null) {
+            if (downloading) {
+                LinearProgressIndicator(progress = { completed / 114f }, modifier = Modifier.fillMaxWidth())
+                Text("Saving $completed of 114 surahs…", style = MaterialTheme.typography.bodySmall)
+            } else {
+                TextButton(enabled = completed != 114, onClick = {
+                    scope.launch {
+                        downloading = true; downloadError = false
+                        try { repository.downloadAll { count, _ -> completed = count } }
+                        catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { downloadError = true }
+                        finally { downloading = false }
+                    }
+                }) { Text(if (completed == 114) "Full tafsir saved offline" else "Download full tafsir for offline reading") }
+            }
+            if (downloadError) Text("Download interrupted. Saved chapters remain available; tap download to continue.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
-        if (downloadError) Text("Download interrupted. Saved chapters remain available; tap download to continue.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
 }

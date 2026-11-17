@@ -25,6 +25,8 @@ object BengaliIbnKathir {
     }
 }
 
+class PublishedTafsirAssetMissing : Exception("Download this tafsir edition to read it offline")
+
 /** The platform reader resolves a SHA-256-verified CDN file, reusing its persistent offline cache. */
 class PublishedTafsirRepository(private val readChapter: suspend (Int) -> String) {
     private val mutex = Mutex()

@@ -481,7 +481,8 @@ internal fun storageCategoryDescription(category: String): String = com.starcept
 }
 
 private fun storageCategoryGroup(category: String): String = when {
-    category == "quran_core" || category == "quran_translation" || category.startsWith("quran_tafsir_") -> "Holy Quran"
+    category.startsWith("quran_tafsir_") -> "Tafsir"
+    category == "quran_core" || category == "quran_translation" -> "Holy Quran"
     category.startsWith("hadith_") -> "Hadith Collections"
     category.startsWith("quran_audio_") || category.endsWith("_audio_bn") ||
         category.startsWith("fortress_audio_") -> "Audio Recitations"
@@ -494,13 +495,14 @@ private fun storageCategoryGroup(category: String): String = when {
 
 private fun storageGroupOrder(group: String): Int = when (group) {
     "Holy Quran" -> 0
-    "Hadith Collections" -> 1
-    "Audio Recitations" -> 2
-    "Text-to-Speech" -> 3
-    "On-device AI" -> 4
-    "Voice Recognition" -> 5
-    "App Data" -> 6
-    else -> 6
+    "Tafsir" -> 1
+    "Hadith Collections" -> 2
+    "Audio Recitations" -> 3
+    "Text-to-Speech" -> 4
+    "On-device AI" -> 5
+    "Voice Recognition" -> 6
+    "App Data" -> 7
+    else -> 8
 }
 
 internal fun formatStorageSize(bytes: Long): String = when {

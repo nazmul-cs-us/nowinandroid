@@ -3955,7 +3955,8 @@ private fun BottomSheetTafseerContent(
         com.starception.submission.feature.quran.TafsirBookPicker(selectedTafseerBook, onTafseerBookSelected)
         Spacer(Modifier.height(20.dp))
         if (publishedEdition != null) {
-            PublishedTafsirContent(tafseerData.surahNumber, tafseerData.ayahNumber, publishedEdition, requireNotNull(publishedRepository), scrollInternally = false)
+            PublishedTafsirContent(tafseerData.surahNumber, tafseerData.ayahNumber, publishedEdition, requireNotNull(publishedRepository), scrollInternally = false,
+                missingAssetContent = { reload -> MissingTafsirAssetCard(publishedEdition, reload) })
         } else {
         if (selectedLanguage != "ar") Text("Automatic translation of Arabic commentary",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -9337,6 +9338,8 @@ fun TafseerDialog(
     selectedArabicFont: String = "pdms_saleem",
     onTafseerBookSelected: (String) -> Unit,
     onDismiss: () -> Unit,
+    missingAssetContent: @Composable (com.starception.submission.feature.quran.PublishedTafsirEdition, () -> Unit) -> Unit =
+        { edition, reload -> MissingTafsirAssetCard(edition, reload) },
 ) {
     val tafsirContext = LocalContext.current.applicationContext
     val edition = PublishedTafsirs.forBook(selectedTafseerBook)
@@ -9374,7 +9377,8 @@ fun TafseerDialog(
                         if (edition != null) {
                             val repository = remember(edition.bookKey) { createPublishedTafsirRepository(tafsirContext, edition) }
                             PublishedTafsirContent(tafseerData.surahNumber, tafseerData.ayahNumber, edition, repository,
-                                scrollInternally = false)
+                                scrollInternally = false,
+                                missingAssetContent = { reload -> missingAssetContent(edition, reload) })
                         } else {
                             val body = when (selectedTafseerBook) {
                                 "moysar" -> tafseerData.tafseerMoysar

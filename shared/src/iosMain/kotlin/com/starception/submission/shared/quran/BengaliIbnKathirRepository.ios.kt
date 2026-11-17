@@ -13,8 +13,8 @@ import platform.Foundation.dataWithContentsOfFile
 
 internal actual fun createPublishedTafsirRepository(edition: PublishedTafsirEdition): PublishedTafsirRepository =
     PublishedTafsirRepository { surah ->
-        val asset = iosCloudAssets.resolveAsset(edition.chapterKey(surah))
-            ?: error("Published tafsir chapter unavailable")
+        val asset = iosCloudAssets.lookupAsset(edition.chapterKey(surah))
+            ?: throw com.starception.submission.feature.quran.PublishedTafsirAssetMissing()
         withContext(Dispatchers.Default) {
             val data = NSData.dataWithContentsOfFile(asset.absolutePath) ?: error("Published tafsir file missing")
             (NSString.create(data = data, encoding = NSUTF8StringEncoding) as String?)

@@ -1021,7 +1021,13 @@ internal fun QuranDetailScreen(
                                     val repository = remember(publishedEdition.bookKey) {
                                         com.starception.submission.shared.quran.createPublishedTafsirRepository(publishedEdition)
                                     }
-                                    PublishedTafsirContent(number, tafseerSheet.ayahNumber, publishedEdition, repository, scrollInternally = false)
+                                    PublishedTafsirContent(number, tafseerSheet.ayahNumber, publishedEdition, repository,
+                                        scrollInternally = false, missingAssetContent = { reload ->
+                                            MissingContentDownloadCard(publishedEdition.category,
+                                                "${publishedEdition.englishLanguageName} · ${publishedEdition.title}",
+                                                "Download all 114 surahs to read this tafsir offline. Manage it in Content & Storage → Tafsir.",
+                                                onDownloadComplete = reload)
+                                        })
                                 } else if (tafseerLoading) {
                                     androidx.compose.foundation.layout.Box(
                                         modifier = Modifier

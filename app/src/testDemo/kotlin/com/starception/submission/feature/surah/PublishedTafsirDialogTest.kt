@@ -30,7 +30,8 @@ class PublishedTafsirDialogTest {
         val selected = mutableStateOf("saadi")
         val data = QuranAyahTafseer(0, 1, "الفاتحة", 1, "بسم الله", "Arabic Saadi", "Arabic Moyassar", "Arabic Baghawi", "", "", "")
         compose.setContent { MaterialTheme {
-            TafseerDialog(data, selected.value, onTafseerBookSelected = { selected.value = it }, onDismiss = {})
+            TafseerDialog(data, selected.value, onTafseerBookSelected = { selected.value = it }, onDismiss = {},
+                missingAssetContent = { _, _ -> androidx.compose.material3.Text("Download tafsir") })
         } }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/tafsir_reader.png")
         compose.onNodeWithTag("published-tafsir-picker").assertIsDisplayed().performClick()

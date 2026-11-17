@@ -57,4 +57,31 @@ class PublishedTafsirContentTest {
         compose.onNodeWithText("Svenska").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("Published tafsir source unavailable").assertExists()
     }
+    @Test fun missingTafsirUsesTheAssetCardAndReloadsOnlyAfterTheDownloadFinishes() {
+        var downloaded = false
+        var reads = 0
+        val edition = PublishedTafsirs.forLanguage("en")!!
+        val repository = PublishedTafsirRepository {
+            reads++
+            if (!downloaded) throw PublishedTafsirAssetMissing()
+            """{"surah":1,"ayahCount":7,"passages":["Saved commentary"],"ayahPassage":[0,0,0,0,0,0,0]}"""
+        }
+        compose.setContent { MaterialTheme {
+            PublishedTafsirContent(1, 1, edition, repository, missingAssetContent = { reload ->
+                androidx.compose.material3.Card {
+                    androidx.compose.material3.Text("Tafsir download required")
+                    androidx.compose.material3.TextButton(onClick = { downloaded = true; reload() }) { androidx.compose.material3.Text("Download") }
+                }
+            })
+        } }
+        compose.waitUntil(5000) { compose.onAllNodes(hasText("Tafsir download required")).fetchSemanticsNodes().isNotEmpty() }
+        org.junit.Assert.assertEquals(1, reads)
+        compose.onNodeWithText("Download full tafsir for offline reading").assertDoesNotExist()
+        compose.onNodeWithText("Could not load this published tafsir.", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Download").performClick()
+        compose.waitUntil(5000) { compose.onAllNodes(hasText("Saved commentary")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Tafsir download required").assertDoesNotExist()
+        org.junit.Assert.assertEquals(2, reads)
+    }
+
 }

@@ -60,9 +60,17 @@ source text is not designated public domain by this integration.
 ## CDN and offline behavior
 
 Each new edition has a separate immutable prefix and optional `quran_tafsir_XX`
-asset category. The app's existing asset cache verifies length and SHA-256 before
-committing downloads. Opening an ayah downloads its chapter; **Download full tafsir
-for offline reading** saves all 114 chapters and reuses completed files on retry.
+asset category. Opening a reader only looks up saved, verified chapters; it does
+not silently download commentary. A missing chapter displays the platform's
+standard missing-content asset card, with the selected edition's category.
+The card downloads the complete edition (114 chapter files plus its manifest and
+notice), then reloads the requested ayah. Failed transfers retain completed files
+for retry. Existing cached chapters can still be read while an edition is partial.
+
+**Settings → Content & Storage → Tafsir** lists every published language edition
+with its size, availability, download and removal controls. The shared storage UI
+also supports per-category cancellation. Downloads use the same category jobs and
+SHA-256 verification as other content; the reader has no separate download button.
 Only two decoded chapters per repository remain in memory. Changing editions
 cancels old reads, resets text/scroll/progress and uses a distinct cache namespace.
 Urdu paragraphs use right alignment and content-aware text direction. Fonts use
