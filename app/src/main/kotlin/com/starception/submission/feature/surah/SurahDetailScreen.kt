@@ -3858,6 +3858,7 @@ private fun BottomSheetTafseerContent(
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
     val tafsirContext = LocalContext.current.applicationContext
+    val speechFactory = remember(tafsirContext) { { AndroidTafsirSpeechPlayer(tafsirContext) } }
     val publishedEdition = PublishedTafsirs.forBook(selectedTafseerBook)
     val publishedRepository = remember(tafsirContext, publishedEdition?.bookKey) {
         publishedEdition?.let { createPublishedTafsirRepository(tafsirContext, it) }
@@ -3956,7 +3957,7 @@ private fun BottomSheetTafseerContent(
         Spacer(Modifier.height(20.dp))
         if (publishedEdition != null) {
             PublishedTafsirContent(tafseerData.surahNumber, tafseerData.ayahNumber, publishedEdition, requireNotNull(publishedRepository), scrollInternally = false,
-                missingAssetContent = { reload -> MissingTafsirAssetCard(publishedEdition, reload) })
+                missingAssetContent = { reload -> MissingTafsirAssetCard(publishedEdition, reload) }, speechPlayerFactory = speechFactory)
         } else {
         if (selectedLanguage != "ar") Text("Automatic translation of Arabic commentary",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -3979,6 +3980,9 @@ private fun BottomSheetTafseerContent(
             originalText
         }
 
+        if (displayText.isNotBlank()) key(tafseerData.surahNumber, tafseerData.ayahNumber, selectedTafseerBook) {
+            com.starception.submission.feature.quran.TafsirPlaybackControls(displayText, selectedLanguage, speechFactory)
+        }
         val displayWordMeanings = if (selectedLanguage != "ar" && translatedWordMeanings != null) {
             translatedWordMeanings
         } else {
@@ -9342,6 +9346,7 @@ fun TafseerDialog(
         { edition, reload -> MissingTafsirAssetCard(edition, reload) },
 ) {
     val tafsirContext = LocalContext.current.applicationContext
+    val speechFactory = remember(tafsirContext) { { AndroidTafsirSpeechPlayer(tafsirContext) } }
     val edition = PublishedTafsirs.forBook(selectedTafseerBook)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
@@ -9378,7 +9383,7 @@ fun TafseerDialog(
                             val repository = remember(edition.bookKey) { createPublishedTafsirRepository(tafsirContext, edition) }
                             PublishedTafsirContent(tafseerData.surahNumber, tafseerData.ayahNumber, edition, repository,
                                 scrollInternally = false,
-                                missingAssetContent = { reload -> missingAssetContent(edition, reload) })
+                                missingAssetContent = { reload -> missingAssetContent(edition, reload) }, speechPlayerFactory = speechFactory)
                         } else {
                             val body = when (selectedTafseerBook) {
                                 "moysar" -> tafseerData.tafseerMoysar
@@ -9387,13 +9392,16 @@ fun TafseerDialog(
                             }
                             if (body.isBlank()) Text("Commentary is unavailable for this ayah.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            else androidx.compose.foundation.text.selection.SelectionContainer {
-                                Text(body, modifier = Modifier.fillMaxWidth(),
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
-                                        fontSize = 20.sp, lineHeight = 36.sp,
-                                        textDirection = androidx.compose.ui.text.style.TextDirection.Content),
-                                    textAlign = TextAlign.Start)
+                            else {
+                                com.starception.submission.feature.quran.TafsirPlaybackControls(body, "ar", speechFactory)
+                                androidx.compose.foundation.text.selection.SelectionContainer {
+                                    Text(body, modifier = Modifier.fillMaxWidth(),
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
+                                            fontSize = 20.sp, lineHeight = 36.sp,
+                                            textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+                                        textAlign = TextAlign.Start)
+                                }
                             }
                             if (tafseerData.ayahMeanings.isNotBlank()) {
                                 Text("Word meanings", style = MaterialTheme.typography.titleSmall,

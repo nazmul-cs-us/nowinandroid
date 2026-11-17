@@ -22,13 +22,14 @@ fun BengaliIbnKathirContent(surah: Int, ayah: Int, repository: BengaliIbnKathirR
 @Composable
 fun PublishedTafsirContent(surah: Int, ayah: Int, edition: PublishedTafsirEdition,
     repository: PublishedTafsirRepository, modifier: Modifier = Modifier, scrollInternally: Boolean = true,
-    missingAssetContent: (@Composable (() -> Unit) -> Unit)? = null) {
-    key(edition.bookKey) { PublishedTafsirReader(surah, ayah, edition, repository, modifier, scrollInternally, missingAssetContent) }
+    missingAssetContent: (@Composable (() -> Unit) -> Unit)? = null,
+    speechPlayerFactory: (() -> TafsirSpeechPlayer)? = null) {
+    key(edition.bookKey) { PublishedTafsirReader(surah, ayah, edition, repository, modifier, scrollInternally, missingAssetContent, speechPlayerFactory) }
 }
 
 @Composable
 private fun PublishedTafsirReader(surah: Int, ayah: Int, edition: PublishedTafsirEdition,
-    repository: PublishedTafsirRepository, modifier: Modifier, scrollInternally: Boolean, missingAssetContent: (@Composable (() -> Unit) -> Unit)?) {
+    repository: PublishedTafsirRepository, modifier: Modifier, scrollInternally: Boolean, missingAssetContent: (@Composable (() -> Unit) -> Unit)?, speechPlayerFactory: (() -> TafsirSpeechPlayer)?) {
     var text by remember(surah, ayah) { mutableStateOf<String?>(null) }
     var assetMissing by remember(surah, ayah) { mutableStateOf(false) }
     var failed by remember(surah, ayah) { mutableStateOf(false) }
@@ -56,6 +57,7 @@ private fun PublishedTafsirReader(surah: Int, ayah: Int, edition: PublishedTafsi
             }
             TextButton(onClick = { uri.openUri(edition.sourceUrl) }) { Text("Source") }
         }
+        if (text != null && speechPlayerFactory != null) TafsirPlaybackControls(text.orEmpty(), edition.languageCode, speechPlayerFactory)
         when {
             assetMissing && missingAssetContent != null -> missingAssetContent { retry++ }
             failed -> {

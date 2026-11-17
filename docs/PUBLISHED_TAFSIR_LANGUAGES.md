@@ -91,3 +91,23 @@ reading, retries, complete/interrupted offline downloads and stale ayah reads.
 CDN contract checks bind every chapter to its verified source checksum. The shared
 asset-cache suite validates integrity and offline resolution. Native iOS device
 validation still requires macOS/Xcode.
+
+## Spoken tafsir
+
+Loaded commentary includes **Play tafsir**, **Pause / Resume**, and **Stop**. These
+read the selected commentary using the device's system TTS in its language; they
+are synthesized narration, not a scholar's recorded lesson. Missing assets must
+be downloaded before playback becomes available. No audio corpus is downloaded.
+A missing or unsupported voice produces an inline message and retry control.
+
+Android lazily initializes TextToSpeech, splits long passages below the engine
+input limit, and resumes at the current word (or chunk if an engine has no range
+callbacks). It requests speech audio focus and pauses any active Quran recitation.
+iOS uses AVSpeechSynthesizer through the existing playback audio session, with a
+matching-language voice check and native pause/resume. Its Quran player pauses
+before narration. Available voices and offline capability depend on the device.
+
+Speech starts only on a tap. Changing the ayah or edition, closing the reader, or
+backgrounding its screen stops narration. Changing or closing the reader releases
+its speech player.
+The new control is available for both published language editions and Arabic books.

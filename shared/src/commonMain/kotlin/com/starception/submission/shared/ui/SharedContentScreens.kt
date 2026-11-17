@@ -558,6 +558,7 @@ internal fun QuranDetailScreen(
     }
     var loadAttempt by remember(number) { mutableStateOf(0) }
     val tafseerRepository = remember { com.starception.submission.shared.quran.createQuranTafseerRepository() }
+    val tafsirSpeechFactory = remember(player) { { com.starception.submission.shared.voice.SystemTafsirSpeechPlayer { player.pause() } } }
     val tafseerScope = androidx.compose.runtime.rememberCoroutineScope()
     var tafseerRequest by remember {
         mutableStateOf<com.starception.submission.shared.quran.AyahTafseer?>(null)
@@ -1027,7 +1028,7 @@ internal fun QuranDetailScreen(
                                                 "${publishedEdition.englishLanguageName} · ${publishedEdition.title}",
                                                 "Download all 114 surahs to read this tafsir offline. Manage it in Content & Storage → Tafsir.",
                                                 onDownloadComplete = reload)
-                                        })
+                                        }, speechPlayerFactory = tafsirSpeechFactory)
                                 } else if (tafseerLoading) {
                                     androidx.compose.foundation.layout.Box(
                                         modifier = Modifier
@@ -1063,6 +1064,7 @@ internal fun QuranDetailScreen(
                                                 }
                                             })
                                     } else {
+                                        com.starception.submission.feature.quran.TafsirPlaybackControls(body, "ar", tafsirSpeechFactory)
                                         Text(
                                             body,
                                             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp, lineHeight = 34.sp,

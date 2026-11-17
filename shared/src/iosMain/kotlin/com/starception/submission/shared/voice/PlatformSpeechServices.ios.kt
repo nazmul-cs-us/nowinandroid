@@ -195,6 +195,7 @@ actual class PlatformSpeechSynthesizer actual constructor() {
         val voice = voiceIdentifier?.let(AVSpeechSynthesisVoice::voiceWithIdentifier)
             ?: AVSpeechSynthesisVoice.voiceWithLanguage(language)
             ?: return false
+        if (voiceIdentifier == null && voice.language.substringBefore('-') != language.substringBefore('-')) return false
         if (!IosAudioSessionController.activatePlayback()) return false
         audioSessionActive = true
         completion = onComplete
