@@ -558,7 +558,6 @@ internal fun QuranDetailScreen(
     }
     var loadAttempt by remember(number) { mutableStateOf(0) }
     val tafseerRepository = remember { com.starception.submission.shared.quran.createQuranTafseerRepository() }
-    val tafsirSpeechFactory = remember(player) { { com.starception.submission.shared.voice.SystemTafsirSpeechPlayer { player.pause() } } }
     val tafseerScope = androidx.compose.runtime.rememberCoroutineScope()
     var tafseerRequest by remember {
         mutableStateOf<com.starception.submission.shared.quran.AyahTafseer?>(null)
@@ -566,6 +565,22 @@ internal fun QuranDetailScreen(
     var tafseerLoading by remember { mutableStateOf(false) }
     var tafseerLoadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var tafseerSelectedBook by remember { mutableStateOf(store.quranTafsirBook()) }
+    var showInlineTafsir by remember(number) { mutableStateOf(false) }
+    var inlineTafsirTarget by remember(number) { mutableIntStateOf(1) }
+    var inlineTafsirRevision by remember { mutableIntStateOf(0) }
+    var inlineTafsirBookIndex by remember { mutableIntStateOf(store.quranTafsirBook().takeIf { it != 3 } ?: 0) }
+    val inlineBook = PublishedTafsirs.forStorageIndex(inlineTafsirBookIndex)?.bookKey
+        ?: listOf("saadi", "moysar", "baghawi")[inlineTafsirBookIndex.coerceIn(0, 2)]
+    val inlineEdition = PublishedTafsirs.forBook(inlineBook)
+    val inlineRepository = remember(inlineBook) {
+        inlineEdition?.let { com.starception.submission.shared.quran.createPublishedTafsirRepository(it) }
+    }
+    val inlineSpeechSession = remember { com.starception.submission.feature.quran.TafsirSpeechSession() }
+    val tafsirSpeechFactory = remember(player) {
+        { inlineSpeechSession.createPlayer { com.starception.submission.shared.voice.SystemTafsirSpeechPlayer { player.pause() } } }
+    }
+    DisposableEffect(showInlineTafsir, inlineBook, number) { onDispose { inlineSpeechSession.stop() } }
+
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
     val repository = remember(loadAttempt) { createQuranVerseRepository() }
     LaunchedEffect(number, translationLanguage, loadAttempt) {
@@ -591,7 +606,8 @@ internal fun QuranDetailScreen(
     var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
     var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
     var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
-    var mushafMode by remember { mutableStateOf(store.quranMushafMode()) }
+    var preferredMushafMode by remember { mutableStateOf(store.quranMushafMode()) }
+    val mushafMode = preferredMushafMode && !showInlineTafsir
     var mushafCurrentPage by remember(number) { mutableIntStateOf(1) }
     var mushafTotalPages by remember(number) { mutableIntStateOf(1) }
     var requestedMushafPage by remember(number) { mutableIntStateOf(1) }
@@ -639,6 +655,12 @@ internal fun QuranDetailScreen(
     // Android's toolbar translation chip — the two-letter code (EN/BN/…) that
     // opens the reading settings' translation picker.
     val openTafsir: (Int, Int) -> Unit = { verseId, preselectBook ->
+        if (preselectBook != 3) {
+            tafseerLoadJob?.cancel(); tafseerRequest = null
+            inlineTafsirBookIndex = store.quranTafsirBook().takeIf { it != 3 } ?: 0
+            inlineTafsirTarget = verseId
+            showInlineTafsir = true
+        } else {
         tafseerLoadJob?.cancel()
         tafseerSelectedBook = if (preselectBook == 3) 3
             else store.quranTafsirBook().takeIf { it != 3 } ?: 0
@@ -663,9 +685,10 @@ internal fun QuranDetailScreen(
                 }
             }
         }
+        }
     }
     val tafsirAction = DetailAction(id = "tafsir", label = "Tafsir", trailingText = "Tafsir") {
-        openTafsir(1, 0)
+        if (showInlineTafsir) showInlineTafsir = false else openTafsir(1, 0)
     }
     val translationChipAction = DetailAction(
         id = "translation_chip",
@@ -704,6 +727,15 @@ internal fun QuranDetailScreen(
     // The ayah list drives the floating surah name and the play FAB's
     // hide-on-scroll behavior, matching Android's scrollState.
     val ayahListState = rememberLazyListState()
+    LaunchedEffect(showInlineTafsir, inlineTafsirTarget) {
+        val loaded = ayahState as? QuranAyahState.Loaded
+        if (showInlineTafsir && loaded != null) {
+            val bismillah = number != 1 && number != 9 && loaded.verses.firstOrNull()?.arabicText?.let(::hasLeadingBismillah) == true
+            androidx.compose.runtime.withFrameNanos { }
+            ayahListState.scrollToItem(2 + (if (bismillah) 1 else 0) + (inlineTafsirTarget - 1).coerceAtLeast(0))
+        }
+    }
+
     // Android's pinned play FAB and the info card share one toggle; both the
     // pinned FAB and the toolbar's play action route through it.
     val toggleSurahPlay = {
@@ -1010,7 +1042,7 @@ internal fun QuranDetailScreen(
                                     ?: arabicKeys.indexOf(book).coerceAtLeast(0)
                                 store.saveQuranTafsirBook(tafseerSelectedBook)
                                 // Published editions do not need the Arabic database. Load it when switching back.
-                                if (tafseerSelectedBook in 0..3) openTafsir(tafseerSheet.ayahNumber, tafseerSelectedBook)
+                                if (tafseerSelectedBook != 3) openTafsir(tafseerSheet.ayahNumber, 0)
                             },
                         )
                         Spacer(Modifier.height(16.dp))
@@ -1184,23 +1216,55 @@ internal fun QuranDetailScreen(
                                 }
                             }
                             items(displayVerses, key = { it.id }) { verse ->
-                                QuranAyahReadingBlock(
-                                    verse = verse,
-                                    showTranslation = showTranslation,
-                                    arabicFont = selectedArabicFont,
-                                    arabicFontSize = arabicFontSize,
-                                    textAlignment = textAlignment,
-                                    tajweedAnnotations = if (tajweedEnabled) {
-                                        tajweedAnnotations?.get(verse.numberInSurah)
-                                    } else {
-                                        null
-                                    },
-                                    onToggleTranslation = {
-                                        showTranslation = !showTranslation
-                                        store.saveQuranShowTranslation(showTranslation)
-                                    },
-                                    onOpenTafseer = openTafsir,
-                                )
+                                Column {
+                                    if (showInlineTafsir && verse.numberInSurah == 1) {
+                                        com.starception.submission.feature.quran.InlineTafsirHeader(inlineBook,
+                                            onSelect = { book ->
+                                                tafseerSelectedBook = PublishedTafsirs.forBook(book)?.storageIndex
+                                                    ?: listOf("saadi", "moysar", "baghawi").indexOf(book).coerceAtLeast(0)
+                                                inlineTafsirBookIndex = tafseerSelectedBook
+                                                store.saveQuranTafsirBook(tafseerSelectedBook)
+                                            }, onHide = { showInlineTafsir = false })
+                                    }
+                                    QuranAyahReadingBlock(
+                                        verse = verse,
+                                        showTranslation = showTranslation,
+                                        arabicFont = selectedArabicFont,
+                                        arabicFontSize = arabicFontSize,
+                                        textAlignment = textAlignment,
+                                        tajweedAnnotations = if (tajweedEnabled) {
+                                            tajweedAnnotations?.get(verse.numberInSurah)
+                                        } else {
+                                            null
+                                        },
+                                        onToggleTranslation = {
+                                            showTranslation = !showTranslation
+                                            store.saveQuranShowTranslation(showTranslation)
+                                        },
+                                        onOpenTafseer = openTafsir,
+                                    )
+                                    if (showInlineTafsir) {
+                                        com.starception.submission.feature.quran.InlineTafsirCommentary(number, verse.numberInSurah,
+                                            inlineBook, inlineTafsirRevision,
+                                            loadText = {
+                                                inlineRepository?.text(number, verse.numberInSurah) ?: run {
+                                                    val data = tafseerRepository.getTafseer(number, verse.numberInSurah)
+                                                        ?: throw com.starception.submission.feature.quran.PublishedTafsirAssetMissing()
+                                                    when (inlineBook) {
+                                                        "moysar" -> data.tafseerMoysar
+                                                        "baghawi" -> data.tafseerBaghawi
+                                                        "word_meanings" -> data.ayahMeanings
+                                                        else -> data.tafseerSaadi
+                                                    }
+                                                }
+                                            }, speechPlayerFactory = tafsirSpeechFactory,
+                                            missingAsset = { reload ->
+                                                MissingContentDownloadCard(inlineEdition?.category ?: "quran_core",
+                                                    inlineEdition?.let { "${it.englishLanguageName} · ${it.title}" } ?: "Arabic tafsir",
+                                                    onDownloadComplete = { inlineTafsirRevision++; reload() })
+                                            })
+                                    }
+                                }
                             }
                         }
                     }
@@ -1317,7 +1381,7 @@ internal fun QuranDetailScreen(
                     store.saveQuranTextAlignment(alignment)
                 },
                 onMushafChange = { enabled ->
-                    mushafMode = enabled
+                    preferredMushafMode = enabled
                     store.saveQuranMushafMode(enabled)
                 },
                 onTranslationChange = { enabled ->

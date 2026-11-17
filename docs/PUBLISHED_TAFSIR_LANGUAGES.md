@@ -1,19 +1,25 @@
 # Published tafsir languages
 
-Surah Details now has a visible **Tafsir** toolbar control and a Tafsir entry in
-Reading settings on Android and iOS; users no longer have to discover an ayah action
-menu first. The top-level control opens the current audio ayah on Android, or ayah 1
-when no verse is active. The shared reader starts with ayah 1. Individual ayah
-actions still open commentary for that exact ayah.
+Surah Details has a **Tafsir** toolbar control and a Reading settings entry on
+Android and iOS. They enable inline commentary beneath each Arabic ayah and its
+translation in the existing surah list. No separate tafsir dialog opens. The ayah
+action also enables inline commentary at that verse. **Hide tafsir** restores the
+normal reader, including the user's saved Mushaf preference; enabling tafsir does
+not overwrite that preference.
 
-The Android and iOS ayah tafsir readers offer a single book-and-language selector,
-including the Arabic sources and published language editions. The selector and
-compact header stay visible while the verse and commentary share one scrolling
-reading area. The native toolbar uses a simple Tafsir text button. The iOS reader
-opens in a modal sheet rather than an inline panel above the ayah list. Selecting an edition changes its title, attribution, source link, chapter
-cache and text together. The Quran translation language supplies the default when
-there is no explicit tafsir preference. Existing Arabic book choices and Bengali
-book key / storage index / offline files remain compatible.
+One book/language selector above the first ayah changes the inline edition across
+the surah. Chapters use the same verified offline repository; only visible lazy
+items request their commentary. Each ayah has its own label and Play/Pause control.
+A narration session prevents two ayahs speaking together. All commentary shares
+the Surah Details scroll container, without nested scrolling. Missing-content cards
+remain inline and a finished download refreshes the visible verses. Word meanings
+retain their separate study UI.
+
+The Quran translation language supplies the default when there is no explicit
+tafsir preference. Existing Arabic book choices and Bengali book key / storage
+index / offline files remain compatible. Sources that explain several ayahs in one
+passage retain that passage for each associated ayah; this UI does not invent
+ayah-specific divisions of the author's text.
 
 | Language | Published edition | Original catalog |
 | --- | --- | --- |

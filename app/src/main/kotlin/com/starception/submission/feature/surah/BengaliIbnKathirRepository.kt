@@ -27,16 +27,18 @@ internal fun createPublishedTafsirRepository(context: Context, edition: Publishe
 }
 
 @androidx.compose.runtime.Composable
-internal fun MissingTafsirAssetCard(edition: PublishedTafsirEdition, onDownloadComplete: () -> Unit) {
+internal fun MissingTafsirAssetCard(edition: PublishedTafsirEdition?, onDownloadComplete: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val manager = androidx.compose.runtime.remember(context) {
         dagger.hilt.android.EntryPointAccessors.fromApplication(context.applicationContext,
             com.starception.submission.voice.SherpaOnnxTtsEntryPoint::class.java).assetDownloadManager()
     }
     com.starception.submission.download.MissingContentCard(
-        resourceName = "${edition.englishLanguageName} · ${edition.title}",
-        category = edition.category,
-        description = "Download all 114 surahs to read this tafsir offline. You can manage it in Content & Storage → Tafsir.",
+        resourceName = edition?.let { "${it.englishLanguageName} · ${it.title}" } ?: "Arabic tafsir and word meanings",
+        category = edition?.category ?: "quran_core",
+        description = if (edition != null)
+            "Download all 114 surahs to read this tafsir offline. You can manage it in Content & Storage → Tafsir."
+            else "Download Quran content to read Arabic tafsir offline. Manage it in Content & Storage → Holy Quran.",
         downloadManager = manager, onDownloadComplete = onDownloadComplete, compact = true,
     )
 }

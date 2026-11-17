@@ -89,6 +89,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -576,7 +577,20 @@ fun SurahDetailScreen(
     val tafseerData by viewModel.tafseerData.collectAsState()
     val selectedTafseerBook by viewModel.selectedTafseerBook.collectAsState()
     var showWordStudyDialog by remember { mutableStateOf(false) }
-    var showTafseerDialog by remember { mutableStateOf(false) }
+    var showInlineTafsir by rememberSaveable(surahNumber) { mutableStateOf(false) }
+    var inlineTafsirTarget by remember(surahNumber) { mutableIntStateOf(0) }
+    var inlineTafsirRevision by remember { mutableIntStateOf(0) }
+    val inlineEdition = PublishedTafsirs.forBook(selectedTafseerBook)
+    val inlineTafsirRepository = remember(inlineEdition?.bookKey, context) {
+        inlineEdition?.let { createPublishedTafsirRepository(context, it) }
+    }
+    val inlineSpeechSession = remember { com.starception.submission.feature.quran.TafsirSpeechSession() }
+    val inlineSpeechFactory = remember(context) {
+        { inlineSpeechSession.createPlayer { AndroidTafsirSpeechPlayer(context) } }
+    }
+    DisposableEffect(showInlineTafsir, selectedTafseerBook, currentPlayingSurahNumber) {
+        onDispose { inlineSpeechSession.stop() }
+    }
 
     // Tafseer translation states
     val tafseerTranslationLanguage by viewModel.tafseerTranslationLanguage.collectAsState()
@@ -653,7 +667,16 @@ fun SurahDetailScreen(
     val tajweedAnnotations by viewModel.tajweedAnnotations.collectAsState()
 
     // Continuous (Mushaf) reading mode
-    val continuousReadingMode by viewModel.continuousReadingMode.collectAsState()
+    val preferredContinuousReadingMode by viewModel.continuousReadingMode.collectAsState()
+    val continuousReadingMode = preferredContinuousReadingMode && !showInlineTafsir
+    LaunchedEffect(showInlineTafsir, inlineTafsirTarget) {
+        if (showInlineTafsir && inlineTafsirTarget > 0) {
+            withFrameNanos { }
+            scrollState.scrollToItem(1 + (if (showBismillahRow) 1 else 0) + inlineTafsirTarget - 1)
+            inlineTafsirTarget = 0
+        }
+    }
+
 
     // Track bookmark state using UserDataRepository
     // When opened from the news feed we use the real news resource ID; otherwise fall back to a
@@ -867,13 +890,10 @@ fun SurahDetailScreen(
     var showReciterPicker by remember { mutableStateOf(false) }
     var showFloatingToolbar by remember { mutableStateOf(false) } // Floating toolbar hidden initially, shown via More menu
     val openHeaderTafsir: () -> Unit = {
-        val loaded = uiState as? SurahDetailUiState.Success
-        if (loaded != null) {
+        if (uiState is SurahDetailUiState.Success) {
             showFloatingToolbar = false
-            val visibleAyahs = surahCache[currentPlayingSurahNumber]?.second ?: loaded.ayahs
-            val ayah = currentRecitingAyah?.takeIf { candidate -> visibleAyahs.any { it.numberInSurah == candidate } } ?: 1
-            viewModel.loadTafseer(currentPlayingSurahNumber, ayah)
-            showTafseerDialog = true
+            inlineTafsirTarget = 1
+            showInlineTafsir = !showInlineTafsir
         }
     }
 
@@ -1130,10 +1150,21 @@ fun SurahDetailScreen(
                                 viewModel.loadWordStudy(surahNumber, ayahNumber)
                                 // Don't show dialog - data is shown in bottom sheet
                             },
-                            onTafseerClick = { ayahNumber ->
-                                viewModel.loadTafseer(surahNumber, ayahNumber)
-                                // Don't show dialog - data is shown in bottom sheet
-                            },
+                            onTafseerClick = { verse -> inlineTafsirTarget = verse; showInlineTafsir = true },
+                            inlineTafsirHeader = if (showInlineTafsir) ({
+                                com.starception.submission.feature.quran.InlineTafsirHeader(selectedTafseerBook,
+                                    onSelect = viewModel::selectTafseerBook, onHide = { showInlineTafsir = false })
+                            }) else null,
+                            inlineTafsirContent = if (showInlineTafsir) ({ chapter, verse ->
+                                com.starception.submission.feature.quran.InlineTafsirCommentary(chapter, verse,
+                                    selectedTafseerBook, inlineTafsirRevision,
+                                    loadText = { inlineTafsirRepository?.text(chapter, verse)
+                                        ?: viewModel.inlineTafsirText(chapter, verse, selectedTafseerBook) },
+                                    speechPlayerFactory = inlineSpeechFactory,
+                                    missingAsset = { reload -> MissingTafsirAssetCard(inlineEdition) {
+                                        inlineTafsirRevision++; reload()
+                                    } })
+                            }) else null,
                             onPlayAyahClick = { ayahNumber ->
                                 val service = playbackService
                                 if (service != null) {
@@ -1839,7 +1870,7 @@ fun SurahDetailScreen(
                     TextButton(onClick = openHeaderTafsir, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.MenuBook, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Tafsir · Choose commentary and language")
+                        Text(if (showInlineTafsir) "Hide inline tafsir" else "Show tafsir beneath each ayah")
                     }
 
                     // Arabic font — value + chevron row.
@@ -2048,20 +2079,6 @@ fun SurahDetailScreen(
                 onDismiss = {
                     showWordStudyDialog = false
                     viewModel.clearWordStudy()
-                },
-            )
-        }
-
-        // Tafseer dialog
-        if (showTafseerDialog && tafseerData != null) {
-            com.starception.submission.feature.surah.TafseerDialog(
-                tafseerData = tafseerData!!,
-                selectedTafseerBook = selectedTafseerBook,
-                selectedArabicFont = selectedArabicFont,
-                onTafseerBookSelected = { book -> viewModel.selectTafseerBook(book) },
-                onDismiss = {
-                    showTafseerDialog = false
-                    viewModel.clearTafseer()
                 },
             )
         }
@@ -2635,6 +2652,8 @@ private fun AlbumPlayerContent(
     onCollapseMusicPlayer: () -> Unit = {},
     onWordStudyClick: (Int) -> Unit = {},
     onTafseerClick: (Int) -> Unit = {},
+    inlineTafsirHeader: (@Composable () -> Unit)? = null,
+    inlineTafsirContent: (@Composable (Int, Int) -> Unit)? = null,
     onPlayAyahClick: (Int) -> Unit = {},
     topics: List<com.starception.submission.core.topicsdatabase.Topic> = emptyList(),
     onTopicClick: (String) -> Unit = {},
@@ -3093,40 +3112,44 @@ private fun AlbumPlayerContent(
                     items = displayAyahs,
                     key = { "${displaySurah.number}_${it.numberInSurah}" },
                 ) { ayah ->
-                    AyahTrackItem(
-                        ayah = ayah,
-                        arabicFont = selectedArabicFont,
-                        arabicFontSize = arabicFontSize,
-                        textAlignment = textAlignment,
-                        showTranslation = showTranslationInText,
-                        showTajweed = showTajweed,
-                        tajweedAnnotations = tajweedAnnotations[ayah.numberInSurah],
-                        isFavourite = ayah.numberInSurah in favouriteAyahs,
-                        hasNote = ayah.numberInSurah in ayahsWithNotes,
-                        isReciting = currentRecitingAyah == ayah.numberInSurah,
-                        isHighlighted = highlightedAyahNumber == ayah.numberInSurah,
-                        onClick = { onAyahClick(ayah) },
-                        onLongPress = {
-                            selectedAyahForOptions = ayah.numberInSurah
-                            showBottomSheet = true
-                        },
-                        onDoubleTap = {
-                            val ayahNumber = ayah.numberInSurah
-                            val isFavourite = ayahNumber in favouriteAyahs
-                            val newFavouriteStatus = !isFavourite
+                    Column {
+                        if (ayah.numberInSurah == displayAyahs.firstOrNull()?.numberInSurah) inlineTafsirHeader?.invoke()
+                        AyahTrackItem(
+                            ayah = ayah,
+                            arabicFont = selectedArabicFont,
+                            arabicFontSize = arabicFontSize,
+                            textAlignment = textAlignment,
+                            showTranslation = showTranslationInText,
+                            showTajweed = showTajweed,
+                            tajweedAnnotations = tajweedAnnotations[ayah.numberInSurah],
+                            isFavourite = ayah.numberInSurah in favouriteAyahs,
+                            hasNote = ayah.numberInSurah in ayahsWithNotes,
+                            isReciting = currentRecitingAyah == ayah.numberInSurah,
+                            isHighlighted = highlightedAyahNumber == ayah.numberInSurah,
+                            onClick = { onAyahClick(ayah) },
+                            onLongPress = {
+                                selectedAyahForOptions = ayah.numberInSurah
+                                showBottomSheet = true
+                            },
+                            onDoubleTap = {
+                                val ayahNumber = ayah.numberInSurah
+                                val isFavourite = ayahNumber in favouriteAyahs
+                                val newFavouriteStatus = !isFavourite
 
-                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                                quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
-                                favouriteAyahs = if (newFavouriteStatus) {
-                                    favouriteAyahs + ayahNumber
-                                } else {
-                                    favouriteAyahs - ayahNumber
+                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                    quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
+                                    favouriteAyahs = if (newFavouriteStatus) {
+                                        favouriteAyahs + ayahNumber
+                                    } else {
+                                        favouriteAyahs - ayahNumber
+                                    }
+                                    val action = if (newFavouriteStatus) "added to" else "removed from"
+                                    android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
                                 }
-                                val action = if (newFavouriteStatus) "added to" else "removed from"
-                                android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                    )
+                            },
+                        )
+                        inlineTafsirContent?.invoke(displaySurah.number, ayah.numberInSurah)
+                    }
                 }
             }
         }
@@ -3417,7 +3440,8 @@ private fun AlbumPlayerContent(
                                                         selectedAyahForOptions?.let { ayahNum ->
                                                             onTafseerClick(ayahNum)
                                                         }
-                                                        bottomSheetMode = "tafseer"
+                                                        showBottomSheet = false
+                                                        bottomSheetMode = "menu"
                                                     },
                                                 )
 
