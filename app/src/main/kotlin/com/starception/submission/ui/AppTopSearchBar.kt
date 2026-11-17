@@ -16,6 +16,10 @@
 
 package com.starception.submission.ui
 
+import com.starception.submission.feature.prayertimes.HomeHeaderDetail
+import com.starception.submission.feature.prayertimes.HomeHeaderTypography
+import com.starception.submission.feature.prayertimes.HomeRotatingHeaderText
+
 import androidx.compose.foundation.layout.Column
 import android.Manifest
 import android.content.Context
@@ -159,50 +163,13 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import coil.size.Size as CoilSize
 import com.google.android.material.R as MaterialR
 
-/** A shallow inset edge, rather than a floating drop shadow, over the cover photo. */
+/** A single crisp face with a subtle shadow for photo contrast. */
 @Composable
-internal fun HomeEngravedGreeting(
-    text: String,
-    color: ComposeColor,
-    onDarkArtwork: Boolean,
-) {
-    val style = com.starception.submission.feature.prayertimes.HomeTypography.greeting
-    val upperShadow = ComposeColor.Black.copy(alpha = if (onDarkArtwork) .32f else .22f)
-    val lowerHighlight = ComposeColor.White.copy(alpha = if (onDarkArtwork) .18f else .42f)
-    Box {
-        Text(
-            text = text,
-            style = style,
-            color = upperShadow,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.offset(y = (-.7).dp).clearAndSetSemantics { },
-        )
-        Text(
-            text = text,
-            style = style,
-            color = lowerHighlight,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.offset(y = .7.dp).clearAndSetSemantics { },
-        )
-        Text(
-            text = text,
-            style = style.copy(
-                shadow = Shadow(
-                    color = ComposeColor.Black.copy(alpha = if (onDarkArtwork) .78f else .06f),
-                    offset = Offset(0f, 1f),
-                    blurRadius = if (onDarkArtwork) 6f else 1f,
-                ),
-            ),
-            color = color,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+internal fun HomeHeaderGreeting(text: String, color: ComposeColor, onDarkArtwork: Boolean) {
+    Text(text = text, style = HomeHeaderTypography.greeting.copy(
+        shadow = Shadow(color = ComposeColor.Black.copy(alpha = if (onDarkArtwork) .32f else .04f),
+            offset = Offset(0f, 1f), blurRadius = 3f)),
+        color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 /** Home's scrolling content must start at the window top, beneath its overlay header. */
@@ -225,7 +192,7 @@ fun AppTopSearchBar(
     homeHeaderActionsVisible: Boolean = true,
     homeHeaderLightText: Boolean = false,
     homeGreetingText: String = "Assalamu alaikum",
-    homeSupportingTexts: List<String> = emptyList(),
+    homeSupportingTexts: List<HomeHeaderDetail> = emptyList(),
     homeHeaderVisibility: () -> Float = { 1f },
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
@@ -912,23 +879,23 @@ fun AppTopSearchBar(
                     modifier = Modifier.weight(1f)
                         .clickable { currentOnProfileClick() }
                         .semantics { contentDescription = "Open profile" },
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    HomeEngravedGreeting(
+                    HomeHeaderGreeting(
                         text = homeGreetingText,
                         color = greetingColor,
                         onDarkArtwork = homeHeaderLightText,
                     )
-                    if (homeSupportingTexts.any(String::isNotBlank)) {
+                    if (homeSupportingTexts.any { it.text.isNotBlank() }) {
                         HomeRotatingHeaderText(
                             texts = homeSupportingTexts,
-                            style = com.starception.submission.feature.prayertimes.HomeTypography.caption.copy(
+                            style = HomeHeaderTypography.detail.copy(
                                 shadow = Shadow(
-                                    color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .78f else .06f),
-                                    offset = Offset(0f, 1f), blurRadius = 6f,
+                                    color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .32f else .04f),
+                                    offset = Offset(0f, 1f), blurRadius = 3f,
                                 ),
                             ),
-                            color = greetingColor.copy(alpha = .82f),
+                            color = greetingColor.copy(alpha = .92f),
                             fontWeight = FontWeight.Normal,
                         )
                     }

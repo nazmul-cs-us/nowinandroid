@@ -16,6 +16,11 @@
 
 package com.starception.submission.shared.ui
 
+import com.starception.submission.feature.prayertimes.HomeHeaderDetail
+import com.starception.submission.feature.prayertimes.HomeHeaderDetailKind
+import com.starception.submission.feature.prayertimes.HomeHeaderTypography
+import com.starception.submission.feature.prayertimes.HomeRotatingHeaderText
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -1122,10 +1127,10 @@ fun PrayerTimesScreen(
                                 lightHeaderInk = homeCoverHeaderUsesLightText(coverPage, coverNightArtwork),
                                 greeting = homeGreetingForHour(day.nowMinute / 60),
                                 supportingTexts = listOfNotNull(
-                                    "${today.dayOfMonth} ${today.month.name.lowercase().replaceFirstChar { it.uppercase() }}, ${today.year}",
+                                    HomeHeaderDetail("${today.dayOfMonth} ${today.month.name.lowercase().replaceFirstChar { it.uppercase() }}, ${today.year}", HomeHeaderDetailKind.Calendar),
                                     listOf(placeName, homeCountryName.takeUnless { placeName.contains(it, ignoreCase = true) }.orEmpty())
-                                        .filter(String::isNotBlank).joinToString(" · ").takeIf(String::isNotBlank),
-                                    day.temperatureCelsius?.let { "${it.toInt()}°C · ${day.currentPrayer.orEmpty()}" }),
+                                        .filter(String::isNotBlank).joinToString(" · ").takeIf(String::isNotBlank)?.let { HomeHeaderDetail(it, HomeHeaderDetailKind.Location) },
+                                    day.temperatureCelsius?.let { HomeHeaderDetail("${it.toInt()}°C · ${day.currentPrayer.orEmpty()}", HomeHeaderDetailKind.Weather) }),
                                 onOpenSettings = onOpenSettings,
                                 onOpenProfile = onOpenProfile,
                                 onOpenSearch = { searchController?.open() ?: onOpenSearch() },
@@ -1298,19 +1303,19 @@ private fun PrayerHomeHeader(
     onArtwork: Boolean = false,
     lightHeaderInk: Boolean = true,
     greeting: String = "Peace be upon you",
-    supportingTexts: List<String> = emptyList(),
+    supportingTexts: List<HomeHeaderDetail> = emptyList(),
 ) {
     if (onArtwork) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val ink = if (lightHeaderInk) Color.White else Color(0xFF101827)
                 val headerShadow = androidx.compose.ui.graphics.Shadow(
-                    color = Color.Black.copy(alpha = if (lightHeaderInk) .78f else .06f),
-                    offset = androidx.compose.ui.geometry.Offset(0f, 1f), blurRadius = 6f,
+                    color = Color.Black.copy(alpha = if (lightHeaderInk) .32f else .04f),
+                    offset = androidx.compose.ui.geometry.Offset(0f, 1f), blurRadius = 3f,
                 )
-                Text(greeting, style = HomeTypography.greeting.copy(shadow = headerShadow), color = ink, maxLines = 1)
-                HomeRotatingHeaderText(supportingTexts, style = HomeTypography.caption.copy(shadow = headerShadow), color = ink.copy(alpha = .82f))
+                Text(greeting, style = HomeHeaderTypography.greeting.copy(shadow = headerShadow), color = ink, maxLines = 1)
+                HomeRotatingHeaderText(supportingTexts, style = HomeHeaderTypography.detail.copy(shadow = headerShadow), color = ink.copy(alpha = .92f))
             }
             AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings)
         }

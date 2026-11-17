@@ -3188,10 +3188,10 @@ fun PrayerTimesScreen(
                     }.getOrNull()
                 }
                 val homeSupportingTexts = listOfNotNull(
-                    homeDateLabel,
-                    homeHijriDate,
-                    homePlace.takeIf { it.isNotBlank() },
-                    homeWeather,
+                    HomeHeaderDetail(homeDateLabel, HomeHeaderDetailKind.Calendar),
+                    homeHijriDate?.let { HomeHeaderDetail(it, HomeHeaderDetailKind.Calendar) },
+                    homePlace.takeIf { it.isNotBlank() }?.let { HomeHeaderDetail(it, HomeHeaderDetailKind.Location) },
+                    homeWeather?.let { HomeHeaderDetail(it, HomeHeaderDetailKind.Weather) },
                 )
                 val coverReading = remember(coverReadingDate) {
                     com.starception.submission.feature.quran.dailyReading(

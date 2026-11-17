@@ -322,7 +322,7 @@ import com.starception.submission.core.images.resources.Res as ImageRes
 import com.starception.submission.ui.VoiceNudgeSparkles
 import com.starception.submission.ui.AppActionButton
 import com.starception.submission.ui.AppActionSurround
-import com.starception.submission.ui.HomeEngravedGreeting
+import com.starception.submission.ui.HomeHeaderGreeting
 import kotlinx.datetime.LocalDate as KotlinLocalDate
 import org.jetbrains.compose.resources.painterResource as composePainterResource
 
@@ -4189,9 +4189,8 @@ internal fun InsightPreviewCard(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     ) {
                         if (engravedHomeHeader && !readerChrome.hidden) {
-                            // Use the Home greeting's larger type and shallow engraved
-                            // edge for every expanded insight heading.
-                            HomeEngravedGreeting(
+                            // Keep expanded insight headings consistent with the Home greeting.
+                            HomeHeaderGreeting(
                                 text = displayLabel,
                                 color = Color.White,
                                 onDarkArtwork = true,

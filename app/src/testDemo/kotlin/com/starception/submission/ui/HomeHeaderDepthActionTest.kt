@@ -3,6 +3,13 @@ package com.starception.submission.ui
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.width
+import com.starception.submission.feature.prayertimes.HomeHeaderDetail
+import com.starception.submission.feature.prayertimes.HomeHeaderDetailKind
+import com.starception.submission.feature.prayertimes.HomeHeaderTypography
+import com.starception.submission.feature.prayertimes.HomeRotatingHeaderText
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -35,11 +42,20 @@ class HomeHeaderDepthActionTest {
     @Test fun sculptedHomeActionsKeepSeparateAccessibleTargets() {
         var searchClicks = 0
         var settingsClicks = 0
+        val headerDetail = androidx.compose.runtime.mutableStateOf(
+            HomeHeaderDetail("6 Jumada II 1448 AH", HomeHeaderDetailKind.Calendar))
         compose.setContent {
             MaterialTheme {
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
                     Color(0xFF6C8190), Color(0xFFB4B6B8),
                 )))) {
+                    Column(Modifier.align(Alignment.TopStart).padding(22.dp).width(240.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        HomeHeaderGreeting("Assalamu alaikum", Color(0xFF101827), false)
+                        HomeRotatingHeaderText(
+                            listOf(headerDetail.value),
+                            HomeHeaderTypography.detail, Color(0xFF101827).copy(alpha = .92f))
+                    }
                     Box(Modifier.align(Alignment.TopEnd).padding(22.dp)) {
                         AppHeaderActions(
                             onDarkArtwork = false,
@@ -57,5 +73,9 @@ class HomeHeaderDepthActionTest {
             .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
         assertEquals(1, searchClicks)
         assertEquals(1, settingsClicks)
+        compose.runOnIdle { headerDetail.value = HomeHeaderDetail("Dubai, UAE", HomeHeaderDetailKind.Location) }
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_header_location.png")
+        compose.runOnIdle { headerDetail.value = HomeHeaderDetail("25°C · Partly cloudy", HomeHeaderDetailKind.Weather) }
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_header_weather.png")
     }
 }
