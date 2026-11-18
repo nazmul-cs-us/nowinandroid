@@ -167,13 +167,16 @@ queue. Source files, checksums, grouping and displayed wording remain unchanged.
 
 | Source abbreviation | Spoken Bengali |
 | --- | --- |
-| রাঃ / (রা.) | আল্লাহ তাঁর প্রতি সন্তুষ্ট হোন |
-| রঃ / রহঃ | আল্লাহ তাঁর প্রতি রহম করুন |
+| রাঃ / (রা.) / (র.) | রাদিয়াল্লাহু আনহু |
+| রঃ / রহঃ | রহমাতুল্লাহি আলাইহি |
 | সঃ / সাঃ | সাল্লাল্লাহু আলাইহি ওয়া সাল্লাম |
-| আঃ | আল্লাহর শান্তি বর্ষিত হোক |
+| আঃ | আলাইহিস সালাম |
 
-Bengali meanings avoid guessing an Arabic gendered pronoun from an abbreviation
-that does not encode gender. Known honorific symbols receive equivalent expansions.
+The companion abbreviation uses the requested Arabic phrase in Bengali script.
+The other abbreviations use their own full Arabic phrases in Bengali script.
+In this edition, রঃ/রহঃ occurs after scholars and is kept distinct from companions’ রাঃ.
+Already written full forms, including আনহা and আনহুম, are preserved. Known honorific symbols
+receive equivalent expansions.
 Embedded abbreviations such as `(হে নবী সঃ!)` are also handled. Numeric references,
 ordinary words, initials, and `(আরবি)` placeholders are preserved. Other narration
 languages are unaffected. Android splits the expanded speech into utterances so

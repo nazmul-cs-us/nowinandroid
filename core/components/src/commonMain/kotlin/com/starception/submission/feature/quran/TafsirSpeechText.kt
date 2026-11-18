@@ -7,12 +7,11 @@ fun normalizeTafsirSpeechText(text: String, language: String): String {
 }
 
 private object BengaliHonorificSpeech {
-    // Bengali abbreviations do not distinguish the gender of the person being named.
-    // Use their Bengali meaning for those prayers instead of guessing an Arabic pronoun.
-    private const val COMPANION = "আল্লাহ তাঁর প্রতি সন্তুষ্ট হোন"
-    private const val MERCY = "আল্লাহ তাঁর প্রতি রহম করুন"
+    // Use the requested Arabic pronunciation in Bengali script for the companion honorific.
+    private const val COMPANION = "রাদিয়াল্লাহু আনহু"
+    private const val MERCY = "রহমাতুল্লাহি আলাইহি"
     private const val PROPHET = "সাল্লাল্লাহু আলাইহি ওয়া সাল্লাম"
-    private const val PEACE = "আল্লাহর শান্তি বর্ষিত হোক"
+    private const val PEACE = "আলাইহিস সালাম"
 
     private class Rule(bracketToken: String, embeddedToken: String, val spoken: String) {
         val bracketed = Regex("\\(\\s*(?:$bracketToken)\\s*\\)")
@@ -20,7 +19,7 @@ private object BengaliHonorificSpeech {
         val embedded = Regex("(^|[\\s(\\[“‘,;])(?:$embeddedToken)(?=$|[\\s)\\]”’!?,;।-])")
     }
     private val rules = listOf(
-        Rule("রা\\s*[ঃ:.]+", "রা\\s*[ঃ:]+", COMPANION),
+        Rule("(?:রা\\s*[ঃ:.]+|র\\s*\\.)", "রা\\s*[ঃ:]+", COMPANION),
         Rule("(?:রহ|র)\\s*[ঃ:.]+", "(?:রহ|র)\\s*[ঃ:]+", MERCY),
         Rule("সা?\\s*[ঃ:.]+", "সা?\\s*[ঃ:]+", PROPHET),
         Rule("আ\\s*[ঃ:.]+", "আ\\s*[ঃ:]+", PEACE),
