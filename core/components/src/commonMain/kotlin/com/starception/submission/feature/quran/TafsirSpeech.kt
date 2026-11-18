@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -47,6 +48,12 @@ fun tafsirSpeechChunks(text: String, maxCharacters: Int = 3000): List<String> {
 
 @Composable
 fun TafsirPlaybackControls(text: String, language: String, playerFactory: () -> TafsirSpeechPlayer) {
+    TafsirPlaybackControls(text, language, compact = false, playerFactory)
+}
+
+@Composable
+fun TafsirPlaybackControls(text: String, language: String, compact: Boolean,
+    playerFactory: () -> TafsirSpeechPlayer) {
     if (text.isBlank()) return
     key(text, language) {
         val player = remember { playerFactory() }
@@ -60,23 +67,35 @@ fun TafsirPlaybackControls(text: String, language: String, playerFactory: () -> 
             onDispose { lifecycle.removeObserver(observer); player.release() }
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(enabled = state.status != TafsirSpeechStatus.PREPARING, onClick = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                val action = when (state.status) {
+                    TafsirSpeechStatus.PLAYING -> "Pause tafsir"
+                    TafsirSpeechStatus.PAUSED -> "Resume tafsir"
+                    TafsirSpeechStatus.PREPARING -> "Preparing voice…"
+                    else -> "Play tafsir"
+                }
+                val onPlay: () -> Unit = {
                     when (state.status) {
                         TafsirSpeechStatus.PLAYING -> player.pause()
                         TafsirSpeechStatus.PAUSED -> player.resume()
                         else -> player.play(text, language)
                     }
-                }) {
-                    Icon(if (state.status == TafsirSpeechStatus.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(when (state.status) {
-                        TafsirSpeechStatus.PLAYING -> "Pause tafsir"
-                        TafsirSpeechStatus.PAUSED -> "Resume tafsir"
-                        TafsirSpeechStatus.PREPARING -> "Preparing voice…"
-                        else -> "Play tafsir"
-                    })
+                }
+                if (compact) {
+                    FilledTonalIconButton(onClick = onPlay, enabled = state.status != TafsirSpeechStatus.PREPARING,
+                        modifier = Modifier.size(48.dp)) {
+                        if (state.status == TafsirSpeechStatus.PREPARING) CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        else Icon(if (state.status == TafsirSpeechStatus.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = action, modifier = Modifier.size(20.dp))
+                    }
+                } else {
+                    FilledTonalButton(enabled = state.status != TafsirSpeechStatus.PREPARING, onClick = onPlay) {
+                        Icon(if (state.status == TafsirSpeechStatus.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(action)
+                    }
                 }
                 if (state.status in listOf(TafsirSpeechStatus.PLAYING, TafsirSpeechStatus.PAUSED, TafsirSpeechStatus.PREPARING)) {
                     IconButton(onClick = player::stop) { Icon(Icons.Default.Stop, contentDescription = "Stop tafsir") }

@@ -2,6 +2,9 @@ package com.starception.submission.feature.quran
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -36,7 +39,7 @@ fun InlineTafsirHeader(book: String, onSelect: (String) -> Unit, onHide: () -> U
 @Composable
 fun InlineTafsirCommentary(surah: Int, ayah: Int, book: String, revision: Int = 0,
     loadText: suspend () -> String, speechPlayerFactory: () -> TafsirSpeechPlayer,
-    missingAsset: @Composable (() -> Unit) -> Unit) {
+    missingAsset: @Composable (() -> Unit) -> Unit, fontScale: Float = 1f) {
     key(surah, ayah, book, revision) {
         var body by remember { mutableStateOf<String?>(null) }
         var failed by remember { mutableStateOf(false) }
@@ -50,29 +53,42 @@ fun InlineTafsirCommentary(surah: Int, ayah: Int, book: String, revision: Int = 
             catch (_: PublishedTafsirAssetMissing) { missing = true }
             catch (_: Exception) { failed = true }
         }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Tafsir · Ayah $ayah", style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary)
-            when {
-                missing -> missingAsset { retry++ }
-                failed -> {
-                    Text("Could not load this ayah’s tafsir.", color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = { retry++ }) { Text("Try again") }
+        val language = PublishedTafsirs.forBook(book)?.languageCode ?: "ar"
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Tafsir · Ayah $ayah", style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        Text("Commentary", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (body != null) Box(Modifier.widthIn(max = 144.dp)) {
+                        TafsirPlaybackControls(body.orEmpty(), language, compact = true, speechPlayerFactory)
+                    }
                 }
-                body == null -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                else -> {
-                    val language = PublishedTafsirs.forBook(book)?.languageCode ?: "ar"
-                    TafsirPlaybackControls(body.orEmpty(), language, speechPlayerFactory)
-                    SelectionContainer {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                when {
+                    missing -> missingAsset { retry++ }
+                    failed -> {
+                        Text("Could not load this ayah’s tafsir.", color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = { retry++ }) { Text("Try again") }
+                    }
+                    body == null -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    else -> SelectionContainer {
                         Text(body.orEmpty(), modifier = Modifier.fillMaxWidth(),
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 30.sp,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = (18f * fontScale).sp, lineHeight = (30f * fontScale).sp,
                                 textDirection = TextDirection.Content),
                             textAlign = if (language == "ar" || language == "ur") TextAlign.Right else TextAlign.Start)
                     }
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         }
     }
 }

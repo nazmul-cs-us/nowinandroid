@@ -6,6 +6,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -55,6 +58,34 @@ class InlineTafsirTest {
         compose.onNodeWithText("Commentary for the second ayah.").assertIsDisplayed()
         compose.onAllNodes(isDialog()).assertCountEquals(0)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/inline_tafsir.png")
+    }
+    @Test fun commentaryResizesWithoutReloadingWhenReadingScaleChanges() {
+        val scale = mutableFloatStateOf(1f)
+        var reads = 0
+        val commentary = "Commentary that follows the reader’s pinch zoom. ".repeat(8)
+        compose.setContent { MaterialTheme {
+            InlineTafsirCommentary(1, 1, "ibn_kathir_en",
+                fontScale = scale.floatValue,
+                loadText = { reads++; commentary }, speechPlayerFactory = { SilentPlayer() },
+                missingAsset = { Text("Download required") })
+        } }
+        compose.waitUntil(5000) { compose.onAllNodes(hasText(commentary)).fetchSemanticsNodes().isNotEmpty() }
+        fun layout(): TextLayoutResult {
+            val results = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(commentary)
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+            return results.single()
+        }
+        val original = layout()
+        assertEquals(18.sp, original.layoutInput.style.fontSize)
+        compose.runOnIdle { scale.floatValue = 1.5f }
+        val enlarged = layout()
+        assertEquals(27.sp, enlarged.layoutInput.style.fontSize)
+        assertEquals(45.sp, enlarged.layoutInput.style.lineHeight)
+        assertTrue(enlarged.size.height > original.size.height)
+        compose.runOnIdle { scale.floatValue = 0.75f }
+        assertEquals(13.5.sp, layout().layoutInput.style.fontSize)
+        assertEquals(1, reads)
     }
     @Test fun changingAyahCancelsAnOldReadEvenWhenItFinishesLater() {
         val ayah = mutableIntStateOf(1)

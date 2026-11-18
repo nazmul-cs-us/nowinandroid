@@ -32,6 +32,19 @@ class SurahTafsirEntryPointTest {
         compose.onNodeWithContentDescription("Change translation language, current: EN").assertIsDisplayed()
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/surah_tafsir_toolbar_compact.png")
     }
+    @Test fun visibleTafsirCanBeHiddenFromTheCompactTopToolbar() {
+        val visible = androidx.compose.runtime.mutableStateOf(true)
+        compose.setContent { MaterialTheme {
+            AlbumPlayerTopBar(1f, false, "Al-Fatihah", "الفاتحة", "en", false, "pdms_saleem", false,
+                onBackClick = {}, onTafsirClick = { visible.value = !visible.value },
+                isTafsirVisible = visible.value)
+        } }
+        compose.onNodeWithContentDescription("Hide tafsir").assertIsDisplayed()
+            .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithContentDescription("Hide tafsir").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Tafsir").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("Hide tafsir").assertIsDisplayed()
+    }
     @Test fun tafsirIsDisabledUntilTheSurahCanBeOpened() {
         compose.setContent { MaterialTheme {
             AlbumPlayerTopBar(1f, false, "", "", "ar", false, "pdms_saleem", false, onBackClick = {})

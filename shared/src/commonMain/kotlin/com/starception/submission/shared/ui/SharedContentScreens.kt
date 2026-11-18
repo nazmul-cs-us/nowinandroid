@@ -1291,6 +1291,7 @@ internal fun QuranDetailScreen(
                                     if (showInlineTafsir) {
                                         com.starception.submission.feature.quran.InlineTafsirCommentary(number, verse.numberInSurah,
                                             inlineBook, inlineTafsirRevision,
+                                            fontScale = arabicFontSize / 41f,
                                             loadText = {
                                                 inlineRepository?.text(number, verse.numberInSurah) ?: run {
                                                     val data = tafseerRepository.getTafseer(number, verse.numberInSurah)

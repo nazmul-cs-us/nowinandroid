@@ -138,6 +138,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
@@ -1180,6 +1181,7 @@ fun SurahDetailScreen(
                             inlineTafsirContent = if (showInlineTafsir) ({ chapter, verse ->
                                 com.starception.submission.feature.quran.InlineTafsirCommentary(chapter, verse,
                                     selectedTafseerBook, inlineTafsirRevision,
+                                    fontScale = arabicFontSize / 41f,
                                     loadText = { inlineTafsirRepository?.text(chapter, verse)
                                         ?: viewModel.inlineTafsirText(chapter, verse, selectedTafseerBook) },
                                     speechPlayerFactory = inlineSpeechFactory,
@@ -1346,7 +1348,7 @@ fun SurahDetailScreen(
         // short header + the PullToSync banner's viewport push leave a small bottom sliver
         // of item 0 peeking at the top of the page — a plain `index >= 1` or "any header
         // pixels visible" check would wrongly keep the toolbar up during reading.
-        val showTopBar = remember {
+        val showTopBar = remember(scrollState, continuousReadingMode) {
             derivedStateOf {
                 if (!continuousReadingMode) return@derivedStateOf true
                 if (scrollState.firstVisibleItemIndex != 0) return@derivedStateOf false
@@ -1414,6 +1416,7 @@ fun SurahDetailScreen(
                     showReciterPicker = true
                 },
                 onTafsirClick = openHeaderTafsir.takeIf { uiState is SurahDetailUiState.Success },
+                isTafsirVisible = showInlineTafsir,
                 selectedReciterName = if (currentAudioLanguage == AudioLanguage.ARABIC_ONLY) {
                     reciterSelection.name
                 } else {
@@ -2397,6 +2400,7 @@ internal fun AlbumPlayerTopBar(
     onTafsirClick: (() -> Unit)? = null,
     selectedReciterName: String = "Mishary Rashid Al-Alafasy",
     onAllSurahsClick: () -> Unit = onBackClick,
+    isTafsirVisible: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     // Smooth transition based on collapseProgress (0 = transparent, 1 = solid)
@@ -2615,11 +2619,15 @@ internal fun AlbumPlayerTopBar(
                 }
                 TextButton(
                     onClick = { onTafsirClick?.invoke() }, enabled = onTafsirClick != null,
-                    modifier = Modifier.size(48.dp).semantics { contentDescription = "Tafsir" },
+                    modifier = Modifier.size(48.dp).semantics {
+                        contentDescription = if (isTafsirVisible) "Hide tafsir" else "Tafsir"
+                        stateDescription = if (isTafsirVisible) "Shown" else "Hidden"
+                    },
                     contentPadding = PaddingValues(0.dp),
-                    colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
+                    colors = ButtonDefaults.textButtonColors(contentColor = contentColor,
+                        containerColor = if (isTafsirVisible) contentColor.copy(alpha = 0.12f) else Color.Transparent),
                 ) {
-                    Text("Tafsir", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                    Text(if (isTafsirVisible) "Hide" else "Tafsir", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                 }
                 // More options menu - always shown (floating toolbar has all options)
                 IconButton(

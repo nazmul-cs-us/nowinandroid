@@ -127,12 +127,14 @@ abstract class QuranDatabase : RoomDatabase() {
                     DATABASE_NAME,
                 )
 
-                // Try CDN/extracted file first, fall back to bundled asset
-                val dbFile = assetRepository?.getDatabaseFile(CDN_KEY)
-                if (dbFile != null) {
-                    builder.createFromFile(dbFile)
-                } else {
-                    builder.createFromAsset("databases/$DATABASE_NAME")
+                // Hilt can construct this singleton before content setup downloads the
+                // source. Resolve it on Room's first open so that early construction
+                // does not permanently select a bundled asset that no longer ships.
+                builder.createFromInputStream {
+                    val repository = assetRepository
+                        ?: com.starception.submission.download.readingAssetRepository(context)
+                    repository?.getDatabaseFile(CDN_KEY)?.inputStream()
+                        ?: context.applicationContext.assets.open("databases/$DATABASE_NAME")
                 }
 
                 val instance = builder
