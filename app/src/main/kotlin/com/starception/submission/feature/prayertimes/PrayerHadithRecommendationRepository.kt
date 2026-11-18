@@ -93,7 +93,14 @@ internal object PrayerHadithRecommendationRepository {
                 date.toEpochDay().toInt() + variation,
             )
             if (shortlist.isEmpty()) {
-                check(searchFailures == 0) { "Unable to search downloaded Hadith collections" }
+                // A user with no downloaded hadith collections, or a prayer with
+                // no matching narrations, must degrade to the fallback content
+                // bank — never crash the read-ahead coroutine.
+                if (searchFailures > 0) {
+                    android.util.Log.w("PrayerHadithSearch", "$searchFailures hadith collection(s) could not be read")
+                } else {
+                    android.util.Log.w("PrayerHadithSearch", "No matching hadiths found for $prayerName")
+                }
                 return@withContext null
             }
             if (DeenlyKnowledgeModel(context).isKnowledgeModelAvailable()) {

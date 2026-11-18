@@ -80,9 +80,10 @@ class DeenlyKnowledgeModel(context: Context) {
     private val appContext = context.applicationContext
 
     fun isKnowledgeModelAvailable(): Boolean {
-        val task = DeenlyKnowledgeTask.KNOWLEDGE
-        val file = File(appContext.filesDir, "cdn_assets/models/now_nudge/${task.modelFileName}")
-        return file.isFile && file.length() == task.modelSizeBytes
+        // Called from composition on card-heavy screens; route through the
+        // cached availability check instead of stat-ing the ~1 GB file on
+        // every recomposition (StrictMode disk-read flood / jank).
+        return isModelDownloaded(appContext, DeenlyKnowledgeTask.KNOWLEDGE)
     }
 
     suspend fun generate(

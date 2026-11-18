@@ -24,13 +24,22 @@ import com.starception.submission.core.model.deenly.InsightReadAhead
 import com.starception.submission.core.model.deenly.PrayerHadithCandidate
 import com.starception.submission.core.model.deenly.packInsightFields
 import com.starception.submission.core.model.deenly.unpackInsightFields
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 /** Application-owned preparation; preferences retain both readings across process restarts. */
 internal object PreparedInsightReadings {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(
+        SupervisorJob() +
+            Dispatchers.Main.immediate +
+            CoroutineExceptionHandler { _, error ->
+                // A failed read-ahead must never crash the app; the UI keeps
+                // showing the last successful reading or the fallback bank.
+                android.util.Log.w("PreparedInsightReadings", "Insight read-ahead failed", error)
+            },
+    )
     private var prayerCache: InsightReadAhead<PrayerHadithRecommendation>? = null
     private var aiCache: InsightReadAhead<NowNudgeKnowledgeCandidate>? = null
 
