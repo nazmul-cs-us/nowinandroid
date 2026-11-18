@@ -568,7 +568,8 @@ internal fun QuranDetailScreen(
     var tafseerLoading by remember { mutableStateOf(false) }
     var tafseerLoadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var tafseerSelectedBook by remember { mutableStateOf(store.quranTafsirBook()) }
-    var showInlineTafsir by remember(number) { mutableStateOf(false) }
+    var showInlineTafsir by remember(number) { mutableStateOf(
+        com.starception.submission.feature.quran.SurahTafsirPlayback.owner.state.value?.entry?.surah == number) }
     var inlineTafsirTarget by remember(number) { mutableIntStateOf(1) }
     var inlineTafsirRevision by remember { mutableIntStateOf(0) }
     var inlineTafsirBookIndex by remember { mutableIntStateOf(store.quranTafsirBook().takeIf { it != 3 } ?: 0) }
@@ -580,11 +581,15 @@ internal fun QuranDetailScreen(
     }
     val inlineSpeechSession = remember { com.starception.submission.feature.quran.TafsirSpeechSession() }
     val tafsirSpeechFactory = remember(player) {
-        { inlineSpeechSession.createPlayer { com.starception.submission.shared.voice.SystemTafsirSpeechPlayer { player.pause() } } }
+        { inlineSpeechSession.createPlayer { com.starception.submission.shared.voice.SystemTafsirSpeechPlayer {
+            com.starception.submission.feature.quran.SurahTafsirPlayback.owner.stop()
+            player.pause()
+        } } }
     }
     val surahTafsirPlayer = if (showInlineTafsir) com.starception.submission.feature.quran.rememberSurahTafsirSpeechPlayer(
         number, inlineBook, inlineSpeechSession,
         engineFactory = { com.starception.submission.shared.voice.SystemTafsirSpeechPlayer { player.pause() } },
+        onActivate = { com.starception.submission.shared.media.QuranPlaybackBus.startTafsir() },
         loadAyah = { verse -> inlineRepository?.text(number, verse) ?: run {
             val data = tafseerRepository.getTafseer(number, verse)
                 ?: throw com.starception.submission.feature.quran.PublishedTafsirAssetMissing()
@@ -6308,7 +6313,7 @@ internal fun QuranPlaybackSyncBar(
         ) {
             Column(
                 modifier = Modifier.weight(1f).let { body ->
-                    playing.surahNumber?.let { number ->
+                    playing.readerSurahNumber?.let { number ->
                         body.clickable { onOpenQuran(number) }
                     } ?: body
                 },

@@ -211,7 +211,7 @@ object NarrationNowPlaying {
     private fun publishQuran(state: QuranPlaybackBus.PlaybackState) {
         publish(
             title = state.title,
-            albumTitle = if (state.surahNumber != null) "Quran recitation" else "Dua & remembrance",
+            albumTitle = state.albumTitle,
             playing = state.playing,
             elapsedSeconds = state.positionSeconds.toDouble(),
             durationSeconds = state.durationSeconds.toDouble(),

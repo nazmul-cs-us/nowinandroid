@@ -141,7 +141,7 @@ fun ContentSetupScreen(
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Text(
-                                    "Offline Quran translation; other translations use local content or internet",
+                                    "Offline Quran translation and matching published tafsir, where available",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

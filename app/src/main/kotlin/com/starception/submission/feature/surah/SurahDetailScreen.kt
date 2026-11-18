@@ -579,7 +579,8 @@ fun SurahDetailScreen(
     val tafseerData by viewModel.tafseerData.collectAsState()
     val selectedTafseerBook by viewModel.selectedTafseerBook.collectAsState()
     var showWordStudyDialog by remember { mutableStateOf(false) }
-    var showInlineTafsir by rememberSaveable(surahNumber) { mutableStateOf(false) }
+    var showInlineTafsir by rememberSaveable(surahNumber) { mutableStateOf(
+        com.starception.submission.feature.quran.SurahTafsirPlayback.owner.state.value?.entry?.surah == surahNumber) }
     var inlineTafsirTarget by remember(surahNumber) { mutableIntStateOf(0) }
     var inlineTafsirRevision by remember { mutableIntStateOf(0) }
     val inlineEdition = PublishedTafsirs.forBook(selectedTafseerBook)
@@ -590,11 +591,14 @@ fun SurahDetailScreen(
     val inlineSpeechFactory = remember(context) {
         { inlineSpeechSession.createPlayer { AndroidTafsirSpeechPlayer(context) } }
     }
+    val speechContext = context.applicationContext
+    val speechSurah = currentPlayingSurahNumber
+    val arabicTafsirReader = remember(speechSurah, selectedTafseerBook) { viewModel.tafsirReader(speechSurah, selectedTafseerBook) }
     val surahTafsirPlayer = if (showInlineTafsir) com.starception.submission.feature.quran.rememberSurahTafsirSpeechPlayer(
         currentPlayingSurahNumber, selectedTafseerBook, inlineSpeechSession,
-        engineFactory = { AndroidTafsirSpeechPlayer(context) },
-        loadAyah = { verse -> inlineTafsirRepository?.text(currentPlayingSurahNumber, verse)
-            ?: viewModel.inlineTafsirText(currentPlayingSurahNumber, verse, selectedTafseerBook) }) else null
+        engineFactory = { AndroidTafsirSpeechPlayer(speechContext, fullSurah = true) },
+        onActivate = { com.starception.submission.services.ChapterRecitationService.playTafsir(speechContext) },
+        loadAyah = { verse -> inlineTafsirRepository?.text(speechSurah, verse) ?: arabicTafsirReader(verse) }) else null
     val tafsirSpeechStatus = surahTafsirPlayer?.state?.collectAsState()?.value?.status
     val tafsirNarration = surahTafsirPlayer?.currentAyahs?.collectAsState()?.value?.takeIf {
         tafsirSpeechStatus == com.starception.submission.feature.quran.TafsirSpeechStatus.PLAYING ||

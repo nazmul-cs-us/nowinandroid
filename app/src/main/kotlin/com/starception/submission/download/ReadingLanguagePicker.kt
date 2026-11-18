@@ -33,7 +33,7 @@ internal fun ReadingLanguagePicker(code: String, enabled: Boolean, onSelected: (
             }
         }
         Text(
-            "Downloads the selected Quran translation for offline reading. Hadith and Dua use available local translations; other translations need internet. Audio downloads are optional.",
+            "Downloads the selected Quran translation and its published tafsir, where available, for offline reading. Hadith and Dua use available local translations; other translations need internet. Audio downloads are optional.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

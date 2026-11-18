@@ -22,13 +22,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
-/** A screen-owned queue; scrolling its controls off screen must not cancel narration. */
+/** An ordered queue whose lifetime is supplied by its playback owner. */
 class SurahTafsirSpeechPlayer(
     private val scope: CoroutineScope,
     private val engine: TafsirSpeechPlayer,
@@ -47,8 +44,13 @@ class SurahTafsirSpeechPlayer(
     fun start() = play("", language)
     override fun play(text: String, language: String) {
         stop()
-        activate(this)
         mutableState.value = TafsirSpeechState(TafsirSpeechStatus.PREPARING)
+        try { activate(this) }
+        catch (error: Exception) {
+            mutableState.value = TafsirSpeechState(TafsirSpeechStatus.ERROR, error.message ?: "Could not start tafsir playback.")
+            return
+        }
+        if (state.value.status != TafsirSpeechStatus.PREPARING) return
         job = scope.launch {
             try {
                 // Preserve source groupings without repeating an identical adjacent explanation.
@@ -97,7 +99,13 @@ class SurahTafsirSpeechPlayer(
         }
     }
     override fun resume() {
-        if (state.value.status == TafsirSpeechStatus.PAUSED) { activate(this); paused.value = false; engine.resume() }
+        if (state.value.status == TafsirSpeechStatus.PAUSED) {
+            try { activate(this); paused.value = false; engine.resume() }
+            catch (error: Exception) {
+                stop()
+                mutableState.value = TafsirSpeechState(TafsirSpeechStatus.ERROR, error.message ?: "Could not resume tafsir playback.")
+            }
+        }
     }
     override fun stop() {
         job?.cancel(); job = null; paused.value = false; engine.stop(); range.value = null; mutableState.value = TafsirSpeechState()
@@ -107,20 +115,15 @@ class SurahTafsirSpeechPlayer(
 
 @Composable
 fun rememberSurahTafsirSpeechPlayer(surah: Int, book: String, session: TafsirSpeechSession,
-    engineFactory: () -> TafsirSpeechPlayer, loadAyah: suspend (Int) -> String): SurahTafsirSpeechPlayer {
-    val scope = rememberCoroutineScope()
-    val read by rememberUpdatedState(loadAyah)
-    val player = remember(surah, book) {
-        SurahTafsirSpeechPlayer(scope, engineFactory(), BengaliIbnKathir.ayahCounts[surah - 1],
-            PublishedTafsirs.forBook(book)?.languageCode ?: "ar", { read(it) }, session::activate)
+    engineFactory: () -> TafsirSpeechPlayer, loadAyah: suspend (Int) -> String,
+    onActivate: () -> Unit = {}): SurahTafsirSpeechPlayer {
+    val owner = SurahTafsirPlayback.owner
+    val entry = remember(surah, book) {
+        owner.attach(surah, book, QuranData.surahs.firstOrNull { it.number == surah }?.nameEnglish ?: "Surah $surah",
+            engineFactory, loadAyah, session::stop, onActivate)
     }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(player, lifecycle) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) player.stop() }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer); player.release() }
-    }
-    return player
+    DisposableEffect(entry) { onDispose { owner.detach(entry) } }
+    return entry.player
 }
 
 @Composable

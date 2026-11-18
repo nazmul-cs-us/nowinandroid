@@ -426,7 +426,7 @@ fun PrayerTimesScreen(
                     modifier = Modifier
                         .weight(1f)
                         .let { body ->
-                            val surahNumber = playing.surahNumber
+                            val surahNumber = playing.readerSurahNumber
                             if (surahNumber != null) {
                                 body.clickable { onOpenQuran(surahNumber) }
                             } else {

@@ -201,7 +201,7 @@ class GlobalMediaViewModel(
         }
     private val chapterRecitationProgressListener: (Int, Int) -> Unit =
         { currentPosition, duration ->
-            if (activeSource is MediaSource.Hadith || activeSource is MediaSource.Fortress) {
+            if (activeSource is MediaSource.Hadith || activeSource is MediaSource.Fortress || activeSource is MediaSource.Tafsir) {
                 _controllerState.update { current ->
                     current.copy(
                         playback = current.playback.copy(
@@ -386,9 +386,19 @@ class GlobalMediaViewModel(
         subtitle: String,
     ) {
         if (!ChapterRecitationState.isActive) {
-            if (activeSource is MediaSource.Hadith || activeSource is MediaSource.Fortress) {
+            if (activeSource is MediaSource.Hadith || activeSource is MediaSource.Fortress || activeSource is MediaSource.Tafsir) {
                 hideController()
             }
+            return
+        }
+
+        val tafsir = com.starception.submission.feature.quran.SurahTafsirPlayback.owner.state.value
+        if (tafsir != null && subtitle.startsWith("Tafsir")) {
+            activeSource = MediaSource.Tafsir(tafsir.entry.surah)
+            _controllerState.update { current -> current.copy(
+                isVisible = true, hasLanguageToggle = false,
+                playback = MediaPlaybackState(isPlaying = isPlaying, title = title, subtitle = subtitle, source = activeSource),
+            ) }
             return
         }
 
@@ -500,6 +510,7 @@ class GlobalMediaViewModel(
             is MediaSource.DrivingMode -> drivingService?.resume()
             is MediaSource.Hadith -> toggleHadithOrFallbackStop()
             is MediaSource.Fortress -> onFortressPlayPauseRequested?.invoke()
+            is MediaSource.Tafsir -> ChapterRecitationService.toggle(context)
             is MediaSource.None -> {}
         }
     }
@@ -511,6 +522,7 @@ class GlobalMediaViewModel(
             is MediaSource.DrivingMode -> drivingService?.pause()
             is MediaSource.Hadith -> toggleHadithOrFallbackStop()
             is MediaSource.Fortress -> onFortressPlayPauseRequested?.invoke()
+            is MediaSource.Tafsir -> ChapterRecitationService.toggle(context)
             is MediaSource.None -> {}
         }
     }
@@ -547,6 +559,7 @@ class GlobalMediaViewModel(
                 }
             }
             is MediaSource.Fortress -> {} // Single-track player; no chapter skip
+            is MediaSource.Tafsir -> {}
             is MediaSource.None -> {}
         }
     }
@@ -564,6 +577,7 @@ class GlobalMediaViewModel(
                 }
             }
             is MediaSource.Fortress -> {} // Single-track player; no chapter skip
+            is MediaSource.Tafsir -> {}
             is MediaSource.None -> {}
         }
     }
@@ -574,6 +588,7 @@ class GlobalMediaViewModel(
             is MediaSource.DrivingMode -> {} // Driving mode doesn't support seek
             is MediaSource.Hadith -> {} // Hadith doesn't support seek
             is MediaSource.Fortress -> onFortressSeekRequested?.invoke(position)
+            is MediaSource.Tafsir -> {}
             is MediaSource.None -> {}
         }
     }
@@ -584,6 +599,7 @@ class GlobalMediaViewModel(
             is MediaSource.DrivingMode -> {} // Volume managed by system
             is MediaSource.Hadith -> {} // Volume managed by system
             is MediaSource.Fortress -> {} // Volume managed by system
+            is MediaSource.Tafsir -> {}
             is MediaSource.None -> {}
         }
         _controllerState.update { it.copy(volume = volume) }
@@ -756,7 +772,7 @@ class GlobalMediaViewModel(
                     title = recite.title,
                 )
             } else {
-                onFortressPlaybackStarted(recite.title)
+                updateChapterRecitationState(recite.isPlaying, recite.title, recite.subtitle)
             }
             _controllerState.update { current ->
                 current.copy(

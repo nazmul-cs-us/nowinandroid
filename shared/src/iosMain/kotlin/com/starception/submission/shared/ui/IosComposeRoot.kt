@@ -155,7 +155,7 @@ private fun ContentSetupGate(
                 setupState = state.copy(isDownloading = true, error = null)
                 coroutineScope.launch {
                     try {
-                        downloadRequiredContent(state.keys, selectedLanguage)
+                        downloadRequiredContent(selectedLanguage)
                         val rechecked = loadRequiredContentState(selectedLanguage)
                         if (rechecked is SetupGateState.Ready) {
                             store.saveContentSetupComplete(true)
@@ -188,7 +188,9 @@ private fun ContentSetupGate(
                         store.savePreferredContentLanguage(language.code)
                         coroutineScope.launch {
                             val rechecked = loadRequiredContentState(language)
-                            setupState = if (rechecked is SetupGateState.Ready) state.copy(categories = emptyList(), keys = emptyList()) else rechecked
+                            if (selectedLanguage == language) {
+                                setupState = if (rechecked is SetupGateState.Ready) state.copy(categories = emptyList(), keys = emptyList()) else rechecked
+                            }
                         }
                     }
                 },
@@ -220,14 +222,31 @@ private sealed interface SetupGateState {
     ) : SetupGateState
 }
 
+private suspend fun loadSetupManifest(language: com.starception.submission.shared.quran.QuranTranslationLanguage):
+    com.starception.submission.core.assetcache.AssetManifest? {
+    val current = iosCloudAssets.loadManifest() ?: return null
+    val keys = com.starception.submission.feature.quran.QuranSetupContent.tafsirAssets(language.code)
+    return if (keys.any { it !in current.assets }) iosCloudAssets.loadManifest(forceRefresh = true) ?: current else current
+}
+
 private suspend fun loadRequiredContentState(language: com.starception.submission.shared.quran.QuranTranslationLanguage): SetupGateState =
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-        val manifest = iosCloudAssets.loadManifest()
+        val manifest = loadSetupManifest(language)
             ?: return@withContext SetupGateState.NeedDownload(
                 keys = emptyList(), categories = emptyList(), overallProgress = 0f,
                 isDownloading = false, error = "Content manifest unavailable. Please retry.",
             )
-        val requiredCategories = manifest.categories.filter { it.value.required }
+        val tafsirEdition = com.starception.submission.feature.quran.QuranSetupContent.tafsirEdition(language.code)
+        val tafsirAssets = com.starception.submission.feature.quran.QuranSetupContent.tafsirAssets(language.code)
+        if (tafsirEdition != null && (tafsirEdition.category !in manifest.categories ||
+                tafsirAssets.any { manifest.assets[it]?.category != tafsirEdition.category })) {
+            return@withContext SetupGateState.NeedDownload(keys = emptyList(), categories = emptyList(),
+                overallProgress = 0f, isDownloading = false,
+                error = "Selected tafsir is missing from the content catalog. Please retry.")
+        }
+        val requiredKeys = com.starception.submission.feature.quran.QuranSetupContent.requiredCategories(
+            manifest.categories.filter { it.value.required }.keys, language.code)
+        val requiredCategories = manifest.categories.filterKeys { it in requiredKeys }
         val missing = requiredCategories.filter { (key, _) ->
             val status = iosCloudAssets.getCategoryStatus(key, manifest)
             !status.isAvailable
@@ -262,21 +281,25 @@ private fun setupTranslationKey(language: com.starception.submission.shared.qura
     else "databases/quran/quran_${language.code}.db"
 
 private suspend fun downloadRequiredContent(
-    keys: List<String>,
     language: com.starception.submission.shared.quran.QuranTranslationLanguage,
 ) {
-    val manifest = checkNotNull(iosCloudAssets.loadManifest()) { "Content manifest unavailable" }
+    val manifest = checkNotNull(loadSetupManifest(language)) { "Content manifest unavailable" }
     // Network reads, file writes, and SHA-256 verification all run in the
     // caller's context — the setup gate calls this from a Main-dispatched
     // LaunchedEffect, so the whole chain must stay off Main (see
     // downloadContentCategory for the same freeze).
     withContext(Dispatchers.Default) {
-        keys.forEach { key ->
+        val tafsirEdition = com.starception.submission.feature.quran.QuranSetupContent.tafsirEdition(language.code)
+        check(com.starception.submission.feature.quran.QuranSetupContent.tafsirAssets(language.code)
+            .all { manifest.assets[it]?.category == tafsirEdition?.category }) { "Selected tafsir is missing from the content catalog" }
+        val requiredKeys = com.starception.submission.feature.quran.QuranSetupContent.requiredCategories(
+            manifest.categories.filter { it.value.required }.keys, language.code)
+        requiredKeys.forEach { key ->
             // Per-chunk progress coalesced to whole-percent steps; see
             // ContentDownloadProgressThrottle.
             val throttle = com.starception.submission.shared.assets
                 .ContentDownloadProgressThrottle()
-            iosCloudAssets.downloadCategory(key, manifest) { progress ->
+            val result = iosCloudAssets.downloadCategory(key, manifest) { progress ->
                 if (throttle.shouldPublish(progress.fraction)) {
                     com.starception.submission.shared.assets.ContentDownloadBus.publish(
                         com.starception.submission.shared.assets.ContentDownloadStatus(
@@ -286,6 +309,7 @@ private suspend fun downloadRequiredContent(
                     )
                 }
             }
+            check(result.isComplete) { "Some selected content did not finish downloading" }
         }
     }
     setupTranslationKey(language)?.let { key ->

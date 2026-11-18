@@ -44,6 +44,9 @@ sealed class MediaSource {
         val title: String = "",
     ) : MediaSource()
 
+    /** Full-surah spoken tafsir, owned by the application and media service. */
+    data class Tafsir(val surahNumber: Int) : MediaSource()
+
     /** No active media source */
     data object None : MediaSource()
 }

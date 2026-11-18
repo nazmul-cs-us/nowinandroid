@@ -56,6 +56,23 @@ class AndroidTafsirSpeechPlayerTest {
         assertTrue(player.state.value.finished)
         player.release()
     }
+    @Test fun fullSurahSpeechDoesNotToggleItsOwnMediaServiceBetweenChunks() {
+        ShadowTextToSpeech.addLanguageAvailability(Locale.ENGLISH)
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        com.starception.submission.services.ChapterRecitationState.publish(true, "Al-Fatihah", "Tafsir · English")
+        val player = AndroidTafsirSpeechPlayer(context, fullSurah = true)
+        try {
+            player.play("Commentary. ".repeat(700), "en")
+            val shadow = shadowOf(ShadowTextToSpeech.getLastTextToSpeechInstance())
+            shadow.onInitListener.onInit(TextToSpeech.SUCCESS)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(shadow.spokenTextList.size > 1)
+            assertNull(shadowOf(context).nextStartedService)
+        } finally {
+            player.release()
+            com.starception.submission.services.ChapterRecitationState.markStopped()
+        }
+    }
     @Test fun bengaliHonorificsAreExpandedBeforeTheEngineReceivesTheText() {
         ShadowTextToSpeech.addLanguageAvailability(Locale.forLanguageTag("bn"))
         val source = "আবু হুরাইরা (রাঃ), নবী (সঃ), মূসা (আঃ), ইবনে কাসীর (রঃ)।"

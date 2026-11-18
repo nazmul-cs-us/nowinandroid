@@ -569,11 +569,16 @@ class SurahDetailViewModel @Inject constructor(
 
     private var tafseerLoadJob: kotlinx.coroutines.Job? = null
 
-    suspend fun inlineTafsirText(surah: Int, ayah: Int, book: String): String = withContext(Dispatchers.IO) {
-        val data = quranEnhancedRepository.getTafseerForAyah(surah, ayah)
-            ?: throw com.starception.submission.feature.quran.PublishedTafsirAssetMissing()
-        when (book) { "moysar" -> data.tafseerMoysar; "baghawi" -> data.tafseerBaghawi; else -> data.tafseerSaadi }
+    fun tafsirReader(surah: Int, book: String): suspend (Int) -> String {
+        val repository = quranEnhancedRepository
+        return { ayah -> withContext(Dispatchers.IO) {
+            val data = repository.getTafseerForAyah(surah, ayah)
+                ?: throw com.starception.submission.feature.quran.PublishedTafsirAssetMissing()
+            when (book) { "moysar" -> data.tafseerMoysar; "baghawi" -> data.tafseerBaghawi; else -> data.tafseerSaadi }
+        } }
     }
+
+    suspend fun inlineTafsirText(surah: Int, ayah: Int, book: String): String = tafsirReader(surah, book)(ayah)
 
     fun loadTafseer(surahNumber: Int, ayahNumber: Int) {
         tafseerLoadJob?.cancel()

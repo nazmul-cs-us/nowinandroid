@@ -783,6 +783,7 @@ fun androidx.navigation.NavController.navigateToMediaSourceDetail(
         is com.starception.submission.media.MediaSource.Quran -> {
             navigateToSurah(source.surahIndex + 1)
         }
+        is com.starception.submission.media.MediaSource.Tafsir -> navigateToSurah(source.surahNumber)
         is com.starception.submission.media.MediaSource.Hadith -> {
             // Play All / Feeling Blessed chains run from the playback service for
             // every collection now, so resolve the database file from the

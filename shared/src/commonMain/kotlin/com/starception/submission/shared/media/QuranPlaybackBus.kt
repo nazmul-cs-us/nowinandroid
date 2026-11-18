@@ -48,7 +48,15 @@ object QuranPlaybackBus {
         val durationSeconds: Float,
         val sourceUrl: String? = null,
         val reciterName: String? = null,
+        /** Separate from recitation identity so Quran play buttons never toggle tafsir. */
+        val tafsirSurahNumber: Int? = null,
     ) {
+        val readerSurahNumber get() = surahNumber ?: tafsirSurahNumber
+        val albumTitle get() = when {
+            tafsirSurahNumber != null -> "Surah tafsir"
+            surahNumber != null -> "Quran recitation"
+            else -> "Dua & remembrance"
+        }
         val bannerTitle: String get() = listOfNotNull(title, reciterName?.takeIf { it.isNotBlank() }).joinToString(" · ")
     }
 
@@ -60,6 +68,31 @@ object QuranPlaybackBus {
     private var ticker: Job? = null
     private var activePlayer: QuranAudioPlayer? = null
     private var activeUrl: String? = null
+    private val speechScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var tafsirObserver: Job? = null
+    private var tafsirEntry: com.starception.submission.feature.quran.SurahTafsirPlaybackOwner.Entry? = null
+
+    /** Registers app-owned speech with the same banner and system controls as recitation. */
+    fun startTafsir() {
+        val owner = com.starception.submission.feature.quran.SurahTafsirPlayback.owner
+        val narration = owner.state.value ?: return
+        if (tafsirEntry === narration.entry) return
+        activePlayer?.stop()
+        clear()
+        com.starception.submission.shared.voice.NarrationQueue.stop()
+        tafsirEntry = narration.entry
+        fun publish(update: com.starception.submission.feature.quran.SurahTafsirPlaybackOwner.Playback) {
+            _state.value = PlaybackState(title = update.entry.title, reciterName = update.subtitle,
+                playing = update.playing, positionSeconds = 0f, durationSeconds = 0f, tafsirSurahNumber = update.entry.surah)
+        }
+        publish(narration)
+        tafsirObserver = speechScope.launch {
+            owner.state.collect { update ->
+                if (update == null) clear()
+                else if (update.entry === tafsirEntry) publish(update)
+            }
+        }
+    }
 
     /** The playing item, or null when nothing plays. The home strip's data source. */
     val state: StateFlow<PlaybackState?> = _state.asStateFlow()
@@ -87,6 +120,10 @@ object QuranPlaybackBus {
 
     /** Pauses when playing and resumes when paused — the mini-bar's button. */
     fun toggle() {
+        tafsirEntry?.let {
+            if (it.player.state.value.status == com.starception.submission.feature.quran.TafsirSpeechStatus.PAUSED) it.player.resume() else it.player.pause()
+            return
+        }
         val player = activePlayer ?: return
         val current = _state.value ?: return
         if (current.playing) {
@@ -117,6 +154,11 @@ object QuranPlaybackBus {
 
     /** Clears the row — explicit stops and natural end-of-track. */
     fun clear() {
+        tafsirObserver?.cancel(); tafsirObserver = null
+        val previousTafsir = tafsirEntry
+        tafsirEntry = null
+        val owner = com.starception.submission.feature.quran.SurahTafsirPlayback.owner
+        if (previousTafsir != null && owner.state.value?.entry === previousTafsir) owner.stop()
         ticker?.cancel()
         ticker = null
         activePlayer = null
@@ -132,6 +174,7 @@ object QuranPlaybackBus {
         sourceUrl: String = url,
         reciterName: String? = null,
     ) {
+        clear()
         activePlayer = player
         activeUrl = url
         _state.value = PlaybackState(

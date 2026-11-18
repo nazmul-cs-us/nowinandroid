@@ -167,6 +167,7 @@ object NarrationQueue {
         language: String,
         provider: String,
     ) {
+        com.starception.submission.shared.media.QuranPlaybackBus.stop()
         generation += 1
         pendingAdvance = false
         queueJob?.cancel()

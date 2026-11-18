@@ -132,10 +132,14 @@ with their source range retained. Each next passage starts only after confirmed
 speech completion. Voice errors and interruptions stop the queue. Pausing at the
 end of a passage also pauses before the next passage.
 
-The queue belongs to Surah Details, so scrolling the selector out of view keeps
-narration running. Starting an individual ayah cancels the full-surah queue, and
-starting the full queue stops individual narration. Hiding tafsir, changing the
-surah or book, leaving the page, or backgrounding stops full-surah playback.
+The full-surah queue belongs to the app. Leaving Surah Details, hiding the inline
+controls, or backgrounding the app keeps narration running. The PullToSync media
+banner shows the surah, tafsir language and current ayah range, with Pause/Resume;
+system media controls use the same queue. Returning to the same surah and edition
+reattaches to the active player. Visiting another book does not start it or replace
+the current audio; pressing Play does. Starting individual-ayah speech or another
+media source stops the full-surah queue. Explicit Stop, completion and errors clear
+the banner. Individual-ayah speech retains its page-owned lifetime.
 
 The full-surah player uses a theme-colored reading card with the surah name,
 ready/listening/paused status, ayah-based progress and a prominent playback action.
@@ -181,3 +185,13 @@ Embedded abbreviations such as `(হে নবী সঃ!)` are also handled. Nu
 ordinary words, initials, and `(আরবি)` placeholders are preserved. Other narration
 languages are unaffected. Android splits the expanded speech into utterances so
 chunk limits and pause/resume offsets apply to what is actually spoken.
+
+## First-run content setup
+
+The selected reading language determines both its offline Quran translation and
+its matching published tafsir. The matching edition is required during first-run
+setup, including all 114 chapters, manifest and attribution notice. Setup checks
+those files before reporting completion, retries incomplete downloads and avoids
+redownloading cached files. Languages without a published edition add no extra
+book; Arabic commentary remains part of Quran core content. Existing users who
+already finished setup can still download editions through Content & Storage.

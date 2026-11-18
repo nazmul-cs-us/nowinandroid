@@ -80,6 +80,15 @@ class QuranPlaybackService : Service() {
     private var coursePositionUpdateRunnable: Runnable? = null
 
     companion object {
+        private var activeService: java.lang.ref.WeakReference<QuranPlaybackService>? = null
+        internal fun pauseActive() {
+            activeService?.get()?.let {
+                it.wasPlayingBeforeChange = false
+                it.reciterJob?.cancel()
+                it.reciterJob = null
+                if (it.isPlaying()) it.togglePlayPause()
+            }
+        }
         private const val NOTIFICATION_ID = 2001
         private const val CHANNEL_ID = "quran_playback_channel"
         const val ACTION_PLAY = "com.starception.submission.ACTION_PLAY"
@@ -96,6 +105,7 @@ class QuranPlaybackService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onCreate() {
+        activeService = java.lang.ref.WeakReference(this)
         super.onCreate()
         Log.d("QuranService", "Service created")
         createNotificationChannel()
@@ -211,6 +221,7 @@ class QuranPlaybackService : Service() {
         private set
 
     fun playSurah(index: Int, shouldAutoPlay: Boolean = true) {
+        if (shouldAutoPlay) com.starception.submission.feature.quran.SurahTafsirPlayback.owner.stop()
         reciterJob?.cancel()
         reciterJob = null
         try {
@@ -381,6 +392,7 @@ class QuranPlaybackService : Service() {
                 onProgressChanged?.invoke(player.currentPosition, player.duration)
             } else {
                 if (deferForTravelDua(player)) return
+                com.starception.submission.feature.quran.SurahTafsirPlayback.owner.stop()
                 player.start()
                 onPlaybackStateChanged?.invoke(true)
                 onGlobalPlaybackStateChanged?.invoke(true)
@@ -765,6 +777,7 @@ class QuranPlaybackService : Service() {
     }
 
     override fun onDestroy() {
+        if (activeService?.get() === this) activeService = null
         com.starception.submission.media.TravelDuaInterruption.controller.unregister(this)
         reciterScope.cancel()
         super.onDestroy()

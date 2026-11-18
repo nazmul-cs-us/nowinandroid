@@ -16,6 +16,8 @@
 
 package com.starception.submission.download
 
+import com.starception.submission.feature.quran.QuranSetupContent
+
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -104,6 +106,19 @@ class AssetDownloadViewModel @Inject constructor(
     private fun selectedTranslationReady(): Boolean =
         ContentReadingLanguage.assetKey(_selectedLanguage.value)?.let(downloadManager::isAssetAvailable) ?: true
 
+    private fun requiredSetupCategories(m: AssetManifest): Set<String> = QuranSetupContent.requiredCategories(
+        m.categories.filter { it.value.required }.keys, _selectedLanguage.value, contentSetupPreferences.isComplete)
+
+    private fun selectedTafsirReady(m: AssetManifest): Boolean = QuranSetupContent.tafsirReady(
+        _selectedLanguage.value, contentSetupPreferences.isComplete) { key ->
+        m.assets.containsKey(key) && downloadManager.isAssetAvailable(key)
+    }
+
+    private suspend fun manifestForSetup(current: AssetManifest): AssetManifest {
+        val keys = QuranSetupContent.tafsirAssets(_selectedLanguage.value, contentSetupPreferences.isComplete)
+        return if (keys.any { it !in current.assets }) downloadManager.refreshManifest() ?: current else current
+    }
+
     private val _screenState = MutableStateFlow<DownloadScreenState>(DownloadScreenState.Loading)
     val screenState: StateFlow<DownloadScreenState> = _screenState.asStateFlow()
 
@@ -129,16 +144,17 @@ class AssetDownloadViewModel @Inject constructor(
     private fun loadManifest() {
         viewModelScope.launch {
             try {
-                val m = downloadManager.loadManifest()
-                if (m == null) {
+                val initialManifest = downloadManager.loadManifest()
+                if (initialManifest == null) {
                     _screenState.value = DownloadScreenState.Error("No asset manifest found")
                     return@launch
                 }
-                manifest = m
                 _selectedLanguage.value = translationService.getSelectedLanguage()
+                val m = manifestForSetup(initialManifest)
+                manifest = m
 
                 // Check if all required assets are already available (bundled fallback works)
-                if (downloadManager.hasEssentialAssets(m) && selectedTranslationReady()) {
+                if (downloadManager.hasEssentialAssets(m) && selectedTranslationReady() && selectedTafsirReady(m)) {
                     markContentSetupComplete()
                     _screenState.value = DownloadScreenState.AllReady
                     Log.i(TAG, "All essential assets ready")
@@ -146,8 +162,8 @@ class AssetDownloadViewModel @Inject constructor(
                 }
 
                 // Also check if all required categories are individually complete
-                val requiredKeys = m.categories.filter { it.value.required }.keys
-                if (requiredKeys.all { downloadManager.isCategoryComplete(it, m) } && selectedTranslationReady()) {
+                val requiredKeys = requiredSetupCategories(m)
+                if (requiredKeys.all { downloadManager.isCategoryComplete(it, m) } && selectedTranslationReady() && selectedTafsirReady(m)) {
                     markContentSetupComplete()
                     _screenState.value = DownloadScreenState.AllReady
                     Log.i(TAG, "All required categories complete, skipping download screen")
@@ -165,9 +181,13 @@ class AssetDownloadViewModel @Inject constructor(
     private fun refreshCategoryStates() {
         val m = manifest ?: return
 
+        val requiredKeys = requiredSetupCategories(m)
+        val selectedTafsirCategory = QuranSetupContent.tafsirEdition(_selectedLanguage.value,
+            contentSetupPreferences.isComplete)?.category
         val categories = m.categories.map { (key, info) ->
             val downloadedSize = downloadManager.getCategoryDownloadedSize(key, m)
-            val isComplete = downloadManager.isCategoryComplete(key, m)
+            val isComplete = if (key == selectedTafsirCategory) selectedTafsirReady(m)
+                else downloadManager.isCategoryComplete(key, m)
             CategoryDownloadState(
                 categoryKey = key,
                 displayName = formatCategoryName(key),
@@ -175,7 +195,7 @@ class AssetDownloadViewModel @Inject constructor(
                 totalSize = info.totalSize,
                 downloadedSize = downloadedSize,
                 fileCount = info.fileCount,
-                required = info.required,
+                required = key in requiredKeys,
                 isComplete = isComplete,
                 progress = if (info.totalSize > 0) downloadedSize.toFloat() / info.totalSize else 0f,
             )
@@ -199,7 +219,7 @@ class AssetDownloadViewModel @Inject constructor(
 
         val totalRequiredSize = categories.filter { it.required }.sumOf { it.totalSize }
         val totalOptionalSize = categories.filter { !it.required }.sumOf { it.totalSize }
-        val requiredComplete = categories.filter { it.required }.all { it.isComplete }
+        val requiredComplete = categories.filter { it.required }.all { it.isComplete } && selectedTafsirReady(m)
 
         val overallRequired = categories.filter { it.required }
         val overallProgress = if (totalRequiredSize > 0) {
@@ -227,8 +247,8 @@ class AssetDownloadViewModel @Inject constructor(
         // Persist even the unchanged default so all readers use the same code.
         selectLanguage(_selectedLanguage.value)
 
-        val requiredCategories = m.categories.filter { it.value.required }.keys
-        val allAlreadyComplete = requiredCategories.all { downloadManager.isCategoryComplete(it, m) } && selectedTranslationReady()
+        val requiredCategories = requiredSetupCategories(m)
+        val allAlreadyComplete = requiredCategories.all { downloadManager.isCategoryComplete(it, m) } && selectedTranslationReady() && selectedTafsirReady(m)
 
         if (allAlreadyComplete) {
             Log.i(TAG, "All required categories already complete, skipping download")
@@ -257,11 +277,20 @@ class AssetDownloadViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                val activeManifest = manifestForSetup(m)
+                manifest = activeManifest
+                refreshCategoryStates()
                 val failedCategories = mutableListOf<String>()
-                for (category in requiredCategories) {
-                    if (downloadManager.isCategoryComplete(category, m)) continue
+                for (category in requiredSetupCategories(activeManifest)) {
+                    val selectedTafsir = QuranSetupContent.tafsirEdition(_selectedLanguage.value, contentSetupPreferences.isComplete)
+                    if (category == selectedTafsir?.category) {
+                        check(QuranSetupContent.tafsirAssets(_selectedLanguage.value).all { activeManifest.assets[it]?.category == category }) {
+                            "Selected tafsir is missing from the content catalog. Please refresh content and retry."
+                        }
+                    }
+                    if (downloadManager.isCategoryComplete(category, activeManifest)) continue
 
-                    val completed = downloadManager.downloadCategory(category, m) { progress, downloaded, _ ->
+                    val completed = downloadManager.downloadCategory(category, activeManifest) { progress, downloaded, _ ->
                         viewModelScope.launch {
                             updateCategoryProgress(category, progress, downloaded)
                         }
@@ -279,7 +308,7 @@ class AssetDownloadViewModel @Inject constructor(
                         }
                         val ready = try {
                             ContentReadingLanguage.ensureAvailable(_selectedLanguage.value, downloadManager::isAssetAvailable) { selectedKey ->
-                                downloadManager.downloadAsset(selectedKey, m) is AssetDownloadManager.DownloadState.Completed
+                                downloadManager.downloadAsset(selectedKey, activeManifest) is AssetDownloadManager.DownloadState.Completed
                             }
                         } finally {
                             progressJob.cancel()
@@ -288,6 +317,11 @@ class AssetDownloadViewModel @Inject constructor(
                             failedCategories += "${ContentReadingLanguage.displayName(_selectedLanguage.value)} translation"
                         }
                     }
+                }
+                if (!selectedTafsirReady(activeManifest)) {
+                    val edition = QuranSetupContent.tafsirEdition(_selectedLanguage.value)
+                    if (edition != null && formatCategoryName(edition.category) !in failedCategories)
+                        failedCategories += formatCategoryName(edition.category)
                 }
                 isCurrentlyDownloading = false
                 refreshCategoryStates()

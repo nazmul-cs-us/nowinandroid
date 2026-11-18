@@ -94,6 +94,8 @@ class ChapterRecitationService : Service() {
     // MediaSession and foreground notification. In that mode there is no MediaPlayer.
     private var isExternalPlayback = false
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var tafsirPlaybackJob: Job? = null
+    private var tafsirEntry: com.starception.submission.feature.quran.SurahTafsirPlaybackOwner.Entry? = null
     private var bookPlaylistJob: Job? = null
     private var bookPlaylistGeneration = 0
     private var bookPlaylistPaused = false
@@ -132,6 +134,7 @@ class ChapterRecitationService : Service() {
         const val ACTION_STOP = "com.starception.submission.CHAPTER_STOP"
         const val ACTION_PLAY_HADITH_BOOK =
             "com.starception.submission.CHAPTER_PLAY_HADITH_BOOK"
+        private const val ACTION_PLAY_TAFSIR = "com.starception.submission.PLAY_TAFSIR"
         const val ACTION_NEXT = "com.starception.submission.CHAPTER_NEXT"
         const val ACTION_PREVIOUS = "com.starception.submission.CHAPTER_PREVIOUS"
         const val EXTRA_SOURCE = "source"
@@ -202,6 +205,12 @@ class ChapterRecitationService : Service() {
             } catch (e: Exception) {
                 Log.e(TAG, "Unable to start external recitation service for $title", e)
             }
+        }
+
+        /** The queue is app-owned; this service supplies foreground and media-control lifetime. */
+        fun playTafsir(context: Context) {
+            androidx.core.content.ContextCompat.startForegroundService(context,
+                Intent(context, ChapterRecitationService::class.java).apply { action = ACTION_PLAY_TAFSIR })
         }
 
         fun toggle(context: Context) {
@@ -370,6 +379,7 @@ class ChapterRecitationService : Service() {
                     )
                 }
             }
+            ACTION_PLAY_TAFSIR -> startTafsirPlayback()
             ACTION_SHOW_EXTERNAL_PLAYBACK -> startExternalPlayback(
                 title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
                 subtitle = intent.getStringExtra(EXTRA_SUBTITLE).orEmpty(),
@@ -406,6 +416,7 @@ class ChapterRecitationService : Service() {
             startForegroundNotification()
             return
         }
+        detachTafsirPlayback()
         // A fresh play request for the same source means replay from the beginning.
         // Play/pause requests arrive through ACTION_TOGGLE and never enter this branch.
         if (source == currentSource && mediaPlayer != null) {
@@ -523,7 +534,61 @@ class ChapterRecitationService : Service() {
         }
     }
 
+    private fun detachTafsirPlayback() {
+        tafsirPlaybackJob?.cancel(); tafsirPlaybackJob = null
+        val previous = tafsirEntry ?: return
+        tafsirEntry = null
+        ChapterRecitationState.onExternalToggle = null
+        ChapterRecitationState.onExternalPause = null
+        ChapterRecitationState.onExternalPlay = null
+        val owner = com.starception.submission.feature.quran.SurahTafsirPlayback.owner
+        if (owner.state.value?.entry === previous) owner.stop()
+    }
+
+    private fun startTafsirPlayback() {
+        val owner = com.starception.submission.feature.quran.SurahTafsirPlayback.owner
+        val playback = owner.state.value ?: run { stopPlaybackAndSelf(); return }
+        detachTafsirPlaybackObserver()
+        bookPlaylistGeneration += 1
+        bookPlaylistJob?.cancel(); bookPlaylistJob = null
+        stopCurrentBookRenderer()
+        ChapterRecitationState.setBookPlaylist(active = false)
+        stopProgressUpdates()
+        startExternalPlayback(playback.entry.title, playback.subtitle)
+        tafsirEntry = playback.entry
+        val player = playback.entry.player
+        ChapterRecitationState.onExternalToggle = {
+            if (player.state.value.status == com.starception.submission.feature.quran.TafsirSpeechStatus.PAUSED) player.resume() else player.pause()
+        }
+        ChapterRecitationState.onExternalPause = player::pause
+        ChapterRecitationState.onExternalPlay = player::resume
+        tafsirPlaybackJob = serviceScope.launch {
+            owner.state.collect { update ->
+                if (update == null) { stopPlaybackAndSelf(); return@collect }
+                // A replacement queue will bind through its own play intent. Never stop it from an old observer.
+                if (update.entry !== tafsirEntry) return@collect
+                currentSubtitle = update.subtitle
+                ChapterRecitationState.publish(update.playing, currentTitle, currentSubtitle)
+                // Unknown speech duration must not inherit the previous recitation's progress.
+                ChapterRecitationState.publishProgress(0, 0)
+                updateMetadata(0L)
+                updatePlaybackState(if (update.playing) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
+                updateNotification()
+                acquireExternalPlaybackWakeLock()
+            }
+        }
+    }
+
+    private fun detachTafsirPlaybackObserver() {
+        tafsirPlaybackJob?.cancel(); tafsirPlaybackJob = null
+        // Preserve the queue being rebound after Resume, but stop a replaced one.
+        val previous = tafsirEntry
+        tafsirEntry = null
+        if (previous != null && com.starception.submission.feature.quran.SurahTafsirPlayback.owner.state.value?.entry !== previous) previous.player.stop()
+    }
+
     private fun startExternalPlayback(title: String, subtitle: String) {
+        detachTafsirPlayback()
         mediaPlayer?.let {
             runCatching { it.stop() }
             it.release()
@@ -1122,6 +1187,7 @@ class ChapterRecitationService : Service() {
     }
 
     private fun stopPlaybackAndSelf() {
+        detachTafsirPlayback()
         com.starception.submission.media.TravelDuaInterruption.controller.cancelGroup(ChapterRecitationState)
         bookPlaylistGeneration += 1
         bookPlaylistJob?.cancel()
@@ -1305,6 +1371,9 @@ class ChapterRecitationService : Service() {
     }
 
     override fun onDestroy() {
+        val wasTafsir = tafsirEntry != null
+        detachTafsirPlayback()
+        if (wasTafsir) ChapterRecitationState.markStopped()
         com.starception.submission.media.TravelDuaInterruption.controller.unregister(this)
         super.onDestroy()
         bookPlaylistGeneration += 1

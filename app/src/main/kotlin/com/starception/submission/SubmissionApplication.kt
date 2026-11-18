@@ -369,7 +369,7 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                             com.starception.submission.media.GlobalMediaViewModel
                                 .onHadithPlaybackChanged
                                 ?.invoke(playing, hadithNumber, subtitle, title)
-                        } else {
+                        } else if (!subtitle.startsWith("Tafsir")) {
                             com.starception.submission.core.ui.ChapterAudioController
                                 .updateExternalState(playing, title)
                             com.starception.submission.media.GlobalMediaViewModel

@@ -23,6 +23,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(application = Application::class, qualifiers = "w393dp-h600dp", sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class FullSurahTafsirControlsTest {
+    @org.junit.After fun stopAppQueue() { compose.runOnIdle { SurahTafsirPlayback.owner.stop() } }
     @get:Rule val compose = createComposeRule()
     private class Engine : TafsirSpeechPlayer {
         override val state = MutableStateFlow(TafsirSpeechState())
@@ -62,7 +63,35 @@ class FullSurahTafsirControlsTest {
         compose.runOnIdle { engine.state.value = TafsirSpeechState(finished = true) }
         assertEquals(2, engine.spoken.size)
     }
-    @Test fun changingEditionReleasesTheQueueAndDoesNotAutomaticallyStartAnotherBook() {
+    @Test fun backNavigationPreservesPlaybackAndReturningAttachesToTheSameQueue() {
+        val readerVisible = mutableStateOf(true)
+        val engine = Engine()
+        var created = 0
+        compose.setContent { MaterialTheme {
+            if (readerVisible.value) {
+                val session = remember { TafsirSpeechSession() }
+                val player = rememberSurahTafsirSpeechPlayer(1, "ibn_kathir_en", session,
+                    engineFactory = { created++; engine }, loadAyah = { "Ayah $it" })
+                SurahTafsirPlaybackControls(player, "Al-Fatihah") { Text("Download required") }
+            } else Text("Home")
+        } }
+        compose.onNodeWithText("Play full surah tafsir").performClick()
+        compose.waitForIdle()
+        compose.waitUntil(5000) { engine.spoken.isNotEmpty() }
+        compose.runOnIdle { readerVisible.value = false }
+        compose.waitForIdle()
+        assertFalse(engine.released)
+        compose.runOnIdle { engine.state.value = TafsirSpeechState(finished = true) }
+        compose.waitForIdle()
+        compose.waitUntil(5000) { engine.spoken.size == 2 }
+        compose.runOnIdle { readerVisible.value = true }
+        compose.waitForIdle()
+        compose.onNodeWithText("Ayah 2 of 7").assertIsDisplayed()
+        compose.onNodeWithText("Pause surah tafsir").assertIsDisplayed()
+        assertEquals(1, created)
+        compose.onNodeWithContentDescription("Stop surah tafsir").performClick()
+    }
+    @Test fun changingEditionKeepsExistingPlaybackUntilTheNewBookIsStarted() {
         val book = mutableStateOf("ibn_kathir_en")
         val engines = mutableListOf<Engine>()
         compose.setContent { MaterialTheme {
@@ -75,10 +104,13 @@ class FullSurahTafsirControlsTest {
         compose.waitUntil(5000) { engines.first().spoken.isNotEmpty() }
         compose.runOnIdle { book.value = "mukhtasar_fr" }
         compose.waitForIdle()
-        assertTrue(engines.first().released)
+        assertFalse(engines.first().released)
         assertEquals(2, engines.size)
         assertTrue(engines.last().spoken.isEmpty())
         compose.onNodeWithText("Play full surah tafsir").assertIsDisplayed()
+        compose.onNodeWithText("Play full surah tafsir").performClick()
+        compose.waitUntil(5000) { engines.last().spoken.isNotEmpty() }
+        assertTrue(engines.first().released)
     }
     @Test
     @Config(qualifiers = "w320dp-h780dp", sdk = [35])

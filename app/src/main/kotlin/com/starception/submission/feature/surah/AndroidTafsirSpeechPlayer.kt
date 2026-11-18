@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
 /** Reader-scoped system speech. Pause resumes at the current word, or chunk on older engines. */
-internal class AndroidTafsirSpeechPlayer(context: Context) : TafsirSpeechPlayer {
+internal class AndroidTafsirSpeechPlayer(context: Context, private val fullSurah: Boolean = false) : TafsirSpeechPlayer {
     private val context = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
     private val mutableState = MutableStateFlow(TafsirSpeechState())
@@ -72,7 +72,11 @@ internal class AndroidTafsirSpeechPlayer(context: Context) : TafsirSpeechPlayer 
         if (audio.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
             fail("Audio is busy. Try playing tafsir again."); return
         }
-        if (ChapterRecitationState.isPlaying) ChapterRecitationService.toggle(context)
+        com.starception.submission.feature.quran.QuranPlaybackService.pauseActive()
+        if (!fullSurah) {
+            SurahTafsirPlayback.owner.stop()
+            if (ChapterRecitationState.isPlaying) ChapterRecitationService.toggle(context)
+        }
         utteranceBase = offset
         utteranceId = "tafsir-${++request}"
         mutableState.value = TafsirSpeechState(TafsirSpeechStatus.PLAYING)
