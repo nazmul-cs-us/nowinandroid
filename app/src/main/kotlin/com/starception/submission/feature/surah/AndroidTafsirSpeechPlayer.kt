@@ -42,7 +42,7 @@ internal class AndroidTafsirSpeechPlayer(context: Context) : TafsirSpeechPlayer 
     override fun play(text: String, language: String) {
         if (released) return
         stop()
-        chunks = tafsirSpeechChunks(text, minOf(3000, TextToSpeech.getMaxSpeechInputLength()))
+        chunks = tafsirSpeechChunks(normalizeTafsirSpeechText(text, language), minOf(3000, TextToSpeech.getMaxSpeechInputLength()))
         if (chunks.isEmpty()) return
         this.language = language
         chunk = 0; offset = 0

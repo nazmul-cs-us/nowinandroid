@@ -158,3 +158,23 @@ That action returns to the narrated ayah and re-enables following. Stop, complet
 changing the surah/book, or hiding inline tafsir clears the active highlight.
 Touch dragging, pointer-wheel scrolling, and Android's scrollbar use this guidance;
 programmatic scrolling does not trigger a manual-scroll hint.
+
+## Bengali honorific narration
+
+Speech input expands common Bengali honorific abbreviations before reaching the
+Android or iOS system voice. This applies to individual ayahs and the full-surah
+queue. Source files, checksums, grouping and displayed wording remain unchanged.
+
+| Source abbreviation | Spoken Bengali |
+| --- | --- |
+| রাঃ / (রা.) | আল্লাহ তাঁর প্রতি সন্তুষ্ট হোন |
+| রঃ / রহঃ | আল্লাহ তাঁর প্রতি রহম করুন |
+| সঃ / সাঃ | সাল্লাল্লাহু আলাইহি ওয়া সাল্লাম |
+| আঃ | আল্লাহর শান্তি বর্ষিত হোক |
+
+Bengali meanings avoid guessing an Arabic gendered pronoun from an abbreviation
+that does not encode gender. Known honorific symbols receive equivalent expansions.
+Embedded abbreviations such as `(হে নবী সঃ!)` are also handled. Numeric references,
+ordinary words, initials, and `(আরবি)` placeholders are preserved. Other narration
+languages are unaffected. Android splits the expanded speech into utterances so
+chunk limits and pause/resume offsets apply to what is actually spoken.

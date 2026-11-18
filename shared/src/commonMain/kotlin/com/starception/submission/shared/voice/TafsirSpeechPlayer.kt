@@ -13,7 +13,7 @@ internal class SystemTafsirSpeechPlayer(private val onStart: () -> Unit) : Tafsi
         stop()
         onStart()
         mutableState.value = TafsirSpeechState(TafsirSpeechStatus.PLAYING)
-        val started = synthesizer.speak(text, language = language, onComplete = { error ->
+        val started = synthesizer.speak(normalizeTafsirSpeechText(text, language), language = language, onComplete = { error ->
             mutableState.value = if (error == null) TafsirSpeechState(finished = true)
                 else TafsirSpeechState(TafsirSpeechStatus.ERROR, error)
         })

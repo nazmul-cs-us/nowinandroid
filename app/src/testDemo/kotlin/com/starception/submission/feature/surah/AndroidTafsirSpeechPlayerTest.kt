@@ -56,4 +56,20 @@ class AndroidTafsirSpeechPlayerTest {
         assertTrue(player.state.value.finished)
         player.release()
     }
+    @Test fun bengaliHonorificsAreExpandedBeforeTheEngineReceivesTheText() {
+        ShadowTextToSpeech.addLanguageAvailability(Locale.forLanguageTag("bn"))
+        val source = "আবু হুরাইরা (রাঃ) বলেন, নবী (সঃ) বলেছেন।"
+        val player = AndroidTafsirSpeechPlayer(ApplicationProvider.getApplicationContext<Context>())
+        player.play(source, "bn")
+        val shadow = shadowOf(ShadowTextToSpeech.getLastTextToSpeechInstance())
+        shadow.onInitListener.onInit(TextToSpeech.SUCCESS)
+        shadowOf(Looper.getMainLooper()).idle()
+        val spoken = shadow.spokenTextList.joinToString("")
+        assertTrue(spoken.contains("আল্লাহ তাঁর প্রতি সন্তুষ্ট হোন"))
+        assertTrue(spoken.contains("সাল্লাল্লাহু আলাইহি ওয়া সাল্লাম"))
+        assertFalse(spoken.contains("(রাঃ)"))
+        assertEquals("bn", shadow.currentLanguage.language)
+        player.release()
+    }
+
 }
