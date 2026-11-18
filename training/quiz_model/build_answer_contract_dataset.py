@@ -6,10 +6,11 @@ or honestly report that the source does not answer it. It mixes three record fam
 
 - Ordinary, non-religious contract sentences that teach exact-span extraction and the
   bounded JSON shape, exactly like the question-contract dataset.
-- Real Quran and Hadith passages with topical questions whose answers are exact spans of
-  the passage, so the model adapts to the corpus language it will see at runtime.
-- Unanswered records where the question is provably absent from the source, teaching the
-  model to reject instead of guessing.
+- Curated preference pairs when explicitly enabled.
+- Synthetic unanswered records that teach rejection instead of guessing.
+
+Automatic topical corpus labels are disabled: source-span membership alone cannot
+establish relevance. Use build_checked_answer_dataset.py for source-specific QA.
 
 Religious knowledge is never memorised: every answer and evidence is a verbatim span of the
 immutable source that ships with the record.
@@ -25,8 +26,12 @@ import re
 import sqlite3
 from pathlib import Path
 
-from build_semantic_contract_dataset import KINDS, semantic_example
-from prepare_hf_dataset import ANSWER_SYSTEM_PROMPT
+try:
+    from .build_semantic_contract_dataset import KINDS, semantic_example
+    from .prepare_hf_dataset import ANSWER_SYSTEM_PROMPT
+except ImportError:
+    from build_semantic_contract_dataset import KINDS, semantic_example
+    from prepare_hf_dataset import ANSWER_SYSTEM_PROMPT
 
 TOPIC_ALIASES = [
     ("fasting", ("fast", "fasting", "fasts", "fasted", "ramadan", "sawm")),
@@ -52,7 +57,7 @@ TOPIC_ALIASES = [
     ("knowledge", ("knowledge", "learn", "teaching", "taught", "scholar")),
     ("honesty", ("honesty", "truthful", "truth", "lying", "liar")),
     ("gratitude", ("gratitude", "grateful", "thank", "thanks", "thankful")),
-    ("generosity", ("generous", "generosity", "giving", "gave")),
+    ("generosity", ("generous", "generosity")),
     ("kindness", ("kind", "kindness", "kindly")),
     ("water", ("water", "drink", "thirsty")),
     ("orphans", ("orphan", "orphans")),
@@ -72,7 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--quran-translation", type=Path)
     parser.add_argument("--hadith-db", action="append", default=[], type=Path)
     parser.add_argument("--contract-examples-per-kind", type=int, default=20)
-    parser.add_argument("--corpus-answer-target", type=int, default=300)
+    parser.add_argument("--corpus-answer-target", type=int, default=0)
     parser.add_argument("--corpus-unanswered-target", type=int, default=160)
     parser.add_argument("--contract-unanswered-per-kind", type=int, default=3)
     parser.add_argument("--max-source-chars", type=int, default=700)
@@ -162,18 +167,7 @@ def answer_clause(sentence: str, alias: str) -> str | None:
             trimmed = clause.strip(" ,;:").strip()
             if trimmed and len(trimmed) <= 96:
                 return trimmed
-    # The alias survives only inside one long clause; fall back to a bounded window
-    # around it. The window is always a contiguous slice of the clause.
-    for clause in clauses:
-        if word_boundary_contains(clause, alias):
-            match = re.search(rf"\b{re.escape(alias)}\b", clause, flags=re.IGNORECASE)
-            if match is None:
-                return None
-            center = (match.start() + match.end()) // 2
-            window = clause[max(0, center - 48) : center + 48].strip()
-            if len(window) > 96:
-                window = window[:96].rsplit(" ", 1)[0]
-            return window if window else None
+    # Long clauses need a reviewed answer; arbitrary windows can cut words or meaning.
     return None
 
 
@@ -386,159 +380,13 @@ def corpus_records(
     unanswered_target: int,
     max_source_chars: int,
 ) -> list[dict]:
-    """Topical QA spans and honest rejections drawn from the real corpus."""
-    rng = random.Random(20261007)
-    rng.shuffle(passages)
-
-    by_collection: dict[str, list[dict]] = {}
-    for passage in passages:
-        by_collection.setdefault(passage["collection"], []).append(passage)
-
-    answered_records: list[dict] = []
-    unanswered_records: list[dict] = []
-    collections = sorted(by_collection)
-    answer_index = 0
-    while len(answered_records) < answer_target and collections:
-        made_progress = False
-        for collection in collections:
-            if len(answered_records) >= answer_target:
-                break
-            pool = by_collection[collection]
-            if answer_index >= len(pool):
-                continue
-            passage = pool[answer_index]
-            made_progress = True
-            source_text = bound_source(passage["text"], max_source_chars)
-            for span_start, span_end in sentence_spans(source_text):
-                sentence = source_text[span_start:span_end].strip()
-                # A 0.5B model copies short spans reliably and long ones poorly
-                # (measured: accepted evidence averages ~78 chars, rejected
-                # ~120). Skip sentences too long to quote cleanly.
-                if not (40 <= len(sentence) <= 240) or not is_clean_english(sentence):
-                    continue
-                located = topic_for(sentence)
-                if located is None:
-                    continue
-                topic, alias = located
-                answer = answer_clause(sentence, alias)
-                if (
-                    answer is None
-                    or answer not in sentence
-                    or answer not in source_text
-                ):
-                    continue
-                if contains_arabic(answer):
-                    continue
-                # Evidence: the shortest sentence prefix that still contains the
-                # whole answer, cut at a word boundary so it remains a contiguous
-                # source span while staying short enough for the model to quote.
-                answer_end = sentence.find(answer) + len(answer)
-                evidence_cut = min(len(sentence), max(answer_end, 110))
-                evidence = sentence[:evidence_cut]
-                if evidence_cut < len(sentence):
-                    evidence = evidence.rstrip(" ,;:")
-                    evidence = (
-                        evidence[:answer_end]
-                        if len(evidence) < answer_end
-                        else evidence
-                    )
-                    boundary = evidence.rsplit(" ", 1)
-                    if len(boundary) > 1 and len(boundary[0]) >= answer_end:
-                        evidence = boundary[0]
-                if answer not in evidence or evidence not in source_text:
-                    continue
-                template = QUESTION_TEMPLATES[
-                    int.from_bytes(
-                        hashlib.sha256(
-                            f"{passage['reference']}|{topic}".encode()
-                        ).digest()[:4],
-                        "big",
-                    )
-                    % len(QUESTION_TEMPLATES)
-                ]
-                answered_records.append(
-                    build_record(
-                        record_id=f"answer-corpus-{topic}-{len(answered_records):05d}",
-                        collection=passage["collection"],
-                        reference=passage["reference"],
-                        topic=passage["topic"],
-                        source_text=source_text,
-                        question=template.format(topic=topic),
-                        payload={
-                            "contentType": "answer",
-                            "answer": answer,
-                            "evidence": evidence,
-                        },
-                    )
-                )
-                break
-        answer_index += 1
-        if not made_progress:
-            break
-
-    # Unanswered corpus records: a topical question the passage does not address.
-    unanswered_index = 0
-    while len(unanswered_records) < unanswered_target and collections:
-        made_progress = False
-        for collection in collections:
-            if len(unanswered_records) >= unanswered_target:
-                break
-            pool = by_collection[collection]
-            if unanswered_index >= len(pool):
-                continue
-            passage = pool[unanswered_index]
-            made_progress = True
-            source_text = bound_source(passage["text"], max_source_chars)
-            present_topics = set()
-            for span_start, span_end in sentence_spans(source_text):
-                located = topic_for(source_text[span_start:span_end])
-                if located is not None:
-                    present_topics.add(located[0])
-            absent = [
-                topic for topic, _ in TOPIC_ALIASES if topic not in present_topics
-            ]
-            if not absent:
-                continue
-            topic = absent[
-                int.from_bytes(
-                    hashlib.sha256(f"{passage['reference']}|absent".encode()).digest()[
-                        :4
-                    ],
-                    "big",
-                )
-                % len(absent)
-            ]
-            template = QUESTION_TEMPLATES[
-                int.from_bytes(
-                    hashlib.sha256(f"{passage['reference']}|{topic}".encode()).digest()[
-                        :4
-                    ],
-                    "big",
-                )
-                % len(QUESTION_TEMPLATES)
-            ]
-            unanswered_records.append(
-                build_record(
-                    record_id=(
-                        f"answer-unanswered-corpus-{topic}-{len(unanswered_records):05d}"
-                    ),
-                    collection=passage["collection"],
-                    reference=passage["reference"],
-                    topic=passage["topic"],
-                    source_text=source_text,
-                    question=template.format(topic=topic),
-                    payload={
-                        "contentType": "unanswered",
-                        "answer": "",
-                        "evidence": "",
-                    },
-                )
-            )
-        unanswered_index += 1
-        if not made_progress:
-            break
-
-    return answered_records + unanswered_records
+    """Legacy topical labels cannot establish that a passage answers a question."""
+    if answer_target or unanswered_target:
+        raise ValueError(
+            "Automatic topical answer labels are disabled. "
+            "Use build_checked_answer_dataset.py with explicit source-checked questions."
+        )
+    return []
 
 
 PREFERENCE_QUESTION_TEMPLATES = (

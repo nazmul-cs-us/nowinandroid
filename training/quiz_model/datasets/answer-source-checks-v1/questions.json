@@ -1,0 +1,623 @@
+{
+  "schemaVersion": 1,
+  "reviewStatus": "agent_source_checked_seed_not_expert_reviewed",
+  "scope": "Extractive reading of supplied English passages; not a comprehensive religious knowledge benchmark.",
+  "cases": [
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "10:36",
+      "split": "train",
+      "questions": [
+        {
+          "question": "What do most of them follow?",
+          "answer": "assumption"
+        },
+        {
+          "question": "What does assumption not avail against?",
+          "answer": "the truth"
+        },
+        {
+          "question": "Which person first made the assumption?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "1b9b0ce2dd0544a927ab15c2004289ab31e3f713291872be7b14bd2ba21158e3"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "10:67",
+      "split": "train",
+      "questions": [
+        {
+          "question": "What was the night made for?",
+          "answer": "to rest therein"
+        },
+        {
+          "question": "Who are the signs for?",
+          "answer": "a people who listen"
+        },
+        {
+          "question": "How many hours of rest does the source specify?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "5dcae946c759b816460ace7bf1076fa1ca35d0b167ae6e300d766112f8c79dda"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "11:58",
+      "split": "train",
+      "questions": [
+        {
+          "question": "Who was saved when the command came?",
+          "answer": "Hud and those who believed with him"
+        },
+        {
+          "question": "What were they saved from?",
+          "answer": "a harsh punishment"
+        },
+        {
+          "question": "How many people believed with Hud?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "aff7175600d7587cba22f43c81619d05b13571ee1f77ae59a20ae072673b94ee"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "17:110",
+      "split": "train",
+      "questions": [
+        {
+          "question": "What kind of way should be sought when reciting in prayer?",
+          "answer": "an [intermediate] way"
+        },
+        {
+          "question": "What belongs to Him?",
+          "answer": "the best names"
+        },
+        {
+          "question": "How many prayers per day does this source specify?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "c5e37ab897336169d9954ee2833dce7b57b39e67ca4acb775e26d5b0e879a5be"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "20:98",
+      "split": "train",
+      "questions": [
+        {
+          "question": "Who is the only god named in this source?",
+          "answer": "Allah"
+        },
+        {
+          "question": "What has He encompassed in knowledge?",
+          "answer": "all things"
+        },
+        {
+          "question": "On which date was this knowledge revealed?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "a8d46b9061d228cfc7ea215c2559eaa536113a755cda8f106a495ececcabf5f1"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "21:79",
+      "split": "train",
+      "questions": [
+        {
+          "question": "Who was given understanding of the case?",
+          "answer": "Solomon"
+        },
+        {
+          "question": "What was subjected to exalt alongside David and the birds?",
+          "answer": "the mountains"
+        },
+        {
+          "question": "How old was Solomon when he understood the case?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "c85f820f895efbff0dfe8b0221e2c6652eaba2794d3cd63f11234e58dc8e8404"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "22:66",
+      "split": "train",
+      "questions": [
+        {
+          "question": "How is mankind described?",
+          "answer": "ungrateful"
+        },
+        {
+          "question": "What will He do after causing you to die?",
+          "answer": "will [again] give you life"
+        },
+        {
+          "question": "How many years of life are promised?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "af156cf6a8297aba3109c4e21b121ac6e4b320a88f128a8301c7acedb0fa85c8"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "23:78",
+      "split": "train",
+      "questions": [
+        {
+          "question": "Which two senses are mentioned?",
+          "answer": "hearing and vision"
+        },
+        {
+          "question": "What is mentioned alongside hearing and vision?",
+          "answer": "hearts"
+        },
+        {
+          "question": "What is the name of the person whose hearing is described?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "9f6f1e94951ad511571b46333ac4105a1c2df05e458afeb5293cca1944556b87"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "26:155",
+      "split": "train",
+      "questions": [
+        {
+          "question": "Which animal is mentioned?",
+          "answer": "a she-camel"
+        },
+        {
+          "question": "When is each time of drink?",
+          "answer": "on a known day"
+        },
+        {
+          "question": "How many she-camels were born that year?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "e17d8bab880102b329397e2fb68dfda1d73d7ec7acedf61100cc5dabb6c8d2bc"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "28:26",
+      "split": "validation",
+      "questions": [
+        {
+          "question": "How is the best person to hire described?",
+          "answer": "the strong and the trustworthy"
+        },
+        {
+          "question": "What does the woman ask her father to do?",
+          "answer": "hire him"
+        },
+        {
+          "question": "What wage was offered to the person being hired?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "83562f3a4173ea16e448ec1953703cbb0de78fb7dbdd437b268b10dfe625ac96"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "2:238",
+      "split": "validation",
+      "questions": [
+        {
+          "question": "Which prayer is singled out in particular?",
+          "answer": "the middle prayer"
+        },
+        {
+          "question": "How should they stand before Allah?",
+          "answer": "devoutly obedient"
+        },
+        {
+          "question": "How many units are in the middle prayer?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "39efe2d46a762994415a224e3b4255efdd7637dfcc6a3d6592d4fd62dfd25ac0"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "2:268",
+      "split": "validation",
+      "questions": [
+        {
+          "question": "What does Satan threaten you with?",
+          "answer": "poverty"
+        },
+        {
+          "question": "What does Allah promise?",
+          "answer": "forgiveness from Him and bounty"
+        },
+        {
+          "question": "How much money is promised as bounty?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "a7d9729a60773364aed75b0fbe435beb2d81014e0e2abf11462a898f57065fa5"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "2:45",
+      "split": "validation",
+      "questions": [
+        {
+          "question": "Through what should help be sought?",
+          "answer": "patience and prayer"
+        },
+        {
+          "question": "For whom is it not difficult?",
+          "answer": "the humbly submissive [to Allah]"
+        },
+        {
+          "question": "How many days should one seek help through patience?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "8d3b33e838913788a7d16ffa6ef359ed78a7c112902bb5ff70619cdb5922f71f"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "33:63",
+      "split": "test",
+      "questions": [
+        {
+          "question": "With whom alone is knowledge of the Hour?",
+          "answer": "Allah"
+        },
+        {
+          "question": "What may be near?",
+          "answer": "the Hour"
+        },
+        {
+          "question": "What is the exact date of the Hour?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "ff29507c6e91d3a754d435b4f7207ad12c73f4453c0eef9d412539deea4e09c8"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "38:35",
+      "split": "test",
+      "questions": [
+        {
+          "question": "What does the speaker ask to be granted?",
+          "answer": "a kingdom"
+        },
+        {
+          "question": "How does the speaker address his Lord at the end?",
+          "answer": "the Bestower"
+        },
+        {
+          "question": "What was the name of the capital of that kingdom?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "c609c4af15b59251ff258e39642cc7ad7ae489e161b74582d7e88536a47eca97"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "35:5",
+      "split": "test",
+      "questions": [
+        {
+          "question": "What should not delude mankind?",
+          "answer": "the worldly life"
+        },
+        {
+          "question": "Who should not deceive mankind about Allah?",
+          "answer": "the Deceiver"
+        },
+        {
+          "question": "What age is specified for mankind in this source?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "6b772aae0e4f9ac8079efebaecd53e8678caeea19d7067db75c758d5682842bd"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "29:43",
+      "split": "test",
+      "questions": [
+        {
+          "question": "Who will understand these examples?",
+          "answer": "those of knowledge"
+        },
+        {
+          "question": "To whom are the examples presented?",
+          "answer": "the people"
+        },
+        {
+          "question": "How many examples were presented to the people?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "917d0a89da0617537c65ed586b3cb5a8ff5034cd423d8708b8d15448b43e6533"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "15:49",
+      "split": "test",
+      "questions": [
+        {
+          "question": "Who should be informed?",
+          "answer": "My servants"
+        },
+        {
+          "question": "What two descriptions are given?",
+          "answer": "the Forgiving, the Merciful"
+        },
+        {
+          "question": "How many servants were to be informed?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "7943b07473af63298400647aead9d8af431b45115f5acfa21bdea4627cca47a7"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "19:28",
+      "split": "test",
+      "questions": [
+        {
+          "question": "How is the father described?",
+          "answer": "not a man of evil"
+        },
+        {
+          "question": "How is the mother described?",
+          "answer": "nor was your mother unchaste"
+        },
+        {
+          "question": "What was the occupation of her father?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "a65af242ebd0a8d429195cc4088ddab53c56cabd86c26857c8ae5fe0ae9c27f7"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "23:2",
+      "split": "test",
+      "questions": [
+        {
+          "question": "How are they described during their prayer?",
+          "answer": "humbly submissive"
+        },
+        {
+          "question": "Where did these people perform their prayer?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "5b6cdf70d14ec7f8aec5793a029e2a25b655ae642b3bd94b826d3b9b6a16de5e"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "27:79",
+      "split": "test",
+      "questions": [
+        {
+          "question": "Upon whom should one rely?",
+          "answer": "Allah"
+        },
+        {
+          "question": "What is the addressee upon?",
+          "answer": "the clear truth"
+        },
+        {
+          "question": "What city was the addressee in?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "c391254626b056c6fcc90cad01bf6e860f1fcfc66f0c7199eb298269e57072cc"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "30:50",
+      "split": "test",
+      "questions": [
+        {
+          "question": "What does He give life to after its lifelessness?",
+          "answer": "the earth"
+        },
+        {
+          "question": "To whom will He give life?",
+          "answer": "the dead"
+        },
+        {
+          "question": "How many days did the earth remain lifeless?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "026000b2e157595e02f7051f3538bbab013da2469ebcf52c1127a61a5e87ad64"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "33:71",
+      "split": "test",
+      "questions": [
+        {
+          "question": "What will He forgive?",
+          "answer": "your sins"
+        },
+        {
+          "question": "What has whoever obeys Allah and His Messenger attained?",
+          "answer": "a great attainment"
+        },
+        {
+          "question": "How many sins were forgiven?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "9d30e6189f91af15a456f70f825758cb6584e27a1223f5a06f1b882211d3e53a"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "14:37",
+      "split": "test",
+      "questions": [
+        {
+          "question": "Where were some descendants settled?",
+          "answer": "an uncultivated valley near Your sacred House"
+        },
+        {
+          "question": "What were they to establish?",
+          "answer": "prayer"
+        },
+        {
+          "question": "What was the population of that valley?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "ad18280c1eb1629cd0788433703ddf2885be6fc3d5b21cabb08e34571e620cb9"
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "13:22",
+      "split": "test",
+      "questions": [
+        {
+          "question": "How do they spend from what was provided?",
+          "answer": "secretly and publicly"
+        },
+        {
+          "question": "With what do they prevent evil?",
+          "answer": "good"
+        },
+        {
+          "question": "How much was spent secretly?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "acafee425ac7d84311f79cc80e44957124ef447fd7a3a934c62c8a5b867e250b"
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "150",
+      "split": "train",
+      "questions": [
+        {
+          "question": "What kind of drink was most liked?",
+          "answer": "sweet and cold"
+        },
+        {
+          "question": "Which fruit was used to sweeten the drink?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "c039e85838ce817a9234c435a748a64e03b633dad9dda42d3f2be619328c6670"
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "152",
+      "split": "train",
+      "questions": [
+        {
+          "question": "What water did he drink?",
+          "answer": "Zam-zam water"
+        },
+        {
+          "question": "In what posture did he drink Zam-zam water?",
+          "answer": "standing"
+        },
+        {
+          "question": "At what time of day did he drink Zam-zam water?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "da23bdb6f6fc7ad4e688f8b39e3039ba6a77b7081c6614d067d9d1d444d0e0d1"
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "169",
+      "split": "train",
+      "questions": [
+        {
+          "question": "How is his laugh described?",
+          "answer": "but a smile"
+        },
+        {
+          "question": "How many times did he smile that day?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "b876f40863ed1da3041b98018eded8e7802e5eab6d22f533564180d3b6be5986"
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "176",
+      "split": "validation",
+      "questions": [
+        {
+          "question": "What did he say he would not say anything but?",
+          "answer": "the truth"
+        },
+        {
+          "question": "What is the name of the first companion who asked about joking?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "f3830c6605d03032cac7817c768bc9d0a2483bbbf3bd08ad516cc7fa9037c7ca"
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "230",
+      "split": "test",
+      "questions": [
+        {
+          "question": "On which days was fasting given importance?",
+          "answer": "Mondays and Thursdays"
+        },
+        {
+          "question": "How many hours did each Monday fast last?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "6f39658ac8439fe92103fa8bab4174a20840b4b052173e6c5e325a6dda59651c"
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "232",
+      "split": "test",
+      "questions": [
+        {
+          "question": "For how many days each month did he fast?",
+          "answer": "three days"
+        },
+        {
+          "question": "Which exact calendar month had the Saturday fasts?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "babf9c9bd9001595b659892989b85d765e7796e750c5c6ebe410d7bb6f72addb"
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "322",
+      "split": "test",
+      "questions": [
+        {
+          "question": "What must one be aware of before acquiring knowledge?",
+          "answer": "from whom knowledge is acquired"
+        },
+        {
+          "question": "At what age should one begin acquiring knowledge?",
+          "answer": null
+        }
+      ],
+      "sourceTextSha256": "fc694a5185404d22218b422210c4d00c656f3fdb6fd733ceae553ab9e8c8c67c"
+    }
+  ],
+  "sourceFiles": {
+    "databases/hadith/shamayele_tirmidhi_complete.db": "2f7db927d95645c7e3881a28cfa9cc0ab39e8ee00541bf715bdaf8790dc71cb5",
+    "databases/quran/quran_en.db": "62f20551a8020acbd0785e56c5237a5dd59e6cebdcb0505224244921b157b400"
+  }
+}

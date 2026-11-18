@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import unicodedata
+import hashlib
 import subprocess
 import time
 from collections import Counter, defaultdict, deque
@@ -165,6 +167,65 @@ def balanced_sample(records: list[dict], count: int, seed: int) -> list[dict]:
     return selected
 
 
+def normalized_answer(text: str) -> list[str]:
+    text = unicodedata.normalize("NFKC", text).casefold()
+    text = "".join(" " if unicodedata.category(c).startswith("P") else c for c in text)
+    return [token for token in text.split() if token not in {"a", "an", "the"}]
+
+
+def answer_f1(prediction: str, reference: str) -> float:
+    predicted, expected = normalized_answer(prediction), normalized_answer(reference)
+    if not predicted or not expected:
+        return float(predicted == expected)
+    overlap = sum((Counter(predicted) & Counter(expected)).values())
+    return 2 * overlap / (len(predicted) + len(expected))
+
+
+def reference_answer_score(example: dict, generated: str, accepted: bool) -> dict | None:
+    """Reference matching is stricter than source-span acceptance; abstaining is not an answer."""
+    expected = json.loads(example["messages"][-1]["content"])
+    if expected["contentType"] not in {"answer", "unanswered"}:
+        return None
+    try:
+        output = json.loads(generated)
+    except (ValueError, TypeError):
+        output = {}
+    if not isinstance(output, dict):
+        output = {}
+    answerable = expected["contentType"] == "answer"
+    abstained = output.get("contentType") == "unanswered"
+    correct = accepted and output.get("contentType") == expected["contentType"] and (
+        output.get("answer") == expected["answer"]
+    )
+    references = example.get("referenceAnswers", [expected["answer"]])
+    type_matches = output.get("contentType") == expected["contentType"]
+    normalized_match = accepted and type_matches and any(
+        normalized_answer(output.get("answer", "")) == normalized_answer(ref) for ref in references)
+    f1 = max(answer_f1(output.get("answer", ""), ref) for ref in references) if accepted and type_matches else 0.0
+    return {"answerable": answerable, "abstained": abstained, "referenceMatch": correct,
+            "normalizedReferenceMatch": normalized_match, "tokenF1": f1}
+
+
+def summarize_answer_quality(results: list[dict]) -> dict | None:
+    scores = [r["answerQuality"] for r in results if r.get("answerQuality") is not None]
+    if not scores:
+        return None
+    answerable = [s for s in scores if s["answerable"]]
+    correct = sum(s["referenceMatch"] for s in scores)
+    correct_answers = sum(s["referenceMatch"] for s in answerable)
+    return {
+        "metric": "exact_reference_answer_and_correct_abstention",
+        "samples": len(scores), "referenceMatches": correct,
+        "referenceMatchRate": correct / len(scores),
+        "normalizedReferenceMatchRate": sum(s.get("normalizedReferenceMatch", s["referenceMatch"]) for s in scores) / len(scores),
+        "meanTokenF1": sum(s.get("tokenF1", float(s["referenceMatch"])) for s in scores) / len(scores),
+        "answerableSamples": len(answerable), "correctAnswers": correct_answers,
+        "answerableExactMatchRate": correct_answers / len(answerable) if answerable else 0.0,
+        "abstentions": sum(s["abstained"] for s in scores),
+        "incorrectAbstentions": sum(s["abstained"] for s in answerable),
+    }
+
+
 def main() -> None:
     args = parse_args()
     records = [
@@ -215,10 +276,12 @@ def main() -> None:
             {
                 "id": example["id"],
                 "sourceCollection": example["sourceCollection"],
+                "benchmarkFamily": example.get("benchmarkFamily", "legacy_unreviewed"),
                 "accepted": accepted,
                 "reason": reason,
                 "generated": payload,
                 "durationMs": duration_ms,
+                "answerQuality": reference_answer_score(example, payload, accepted),
             }
         )
         print(
@@ -236,6 +299,11 @@ def main() -> None:
         "accepted": accepted_count,
         "rejected": len(results) - accepted_count,
         "acceptanceRate": accepted_count / len(results) if results else 0.0,
+        "answerQuality": summarize_answer_quality(results),
+        "answerQualityByFamily": {family: summarize_answer_quality([r for r in results if r["benchmarkFamily"] == family])
+                                  for family in sorted({r["benchmarkFamily"] for r in results})},
+        "testDataSha256": hashlib.sha256(args.data.read_bytes()).hexdigest(),
+        "qualityNote": "Contract acceptance is not factual accuracy. Topic-only questions require factual review.",
         "sourceIntegrityViolationsShownToUser": 0,
         "meanDurationMs": round(sum(durations_ms) / len(durations_ms))
         if durations_ms

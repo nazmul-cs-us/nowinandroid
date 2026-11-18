@@ -85,7 +85,12 @@ def encode_example(tokenizer, example: dict, max_length: int) -> dict[str, list[
     if len(completion_ids) >= max_length - 32:
         raise ValueError(f"Completion for {example['id']} exceeds max length")
     prompt_ids = tokenizer(prompt, add_special_tokens=False)["input_ids"]
-    prompt_ids = prompt_ids[: max_length - len(completion_ids)]
+    if len(prompt_ids) + len(completion_ids) > max_length:
+        raise ValueError(
+            f"Example {example['id']} needs {len(prompt_ids) + len(completion_ids)} tokens; "
+            f"max_length={max_length}. Increase the limit or exclude the example; "
+            "never truncate the source or assistant prompt."
+        )
     input_ids = prompt_ids + completion_ids
     return {
         "input_ids": input_ids,

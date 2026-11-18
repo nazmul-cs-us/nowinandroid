@@ -1,0 +1,3 @@
+-r requirements-hf.txt
+# Needed by the DeBERTa SentencePiece tokenizer conversion.
+protobuf==4.25.8

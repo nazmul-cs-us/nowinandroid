@@ -1,0 +1,813 @@
+{
+  "schemaVersion": 2,
+  "reviewStatus": "agent_source_checked_not_expert_reviewed",
+  "scope": "Randomly sampled unseen Quran/Shamail references; literal supplied-source reading only.",
+  "sampling": "24 Quran and 16 Shama'il passages, 80–280 chars, excluding all previous answer benchmark references; split before inference",
+  "seed": 2026111901,
+  "sourceFiles": {
+    "databases/hadith/shamayele_tirmidhi_complete.db": "2f7db927d95645c7e3881a28cfa9cc0ab39e8ee00541bf715bdaf8790dc71cb5",
+    "databases/quran/quran_en.db": "62f20551a8020acbd0785e56c5237a5dd59e6cebdcb0505224244921b157b400"
+  },
+  "cases": [
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "20:123",
+      "split": "validation",
+      "sourceTextSha256": "f71f25279f75f8adaa15d689c792fd499bd6c3cba98f336a16a086658d0720a6",
+      "questions": [
+        {
+          "question": "Who will neither go astray nor suffer?",
+          "answer": "whoever follows My guidance"
+        },
+        {
+          "question": "Where are they told to descend from?",
+          "answer": "Paradise"
+        },
+        {
+          "question": "How many descendants are mentioned?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "165",
+      "split": "validation",
+      "sourceTextSha256": "def0883eb767d7c2ca54a22e1bc8411cd20a58f563666d75dbf45fef731779e7",
+      "questions": [
+        {
+          "question": "How did he speak?",
+          "answer": "clearly, word for word"
+        },
+        {
+          "question": "What did a person sitting in his company remember?",
+          "answer": "what he said"
+        },
+        {
+          "question": "What were the exact words of his speech on that occasion?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "4:13",
+      "split": "validation",
+      "sourceTextSha256": "6ebce791a5fb7a3639bb10a44a210fe9a5212d83d8bd89d71ab57a9e1b9ddbcd",
+      "questions": [
+        {
+          "question": "What flows under the gardens?",
+          "answer": "rivers"
+        },
+        {
+          "question": "For how long will they abide therein?",
+          "answer": "eternally"
+        },
+        {
+          "question": "What is the geographical location of those gardens?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "28:76",
+      "split": "validation",
+      "sourceTextSha256": "1cad50d1d3a36008ff4e70fad509245d7497dcc01aa33d946aa4906d564a085a",
+      "questions": [
+        {
+          "question": "From whose people was Qarun?",
+          "answer": "Moses"
+        },
+        {
+          "question": "What would the keys burden?",
+          "answer": "a band of strong men"
+        },
+        {
+          "question": "What was the total value of his treasures?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "22:70",
+      "split": "validation",
+      "sourceTextSha256": "dbccb7091584e980ee4163a929710e45931b0b84ae19152e0e0eb13091efb1be",
+      "questions": [
+        {
+          "question": "Where is that knowledge recorded?",
+          "answer": "a Record"
+        },
+        {
+          "question": "What does Allah know?",
+          "answer": "what is in the heaven and earth"
+        },
+        {
+          "question": "On what date was the Record written?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "64:16",
+      "split": "validation",
+      "sourceTextSha256": "5c603015f18978d39d1637956121f6a2ccc3a514b6ce2376291408810d1f7d80",
+      "questions": [
+        {
+          "question": "How much should one fear Allah?",
+          "answer": "as much as you are able"
+        },
+        {
+          "question": "From what is the successful person protected?",
+          "answer": "the stinginess of his soul"
+        },
+        {
+          "question": "What exact amount should be spent?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "3:52",
+      "split": "validation",
+      "sourceTextSha256": "e3fa7cd8c2358a99bf27f745b46de19789db5d5f5e3b407375f75bbd26cc168a",
+      "questions": [
+        {
+          "question": "Who said they were supporters for Allah?",
+          "answer": "The disciples"
+        },
+        {
+          "question": "Who asked for supporters?",
+          "answer": "Jesus"
+        },
+        {
+          "question": "What are the names of all the disciples?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "11:98",
+      "split": "validation",
+      "sourceTextSha256": "b726364b55af0c0d47f5957af6a9d5d9927caf32b69a7d6f8157703f79a5fa10",
+      "questions": [
+        {
+          "question": "When will he precede his people?",
+          "answer": "the Day of Resurrection"
+        },
+        {
+          "question": "Where will he lead them?",
+          "answer": "the Fire"
+        },
+        {
+          "question": "What is the name of the person leading them?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "17",
+      "split": "validation",
+      "sourceTextSha256": "c36d5ac1cea02ed80bf05143694726aed05b068a8effecb816417713fbc08ebe",
+      "questions": [
+        {
+          "question": "Where was the Seal of Prophethood?",
+          "answer": "Rasulullah Sallallahu 'Alayhi Wasallam's back"
+        },
+        {
+          "question": "How was the Seal described?",
+          "answer": "a piece of raised flesh"
+        },
+        {
+          "question": "How many centimetres wide was the Seal?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "2:277",
+      "split": "validation",
+      "sourceTextSha256": "a908e5ba075e025d6aeab2d15ae0b7059d70c43d5a0b5e398ac76b6078bd31b7",
+      "questions": [
+        {
+          "question": "With whom will they have their reward?",
+          "answer": "their Lord"
+        },
+        {
+          "question": "What charitable payment is mentioned?",
+          "answer": "zakah"
+        },
+        {
+          "question": "What exact monetary reward is specified?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "294",
+      "split": "validation",
+      "sourceTextSha256": "8fd996adab539217371b6259da6ad95031770424eb9758e4ca41fb5d6facbc44",
+      "questions": [
+        {
+          "question": "At what age did he pass away?",
+          "answer": "sixty three years"
+        },
+        {
+          "question": "Who reports his age in this source?",
+          "answer": "'Aayeshah Radiyallahu 'Anha"
+        },
+        {
+          "question": "In which month was he born?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "100",
+      "split": "validation",
+      "sourceTextSha256": "afcf63b758c280e6d2a45ce2ca77a9849595653fb0c719c5023aeac10c2497a4",
+      "questions": [
+        {
+          "question": "What does he say he does not do when having meals?",
+          "answer": "lean"
+        },
+        {
+          "question": "Who reports this narration?",
+          "answer": "Abu Juhayafah radiyallahu anhu"
+        },
+        {
+          "question": "Which food was being eaten?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "51",
+      "split": "validation",
+      "sourceTextSha256": "4ce279be13a5fb8265df4f6e787ff994d95b8224990e6c5a1f2956ab7d95b894",
+      "questions": [
+        {
+          "question": "What colour were the sheets?",
+          "answer": "green"
+        },
+        {
+          "question": "How many sheets were mentioned?",
+          "answer": "two"
+        },
+        {
+          "question": "What fabric were the sheets made from?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "33:57",
+      "split": "validation",
+      "sourceTextSha256": "a4640d96b99c22e5eebbbe5c2595ad51f2f938bad58d0a76b26567aec3a75c64",
+      "questions": [
+        {
+          "question": "What punishment was prepared?",
+          "answer": "a humiliating punishment"
+        },
+        {
+          "question": "Where were they cursed?",
+          "answer": "this world and the Hereafter"
+        },
+        {
+          "question": "In which year was the curse pronounced?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "6:24",
+      "split": "validation",
+      "sourceTextSha256": "607c7a155e9d135abedebacf000d5ae5b59130b88b3d330ffbd285d39c8fe6b7",
+      "questions": [
+        {
+          "question": "About whom will they lie?",
+          "answer": "themselves"
+        },
+        {
+          "question": "What will be lost from them?",
+          "answer": "what they used to invent"
+        },
+        {
+          "question": "Which specific object had they invented?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "304",
+      "split": "validation",
+      "sourceTextSha256": "6589db235ad8f367ebcc9bab63325696ac4e281102ef47cf327b51f8a321e87e",
+      "questions": [
+        {
+          "question": "On what day did he pass away?",
+          "answer": "Monday"
+        },
+        {
+          "question": "Who reports the day in this source?",
+          "answer": "'Aayeshah Radiyallahu 'Anha"
+        },
+        {
+          "question": "What was the calendar date of his birth?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "81",
+      "split": "validation",
+      "sourceTextSha256": "0f18552b8ee6bdd248c3b657ab9ec61462c94c1875f0c7c30070c8a10f43823d",
+      "questions": [
+        {
+          "question": "What was the sword handle made of?",
+          "answer": "silver"
+        },
+        {
+          "question": "Who reports the material of the handle?",
+          "answer": "Hazrat Anas radiyallahu anhu"
+        },
+        {
+          "question": "What was the price of the sword?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "2:104",
+      "split": "validation",
+      "sourceTextSha256": "487545fea59657bd8573a2a5f75818e1345e4410f0c128fca7c00fe1c4eb17c1",
+      "questions": [
+        {
+          "question": "What should the believers say instead of Ra'ina?",
+          "answer": "Unthurna"
+        },
+        {
+          "question": "What punishment is mentioned for the disbelievers?",
+          "answer": "a painful punishment"
+        },
+        {
+          "question": "How many years does that punishment last?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "51:23",
+      "split": "validation",
+      "sourceTextSha256": "8cb4f99f0a6464f4b21a51d9c96413b1cae555916b6ad47ff2e69ca14c909363",
+      "questions": [
+        {
+          "question": "What familiar certainty is used in the comparison?",
+          "answer": "you are speaking"
+        },
+        {
+          "question": "Of what is He the Lord?",
+          "answer": "the heaven and earth"
+        },
+        {
+          "question": "On which date was this statement made?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "272",
+      "split": "validation",
+      "sourceTextSha256": "14ebaba89e56851fa4a77da8e481d4f0849fa9be7d4ce89d35c7719e1587f7e9",
+      "questions": [
+        {
+          "question": "What did he never say to a request?",
+          "answer": "No"
+        },
+        {
+          "question": "Who reports this narration?",
+          "answer": "Jaabir Radiyallahu 'Anhu"
+        },
+        {
+          "question": "Who made the particular request?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "11:28",
+      "split": "test",
+      "sourceTextSha256": "ae3969b83bb1126e26638f6ed7ce746a511638a55bb2c48ca4b30cf3ad198494",
+      "questions": [
+        {
+          "question": "From whom does the clear evidence come?",
+          "answer": "my Lord"
+        },
+        {
+          "question": "What was given from Himself?",
+          "answer": "mercy"
+        },
+        {
+          "question": "What is the name of the person speaking?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "10:17",
+      "split": "test",
+      "sourceTextSha256": "4aefc3723ff95f3c703383897afd0e9322e750269efad43e4c51267dba1af0f4",
+      "questions": [
+        {
+          "question": "Who will not succeed?",
+          "answer": "the criminals"
+        },
+        {
+          "question": "What does the unjust person invent?",
+          "answer": "a lie about Allah"
+        },
+        {
+          "question": "In what year will the criminals be punished?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "68:49",
+      "split": "test",
+      "sourceTextSha256": "2219f8c36725018ff360dcd90b9502b5959349bc399bea64072114b876fe3c50",
+      "questions": [
+        {
+          "question": "Where would he have been thrown?",
+          "answer": "the naked shore"
+        },
+        {
+          "question": "How would he have been described when thrown there?",
+          "answer": "censured"
+        },
+        {
+          "question": "What is the name of the person in this passage?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "98",
+      "split": "test",
+      "sourceTextSha256": "7dc2fdc0bdcd6f80355375d87d9297863cc5a8b740b8566974a24284f03540c3",
+      "questions": [
+        {
+          "question": "On what did he lean?",
+          "answer": "a pillow"
+        },
+        {
+          "question": "On which side was the pillow?",
+          "answer": "his left side"
+        },
+        {
+          "question": "What colour was the pillow?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "13:21",
+      "split": "test",
+      "sourceTextSha256": "14f9f970a359b1ba2f4725bd6b1d51a2c396e7f10e0af9db8296b1a645949496",
+      "questions": [
+        {
+          "question": "Whom do they fear?",
+          "answer": "their Lord"
+        },
+        {
+          "question": "Of what are they afraid?",
+          "answer": "the evil of [their] account"
+        },
+        {
+          "question": "On what date will their account occur?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "4:65",
+      "split": "test",
+      "sourceTextSha256": "8dc21ae32dad1311b5f6c3e15479d43c25368f0aaa0abacc6e03a809f8bdccfb",
+      "questions": [
+        {
+          "question": "Whom must they make judge?",
+          "answer": "Muhammad"
+        },
+        {
+          "question": "How should they submit?",
+          "answer": "[full, willing] submission"
+        },
+        {
+          "question": "In which city did this dispute take place?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "19",
+      "split": "test",
+      "sourceTextSha256": "c47f43330bc2747f7ba524a62c2b92b4ce5ca388675a509e0f82350eb2d28760",
+      "questions": [
+        {
+          "question": "How far did his hair reach?",
+          "answer": "half of his ears"
+        },
+        {
+          "question": "Who reports the length of the hair?",
+          "answer": "Anas R.A."
+        },
+        {
+          "question": "What was the exact length in centimetres?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "13",
+      "split": "test",
+      "sourceTextSha256": "75f6147ca1f2cc093b797e52a14392ad67d899da5c5b1d424f15916c5b31ad45",
+      "questions": [
+        {
+          "question": "Where was the Seal of Prophethood located?",
+          "answer": "between his two shoulders"
+        },
+        {
+          "question": "What was its size compared with?",
+          "answer": "that of a pigeon's egg"
+        },
+        {
+          "question": "How many centimetres across was it?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "21:56",
+      "split": "test",
+      "sourceTextSha256": "554a98c66b1e7b9a1094448a996ff4f9ddada728936adfe1a807b1253d4e9d30",
+      "questions": [
+        {
+          "question": "Who created the heavens and earth?",
+          "answer": "the Lord of the heavens and the earth"
+        },
+        {
+          "question": "What does the speaker say he is one of?",
+          "answer": "those who testify"
+        },
+        {
+          "question": "What is the name of the speaker?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "16:63",
+      "split": "test",
+      "sourceTextSha256": "79bb7ac63767617ce0783bdd8de9aab085b78efda9389f954a2cff84a1e0aafb",
+      "questions": [
+        {
+          "question": "Who made their deeds attractive to them?",
+          "answer": "Satan"
+        },
+        {
+          "question": "What punishment will they have?",
+          "answer": "a painful punishment"
+        },
+        {
+          "question": "Which messengers are named in this passage?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "227",
+      "split": "test",
+      "sourceTextSha256": "cc3ae03ee10d8a5501b3222a5a3eeb597a4213b908befd856015ed4d0dc72d04",
+      "questions": [
+        {
+          "question": "Which two months are named?",
+          "answer": "Sha'baan and Ramadhaan"
+        },
+        {
+          "question": "How many consecutive months are mentioned?",
+          "answer": "two"
+        },
+        {
+          "question": "How many hours did each fast last?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "153",
+      "split": "test",
+      "sourceTextSha256": "fc29fcf43273a30ff99115db67762abaa5022e1bffd44ddcd47eae9534ba12b9",
+      "questions": [
+        {
+          "question": "What did he drink?",
+          "answer": "water"
+        },
+        {
+          "question": "In what postures was he seen drinking?",
+          "answer": "standing and also whilst sitting"
+        },
+        {
+          "question": "At what time of day did he drink?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "28",
+      "split": "test",
+      "sourceTextSha256": "f5209473133cf7478a1e09b14e606920b21f2eee3d10f59d2f8bcf45f469b5de",
+      "questions": [
+        {
+          "question": "With which side did he like to begin?",
+          "answer": "the right"
+        },
+        {
+          "question": "What did he do to his hair?",
+          "answer": "combing his hair"
+        },
+        {
+          "question": "What colour were his shoes?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "40:13",
+      "split": "test",
+      "sourceTextSha256": "42a4569ad588a3a273b4807c686d66d0053947caa12891f6ea31df32fac2675e",
+      "questions": [
+        {
+          "question": "From where is provision sent down?",
+          "answer": "the sky"
+        },
+        {
+          "question": "Who will remember?",
+          "answer": "he who turns back [in repentance]"
+        },
+        {
+          "question": "What quantity of provision was sent?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "301",
+      "split": "test",
+      "sourceTextSha256": "71eace9a91563343c0456bb8d7eed0911cffc4fcaca6cb51304e0fe00823d16f",
+      "questions": [
+        {
+          "question": "Who kissed his forehead?",
+          "answer": "Abubakr Siddiqe"
+        },
+        {
+          "question": "What part was kissed?",
+          "answer": "the forehead"
+        },
+        {
+          "question": "On which calendar date was he buried?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "23:96",
+      "split": "test",
+      "sourceTextSha256": "415464e933806daa283127f04a9379b233fc16e21ee8f09cba44a4744573adf7",
+      "questions": [
+        {
+          "question": "By what means should evil be repelled?",
+          "answer": "what is best"
+        },
+        {
+          "question": "What should be repelled?",
+          "answer": "[their] evil"
+        },
+        {
+          "question": "What specific act of evil was committed?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/hadith/shamayele_tirmidhi_complete.db",
+      "reference": "31",
+      "split": "test",
+      "sourceTextSha256": "812c7c76c3348cb8c75c8d6805e43302af2052b3863f2306755fed2630700ade",
+      "questions": [
+        {
+          "question": "What upper count of white hairs is mentioned?",
+          "answer": "fourteen"
+        },
+        {
+          "question": "Where were the white hairs counted?",
+          "answer": "the head and beard"
+        },
+        {
+          "question": "Who counted the hairs on the previous day?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "52:43",
+      "split": "test",
+      "sourceTextSha256": "a8ad4c1dae9f5fd38595e110a8cc80c90af7424b10494e6df2590e94c3beb475",
+      "questions": [
+        {
+          "question": "Which deity is named?",
+          "answer": "Allah"
+        },
+        {
+          "question": "Above what is Allah exalted?",
+          "answer": "whatever they associate with Him"
+        },
+        {
+          "question": "How many deities did those people associate with Him?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "74:49",
+      "split": "test",
+      "sourceTextSha256": "05c3b0d52e2399e80687b512a2c3ee21ec739a9d81fa37e4becd7e23d3e93552",
+      "questions": [
+        {
+          "question": "From what are they turning away?",
+          "answer": "the reminder"
+        },
+        {
+          "question": "What are they doing in relation to the reminder?",
+          "answer": "turning away"
+        },
+        {
+          "question": "What is the name of the person who delivered the reminder?",
+          "answer": null
+        }
+      ]
+    },
+    {
+      "sourceKey": "databases/quran/quran_en.db",
+      "reference": "98:8",
+      "split": "test",
+      "sourceTextSha256": "86329624af416405a6ec3ebbe27dbd2c6763d2fdfd8fb9f086928882806b0ce7",
+      "questions": [
+        {
+          "question": "What is their reward?",
+          "answer": "gardens of perpetual residence"
+        },
+        {
+          "question": "How long will they abide?",
+          "answer": "forever"
+        },
+        {
+          "question": "What species of trees are in those gardens?",
+          "answer": null
+        }
+      ]
+    }
+  ]
+}

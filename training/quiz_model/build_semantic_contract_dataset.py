@@ -14,7 +14,10 @@ import json
 import random
 from pathlib import Path
 
-from prepare_hf_dataset import SYSTEM_PROMPT
+try:
+    from .prepare_hf_dataset import SYSTEM_PROMPT
+except ImportError:
+    from prepare_hf_dataset import SYSTEM_PROMPT
 
 KINDS = (
     "person",
