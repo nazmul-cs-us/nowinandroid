@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "purpose": "grounded_answer_contract_instruction_tuning",
+  "baseModel": "Qwen/Qwen2.5-0.5B-Instruct",
+  "religiousFactsAdded": false,
+  "runtimeKnowledgePolicy": "verified_source_envelope_only",
+  "answerPolicy": "exact_contiguous_source_spans_or_unanswered",
+  "counts": {
+    "train": 544,
+    "validation": 70,
+    "test": 71
+  },
+  "countsByContentType": {
+    "answer": 630,
+    "unanswered": 55
+  },
+  "corpusPassagesAvailable": 13810
+}

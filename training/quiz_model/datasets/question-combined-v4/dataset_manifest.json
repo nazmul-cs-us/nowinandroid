@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "purpose": "question_v5_training",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "counts": {
+    "train": 5393,
+    "validation": 678,
+    "test": 647
+  },
+  "countsBySource": {
+    "sahih_al-bukhari": 406,
+    "verified_local_database": 330,
+    "quran": 269,
+    "shamai'l_at-tirmidhi": 25,
+    "dorar_arabia": 743,
+    "dorar_figh": 1001,
+    "dorar_tafseer": 2362,
+    "dorar_akida": 760,
+    "dorar_history": 415,
+    "dorar_hadith": 407
+  }
+}

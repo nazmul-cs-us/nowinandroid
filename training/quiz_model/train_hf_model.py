@@ -26,6 +26,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-length", type=int, default=768)
     parser.add_argument("--seed", type=int, default=20261005)
     parser.add_argument(
+        "--bf16",
+        action="store_true",
+        help="Train with bfloat16 mixed precision; halves the MPS memory "
+        "footprint and avoids the fp32 allocator churn that makes "
+        "variable-length batches 10x slower on Apple Silicon",
+    )
+    parser.add_argument(
+        "--fixed-length-padding",
+        action="store_true",
+        help="Pad every batch to --max-length. Identical losses (padding is "
+        "label-masked) but every tensor has the same shape, which keeps the "
+        "MPS allocator from thrashing and step time stable.",
+    )
+    parser.add_argument(
         "--cpu",
         action="store_true",
         help="Force CPU training; avoids the GPU contention that makes the desktop unresponsive",
@@ -120,7 +134,9 @@ def main() -> None:
         args.data_dir / "validation.jsonl", args.max_eval_samples, args.seed + 1
     )
 
-    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=torch.float32)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model, torch_dtype=torch.bfloat16 if args.bf16 else torch.float32
+    )
     model.config.use_cache = False
     model = get_peft_model(
         model,
@@ -142,7 +158,10 @@ def main() -> None:
     )
 
     def collate(batch: list[dict[str, list[int]]]) -> dict[str, torch.Tensor]:
-        length = max(len(item["input_ids"]) for item in batch)
+        if args.fixed_length_padding:
+            length = args.max_length
+        else:
+            length = max(len(item["input_ids"]) for item in batch)
         inputs, masks, labels = [], [], []
         for item in batch:
             padding = length - len(item["input_ids"])
@@ -176,6 +195,7 @@ def main() -> None:
         dataloader_pin_memory=False,
         seed=args.seed,
         use_cpu=args.cpu,
+        bf16=args.bf16,
     )
     trainer = Trainer(
         model=model,
