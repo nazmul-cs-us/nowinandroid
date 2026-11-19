@@ -420,6 +420,11 @@ phrase, corpus retrieval, app-wide accuracy, or Android performance.
 
 ## Versioned reader release bundle
 
+Published model artifacts use a `-vN` suffix immediately before the file extension
+(for example, `deenly-source-reader-v1.tar.gz`) and a matching versioned CDN
+directory. A new set of weights, tokenizer, or calibration gets a new version;
+published versions are retained so installed clients keep their pinned files.
+
 `package_source_reader.py` packages only a qualified, checksum-matched RoBERTa
 source-quote reader. It binds the safetensors weights to the frozen calibration,
 holdout report, and assessment; includes tokenizer files, attribution, and per-file

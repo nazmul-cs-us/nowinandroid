@@ -8,7 +8,9 @@
   "artifact": {
     "fileName": "deenly-source-reader-v1.tar.gz",
     "sizeBytes": 460391132,
-    "sha256": "a0721bd1042667838fdd2e929adcabc4b63b6134f8fd8d73e2fcdad6cd268a7a"
+    "sha256": "a0721bd1042667838fdd2e929adcabc4b63b6134f8fd8d73e2fcdad6cd268a7a",
+    "cdnKey": "models/now_nudge/deenly-source-reader-v1/deenly-source-reader-v1.tar.gz",
+    "url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev/models/now_nudge/deenly-source-reader-v1/deenly-source-reader-v1.tar.gz"
   },
   "modelWeightsSha256": "6100dc747e83685ec812727cf56c47cc9feb00381d9a22fe7db9994363483050",
   "calibrationSha256": "3a138c4bdda23b0b6a58cd07982e43201fd9c750a612dd1a28651ed7de090ed9",
@@ -25,8 +27,10 @@
   },
   "delivery": {
     "activeInApp": false,
-    "published": false,
-    "requires": "A compatible extractive-reader runtime and tokenizer; cannot replace GGUF weights."
+    "published": true,
+    "requires": "A compatible extractive-reader runtime and tokenizer; cannot replace GGUF weights.",
+    "publishedAt": "2026-11-19T04:28:00.103338+00:00",
+    "verification": "Full public CDN download matched size and SHA-256"
   },
   "limitations": [
     "Small agent-checked source-reading pilot; no end-to-end retrieval or Android results.",
