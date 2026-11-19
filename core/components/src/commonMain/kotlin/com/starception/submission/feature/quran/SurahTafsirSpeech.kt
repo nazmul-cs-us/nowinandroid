@@ -142,15 +142,17 @@ fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, surahTitle: Str
                 }, modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(0.dp), contentPadding = PaddingValues(vertical = 4.dp),
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
-                    Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        if (playing) "Pause surah tafsir" else if (paused) "Resume surah tafsir" else "Play full surah tafsir",
-                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+                        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            if (playing) "Pause surah tafsir" else if (paused) "Resume surah tafsir" else "Play full surah tafsir",
+                            modifier = Modifier.padding(8.dp).size(18.dp))
+                    }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(when { preparing -> "Preparing tafsir…"; playing -> "Listening to tafsir"; paused -> "Tafsir paused"; else -> "Play full surah tafsir" },
                             style = MaterialTheme.typography.labelLarge)
                         Text(ayahs?.let { if (it.first == it.last) "Ayah ${it.first} of ${player.totalAyahs}" else "Ayahs ${it.first}–${it.last} of ${player.totalAyahs}" }
-                            ?: if (state.finished) "Finished · Listen again" else "Listen while you read",
+                            ?: if (state.finished) "Finished · Listen again" else "${player.totalAyahs} ayahs",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

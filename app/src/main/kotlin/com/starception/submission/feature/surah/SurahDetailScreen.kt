@@ -1185,6 +1185,7 @@ fun SurahDetailScreen(
                                     loadText = { inlineTafsirRepository?.text(chapter, verse)
                                         ?: viewModel.inlineTafsirText(chapter, verse, selectedTafseerBook) },
                                     speechPlayerFactory = inlineSpeechFactory, embedded = true,
+                                    narrating = chapter == speechSurah && tafsirNarration?.contains(verse) == true,
                                     missingAsset = { reload -> MissingTafsirAssetCard(inlineEdition) {
                                         inlineTafsirRevision++; reload()
                                     } })
@@ -2134,7 +2135,8 @@ fun SurahDetailScreen(
         // the second showing the hint starts life already collapsed to the
         // grabber so re-entries stop nagging.
         var swipeDownHintShows by remember { mutableStateOf(0) }
-        LaunchedEffect(scrollState) {
+        LaunchedEffect(scrollState, showInlineTafsir) {
+            if (showInlineTafsir) return@LaunchedEffect
             // One peek per screen visit, on the first entry into fullscreen
             // Mushaf. Deliberately NOT keyed on the fullscreen flag: the peek
             // itself makes the header visible mid-animation, and a keyed
@@ -2156,7 +2158,7 @@ fun SurahDetailScreen(
                 )
             }
         }
-        if (uiState is SurahDetailUiState.Success && !showFloatingToolbar) {
+        if (uiState is SurahDetailUiState.Success && !showFloatingToolbar && !showInlineTafsir) {
             val item0BottomPx = scrollState.layoutInfo.visibleItemsInfo
                 .firstOrNull { it.index == 0 }
                 ?.let { it.offset + it.size }
@@ -8419,8 +8421,6 @@ private fun AyahTrackItem(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = horizontalAlignment,
             ) {
-                if (studyMode) Text("Arabic", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary)
                 // Arabic text with user-selected font and size
                 val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
 

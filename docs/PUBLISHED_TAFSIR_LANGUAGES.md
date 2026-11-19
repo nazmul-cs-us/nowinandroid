@@ -198,14 +198,13 @@ already finished setup can still download editions through Content & Storage.
 
 Bengali source quality, Arabic quotation coverage and compatibility details are in [BENGALI_TAFSIR_SOURCES.md](BENGALI_TAFSIR_SOURCES.md).
 
-The inline reader uses an open reading canvas with a text-based edition selector,
-source attribution and lightweight audio controls. Arabic and translation labels,
-serif commentary typography and subtle rules keep the reading hierarchy clear.
-Commentary retains source paragraphs and mixed-script Arabic/Bengali text,
-respects reader font scaling, and remains part of the surah’s single scroll container.
+Surah Details groups each Arabic ayah with its translation and tafsir. The reading
+column stays at most 680 dp wide on tablets. Each explanation shows up to five
+lines, with **Read full tafsir** and **Show less** for longer passages. During
+full-surah playback the current passage opens automatically. The original source
+paragraphs, mixed scripts and reader font scaling apply in both views.
 
-When tafsir is enabled, each ayah’s Arabic, available translation and explanation
-form one continuous reading section, in that order, with clear section labels. Translation is shown
-temporarily in this study layout; hiding tafsir restores the saved translation
-visibility preference. The full-surah listening action is a compact audio row; pause/resume, ayah progress
-and Stop stay inline during playback.
+The edition picker, source credit and full-surah playback controls appear together
+at the beginning. Each ayah also has its own listening control. Opening tafsir
+shows the available translation. Closing tafsir restores the saved translation
+preference.

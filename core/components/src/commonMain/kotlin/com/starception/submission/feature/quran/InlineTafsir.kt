@@ -1,6 +1,10 @@
 package com.starception.submission.feature.quran
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MenuBook
@@ -26,29 +30,26 @@ fun InlineTafsirHeader(book: String, onSelect: (String) -> Unit, onHide: () -> U
     val edition = PublishedTafsirs.forBook(book)
     val uri = LocalUriHandler.current
     val colors = MaterialTheme.colorScheme
-    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("TAFSIR", modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, color = colors.primary)
-            IconButton(onClick = onHide, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.Close, "Hide tafsir", tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.widthIn(max = 680.dp).fillMaxWidth()
+            .background(colors.surfaceContainerLow)
+            .padding(horizontal = 20.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.MenuBook, null, tint = colors.primary, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(12.dp))
+                Box(Modifier.weight(1f)) { TafsirBookPicker(book, onSelect) }
+                IconButton(onClick = onHide) { Icon(Icons.Default.Close, "Hide tafsir") }
             }
-        }
-        TafsirBookPicker(book, onSelect)
-        if (edition != null) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(edition.attribution, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall,
-                color = colors.onSurfaceVariant)
-            TextButton(onClick = { uri.openUri(edition.sourceUrl) }, contentPadding = PaddingValues(0.dp)) {
-                Text("Source", style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.width(4.dp))
-                Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(12.dp))
+            if (edition != null) Row(
+                Modifier.clickable(onClickLabel = "Open source") { uri.openUri(edition.sourceUrl) }
+                    .heightIn(min = 48.dp).padding(start = 36.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(edition.attribution, modifier = Modifier.weight(1f, fill = false),
+                    style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                Icon(Icons.Default.OpenInNew, null, tint = colors.primary, modifier = Modifier.size(14.dp))
             }
-        }
-        playback?.let {
-            HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.4f))
-            it()
+            playback?.invoke()
         }
     }
 }
@@ -57,12 +58,14 @@ fun InlineTafsirHeader(book: String, onSelect: (String) -> Unit, onHide: () -> U
 @Composable
 fun InlineTafsirCommentary(surah: Int, ayah: Int, book: String, revision: Int = 0,
     loadText: suspend () -> String, speechPlayerFactory: () -> TafsirSpeechPlayer,
-    missingAsset: @Composable (() -> Unit) -> Unit, fontScale: Float = 1f, embedded: Boolean = false) {
+    missingAsset: @Composable (() -> Unit) -> Unit, fontScale: Float = 1f, embedded: Boolean = false, narrating: Boolean = false) {
     key(surah, ayah, book, revision) {
         var body by remember { mutableStateOf<String?>(null) }
         var failed by remember { mutableStateOf(false) }
         var missing by remember { mutableStateOf(false) }
         var retry by remember { mutableIntStateOf(0) }
+        var expanded by rememberSaveable { mutableStateOf(false) }
+        var overflows by remember { mutableStateOf(false) }
         val read by rememberUpdatedState(loadText)
         LaunchedEffect(retry) {
             body = null; failed = false; missing = false
@@ -73,10 +76,10 @@ fun InlineTafsirCommentary(surah: Int, ayah: Int, book: String, revision: Int = 
         }
         val language = PublishedTafsirs.forBook(book)?.languageCode ?: "ar"
         Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = if (embedded) 0.dp else 16.dp, vertical = if (embedded) 0.dp else 12.dp),
-            shape = RoundedCornerShape(if (embedded) 0.dp else 24.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = if (embedded) 20.dp else 16.dp, vertical = if (embedded) 0.dp else 12.dp),
+            shape = RoundedCornerShape(if (embedded) 12.dp else 24.dp),
             border = if (embedded) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-            colors = CardDefaults.cardColors(containerColor = if (embedded) androidx.compose.ui.graphics.Color.Transparent
+            colors = CardDefaults.cardColors(containerColor = if (embedded) MaterialTheme.colorScheme.surfaceContainerLow
                 else MaterialTheme.colorScheme.surfaceContainerLowest),
         ) {
             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(if (embedded) 12.dp else 18.dp)) {
@@ -88,8 +91,8 @@ fun InlineTafsirCommentary(surah: Int, ayah: Int, book: String, revision: Int = 
                             color = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(if (embedded) "Tafsir" else "Tafsir · Ayah $ayah",
-                            style = if (embedded) MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif) else MaterialTheme.typography.labelLarge,
+                        Text(if (embedded) "Tafsir · $surah:$ayah" else "Tafsir · Ayah $ayah",
+                            style = if (embedded) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
                             fontWeight = if (embedded) FontWeight.Medium else FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                         if (!embedded) Text(PublishedTafsirs.forBook(book)?.languageName ?: "العربية", style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -108,11 +111,19 @@ fun InlineTafsirCommentary(surah: Int, ayah: Int, book: String, revision: Int = 
                     body == null -> LinearProgressIndicator(Modifier.fillMaxWidth())
                     else -> SelectionContainer {
                         Text(body.orEmpty(), modifier = Modifier.fillMaxWidth(),
+                            maxLines = if (embedded && !expanded && !narrating) 5 else Int.MAX_VALUE,
+                            overflow = TextOverflow.Ellipsis,
+                            onTextLayout = { if (embedded && !expanded && !narrating) overflows = it.hasVisualOverflow },
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontSize = (18f * fontScale).sp, lineHeight = ((if (embedded) 32f else 30f) * fontScale).sp,
                                 fontFamily = if (embedded) FontFamily.Serif else MaterialTheme.typography.bodyLarge.fontFamily,
                                 textDirection = TextDirection.Content),
                             textAlign = if (language == "ar" || language == "ur") TextAlign.Right else TextAlign.Start)
+                    }
+                }
+                if (embedded && !narrating && body != null && (expanded || overflows)) {
+                    TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                        Text(if (expanded) "Show less" else "Read full tafsir")
                     }
                 }
             }

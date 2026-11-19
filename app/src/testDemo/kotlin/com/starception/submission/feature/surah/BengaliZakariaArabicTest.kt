@@ -52,6 +52,7 @@ class BengaliZakariaArabicTest {
             override fun stop() = Unit
             override fun release() = Unit
         }
+        val narrating = mutableStateOf(false)
         compose.setContent {
             val density = androidx.compose.ui.platform.LocalDensity.current
             CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides
@@ -66,7 +67,6 @@ class BengaliZakariaArabicTest {
                         }) }
                         item { AyahNarrationGroup(4, false, studyMode = true) {
                             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Arabic", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                                 Text("أَوْ زِدْ عَلَيْهِ وَرَتِّلِ الْقُرْآنَ تَرْتِيلًا", modifier = Modifier.fillMaxWidth(),
                                     style = MaterialTheme.typography.headlineSmall,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Right)
@@ -74,8 +74,7 @@ class BengaliZakariaArabicTest {
                                 Text("অথবা তার চেয়েও একটু বাড়ান। আর কুরআন তিলাওয়াত করুন ধীরে ধীরে সুস্পষ্টভাবে।",
                                     style = MaterialTheme.typography.bodyLarge)
                             }
-                            HorizontalDivider(Modifier.padding(horizontal = 20.dp))
-                            InlineTafsirCommentary(73, 4, "zakaria_bn", loadText = { repo.text(73, 4) }, embedded = true,
+                            InlineTafsirCommentary(73, 4, "zakaria_bn", loadText = { repo.text(73, 4) }, embedded = true, narrating = narrating.value,
                                 speechPlayerFactory = { silent }, missingAsset = { Text("Download required") })
                         } }
                     } }
@@ -85,12 +84,19 @@ class BengaliZakariaArabicTest {
         compose.waitForIdle()
         compose.waitUntil(5000) { compose.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("tafsir-ayah-4").assertExists()
-        compose.onNodeWithText("Arabic").assertExists()
         compose.onNodeWithText("Translation").assertExists()
         compose.onNodeWithText(text).assertExists()
         compose.onNodeWithText("Play full surah tafsir").assertIsDisplayed()
         compose.onNodeWithContentDescription("Hide tafsir").assertIsDisplayed()
         compose.onRoot().captureRoboImage(if (dark) "src/testDemo/screenshots/bengali_tafsir_dark_large.png"
             else "src/testDemo/screenshots/bengali_zakaria_arabic.png")
+        compose.onNodeWithText("Read full tafsir").performScrollTo().performClick()
+        compose.onNodeWithText("Show less").performScrollTo().performClick()
+        compose.onNodeWithText("Read full tafsir").assertExists()
+        compose.runOnIdle { narrating.value = true }
+        compose.onNodeWithText("Read full tafsir").assertDoesNotExist()
+        compose.onNodeWithText(text).assertExists()
+        compose.runOnIdle { narrating.value = false }
+        compose.onNodeWithText("Read full tafsir").assertExists()
     }
 }

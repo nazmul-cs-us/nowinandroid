@@ -1295,6 +1295,7 @@ internal fun QuranDetailScreen(
                                         com.starception.submission.feature.quran.InlineTafsirCommentary(number, verse.numberInSurah,
                                             inlineBook, inlineTafsirRevision,
                                             fontScale = arabicFontSize / 41f, embedded = true,
+                                            narrating = tafsirNarration?.contains(verse.numberInSurah) == true,
                                             loadText = {
                                                 inlineRepository?.text(number, verse.numberInSurah) ?: run {
                                                     val data = tafseerRepository.getTafseer(number, verse.numberInSurah)
@@ -1647,8 +1648,6 @@ private fun QuranAyahReadingBlock(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = horizontalAlignment,
             ) {
-                if (studyMode) Text("Arabic", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary)
                 Text(
                     text = tajweedAnnotatedString(verse.arabicText, tajweedAnnotations),
                     modifier = Modifier.fillMaxWidth(),
