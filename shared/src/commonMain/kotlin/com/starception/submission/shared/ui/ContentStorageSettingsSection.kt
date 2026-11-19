@@ -98,6 +98,7 @@ fun ContentStorageSettingsSection(
 ) {
     val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
     val groupedCategories = state.categories
+        .filterNot { com.starception.submission.feature.quran.PublishedTafsirs.isRetiredCategory(it.categoryKey) }
         .groupBy { storageCategoryGroup(it.categoryKey) }
         .entries
         .sortedBy { storageGroupOrder(it.key) }

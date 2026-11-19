@@ -14,11 +14,6 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-/** Published Bengali text only: errors never fall back to Arabic or machine-generated Bengali. */
-@Composable
-fun BengaliIbnKathirContent(surah: Int, ayah: Int, repository: BengaliIbnKathirRepository, modifier: Modifier = Modifier) =
-    PublishedTafsirContent(surah, ayah, PublishedTafsirs.bengali, repository, modifier)
-
 @Composable
 fun PublishedTafsirContent(surah: Int, ayah: Int, edition: PublishedTafsirEdition,
     repository: PublishedTafsirRepository, modifier: Modifier = Modifier, scrollInternally: Boolean = true,

@@ -27,11 +27,12 @@ edition reproduce the omissions.
   Attribution and the original source are included in the downloadable NOTICE;
   the app does not label the underlying text public domain.
 
-This is a separately named commentary, not an edited Ibn Kathir edition.
-New Bengali language defaults and first-run downloads use Zakaria. Existing
-explicit book selections, including iOS index 4 for Ibn Kathir, remain intact;
-readers can choose either source in the tafsir selector. Index 14 identifies
-Zakaria, with separate cache paths and a separate Content & Storage category.
+Zakaria is the Bengali commentary available in the app. The incomplete Bengali
+Ibn Kathir option and download category have been retired. Saved `ibn_kathir_bn`
+book keys and iOS index 4 migrate to Zakaria (index 14), including when the Quran
+translation language has since changed. Arabic and other language choices remain
+unchanged. The retired edition is absent from the public and bundled catalogs,
+and filtered out even when an older manifest is cached.
 
 CDN prefix: `tafsir/bn-zakaria/v1`; category: `quran_tafsir_bn_zakaria`.
 The package contains 114 chapters, an integrity manifest and an attribution notice.

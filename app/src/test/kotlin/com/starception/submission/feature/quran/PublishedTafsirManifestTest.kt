@@ -34,5 +34,7 @@ class PublishedTafsirManifestTest {
             }
         }
         assertFalse(assets.keys.any { it.startsWith("tafsir/tr-ibn-kathir/") })
+        assertFalse(assets.keys.any { it.startsWith("tafsir/bn-ibn-kathir/") })
+        assertFalse(bundle.getValue("categories").jsonObject.containsKey("quran_tafsir_bn"))
     }
 }

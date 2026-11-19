@@ -1260,7 +1260,7 @@ internal fun QuranDetailScreen(
                                                 store.saveQuranTafsirBook(tafseerSelectedBook)
                                             }, onHide = { showInlineTafsir = false }, playback = {
                                             surahTafsirPlayer?.let { fullPlayer ->
-                                                com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer, surahTitle = surah.nameEnglish) { reload ->
+                                                com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer, surahTitle = surah.nameEnglish, compact = true) { reload ->
                                                     MissingContentDownloadCard(inlineEdition?.category ?: "quran_core",
                                                         inlineEdition?.let { "${it.englishLanguageName} · ${it.title}" } ?: "Arabic tafsir",
                                                         onDownloadComplete = { inlineTafsirRevision++; reload() })
@@ -1270,10 +1270,11 @@ internal fun QuranDetailScreen(
                                         }
                                     }
                                     com.starception.submission.feature.quran.AyahNarrationGroup(verse.numberInSurah,
-                                        tafsirNarration?.contains(verse.numberInSurah) == true) {
+                                        tafsirNarration?.contains(verse.numberInSurah) == true, studyMode = showInlineTafsir) {
                                     QuranAyahReadingBlock(
                                         verse = verse,
-                                        showTranslation = showTranslation,
+                                        showTranslation = showTranslation || showInlineTafsir,
+                                        studyMode = showInlineTafsir,
                                         arabicFont = selectedArabicFont,
                                         arabicFontSize = arabicFontSize,
                                         textAlignment = textAlignment,
@@ -1283,15 +1284,17 @@ internal fun QuranDetailScreen(
                                             null
                                         },
                                         onToggleTranslation = {
-                                            showTranslation = !showTranslation
-                                            store.saveQuranShowTranslation(showTranslation)
+                                            if (!showInlineTafsir) {
+                                                showTranslation = !showTranslation
+                                                store.saveQuranShowTranslation(showTranslation)
+                                            }
                                         },
                                         onOpenTafseer = openTafsir,
                                     )
                                     if (showInlineTafsir) {
                                         com.starception.submission.feature.quran.InlineTafsirCommentary(number, verse.numberInSurah,
                                             inlineBook, inlineTafsirRevision,
-                                            fontScale = arabicFontSize / 41f,
+                                            fontScale = arabicFontSize / 41f, embedded = true,
                                             loadText = {
                                                 inlineRepository?.text(number, verse.numberInSurah) ?: run {
                                                     val data = tafseerRepository.getTafseer(number, verse.numberInSurah)
@@ -1598,6 +1601,7 @@ private fun QuranAyahReadingBlock(
     arabicFontSize: Float,
     textAlignment: String,
     tajweedAnnotations: List<SharedTajweedAnnotation>? = null,
+    studyMode: Boolean = false,
     onToggleTranslation: () -> Unit,
     onOpenTafseer: (ayahNumber: Int, preselectBook: Int) -> Unit = { _, _ -> },
 ) {
@@ -1643,6 +1647,8 @@ private fun QuranAyahReadingBlock(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = horizontalAlignment,
             ) {
+                if (studyMode) Text("Arabic", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary)
                 Text(
                     text = tajweedAnnotatedString(verse.arabicText, tajweedAnnotations),
                     modifier = Modifier.fillMaxWidth(),
@@ -1655,6 +1661,8 @@ private fun QuranAyahReadingBlock(
                 )
 
                 if (showTranslation && verse.translation.isNotBlank()) {
+                    if (studyMode) Text("Translation", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary)
                     val translationFontSize = arabicFontSize * 0.5f
                     Text(
                         text = verse.translation,
@@ -1671,7 +1679,7 @@ private fun QuranAyahReadingBlock(
         }
     }
 
-    HorizontalDivider(
+    if (!studyMode) HorizontalDivider(
         modifier = Modifier.padding(horizontal = 16.dp),
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
     )

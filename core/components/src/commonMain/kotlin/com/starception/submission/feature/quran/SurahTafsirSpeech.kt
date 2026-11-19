@@ -127,10 +127,43 @@ fun rememberSurahTafsirSpeechPlayer(surah: Int, book: String, session: TafsirSpe
 }
 
 @Composable
-fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, surahTitle: String? = null,
+fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, surahTitle: String? = null, compact: Boolean = false,
     missingAsset: @Composable (() -> Unit) -> Unit) {
     val state by player.state.collectAsState()
     val ayahs by player.currentAyahs.collectAsState()
+    if (compact) {
+        val preparing = state.status == TafsirSpeechStatus.PREPARING
+        val playing = state.status == TafsirSpeechStatus.PLAYING
+        val paused = state.status == TafsirSpeechStatus.PAUSED
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(enabled = !preparing, onClick = {
+                    when { playing -> player.pause(); paused -> player.resume(); else -> player.start() }
+                }, modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(0.dp), contentPadding = PaddingValues(vertical = 4.dp),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
+                    Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (playing) "Pause surah tafsir" else if (paused) "Resume surah tafsir" else "Play full surah tafsir",
+                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(when { preparing -> "Preparing tafsir…"; playing -> "Listening to tafsir"; paused -> "Tafsir paused"; else -> "Play full surah tafsir" },
+                            style = MaterialTheme.typography.labelLarge)
+                        Text(ayahs?.let { if (it.first == it.last) "Ayah ${it.first} of ${player.totalAyahs}" else "Ayahs ${it.first}–${it.last} of ${player.totalAyahs}" }
+                            ?: if (state.finished) "Finished · Listen again" else "Listen while you read",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (playing || paused || preparing) IconButton(onClick = player::stop) {
+                    Icon(Icons.Default.Stop, "Stop surah tafsir", modifier = Modifier.size(20.dp))
+                }
+            }
+            if (preparing) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp))
+            if (state.assetMissing) missingAsset { player.stop() }
+            else state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        }
+        return
+    }
     val colors = MaterialTheme.colorScheme
     val active = state.status in listOf(TafsirSpeechStatus.PREPARING, TafsirSpeechStatus.PLAYING, TafsirSpeechStatus.PAUSED)
     val action = when (state.status) {
@@ -148,7 +181,7 @@ fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, surahTitle: Str
         colors = CardDefaults.cardColors(containerColor = colors.surface)) {
         Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(
             colors.primaryContainer.copy(alpha = 0.45f), colors.surfaceContainerLow)))
-            .padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            .padding(if (compact) 16.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 18.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Headphones, contentDescription = null, tint = colors.primary, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -166,7 +199,7 @@ fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, surahTitle: Str
                         style = MaterialTheme.typography.labelSmall, color = colors.primary)
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (!compact) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(surahTitle ?: "Listen to tafsir", style = MaterialTheme.typography.headlineSmall,
                     fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium, color = colors.onSurface)
                 Text("The full surah, read aloud", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)

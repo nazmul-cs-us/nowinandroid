@@ -13,10 +13,9 @@ data class PublishedTafsirEdition(
 }
 
 object PublishedTafsirs {
-    // Append new indexes; index 4 and ibn_kathir_bn preserve existing Bengali selections.
+    // Index 4 is retired. Saved Bengali Ibn Kathir selections migrate to Zakaria (14).
     // New Bengali defaults use Zakaria, whose source preserves Arabic quotations.
     val editions = listOf(
-        PublishedTafsirEdition("bn", 4, "বাংলা", "Bengali", "তাফসীর ইবনে কাসীর", "ibn_kathir_bn", "Tawheed Publication", "https://qul.tarteel.ai/resources/tafsir/31", "tafsir/bn-ibn-kathir/v1", "quran_tafsir_bn"),
         PublishedTafsirEdition("en", 5, "English", "English", "Ibn Kathir (abridged)", "ibn_kathir_en", "Hafiz Ibn Kathir", "https://qul.tarteel.ai/resources/tafsir/35", "tafsir/en-ibn-kathir/v1", "quran_tafsir_en"),
         PublishedTafsirEdition("hi", 6, "हिन्दी", "Hindi", "Al-Mukhtasar", "mukhtasar_hi", "QUL / Tarteel", "https://qul.tarteel.ai/resources/tafsir/535", "tafsir/hi-mukhtasar/v1", "quran_tafsir_hi"),
         PublishedTafsirEdition("es", 7, "Español", "Spanish", "Al-Mukhtasar", "mukhtasar_es", "QUL / Tarteel", "https://qul.tarteel.ai/resources/tafsir/268", "tafsir/es-mukhtasar/v1", "quran_tafsir_es"),
@@ -29,13 +28,14 @@ object PublishedTafsirs {
         PublishedTafsirEdition("bn", 14, "বাংলা", "Bengali", "তাফসীর আবু বকর যাকারিয়া", "zakaria_bn", "King Fahd Quran Printing Complex", "https://qul.tarteel.ai/resources/tafsir/33", "tafsir/bn-zakaria/v1", "quran_tafsir_bn_zakaria"),
     )
     val bengaliZakaria: PublishedTafsirEdition get() = editions.first { it.bookKey == "zakaria_bn" }
-    val bengali: PublishedTafsirEdition get() = editions.first()
     fun forLanguage(code: String): PublishedTafsirEdition? =
         if (code == "bn") bengaliZakaria else editions.firstOrNull { it.languageCode == code }
     fun forBook(key: String): PublishedTafsirEdition? = editions.firstOrNull { it.bookKey == key }
     fun forCategory(category: String): PublishedTafsirEdition? = editions.firstOrNull { it.category == category }
     fun forStorageIndex(index: Int): PublishedTafsirEdition? = editions.firstOrNull { it.storageIndex == index }
-    fun preferredBook(code: String, savedBook: String?): String = savedBook?.takeIf {
+    fun isRetiredCategory(category: String): Boolean = category == BengaliIbnKathir.CATEGORY
+    fun migrateStorageIndex(index: Int): Int = if (index == 4) bengaliZakaria.storageIndex else index
+    fun preferredBook(code: String, savedBook: String?): String = if (savedBook == BengaliIbnKathir.BOOK_KEY) bengaliZakaria.bookKey else savedBook?.takeIf {
         forBook(it) != null || it in listOf("saadi", "moysar", "baghawi", "word_meanings")
     } ?: forLanguage(code)?.bookKey ?: "saadi"
     fun defaultStorageIndex(code: String): Int = forLanguage(code)?.storageIndex ?: 0

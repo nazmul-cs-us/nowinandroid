@@ -51,12 +51,18 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
     }
 
     /** Selected Quran translation language code (see [QuranTranslationLanguage]). */
-    fun quranTafsirBook(): Int = store.getString("quran_tafsir_book")?.toIntOrNull()?.takeIf(PublishedTafsirs::validStorageIndex)
-        ?: PublishedTafsirs.defaultStorageIndex(quranTranslationLanguage())
+    fun quranTafsirBook(): Int {
+        val saved = store.getString("quran_tafsir_book")?.toIntOrNull()
+        val migrated = saved?.let(PublishedTafsirs::migrateStorageIndex)
+        if (saved != migrated && migrated != null) store.putString("quran_tafsir_book", migrated.toString())
+        return migrated?.takeIf(PublishedTafsirs::validStorageIndex)
+            ?: PublishedTafsirs.defaultStorageIndex(quranTranslationLanguage())
+    }
 
     fun saveQuranTafsirBook(book: Int) {
-        require(PublishedTafsirs.validStorageIndex(book))
-        store.putString("quran_tafsir_book", book.toString())
+        val migrated = PublishedTafsirs.migrateStorageIndex(book)
+        require(PublishedTafsirs.validStorageIndex(migrated))
+        store.putString("quran_tafsir_book", migrated.toString())
     }
 
     fun quranTranslationLanguage(): String =

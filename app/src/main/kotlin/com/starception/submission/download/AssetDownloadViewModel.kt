@@ -185,7 +185,7 @@ class AssetDownloadViewModel @Inject constructor(
         val requiredKeys = requiredSetupCategories(m)
         val selectedTafsirCategory = QuranSetupContent.tafsirEdition(_selectedLanguage.value,
             contentSetupPreferences.isComplete)?.category
-        val categories = m.categories.map { (key, info) ->
+        val categories = m.categories.filterKeys { !com.starception.submission.feature.quran.PublishedTafsirs.isRetiredCategory(it) }.map { (key, info) ->
             val downloadedSize = downloadManager.getCategoryDownloadedSize(key, m)
             val isComplete = if (key == selectedTafsirCategory) selectedTafsirReady(m)
                 else downloadManager.isCategoryComplete(key, m)

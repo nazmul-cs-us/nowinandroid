@@ -34,7 +34,7 @@ class TafsirMediaBannerTest {
             override fun stop() { state.value = TafsirSpeechState() }
             override fun release() = stop()
         }
-        val entry = owner.attach(1, "ibn_kathir_bn", "Al-Fatihah", { engine }, { "Ayah $it" })
+        val entry = owner.attach(1, "zakaria_bn", "Al-Fatihah", { engine }, { "Ayah $it" })
         try {
             entry.player.start(); runCurrent(); owner.detach(entry)
             ChapterRecitationState.publish(true, entry.title, owner.state.value!!.subtitle)

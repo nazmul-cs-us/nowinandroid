@@ -21,7 +21,7 @@ class TafsirPlaybackBusTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val owner = SurahTafsirPlayback.owner
         val engine = Engine()
-        val entry = owner.attach(1, "ibn_kathir_bn", "Al-Fatihah", { engine }, { "Grouped commentary" },
+        val entry = owner.attach(1, "zakaria_bn", "Al-Fatihah", { engine }, { "Grouped commentary" },
             onActivate = QuranPlaybackBus::startTafsir)
         try {
             entry.player.start(); runCurrent(); owner.detach(entry)
@@ -44,7 +44,7 @@ class TafsirPlaybackBusTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val owner = SurahTafsirPlayback.owner
         val firstEngine = Engine(); val secondEngine = Engine()
-        val first = owner.attach(1, "ibn_kathir_bn", "Al-Fatihah", { firstEngine }, { "Bengali" }, onActivate = QuranPlaybackBus::startTafsir)
+        val first = owner.attach(1, "zakaria_bn", "Al-Fatihah", { firstEngine }, { "Bengali" }, onActivate = QuranPlaybackBus::startTafsir)
         val second = owner.attach(2, "ibn_kathir_en", "Al-Baqarah", { secondEngine }, { "English" }, onActivate = QuranPlaybackBus::startTafsir)
         try {
             first.player.start(); runCurrent(); owner.detach(first)

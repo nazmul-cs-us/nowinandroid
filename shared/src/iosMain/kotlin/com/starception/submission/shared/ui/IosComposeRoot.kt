@@ -1483,6 +1483,7 @@ private suspend fun loadIosContentStorageState(): ContentStorageState =
             // Every manifest category shows — the iOS storage manager mirrors
             // the Android one, which lists all downloadable content.
             val categories = manifest.categories
+                .filterKeys { !com.starception.submission.feature.quran.PublishedTafsirs.isRetiredCategory(it) }
                 .map { (category, info) ->
                     val status = iosCloudAssets.getCategoryStatus(category, manifest)
                     ContentStorageCategoryState(

@@ -80,7 +80,7 @@ fun ContentManagementSection(
     val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
 
     // Group categories using the ViewModel's grouping logic
-    val grouped = categories.groupBy { AssetDownloadViewModel.categoryGroup(it.categoryKey) }
+    val grouped = categories.filterNot { com.starception.submission.feature.quran.PublishedTafsirs.isRetiredCategory(it.categoryKey) }.groupBy { AssetDownloadViewModel.categoryGroup(it.categoryKey) }
         .toSortedMap(compareBy { AssetDownloadViewModel.groupSortOrder(it) })
 
     Column(

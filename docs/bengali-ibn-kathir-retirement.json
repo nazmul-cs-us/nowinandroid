@@ -1,0 +1,11 @@
+{
+  "retired_book": "ibn_kathir_bn",
+  "retired_category": "quran_tafsir_bn",
+  "replacement_book": "zakaria_bn",
+  "replacement_category": "quran_tafsir_bn_zakaria",
+  "removed_catalog_assets": 116,
+  "remaining_assets_preserved": 8328,
+  "manifest_version": 5,
+  "manifest_sha256": "3b95608c65560121c56aa35c8b1eafcb10e51cc061fe733f49b706497e8f3f7c",
+  "verified_at": "2026-11-19"
+}

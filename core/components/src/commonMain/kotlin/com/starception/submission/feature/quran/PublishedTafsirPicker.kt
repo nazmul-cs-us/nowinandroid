@@ -47,14 +47,15 @@ fun TafsirBookPicker(selectedBook: String, onSelect: (String) -> Unit, includeWo
         if (includeWordMeanings) listOf("word_meanings" to "Word meanings") else emptyList()
     val edition = PublishedTafsirs.forBook(selectedBook)
     Box(Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick = { expanded = true },
+        TextButton(onClick = { expanded = true },
             modifier = Modifier.fillMaxWidth().testTag("published-tafsir-picker"),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+            contentPadding = PaddingValues(vertical = 4.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(edition?.languageName ?: "العربية · Arabic", style = MaterialTheme.typography.labelMedium)
                 Text(edition?.title ?: arabic.firstOrNull { it.first == selectedBook }?.second ?: "Choose commentary",
-                    style = MaterialTheme.typography.titleSmall, maxLines = 2,
+                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif), maxLines = 3,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
             Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.padding(start = 12.dp).size(20.dp))

@@ -164,11 +164,19 @@ fun AyahScrollHint(guide: AyahScrollGuide, narrating: Boolean, modifier: Modifie
 }
 
 @Composable
-fun AyahNarrationGroup(ayah: Int, narrating: Boolean, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().background(
+fun AyahNarrationGroup(ayah: Int, narrating: Boolean, studyMode: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    val group = Modifier.fillMaxWidth().testTag("tafsir-ayah-$ayah").semantics {
+        stateDescription = if (narrating) "Narrating ayah $ayah" else "Ayah $ayah"
+    }
+    if (studyMode) {
+        Column(group.padding(vertical = 12.dp).background(
+            if (narrating) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            else androidx.compose.ui.graphics.Color.Transparent)) {
+            content()
+            HorizontalDivider(Modifier.padding(horizontal = 24.dp).padding(top = 20.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        }
+    } else Column(group.background(
         if (narrating) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-        else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(16.dp))
-        .testTag("tafsir-ayah-$ayah").semantics {
-            stateDescription = if (narrating) "Narrating ayah $ayah" else "Ayah $ayah"
-        }, content = content)
+        else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(16.dp)), content = content)
 }

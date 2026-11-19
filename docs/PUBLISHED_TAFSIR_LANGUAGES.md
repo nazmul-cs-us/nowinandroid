@@ -16,8 +16,8 @@ remain inline and a finished download refreshes the visible verses. Word meaning
 retain their separate study UI.
 
 The Quran translation language supplies the default when there is no explicit
-tafsir preference. Existing Arabic book choices and Bengali book key / storage
-index / offline files remain compatible. Sources that explain several ayahs in one
+tafsir preference. Existing Arabic book choices remain compatible. Retired Bengali Ibn Kathir
+selections migrate to Abu Bakr Zakaria. Sources that explain several ayahs in one
 passage retain that passage for each associated ayah; this UI does not invent
 ayah-specific divisions of the author's text.
 
@@ -25,7 +25,6 @@ ayah-specific divisions of the author's text.
 | --- | --- | --- |
 | English | Ibn Kathir (abridged) | [QUL 35](https://qul.tarteel.ai/resources/tafsir/35) |
 | Bengali (default) | Abu Bakr Zakaria — King Fahd Quran Printing Complex | [QUL 33](https://qul.tarteel.ai/resources/tafsir/33) |
-| Bengali (also available) | Ibn Kathir — Tawheed Publication | [QUL 31](https://qul.tarteel.ai/resources/tafsir/31) |
 | Hindi | Al-Mukhtasar | [QUL 535](https://qul.tarteel.ai/resources/tafsir/535) |
 | Spanish | Al-Mukhtasar | [QUL 268](https://qul.tarteel.ai/resources/tafsir/268) |
 | French | Al-Mukhtasar | [QUL 259](https://qul.tarteel.ai/resources/tafsir/259) |
@@ -198,3 +197,15 @@ book; Arabic commentary remains part of Quran core content. Existing users who
 already finished setup can still download editions through Content & Storage.
 
 Bengali source quality, Arabic quotation coverage and compatibility details are in [BENGALI_TAFSIR_SOURCES.md](BENGALI_TAFSIR_SOURCES.md).
+
+The inline reader uses an open reading canvas with a text-based edition selector,
+source attribution and lightweight audio controls. Arabic and translation labels,
+serif commentary typography and subtle rules keep the reading hierarchy clear.
+Commentary retains source paragraphs and mixed-script Arabic/Bengali text,
+respects reader font scaling, and remains part of the surah’s single scroll container.
+
+When tafsir is enabled, each ayah’s Arabic, available translation and explanation
+form one continuous reading section, in that order, with clear section labels. Translation is shown
+temporarily in this study layout; hiding tafsir restores the saved translation
+visibility preference. The full-surah listening action is a compact audio row; pause/resume, ayah progress
+and Stop stay inline during playback.

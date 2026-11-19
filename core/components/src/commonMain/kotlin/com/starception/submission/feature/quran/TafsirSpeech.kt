@@ -82,12 +82,12 @@ fun TafsirPlaybackControls(text: String, language: String, compact: Boolean,
                     }
                 }
                 if (compact) {
-                    FilledTonalIconButton(onClick = onPlay, enabled = state.status != TafsirSpeechStatus.PREPARING,
+                    IconButton(onClick = onPlay, enabled = state.status != TafsirSpeechStatus.PREPARING,
                         modifier = Modifier.size(48.dp)) {
                         if (state.status == TafsirSpeechStatus.PREPARING) CircularProgressIndicator(
                             modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         else Icon(if (state.status == TafsirSpeechStatus.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = action, modifier = Modifier.size(20.dp))
+                            contentDescription = action, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                     }
                 } else {
                     FilledTonalButton(enabled = state.status != TafsirSpeechStatus.PREPARING, onClick = onPlay) {

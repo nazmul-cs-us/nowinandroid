@@ -10,11 +10,13 @@ class PublishedTafsirCatalogTest {
         assertNull(PublishedTafsirs.forLanguage("transliteration"))
         assertNull(PublishedTafsirs.forLanguage("ar")) // Existing Arabic books remain in their original reader.
     }
-    @Test fun legacyBengaliSelectionsAndPathsRemainCompatible() {
-        val bengali = PublishedTafsirs.forStorageIndex(4)!!
-        assertEquals(BengaliIbnKathir.BOOK_KEY, bengali.bookKey)
-        assertEquals(BengaliIbnKathir.chapterKey(114), bengali.chapterKey(114))
-        assertEquals(BengaliIbnKathir.PUBLISHER, bengali.attribution)
+    @Test fun retiredBengaliEditionIsNotSelectableAndMigratesToZakaria() {
+        assertNull(PublishedTafsirs.forBook("ibn_kathir_bn"))
+        assertNull(PublishedTafsirs.forStorageIndex(4))
+        assertNull(PublishedTafsirs.forCategory("quran_tafsir_bn"))
+        assertTrue(PublishedTafsirs.isRetiredCategory("quran_tafsir_bn"))
+        assertEquals(14, PublishedTafsirs.migrateStorageIndex(4))
+        assertFalse(PublishedTafsirs.isRetiredCategory("quran_tafsir_bn_zakaria"))
     }
     @Test fun editionKeysIndexesCategoriesAndCachePathsAreUniqueAndRoundTrip() {
         val editions = PublishedTafsirs.editions
@@ -29,15 +31,15 @@ class PublishedTafsirCatalogTest {
             assertEquals(it.languageCode, PublishedTafsirs.forStorageIndex(PublishedTafsirs.defaultStorageIndex(it.languageCode))?.languageCode)
         }
     }
-    @Test fun bengaliDefaultsToZakariaWithoutRenamingOrRemovingIbnKathir() {
+    @Test fun bengaliOffersOnlyZakaria() {
         assertEquals("zakaria_bn", PublishedTafsirs.forLanguage("bn")?.bookKey)
         assertEquals(14, PublishedTafsirs.defaultStorageIndex("bn"))
-        assertEquals("ibn_kathir_bn", PublishedTafsirs.forStorageIndex(4)?.bookKey)
-        assertEquals(setOf("zakaria_bn", "ibn_kathir_bn"), PublishedTafsirs.editions.filter { it.languageCode == "bn" }.map { it.bookKey }.toSet())
+        assertEquals(setOf("zakaria_bn"), PublishedTafsirs.editions.filter { it.languageCode == "bn" }.map { it.bookKey }.toSet())
     }
     @Test fun savedBengaliBookChoiceSurvivesTheNewDefaultAndUnknownKeysRecoverSafely() {
         assertEquals("zakaria_bn", PublishedTafsirs.preferredBook("bn", null))
-        assertEquals("ibn_kathir_bn", PublishedTafsirs.preferredBook("bn", "ibn_kathir_bn"))
+        assertEquals("zakaria_bn", PublishedTafsirs.preferredBook("bn", "ibn_kathir_bn"))
+        assertEquals("zakaria_bn", PublishedTafsirs.preferredBook("en", "ibn_kathir_bn"))
         assertEquals("zakaria_bn", PublishedTafsirs.preferredBook("bn", "unknown"))
         assertEquals("baghawi", PublishedTafsirs.preferredBook("bn", "baghawi"))
         assertEquals("saadi", PublishedTafsirs.preferredBook("sv", null))

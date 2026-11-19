@@ -22,7 +22,7 @@ class SurahTafsirPlaybackOwnerTest {
     @Test fun leavingReaderKeepsQueueAndBannerAliveAndReturningReusesPlayback() = runTest {
         val owner = SurahTafsirPlaybackOwner(backgroundScope)
         val engine = Engine()
-        val entry = owner.attach(1, "ibn_kathir_bn", "Al-Fatihah", { engine }, { "Ayah $it" })
+        val entry = owner.attach(1, "zakaria_bn", "Al-Fatihah", { engine }, { "Ayah $it" })
         entry.player.start(); runCurrent()
         owner.detach(entry); runCurrent()
         assertFalse(engine.released)
@@ -30,7 +30,7 @@ class SurahTafsirPlaybackOwnerTest {
         assertTrue(owner.state.value?.subtitle.orEmpty().contains("Tafsir · Bengali · Ayah 1"))
         engine.finish(); runCurrent()
         assertEquals(listOf("Ayah 1", "Ayah 2"), engine.spoken)
-        val reopened = owner.attach(1, "ibn_kathir_bn", "Al-Fatihah", { error("Do not create another engine") }, { error("Do not replace the active reader") })
+        val reopened = owner.attach(1, "zakaria_bn", "Al-Fatihah", { error("Do not create another engine") }, { error("Do not replace the active reader") })
         assertSame(entry, reopened)
         assertEquals(2..2, reopened.player.currentAyahs.value)
         owner.stop(); owner.detach(reopened)
@@ -53,7 +53,7 @@ class SurahTafsirPlaybackOwnerTest {
     @Test fun visitingAnotherBookDoesNotReplaceAudioButStartingItStopsTheOldQueue() = runTest {
         val owner = SurahTafsirPlaybackOwner(backgroundScope)
         val firstEngine = Engine(); val secondEngine = Engine()
-        val first = owner.attach(1, "ibn_kathir_bn", "Al-Fatihah", { firstEngine }, { "Bengali $it" })
+        val first = owner.attach(1, "zakaria_bn", "Al-Fatihah", { firstEngine }, { "Bengali $it" })
         first.player.start(); runCurrent(); owner.detach(first)
         val second = owner.attach(1, "ibn_kathir_en", "Al-Fatihah", { secondEngine }, { "English $it" })
         assertSame(first, owner.state.value!!.entry)
@@ -81,7 +81,7 @@ class SurahTafsirPlaybackOwnerTest {
     @Test fun missingAssetsClearTheBannerAndRemainRetryableInTheReader() = runTest {
         val owner = SurahTafsirPlaybackOwner(backgroundScope)
         val engine = Engine(); var available = false
-        val entry = owner.attach(1, "ibn_kathir_bn", "Al-Fatihah", { engine }, {
+        val entry = owner.attach(1, "zakaria_bn", "Al-Fatihah", { engine }, {
             if (!available) throw PublishedTafsirAssetMissing() else "Commentary"
         })
         entry.player.start(); runCurrent()

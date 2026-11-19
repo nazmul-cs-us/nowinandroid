@@ -17,7 +17,7 @@ class BengaliTafsirPreferenceTest {
         store.saveQuranTafsirBook(0)
         assertEquals(0, SharedContentStore(values).quranTafsirBook())
         store.saveQuranTafsirBook(4)
-        assertEquals(4, SharedContentStore(values).quranTafsirBook())
+        assertEquals(14, SharedContentStore(values).quranTafsirBook())
     }
     @Test fun invalidStoredBooksRecoverToALanguageAppropriateDefault() {
         val values = InMemoryKeyValueStore()
@@ -35,10 +35,10 @@ class BengaliTafsirPreferenceTest {
             assertEquals(edition.storageIndex, SharedContentStore(values).quranTafsirBook())
         }
     }
-    @Test fun legacyArabicAndBengaliIndexesAreNotRemappedWhenTheTranslationChanges() {
+    @Test fun retiredBengaliIndexMigratesEvenWhenTheReadingLanguageHasChanged() {
         val values = InMemoryKeyValueStore(); val store = SharedContentStore(values)
         values.putString("quran_tafsir_book", "4"); store.saveQuranTranslationLanguage("zh")
-        assertEquals(4, SharedContentStore(values).quranTafsirBook())
+        assertEquals(14, SharedContentStore(values).quranTafsirBook())
         store.saveQuranTafsirBook(0)
         assertEquals(0, SharedContentStore(values).quranTafsirBook())
     }

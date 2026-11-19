@@ -23,7 +23,7 @@ class PublishedTafsirStorageUiTest {
     @get:Rule val compose = createComposeRule()
     @Test fun tafsirGroupCanDownloadAndRemoveIndividualLanguageEditions() {
         val english = CategoryDownloadState("quran_tafsir_en", "English tafsir", "All 114 surahs", 100, 0, 116, false, false)
-        val bengali = CategoryDownloadState("quran_tafsir_bn", "Bengali tafsir", "All 114 surahs", 100, 100, 116, false, true)
+        val bengali = CategoryDownloadState("quran_tafsir_bn_zakaria", "Bengali tafsir", "All 114 surahs", 100, 100, 116, false, true)
         val calls = mutableListOf<String>()
         compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
             ContentManagementSection(listOf(english, bengali), 100,
@@ -33,6 +33,15 @@ class PublishedTafsirStorageUiTest {
         compose.onNodeWithText("Tafsir").performClick()
         compose.onNodeWithContentDescription("Download English tafsir").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Remove Bengali tafsir").performScrollTo().performClick()
-        assertEquals(listOf("download:quran_tafsir_en", "delete:quran_tafsir_bn"), calls)
+        assertEquals(listOf("download:quran_tafsir_en", "delete:quran_tafsir_bn_zakaria"), calls)
     }
+    @Test fun aCachedRetiredCategoryCannotReappearInStorage() {
+        val retired = CategoryDownloadState("quran_tafsir_bn", "Old Bengali Ibn Kathir", "Retired", 100, 100, 116, false, true)
+        val active = CategoryDownloadState("quran_tafsir_bn_zakaria", "Bengali Zakaria", "All 114 surahs", 100, 0, 116, false, false)
+        compose.setContent { MaterialTheme { ContentManagementSection(listOf(retired, active), 100, {}, {}) } }
+        compose.onNodeWithText("Tafsir").performClick()
+        compose.onNodeWithText("Old Bengali Ibn Kathir").assertDoesNotExist()
+        compose.onNodeWithText("Bengali Zakaria").assertIsDisplayed()
+    }
+
 }

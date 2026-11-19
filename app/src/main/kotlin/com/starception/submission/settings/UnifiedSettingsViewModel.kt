@@ -1232,7 +1232,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     .filterNot { (key, _) ->
                         // Hide categories that are fully bundled in the APK
                         // since users cannot delete or manage them
-                        downloadManager.isCategoryFullyBundled(key, m)
+                        com.starception.submission.feature.quran.PublishedTafsirs.isRetiredCategory(key) ||
+                            downloadManager.isCategoryFullyBundled(key, m)
                     }
                     .map { (key, info) ->
                         val downloadedSize = downloadManager.getCategoryDownloadedSize(key, m)

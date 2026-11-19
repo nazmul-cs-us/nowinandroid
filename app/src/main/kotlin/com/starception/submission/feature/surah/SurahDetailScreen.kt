@@ -1172,7 +1172,7 @@ fun SurahDetailScreen(
                                 com.starception.submission.feature.quran.InlineTafsirHeader(selectedTafseerBook,
                                     onSelect = viewModel::selectTafseerBook, onHide = { showInlineTafsir = false }, playback = {
                                         surahTafsirPlayer?.let { fullPlayer ->
-                                            com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer, surahTitle = pageSurah.nameEnglish) { reload ->
+                                            com.starception.submission.feature.quran.SurahTafsirPlaybackControls(fullPlayer, surahTitle = pageSurah.nameEnglish, compact = true) { reload ->
                                                 MissingTafsirAssetCard(inlineEdition) { inlineTafsirRevision++; reload() }
                                             }
                                         }
@@ -1184,7 +1184,7 @@ fun SurahDetailScreen(
                                     fontScale = arabicFontSize / 41f,
                                     loadText = { inlineTafsirRepository?.text(chapter, verse)
                                         ?: viewModel.inlineTafsirText(chapter, verse, selectedTafseerBook) },
-                                    speechPlayerFactory = inlineSpeechFactory,
+                                    speechPlayerFactory = inlineSpeechFactory, embedded = true,
                                     missingAsset = { reload -> MissingTafsirAssetCard(inlineEdition) {
                                         inlineTafsirRevision++; reload()
                                     } })
@@ -3158,13 +3158,14 @@ private fun AlbumPlayerContent(
                             Box(Modifier.onSizeChanged { inlineHeaderHeight = it.height }) { inlineTafsirHeader() }
                         }
                         com.starception.submission.feature.quran.AyahNarrationGroup(ayah.numberInSurah,
-                            tafsirNarration?.contains(ayah.numberInSurah) == true) {
+                            tafsirNarration?.contains(ayah.numberInSurah) == true, studyMode = inlineTafsirContent != null) {
                         AyahTrackItem(
                             ayah = ayah,
                             arabicFont = selectedArabicFont,
                             arabicFontSize = arabicFontSize,
                             textAlignment = textAlignment,
-                            showTranslation = showTranslationInText,
+                            showTranslation = showTranslationInText || inlineTafsirContent != null,
+                            studyMode = inlineTafsirContent != null,
                             showTajweed = showTajweed,
                             tajweedAnnotations = tajweedAnnotations[ayah.numberInSurah],
                             isFavourite = ayah.numberInSurah in favouriteAyahs,
@@ -8336,6 +8337,7 @@ private fun AyahTrackItem(
     hasNote: Boolean = false,
     isReciting: Boolean = false,
     isHighlighted: Boolean = false,
+    studyMode: Boolean = false,
     onClick: () -> Unit,
     onLongPress: () -> Unit = {},
     onDoubleTap: () -> Unit = {},
@@ -8417,6 +8419,8 @@ private fun AyahTrackItem(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = horizontalAlignment,
             ) {
+                if (studyMode) Text("Arabic", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary)
                 // Arabic text with user-selected font and size
                 val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
 
@@ -8445,6 +8449,8 @@ private fun AyahTrackItem(
 
                 // Translation text with 2:1 ratio (translation is 1/2 of Arabic size)
                 if (showTranslation && translationText != null && translationText.isNotBlank()) {
+                    if (studyMode) Text("Translation", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary)
                     val translationFontSize = arabicFontSize * 0.5f // 2:1 ratio (50%)
                     Text(
                         text = translationText,
@@ -8462,7 +8468,7 @@ private fun AyahTrackItem(
     }
 
     // Divider
-    HorizontalDivider(
+    if (!studyMode) HorizontalDivider(
         modifier = Modifier.padding(horizontal = 16.dp),
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
     )
