@@ -11,10 +11,10 @@ class PublishedTafsirManifestTest {
         val assets = bundle.getValue("assets").jsonObject
         val integrity = Json.parseToJsonElement(File("../docs/published-tafsirs-integrity.json").readText()).jsonObject
         val editions = integrity.getValue("editions").jsonArray
-        assertEquals(9, editions.size)
+        assertEquals(10, editions.size)
         editions.forEach { item ->
             val source = item.jsonObject
-            val edition = PublishedTafsirs.forLanguage(source.getValue("language").jsonPrimitive.content)!!
+            val edition = PublishedTafsirs.forBook(source.getValue("bookKey").jsonPrimitive.content)!!
             assertEquals(edition.bookKey, source.getValue("bookKey").jsonPrimitive.content)
             assertEquals(edition.sourceUrl, source.getValue("sourceUrl").jsonPrimitive.content)
             assertEquals(114, source.getValue("surah_count").jsonPrimitive.int)

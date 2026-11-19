@@ -10,16 +10,16 @@ import org.junit.Test
 class QuranSetupContentTest {
     @Test fun selectedLanguageAddsExactlyItsTafsirToFirstRunRequirements() {
         val base = setOf("quran_core", "news")
-        for (edition in PublishedTafsirs.editions) {
+        for (edition in PublishedTafsirs.editions.map { it.languageCode }.distinct().mapNotNull(PublishedTafsirs::forLanguage)) {
             assertEquals(base + edition.category, QuranSetupContent.requiredCategories(base, edition.languageCode))
             assertFalse(QuranSetupContent.requiredCategories(base, edition.languageCode).any { it.startsWith("quran_audio_") })
         }
     }
     @Test fun changingLanguageReplacesTheTafsirRequirementInsteadOfKeepingThePreviousBook() {
         val base = setOf("quran_core")
-        assertEquals(base + "quran_tafsir_bn", QuranSetupContent.requiredCategories(base, "bn"))
+        assertEquals(base + "quran_tafsir_bn_zakaria", QuranSetupContent.requiredCategories(base, "bn"))
         assertEquals(base + "quran_tafsir_ur", QuranSetupContent.requiredCategories(base, "ur"))
-        assertFalse("quran_tafsir_bn" in QuranSetupContent.requiredCategories(base, "ur"))
+        assertFalse("quran_tafsir_bn_zakaria" in QuranSetupContent.requiredCategories(base, "ur"))
     }
     @Test fun cachedTranslationAloneDoesNotFinishSetupAndPartialTafsirCanBeRetried() {
         val files = mutableSetOf("databases/quran/quran_bn.db")
@@ -28,7 +28,7 @@ class QuranSetupContentTest {
         assertFalse(QuranSetupContent.tafsirReady("bn", isAvailable = files::contains))
         files += QuranSetupContent.tafsirAssets("bn")
         assertTrue(QuranSetupContent.tafsirReady("bn", isAvailable = files::contains))
-        files -= "tafsir/bn-ibn-kathir/v1/114.json"
+        files -= "tafsir/bn-zakaria/v1/114.json"
         assertFalse(QuranSetupContent.tafsirReady("bn", isAvailable = files::contains))
     }
     @Test fun unsupportedTafsirLanguagesAndArabicRequireNoAdditionalBook() {
@@ -45,7 +45,7 @@ class QuranSetupContentTest {
     @Test fun everySetupEditionHasAll114ChaptersAndMetadataInTheRealDownloadManifest() {
         val manifest = Json.parseToJsonElement(File("src/main/assets/manifest.json").readText()).jsonObject
         val assets = manifest.getValue("assets").jsonObject
-        for (edition in PublishedTafsirs.editions) {
+        for (edition in PublishedTafsirs.editions.map { it.languageCode }.distinct().mapNotNull(PublishedTafsirs::forLanguage)) {
             val required = QuranSetupContent.tafsirAssets(edition.languageCode)
             assertEquals(116, required.size)
             assertTrue(required.contains(edition.chapterKey(1)))

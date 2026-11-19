@@ -24,7 +24,8 @@ ayah-specific divisions of the author's text.
 | Language | Published edition | Original catalog |
 | --- | --- | --- |
 | English | Ibn Kathir (abridged) | [QUL 35](https://qul.tarteel.ai/resources/tafsir/35) |
-| Bengali | Ibn Kathir — Tawheed Publication | [QUL 31](https://qul.tarteel.ai/resources/tafsir/31) |
+| Bengali (default) | Abu Bakr Zakaria — King Fahd Quran Printing Complex | [QUL 33](https://qul.tarteel.ai/resources/tafsir/33) |
+| Bengali (also available) | Ibn Kathir — Tawheed Publication | [QUL 31](https://qul.tarteel.ai/resources/tafsir/31) |
 | Hindi | Al-Mukhtasar | [QUL 535](https://qul.tarteel.ai/resources/tafsir/535) |
 | Spanish | Al-Mukhtasar | [QUL 268](https://qul.tarteel.ai/resources/tafsir/268) |
 | French | Al-Mukhtasar | [QUL 259](https://qul.tarteel.ai/resources/tafsir/259) |
@@ -195,3 +196,5 @@ those files before reporting completion, retries incomplete downloads and avoids
 redownloading cached files. Languages without a published edition add no extra
 book; Arabic commentary remains part of Quran core content. Existing users who
 already finished setup can still download editions through Content & Storage.
+
+Bengali source quality, Arabic quotation coverage and compatibility details are in [BENGALI_TAFSIR_SOURCES.md](BENGALI_TAFSIR_SOURCES.md).

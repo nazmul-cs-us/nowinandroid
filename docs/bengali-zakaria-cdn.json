@@ -1,0 +1,17 @@
+{
+  "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
+  "prefix": "tafsir/bn-zakaria/v1",
+  "category": "quran_tafsir_bn_zakaria",
+  "active": true,
+  "manifest_version": 4,
+  "manifest_sha256": "1e5438615f708e1e2aa8f1c300335b584feeb809f59df76e1a46d5cba333c040",
+  "previous_assets_preserved": 8328,
+  "surahs": 114,
+  "ayahs": 6236,
+  "bytes": 13556678,
+  "arabic_characters": 29458,
+  "arabic_placeholders": 5,
+  "files": 116,
+  "live_api_samples_matched": 5,
+  "verified_at": "2026-11-19"
+}

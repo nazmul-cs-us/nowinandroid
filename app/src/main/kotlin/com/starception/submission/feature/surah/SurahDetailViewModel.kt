@@ -533,7 +533,7 @@ class SurahDetailViewModel @Inject constructor(
     private val initialTafsirLanguage = prefs.getString("tafseer_translation_lang",
         prefs.getString("quran_translation", "ar") ?: "ar") ?: "ar"
     private val _selectedTafseerBook = MutableStateFlow(
-        PublishedTafsirs.forLanguage(initialTafsirLanguage)?.bookKey ?: "saadi")
+        PublishedTafsirs.preferredBook(initialTafsirLanguage, prefs.getString("tafseer_book_key", null)))
     val selectedTafseerBook: StateFlow<String> = _selectedTafseerBook.asStateFlow()
 
     // Tafseer translation states
@@ -611,6 +611,7 @@ class SurahDetailViewModel @Inject constructor(
 
     fun selectTafseerBook(book: String) {
         _selectedTafseerBook.value = book
+        prefs.edit().putString("tafseer_book_key", book).apply()
         val published = PublishedTafsirs.forBook(book)
         if (published != null) {
             _tafseerTranslationLanguage.value = published.languageCode
@@ -631,11 +632,13 @@ class SurahDetailViewModel @Inject constructor(
             val published = PublishedTafsirs.forLanguage(languageCode)
             if (published != null) {
                 _selectedTafseerBook.value = published.bookKey
+                prefs.edit().putString("tafseer_book_key", published.bookKey).apply()
                 _isTafseerTranslating.value = false
                 return@launch
             }
             if (PublishedTafsirs.forBook(_selectedTafseerBook.value) != null) {
                 _selectedTafseerBook.value = "saadi"
+                prefs.edit().putString("tafseer_book_key", "saadi").apply()
                 _tafseerData.value?.let { loadTafseer(it.surahNumber, it.ayahNumber) }
             }
             // If Arabic, clear translations

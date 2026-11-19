@@ -26,8 +26,21 @@ class PublishedTafsirCatalogTest {
             assertEquals(it, PublishedTafsirs.forBook(it.bookKey))
             assertEquals(it, PublishedTafsirs.forCategory(it.category))
             assertEquals(it, PublishedTafsirs.forStorageIndex(it.storageIndex))
-            assertEquals(it.storageIndex, PublishedTafsirs.defaultStorageIndex(it.languageCode))
+            assertEquals(it.languageCode, PublishedTafsirs.forStorageIndex(PublishedTafsirs.defaultStorageIndex(it.languageCode))?.languageCode)
         }
+    }
+    @Test fun bengaliDefaultsToZakariaWithoutRenamingOrRemovingIbnKathir() {
+        assertEquals("zakaria_bn", PublishedTafsirs.forLanguage("bn")?.bookKey)
+        assertEquals(14, PublishedTafsirs.defaultStorageIndex("bn"))
+        assertEquals("ibn_kathir_bn", PublishedTafsirs.forStorageIndex(4)?.bookKey)
+        assertEquals(setOf("zakaria_bn", "ibn_kathir_bn"), PublishedTafsirs.editions.filter { it.languageCode == "bn" }.map { it.bookKey }.toSet())
+    }
+    @Test fun savedBengaliBookChoiceSurvivesTheNewDefaultAndUnknownKeysRecoverSafely() {
+        assertEquals("zakaria_bn", PublishedTafsirs.preferredBook("bn", null))
+        assertEquals("ibn_kathir_bn", PublishedTafsirs.preferredBook("bn", "ibn_kathir_bn"))
+        assertEquals("zakaria_bn", PublishedTafsirs.preferredBook("bn", "unknown"))
+        assertEquals("baghawi", PublishedTafsirs.preferredBook("bn", "baghawi"))
+        assertEquals("saadi", PublishedTafsirs.preferredBook("sv", null))
     }
     @Test fun languagesWithoutAPublishedEditionKeepTheExistingArabicReader() {
         assertEquals(0, PublishedTafsirs.defaultStorageIndex("sv"))

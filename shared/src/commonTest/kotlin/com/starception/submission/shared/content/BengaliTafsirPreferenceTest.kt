@@ -9,7 +9,7 @@ class BengaliTafsirPreferenceTest {
     @Test fun bengaliReadersDefaultToThePublishedEdition() {
         val store = SharedContentStore(InMemoryKeyValueStore())
         store.saveQuranTranslationLanguage("bn")
-        assertEquals(4, store.quranTafsirBook())
+        assertEquals(14, store.quranTafsirBook())
     }
     @Test fun explicitBookChoiceSurvivesRecreatingTheReaderAndOverridesTheLanguageDefault() {
         val values = InMemoryKeyValueStore(); val store = SharedContentStore(values)
@@ -29,7 +29,7 @@ class BengaliTafsirPreferenceTest {
         for (edition in com.starception.submission.feature.quran.PublishedTafsirs.editions) {
             val values = InMemoryKeyValueStore(); val store = SharedContentStore(values)
             store.saveQuranTranslationLanguage(edition.languageCode)
-            assertEquals(edition.storageIndex, store.quranTafsirBook())
+            assertEquals(com.starception.submission.feature.quran.PublishedTafsirs.defaultStorageIndex(edition.languageCode), store.quranTafsirBook())
             store.saveQuranTafsirBook(edition.storageIndex)
             store.saveQuranTranslationLanguage("sv")
             assertEquals(edition.storageIndex, SharedContentStore(values).quranTafsirBook())

@@ -1,8 +1,8 @@
 {
-  "version": 3,
+  "version": 4,
   "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
-  "total_size": 14663569736,
-  "total_files": 8328,
+  "total_size": 14677166050,
+  "total_files": 8444,
   "categories": {
     "json_data": {
       "total_size": 19570239,
@@ -211,6 +211,11 @@
     },
     "quran_tafsir_fr": {
       "total_size": 1950832,
+      "file_count": 116,
+      "required": false
+    },
+    "quran_tafsir_bn_zakaria": {
+      "total_size": 13596314,
       "file_count": 116,
       "required": false
     }
@@ -50182,6 +50187,702 @@
       "size": 492,
       "sha256": "46e93c94b81f0b9f9ead8923f1750d0ffbca4dd9504cf58ef85c8c26399f64c8",
       "category": "quran_tafsir_tr",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/95.json": {
+      "size": 16903,
+      "sha256": "b1f475149ceb0284ae1a7b4b581625b2de769ce194ed79f26cffe97e3177b87c",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/105.json": {
+      "size": 7526,
+      "sha256": "3a53232ab0b7d4c39e3b05023dbe84a24827374105e8ed52ba3200c98334171e",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/28.json": {
+      "size": 163147,
+      "sha256": "277e211d9f2a142576e66a675a6e24c3eddd4f5842f3eab70febcfc55c891f21",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/52.json": {
+      "size": 45890,
+      "sha256": "d1a235280ba16f859f255446c81b22d938f3b7d6ef83e1e41313cfdc30c3e6d1",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/108.json": {
+      "size": 19521,
+      "sha256": "a84825c87814c16469d5b07a53f050c12f8b15d7028d5f0ae8f135b49d619ee9",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/37.json": {
+      "size": 75526,
+      "sha256": "f83355ba26dddadaba9391e6054b4fce3853b9dbe9ca3dab1651c3900e0543bc",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/55.json": {
+      "size": 74301,
+      "sha256": "a26df583b703ff386b8ac096a5da6175b7946c0316ba1d0deb14ebd9861d400b",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/17.json": {
+      "size": 360731,
+      "sha256": "51ee096350e795b85883d17274e8013bdfcbb59500901aa587a5734f0d145685",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/4.json": {
+      "size": 694398,
+      "sha256": "fb640738fef893500899ce58d713421a66945f8ced7038277772cbf547cf8b65",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/63.json": {
+      "size": 31835,
+      "sha256": "cfae7b2df9e68df0baf859f51185da73111aeabb09a5dead3bbf0c977872a9d0",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/89.json": {
+      "size": 36659,
+      "sha256": "dc5521b16b6a15995c6d7f5092115459eade78da105e4420cb7ce76cbdb10695",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/59.json": {
+      "size": 58554,
+      "sha256": "f6198f66c33769e59219459f4e1bae05448e6cf7963ff2a049c928e235b1f847",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/60.json": {
+      "size": 52102,
+      "sha256": "050f6fee1dba7e29d75f2e159721323bba5914ed83dedb100b181e020fb831f9",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/7.json": {
+      "size": 715857,
+      "sha256": "c1d53b7bfc2a04ed9b165bcc2a252751595310e7f4b88118cfa475e1201a0678",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/101.json": {
+      "size": 15589,
+      "sha256": "605415094f3b36fefdeb85fc7e57fe8c377b14a5d654be62d7a3300a84a40a75",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/18.json": {
+      "size": 275863,
+      "sha256": "2526600ebeb93be074457ce1c84db4661ea715ae4a966bbea868e4491f018ccc",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/24.json": {
+      "size": 288611,
+      "sha256": "d74e6198f148d91528a2db52570adf75b411e4b782bf63c77532c2f6939868a5",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/88.json": {
+      "size": 21987,
+      "sha256": "2c97403499a637ad894a2cd7a6b8f83ccf964c21e8a2ca027a496f5bc251a680",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/11.json": {
+      "size": 369101,
+      "sha256": "e220d60e974d8e986035548ffbf25a76e143ba63517a2f778278df136c8e1030",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/29.json": {
+      "size": 192893,
+      "sha256": "ba7dcf2b9e84f26265600f2ce5afc61f2f333a9499e4503febbb033b148221ab",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/45.json": {
+      "size": 25981,
+      "sha256": "1af134453cc4e7090c8656b21e172086e8ccb8abc607a5826cdfd8f35205d912",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/48.json": {
+      "size": 53937,
+      "sha256": "2e1e551bd5f3745ef2396f4c8fceb143e75e6cf5da4d622ef35851075783f513",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/31.json": {
+      "size": 102338,
+      "sha256": "4b4edf0faa303203b685f70d531609ad6f0d11a8b661d965611e971878259c71",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/8.json": {
+      "size": 314191,
+      "sha256": "380833ccc080e74a8814339344839b1d116b83cd4cf1a7ce7f7ba4a85be1c353",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/9.json": {
+      "size": 493492,
+      "sha256": "53c5e019d0e8fee95d88ee1244e0d913a958853ae09fba9b0dbdb37c3df74157",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/19.json": {
+      "size": 175311,
+      "sha256": "0499afc1ab0a37e87d057a99f22db4fb8f2c24cafcb70dac3ec2d0ef03c6282d",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/5.json": {
+      "size": 479417,
+      "sha256": "9b19629b24221c6e5582ae9247a00cf03de8c78908fc08fd5f62517e4d64fc3f",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/36.json": {
+      "size": 94308,
+      "sha256": "cfbaff49c39f511ebabb4b3c66d707bffbb5666ff3fd946f6f796b1b6d3607a4",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/99.json": {
+      "size": 18126,
+      "sha256": "400e004afa1a4a1b2f7bd3eb0854cc09387c52eb0829a60cb305adecee6724d0",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/81.json": {
+      "size": 28123,
+      "sha256": "6df90bd7904ca8d6ee70e4c30b00241f41be94a765f34b6a04a5ac256152a247",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/76.json": {
+      "size": 39884,
+      "sha256": "5f11768ba59c86f8ccec8e6a42ea06bf7f2ae5223d2bb78bc0ed8fb11c878dfe",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/106.json": {
+      "size": 21615,
+      "sha256": "b561666cacc9256d4e203f11101c371257abe0cc32d133407ab74e87b3489a52",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/58.json": {
+      "size": 53249,
+      "sha256": "d1f73dfa4f04550b46116351ef9a6941cdff80bbabae4a578f07ff9e7953fa4e",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/51.json": {
+      "size": 50196,
+      "sha256": "5714c749dbb7fb23799470dc0afcc57296f8b4e325632c7a66475382f3596fe1",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/26.json": {
+      "size": 83975,
+      "sha256": "f9b2bfbfc306f91f6d429cb9e32b8d3ec992d5dda7dec5ae8fd76386fe6aeb48",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/62.json": {
+      "size": 32878,
+      "sha256": "139ce304ece1471a177b567375228a42312d0b2c4f92519450832d4c6a6562c3",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/35.json": {
+      "size": 85502,
+      "sha256": "22149b715d01be83059326bde2264467ed9113d5ff73606410d520971c4e6c0d",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/65.json": {
+      "size": 16142,
+      "sha256": "83f6d26ddb41f94e830feb7a856a6381aa38de56e103ccbc291d9a08f2a2abe3",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/42.json": {
+      "size": 70405,
+      "sha256": "9c183202c22a0d1c5e9efc8e3a548907fef14d82912e7e0c46202158b16bdd0f",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/50.json": {
+      "size": 41743,
+      "sha256": "9425ef3c6edffd9b4e8acfd35044a6cd0d6ca98efa2e00fb106c899d1c4a35c1",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/109.json": {
+      "size": 24917,
+      "sha256": "6b6d4491ab623de861597e2584a96e0339da02a0f28f2014dddda149374c39c3",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/107.json": {
+      "size": 10062,
+      "sha256": "df2474438afb68bb82c9bf151401dd19403c5bef5aaa684d9ce6ad7e6b10e31c",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/72.json": {
+      "size": 34106,
+      "sha256": "96af37796d70fdaf2d5af4449535c6704d4ee0f2cb16bb6bef0f27da4dacdc5b",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/22.json": {
+      "size": 342642,
+      "sha256": "df7fecf0edd522fa3822ddf3bcf3b912deac107d65ed2a061632c92f53fb427f",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/112.json": {
+      "size": 31556,
+      "sha256": "6f399bf7d7a01457d09b3470df0f91f7d940d3de1d46f5883350c384bffa26cb",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/44.json": {
+      "size": 40138,
+      "sha256": "a322d8d3972cfc641f7077f725de142b90dbfef52b701ee1b188f682e072cfbe",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/69.json": {
+      "size": 16710,
+      "sha256": "4b97923fa863062ca205b1af9e8fa4dc8a176b63d237b610f6eefd82628b2498",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/83.json": {
+      "size": 32413,
+      "sha256": "efa10e18a7c3b43d41f97e7eb5e08754973c92663486dc32b9b3f5ae609253b9",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/21.json": {
+      "size": 219330,
+      "sha256": "0853a133d91c375e94b3995951308a14d4e15ebc7dc0254b156a3835f125d585",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/96.json": {
+      "size": 22555,
+      "sha256": "2540623acbeeb095fb000a191e12d30049458f8534e83088a88624d45a231b92",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/54.json": {
+      "size": 55874,
+      "sha256": "e7202c9fbf2cf74ed182f0118c18ae31f7333fd7f412e735a94046454bfcbeaf",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/79.json": {
+      "size": 28046,
+      "sha256": "a776004562267b28472ee5f35a2b3d3d05c0274c84d61a9d11d657453ee5dc11",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/16.json": {
+      "size": 408058,
+      "sha256": "d454f98c456a05993394052d1e7db7361aa7879410e222c09749315209d7f539",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/41.json": {
+      "size": 78341,
+      "sha256": "a7fba7494db66bfa0deb731b6fe870e9750b947569eb3808891544f9f5e287ac",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/87.json": {
+      "size": 29215,
+      "sha256": "4e2d2f779c81357c2fe27e8a6c019c749e7bac424b0ad47e4fcfa4a7f678e979",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/manifest.json": {
+      "size": 38951,
+      "sha256": "e0f0c7a8882a191eee23a61f0bfd3b7a0fd977277ccfdff26f5beb655678a121",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/90.json": {
+      "size": 19981,
+      "sha256": "f8c4455605da2aaf62c6e8311a216e098d135eea617cefa62a23a256ed96c486",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/84.json": {
+      "size": 27480,
+      "sha256": "e70f72833de086675219e505bf0b929c914a7095e84c8bf679c9a97ad97c8e7a",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/43.json": {
+      "size": 49273,
+      "sha256": "e7ab1d7bf523f3b53ec8b58d1bc75342e5e6d3294de4f231afb4343095de6399",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/64.json": {
+      "size": 16028,
+      "sha256": "7119662b42bed63d1ac8282dccd1649bb65f3151d6c0e0cde0593fc3cc910f92",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/91.json": {
+      "size": 23105,
+      "sha256": "9179bbb322f61a44ce17b855d5c837e6c8aea7575beafa234864b76e9e0e68a4",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/104.json": {
+      "size": 15003,
+      "sha256": "3f9aa7626efe3176a79dacf64051639d6eea0682c1fec8d399c083902eb858f9",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/32.json": {
+      "size": 40561,
+      "sha256": "b9ef8c0f86c204f47c56c70f84ee99db6b096fbadcda1d41a68550a706704252",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/39.json": {
+      "size": 83938,
+      "sha256": "beb1049db25e84f5a01f18d7766e71a521a325a273673eb46a4eff2b2611d333",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/78.json": {
+      "size": 25019,
+      "sha256": "3c6d3a74f9c5f3a8c602f034a581e9ba6ced75ef9de731546364be11cb44bfad",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/103.json": {
+      "size": 23195,
+      "sha256": "5302808853a1f163bd2fddc3098db1161806f4952ca237b3d964b1a4286203ab",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/30.json": {
+      "size": 105326,
+      "sha256": "2ab21969461cdd1a33fd168b3c4e151dd8ae165ce715a4c9dbc7c0c4437c1b17",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/23.json": {
+      "size": 202113,
+      "sha256": "450eca17afac09c9ae5ea466ba533dedb2de9f097e1c2c7e12ae6082975b7d74",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/74.json": {
+      "size": 39647,
+      "sha256": "b60734e2c7d169a476934c30a346f6eda181449460e494f10f87fde1946c4b77",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/66.json": {
+      "size": 26620,
+      "sha256": "2cfcf9dcb1802e0b0a9cc2b3a89e29195571d15f5a4169f9728e92c14c8896df",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/27.json": {
+      "size": 236252,
+      "sha256": "1b648fe16396780f46ae7084b75bb69dbfd867da3f6b45e125d93b7f5179e946",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/71.json": {
+      "size": 32834,
+      "sha256": "33b67ce2d668f62c4c0c077d0329b419068255e9629fcaaed90faf5b6a287c4f",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/111.json": {
+      "size": 26363,
+      "sha256": "c8fbf428938c9c07c1e18ec7d1b3aecc7b970e8faaffca95bfc9c3e941664991",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/102.json": {
+      "size": 24418,
+      "sha256": "4210fe429d210d441076597c22b0d5fbb6b92dd9384da36648a0650ce1443829",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/73.json": {
+      "size": 40402,
+      "sha256": "0bdbad0c8ef2f598c1b9c0e2076722c8da41146c23c10e3a43b004aeec2ac888",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/67.json": {
+      "size": 16271,
+      "sha256": "2c40f7aa2f05311d890464036b25ab8be26e3a948eda93b84e4fdfb1a6b8bb45",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/92.json": {
+      "size": 23270,
+      "sha256": "d758f15ceb19dffd0ca6bbd821460628a4334a6ca30282dec2a2ea1999a016bc",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/12.json": {
+      "size": 333811,
+      "sha256": "010ddba9476af524f50e08cd8a3a62d79522417596c97e0722b997769d199432",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/93.json": {
+      "size": 20056,
+      "sha256": "fe5628b2b2d8a9fcc63bb98dfc9809b101181d90624e07b1636d37210bb257f1",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/80.json": {
+      "size": 23929,
+      "sha256": "e8e6c684149b8ce506d7caa535471fab803540784d7991687543862f8d8f57e4",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/2.json": {
+      "size": 1263310,
+      "sha256": "2aa58d173e4f80fe2d059f72c18fcaf29823dfe1651537095a423d7ae1cb8df8",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/77.json": {
+      "size": 26683,
+      "sha256": "3bb736070beef4400c72dc4bb6fd2e753b2276aac39518c3741a475ab2c052ac",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/49.json": {
+      "size": 50310,
+      "sha256": "61ae94adcb40d2f7b472810083860768519af4fe44aea8cf1464ba432d603639",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/20.json": {
+      "size": 241278,
+      "sha256": "be10f9f1deeee983622520e9dc13ab82770982db657c8b0e84b99a184eee39d7",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/110.json": {
+      "size": 13626,
+      "sha256": "daa09601700a8fb7191bcfbfa5324a6794fd56353ef6c293ad39664c815ba09a",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/1.json": {
+      "size": 100913,
+      "sha256": "3abbf8e2957ee099391d94a128be963e66f61ebd8afbed41de46f07217b952b5",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/75.json": {
+      "size": 38546,
+      "sha256": "861cb1bdba7c321c530dc0085a9e66b782f19de458d6f4d93e965edb0793352d",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/38.json": {
+      "size": 82853,
+      "sha256": "0d951828503eb9635d26a11c8c830d369fd3290f6e9453c11cca29da2ae60df6",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/10.json": {
+      "size": 372505,
+      "sha256": "0c46984806f2fcdc9438fd71c8bdf91184c5a7b934added55808b02b017ab5b1",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/97.json": {
+      "size": 13208,
+      "sha256": "989bd8ad0d3e2709370bd0c28754fc88bcf57e9adff5afa254528f662dcfdb17",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/33.json": {
+      "size": 151071,
+      "sha256": "4255140ee7ad030071181252f62e4de3edf15935d42b4465751d4b01c28617f0",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/82.json": {
+      "size": 15976,
+      "sha256": "f79a3c7601f50e6ea67f15e58ff5edadd04f0fa47a4fe097eabb5bbb8b52947b",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/6.json": {
+      "size": 525681,
+      "sha256": "7f6f8b31e098c0713121e1d83bc711d6fef4c70d578523a9f809d822f5e4855e",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/53.json": {
+      "size": 76425,
+      "sha256": "5bba005564d183a5e9a8fb0d024bac9adbbdf72af7cb3c2172fe2c002c705437",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/113.json": {
+      "size": 35304,
+      "sha256": "2c85b2d2b6f0b6923a44c123dcb09b06a027645a7b0c95a3b0ce715116b2e8ce",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/15.json": {
+      "size": 137867,
+      "sha256": "f79a1220ca1dbb6769410b28055c6daf599477cb5629dbb647ded163b2d1ff5d",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/3.json": {
+      "size": 546015,
+      "sha256": "1381973b82ad7b922a8641a0b018da55fb4d7c81506495256e6ed538bca00f52",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/46.json": {
+      "size": 58626,
+      "sha256": "263b7cc3ae174ffbe59b1c879909ee88d278de69f5b7a32d5f8056b426338ac6",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/98.json": {
+      "size": 14591,
+      "sha256": "6e69fee8e4a3726fc7f6eb0037fca11480d20dd7b9b47ea1465c369fd2f9d76d",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/47.json": {
+      "size": 41086,
+      "sha256": "ff04c1d0fec36dcada79ae4fcb2f0442e636b632e2fdd35a37fa75a0cb2e1cd4",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/70.json": {
+      "size": 38237,
+      "sha256": "6529fd29fed3ba4b21e526f36f932e7ec8dfa0d793c88a84193a6fb81e47c65f",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/61.json": {
+      "size": 18862,
+      "sha256": "d637009fe82399aa08721d3af318e7c9133251a4dfcd6fa90648321e316300f2",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/34.json": {
+      "size": 67573,
+      "sha256": "bab14698d38a262efc3df8e7af830fb137b9bc87f77ea8e5394f53b470425e47",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/94.json": {
+      "size": 11414,
+      "sha256": "bd54b3c3a439f942b870e0e74a720eb8c22114f256e902b8544aba06454820c2",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/NOTICE.txt": {
+      "size": 685,
+      "sha256": "aec5ffb444542689a56a89e76c5d5e1cac5a39a019ae3831d029ba8b80488662",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/85.json": {
+      "size": 22472,
+      "sha256": "bdb6469d53dd9e0adc4bcbda37ed753e48a337a2c04db9d19ceaf329da4c2372",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/56.json": {
+      "size": 126480,
+      "sha256": "fae9d929cbcaa654314a82300e43a2f8cdbe8bee2aa5197f5fcaaae5ada202ba",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/114.json": {
+      "size": 5151,
+      "sha256": "c7f0b88905d62165f626d48219d39751e02381739c9dba2b5bfb02686559002c",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/57.json": {
+      "size": 100629,
+      "sha256": "701f62fdabfc4b63d9b81a757a3b0ff9bf42b364f30be66349a56657cc2b7f18",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/86.json": {
+      "size": 18924,
+      "sha256": "78aa69ba475a3a0f3bd57cd51fbeeadc2dc97f5930fc6decab67920e2ec500ae",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/68.json": {
+      "size": 22557,
+      "sha256": "3ca248db263852a6f3e1c5d091e30ac77f88f2be26b7f827bbd8b0821b5636be",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/14.json": {
+      "size": 237685,
+      "sha256": "3d27c06709f9e5ea866c3c50ca179639daf08d48d6fb589a6efda6a6c01d83a9",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/100.json": {
+      "size": 14849,
+      "sha256": "1552fb99f71ece9eb1eb3913b475364d5e9b930c052ea92dec58543f6074d5b1",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/13.json": {
+      "size": 254593,
+      "sha256": "2e274c89760acb56c5f7f2f290312e06866fd21658792d8f9557e0b9f12182ee",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/25.json": {
+      "size": 84316,
+      "sha256": "0df752c7c5ed992d18e4f516235b86b849fb0caced69f16434bfa796740d808e",
+      "category": "quran_tafsir_bn_zakaria",
+      "required": false
+    },
+    "tafsir/bn-zakaria/v1/40.json": {
+      "size": 80397,
+      "sha256": "7c7e015b3ca02df68e6cdf14c7729b6b1d9f784add1c89b1fd4e663ef23b99dc",
+      "category": "quran_tafsir_bn_zakaria",
       "required": false
     }
   }

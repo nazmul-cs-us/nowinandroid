@@ -8450,6 +8450,1180 @@
           "missing_ayahs": []
         }
       ]
+    },
+    {
+      "language": "bn",
+      "storageIndex": 14,
+      "languageName": "বাংলা",
+      "englishLanguageName": "Bengali",
+      "title": "তাফসীর আবু বকর যাকারিয়া",
+      "bookKey": "zakaria_bn",
+      "attribution": "King Fahd Quran Printing Complex",
+      "sourceUrl": "https://qul.tarteel.ai/resources/tafsir/33",
+      "cdnPrefix": "tafsir/bn-zakaria/v1",
+      "category": "quran_tafsir_bn_zakaria",
+      "metadata": {
+        "author_name": "King Fahd Quran Printing Complex",
+        "id": 33,
+        "language_name": "bengali",
+        "name": "Tafsir Abu Bakr Zakaria",
+        "slug": "bn-tafsir-abu-bakr-zakaria",
+        "source": "https://qul.tarteel.ai/resources/tafsir/33"
+      },
+      "source_commit": "311a038bf532fa84566ca1bb2cdbeb210da3d5ed",
+      "surah_count": 114,
+      "ayah_count": 6236,
+      "missing_ayahs": [],
+      "notice": "Tafsir Abu Bakr Zakaria — Bengali\nAuthor: Dr. Abu Bakr Muhammad Zakaria\nCatalog attribution: King Fahd Quran Printing Complex\nSource: https://qul.tarteel.ai/resources/tafsir/33\nQuran.com resource: 166\nMirror: https://github.com/spa5k/tafsir_api\nPinned commit: 311a038bf532fa84566ca1bb2cdbeb210da3d5ed\nAll 114 surahs / 6,236 ayah entries. Original Bengali, Arabic quotations, paragraph breaks and source groupings are preserved without rewriting or machine translation.\nThis is a separate commentary, not a repaired or renamed Ibn Kathir edition.\nQUL currently lists no copyright information for this resource; the underlying published text is not designated public domain by Deenly.\n",
+      "files": [
+        {
+          "surah": 1,
+          "ayahs": 7,
+          "bytes": 100913,
+          "sha256": "3abbf8e2957ee099391d94a128be963e66f61ebd8afbed41de46f07217b952b5",
+          "source_sha256": "8ebbbccc9fd9f6bfea1ae4cd1242511f66611176c387311601b282c8af6fc7f7",
+          "missing_ayahs": [],
+          "arabic_characters": 970,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 2,
+          "ayahs": 286,
+          "bytes": 1263310,
+          "sha256": "2aa58d173e4f80fe2d059f72c18fcaf29823dfe1651537095a423d7ae1cb8df8",
+          "source_sha256": "f48e5e15a7b8cac308229e1588b3fbf73d2a52f7274f8b542d67f65db4660b0f",
+          "missing_ayahs": [],
+          "arabic_characters": 2037,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 3,
+          "ayahs": 200,
+          "bytes": 546015,
+          "sha256": "1381973b82ad7b922a8641a0b018da55fb4d7c81506495256e6ed538bca00f52",
+          "source_sha256": "b592ce1ed1c0323e41316dcd513c3e199f2b7b2b0ce777fc62b9fedb5ab9e98d",
+          "missing_ayahs": [],
+          "arabic_characters": 569,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 4,
+          "ayahs": 176,
+          "bytes": 694398,
+          "sha256": "fb640738fef893500899ce58d713421a66945f8ced7038277772cbf547cf8b65",
+          "source_sha256": "fcdd6b0827b147c005d106f6567d3f2fb0612af3168579458b7cd74743f774be",
+          "missing_ayahs": [],
+          "arabic_characters": 600,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 5,
+          "ayahs": 120,
+          "bytes": 479417,
+          "sha256": "9b19629b24221c6e5582ae9247a00cf03de8c78908fc08fd5f62517e4d64fc3f",
+          "source_sha256": "9feb3723947592d3350cc8dfd1aae7944da05ff0bcfaea91cb3c4a3e9d8c5b22",
+          "missing_ayahs": [],
+          "arabic_characters": 1008,
+          "arabic_placeholders": 2
+        },
+        {
+          "surah": 6,
+          "ayahs": 165,
+          "bytes": 525681,
+          "sha256": "7f6f8b31e098c0713121e1d83bc711d6fef4c70d578523a9f809d822f5e4855e",
+          "source_sha256": "e234dc1c22b413a80926c6f4abc5518920fd3c19649b79952a44764f9dc1d933",
+          "missing_ayahs": [],
+          "arabic_characters": 872,
+          "arabic_placeholders": 1
+        },
+        {
+          "surah": 7,
+          "ayahs": 206,
+          "bytes": 715857,
+          "sha256": "c1d53b7bfc2a04ed9b165bcc2a252751595310e7f4b88118cfa475e1201a0678",
+          "source_sha256": "e04e8488d0c9d8b9275852f77a06f1498077104f45f3e09143d06921c3a1c420",
+          "missing_ayahs": [],
+          "arabic_characters": 1252,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 8,
+          "ayahs": 75,
+          "bytes": 314191,
+          "sha256": "380833ccc080e74a8814339344839b1d116b83cd4cf1a7ce7f7ba4a85be1c353",
+          "source_sha256": "88061c06078d8fc80783f3a4c7815249d92d1a554e542f0ad7f1367f9de62987",
+          "missing_ayahs": [],
+          "arabic_characters": 571,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 9,
+          "ayahs": 129,
+          "bytes": 493492,
+          "sha256": "53c5e019d0e8fee95d88ee1244e0d913a958853ae09fba9b0dbdb37c3df74157",
+          "source_sha256": "d3b05faa77362bc879fcadd826981cfe3ab129cd18c2ec8ea03d7e89782f0a4c",
+          "missing_ayahs": [],
+          "arabic_characters": 541,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 10,
+          "ayahs": 109,
+          "bytes": 372505,
+          "sha256": "0c46984806f2fcdc9438fd71c8bdf91184c5a7b934added55808b02b017ab5b1",
+          "source_sha256": "f6be9ac3f4200d2ffa641046f7152388a98c3324715b1561b1e8067bcaa81fda",
+          "missing_ayahs": [],
+          "arabic_characters": 670,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 11,
+          "ayahs": 123,
+          "bytes": 369101,
+          "sha256": "e220d60e974d8e986035548ffbf25a76e143ba63517a2f778278df136c8e1030",
+          "source_sha256": "5eda0f7a55ccbb2153e2ffaef4736bb00ff68d962b46539cea4fb25a8c5fb1a4",
+          "missing_ayahs": [],
+          "arabic_characters": 120,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 12,
+          "ayahs": 111,
+          "bytes": 333811,
+          "sha256": "010ddba9476af524f50e08cd8a3a62d79522417596c97e0722b997769d199432",
+          "source_sha256": "2a700c28ef15c9872757bf10913c74577fbebbe0e269816329c3af9cbba23710",
+          "missing_ayahs": [],
+          "arabic_characters": 496,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 13,
+          "ayahs": 43,
+          "bytes": 254593,
+          "sha256": "2e274c89760acb56c5f7f2f290312e06866fd21658792d8f9557e0b9f12182ee",
+          "source_sha256": "8adf9d37b685b58d1a2e4a21a2730a887cd6fa826948104748e8c70f30b525ea",
+          "missing_ayahs": [],
+          "arabic_characters": 361,
+          "arabic_placeholders": 1
+        },
+        {
+          "surah": 14,
+          "ayahs": 52,
+          "bytes": 237685,
+          "sha256": "3d27c06709f9e5ea866c3c50ca179639daf08d48d6fb589a6efda6a6c01d83a9",
+          "source_sha256": "271df6341f18f470f73c354c944cac7af81e93376f4fc7e5393c82499b796ea7",
+          "missing_ayahs": [],
+          "arabic_characters": 581,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 15,
+          "ayahs": 99,
+          "bytes": 137867,
+          "sha256": "f79a1220ca1dbb6769410b28055c6daf599477cb5629dbb647ded163b2d1ff5d",
+          "source_sha256": "5d7f356860505b6b59f2beb9abaaabf28fc600dde066eaa199296c215d59aed8",
+          "missing_ayahs": [],
+          "arabic_characters": 292,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 16,
+          "ayahs": 128,
+          "bytes": 408058,
+          "sha256": "d454f98c456a05993394052d1e7db7361aa7879410e222c09749315209d7f539",
+          "source_sha256": "e9b4d979fc63122b0a2ee8916a20d8a4e187e7a8227699f2e45e1b7a101f177d",
+          "missing_ayahs": [],
+          "arabic_characters": 939,
+          "arabic_placeholders": 1
+        },
+        {
+          "surah": 17,
+          "ayahs": 111,
+          "bytes": 360731,
+          "sha256": "51ee096350e795b85883d17274e8013bdfcbb59500901aa587a5734f0d145685",
+          "source_sha256": "2584f067230a29ec1d7a0b03ef53015960c53cb2b14ee1e58a36ad392ec42c22",
+          "missing_ayahs": [],
+          "arabic_characters": 850,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 18,
+          "ayahs": 110,
+          "bytes": 275863,
+          "sha256": "2526600ebeb93be074457ce1c84db4661ea715ae4a966bbea868e4491f018ccc",
+          "source_sha256": "ac18836835a18b673d0891985052e4bee453973f3b2612c61f82accc04a2c61d",
+          "missing_ayahs": [],
+          "arabic_characters": 628,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 19,
+          "ayahs": 98,
+          "bytes": 175311,
+          "sha256": "0499afc1ab0a37e87d057a99f22db4fb8f2c24cafcb70dac3ec2d0ef03c6282d",
+          "source_sha256": "f12a6257bc868f6389431cbe4eb1bec8ca332ffb73304fb58227b70b4dec1c56",
+          "missing_ayahs": [],
+          "arabic_characters": 225,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 20,
+          "ayahs": 135,
+          "bytes": 241278,
+          "sha256": "be10f9f1deeee983622520e9dc13ab82770982db657c8b0e84b99a184eee39d7",
+          "source_sha256": "2de749e218770e62ea14197f1c7b84fdc46846b03b3c900e7502e5945c9735c0",
+          "missing_ayahs": [],
+          "arabic_characters": 324,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 21,
+          "ayahs": 112,
+          "bytes": 219330,
+          "sha256": "0853a133d91c375e94b3995951308a14d4e15ebc7dc0254b156a3835f125d585",
+          "source_sha256": "c19efa23f3f5826dd6579985cfb5e293fe8264e07c936693d4855d405dcd64f3",
+          "missing_ayahs": [],
+          "arabic_characters": 216,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 22,
+          "ayahs": 78,
+          "bytes": 342642,
+          "sha256": "df7fecf0edd522fa3822ddf3bcf3b912deac107d65ed2a061632c92f53fb427f",
+          "source_sha256": "9f7b3590f9c0c6c889df8231f92ec94bb6b07f5799a4b9512751ff805738b7f9",
+          "missing_ayahs": [],
+          "arabic_characters": 784,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 23,
+          "ayahs": 118,
+          "bytes": 202113,
+          "sha256": "450eca17afac09c9ae5ea466ba533dedb2de9f097e1c2c7e12ae6082975b7d74",
+          "source_sha256": "1e6a3682e81c7c95b0c117b0357e233cb79202d30761bdc81622fc1c2e661dac",
+          "missing_ayahs": [],
+          "arabic_characters": 520,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 24,
+          "ayahs": 64,
+          "bytes": 288611,
+          "sha256": "d74e6198f148d91528a2db52570adf75b411e4b782bf63c77532c2f6939868a5",
+          "source_sha256": "8bbb74331ba61da30c35dff98726aee1d97df26132e49a6a0eec3f478fecf8d9",
+          "missing_ayahs": [],
+          "arabic_characters": 1070,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 25,
+          "ayahs": 77,
+          "bytes": 84316,
+          "sha256": "0df752c7c5ed992d18e4f516235b86b849fb0caced69f16434bfa796740d808e",
+          "source_sha256": "9006b1b94059deddc489ccd08368dddece9349d0630136b51db56070b4cb7e39",
+          "missing_ayahs": [],
+          "arabic_characters": 322,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 26,
+          "ayahs": 227,
+          "bytes": 83975,
+          "sha256": "f9b2bfbfc306f91f6d429cb9e32b8d3ec992d5dda7dec5ae8fd76386fe6aeb48",
+          "source_sha256": "234c7070ac27aa6c48392692a6c1546a88a16702f9b37b9712a9d17c72f52f32",
+          "missing_ayahs": [],
+          "arabic_characters": 329,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 27,
+          "ayahs": 93,
+          "bytes": 236252,
+          "sha256": "1b648fe16396780f46ae7084b75bb69dbfd867da3f6b45e125d93b7f5179e946",
+          "source_sha256": "51da4188e76f32d3584e3e2d48bb36eb40acce806a48e7adeb2c8a478f279ef6",
+          "missing_ayahs": [],
+          "arabic_characters": 500,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 28,
+          "ayahs": 88,
+          "bytes": 163147,
+          "sha256": "277e211d9f2a142576e66a675a6e24c3eddd4f5842f3eab70febcfc55c891f21",
+          "source_sha256": "e86a7330f480fdb1a645344bfa7b71934d1a9e2f5bc6cb38be86eda6a321dd22",
+          "missing_ayahs": [],
+          "arabic_characters": 213,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 29,
+          "ayahs": 69,
+          "bytes": 192893,
+          "sha256": "ba7dcf2b9e84f26265600f2ce5afc61f2f333a9499e4503febbb033b148221ab",
+          "source_sha256": "9258fafa64d0d08a2e6ea03f5fdff7f334dd790979ff170aed693c9494d8ea0c",
+          "missing_ayahs": [],
+          "arabic_characters": 70,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 30,
+          "ayahs": 60,
+          "bytes": 105326,
+          "sha256": "2ab21969461cdd1a33fd168b3c4e151dd8ae165ce715a4c9dbc7c0c4437c1b17",
+          "source_sha256": "6f9d1aa5fd38628f12e1cc5995b5ac86292deae273bc882533218a5deda9bb7e",
+          "missing_ayahs": [],
+          "arabic_characters": 110,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 31,
+          "ayahs": 34,
+          "bytes": 102338,
+          "sha256": "4b4edf0faa303203b685f70d531609ad6f0d11a8b661d965611e971878259c71",
+          "source_sha256": "a413fac52a72fa6550633c362699cf6178d648de8bf4d832057f0564a3c8a4a7",
+          "missing_ayahs": [],
+          "arabic_characters": 196,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 32,
+          "ayahs": 30,
+          "bytes": 40561,
+          "sha256": "b9ef8c0f86c204f47c56c70f84ee99db6b096fbadcda1d41a68550a706704252",
+          "source_sha256": "798374cb4dd1006a13176002f4ad3f0f1415b03a7a19111de759c922c6228dcc",
+          "missing_ayahs": [],
+          "arabic_characters": 32,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 33,
+          "ayahs": 73,
+          "bytes": 151071,
+          "sha256": "4255140ee7ad030071181252f62e4de3edf15935d42b4465751d4b01c28617f0",
+          "source_sha256": "e4721db54db6b589551f5f1ddb612f5dfa18d54f5897c5c61b5ad044aa021b21",
+          "missing_ayahs": [],
+          "arabic_characters": 559,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 34,
+          "ayahs": 54,
+          "bytes": 67573,
+          "sha256": "bab14698d38a262efc3df8e7af830fb137b9bc87f77ea8e5394f53b470425e47",
+          "source_sha256": "f39f1be8e6de90e1e6df739094e1d7a5a8383ae93e770ef04392abbf1948816a",
+          "missing_ayahs": [],
+          "arabic_characters": 5,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 35,
+          "ayahs": 45,
+          "bytes": 85502,
+          "sha256": "22149b715d01be83059326bde2264467ed9113d5ff73606410d520971c4e6c0d",
+          "source_sha256": "90474b167833735ecb0a6e25095c38f53b3efd92183e1984383c5876789c95b6",
+          "missing_ayahs": [],
+          "arabic_characters": 43,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 36,
+          "ayahs": 83,
+          "bytes": 94308,
+          "sha256": "cfbaff49c39f511ebabb4b3c66d707bffbb5666ff3fd946f6f796b1b6d3607a4",
+          "source_sha256": "4d9ac4e29f7cbc1f3ad348ebff3e31ac78920ca7d189b4ef7d7f3b87c4b4a0e6",
+          "missing_ayahs": [],
+          "arabic_characters": 218,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 37,
+          "ayahs": 182,
+          "bytes": 75526,
+          "sha256": "f83355ba26dddadaba9391e6054b4fce3853b9dbe9ca3dab1651c3900e0543bc",
+          "source_sha256": "4899eef29c68ec95d384c56173c66251309be72dce5c8fd0188d9bf13c820686",
+          "missing_ayahs": [],
+          "arabic_characters": 114,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 38,
+          "ayahs": 88,
+          "bytes": 82853,
+          "sha256": "0d951828503eb9635d26a11c8c830d369fd3290f6e9453c11cca29da2ae60df6",
+          "source_sha256": "a9114f42fcad922076a351eb36a80f9cecb1100b305f01aeb5af14c97931d7d3",
+          "missing_ayahs": [],
+          "arabic_characters": 158,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 39,
+          "ayahs": 75,
+          "bytes": 83938,
+          "sha256": "beb1049db25e84f5a01f18d7766e71a521a325a273673eb46a4eff2b2611d333",
+          "source_sha256": "53acd6e4ded614063b3e14b7e1dd9a7a4d9c94dbd77d36a74c94e0d8894128f7",
+          "missing_ayahs": [],
+          "arabic_characters": 520,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 40,
+          "ayahs": 85,
+          "bytes": 80397,
+          "sha256": "7c7e015b3ca02df68e6cdf14c7729b6b1d9f784add1c89b1fd4e663ef23b99dc",
+          "source_sha256": "f869a5e7d6791df25f3b1b61aa62c1b19afb9ded0ebf33e4b791af2d71f52cd8",
+          "missing_ayahs": [],
+          "arabic_characters": 640,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 41,
+          "ayahs": 54,
+          "bytes": 78341,
+          "sha256": "a7fba7494db66bfa0deb731b6fe870e9750b947569eb3808891544f9f5e287ac",
+          "source_sha256": "5cc230f2ad6ad5cb93101a921469cdab9ec9ac166db1e6814469848ac48a30ca",
+          "missing_ayahs": [],
+          "arabic_characters": 470,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 42,
+          "ayahs": 53,
+          "bytes": 70405,
+          "sha256": "9c183202c22a0d1c5e9efc8e3a548907fef14d82912e7e0c46202158b16bdd0f",
+          "source_sha256": "690e861e490cfc48ee4783f61f32328ffa36f361b5bd941a50c33c4bdc781fa8",
+          "missing_ayahs": [],
+          "arabic_characters": 246,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 43,
+          "ayahs": 89,
+          "bytes": 49273,
+          "sha256": "e7ab1d7bf523f3b53ec8b58d1bc75342e5e6d3294de4f231afb4343095de6399",
+          "source_sha256": "b4cc9d8d1139af66cd6be9862b842b46063011866ed6d7a7cb484cbd247aec90",
+          "missing_ayahs": [],
+          "arabic_characters": 266,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 44,
+          "ayahs": 59,
+          "bytes": 40138,
+          "sha256": "a322d8d3972cfc641f7077f725de142b90dbfef52b701ee1b188f682e072cfbe",
+          "source_sha256": "09ae9bbd7cd515d06cc984f35821431dedf4d5f80e3b30a3b866daae1ee4eff7",
+          "missing_ayahs": [],
+          "arabic_characters": 135,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 45,
+          "ayahs": 37,
+          "bytes": 25981,
+          "sha256": "1af134453cc4e7090c8656b21e172086e8ccb8abc607a5826cdfd8f35205d912",
+          "source_sha256": "2434f810b6e5776fa83137d48f39cb09a3d4e82ceaac4564819118d6884c2c49",
+          "missing_ayahs": [],
+          "arabic_characters": 20,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 46,
+          "ayahs": 35,
+          "bytes": 58626,
+          "sha256": "263b7cc3ae174ffbe59b1c879909ee88d278de69f5b7a32d5f8056b426338ac6",
+          "source_sha256": "7bdd4621dfdd08f7dd5889fc95a68376c3eddaee22f7f1a5472a126b8b21c86e",
+          "missing_ayahs": [],
+          "arabic_characters": 152,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 47,
+          "ayahs": 38,
+          "bytes": 41086,
+          "sha256": "ff04c1d0fec36dcada79ae4fcb2f0442e636b632e2fdd35a37fa75a0cb2e1cd4",
+          "source_sha256": "a734cf2e889b8aceb2b122b567df58ace0de4547b157f59bddc8a003f84937e3",
+          "missing_ayahs": [],
+          "arabic_characters": 160,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 48,
+          "ayahs": 29,
+          "bytes": 53937,
+          "sha256": "2e1e551bd5f3745ef2396f4c8fceb143e75e6cf5da4d622ef35851075783f513",
+          "source_sha256": "810ba59efeeaf5c000b81bff6975161fed4eddc4bb18f8e40d0df895d450b49c",
+          "missing_ayahs": [],
+          "arabic_characters": 66,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 49,
+          "ayahs": 18,
+          "bytes": 50310,
+          "sha256": "61ae94adcb40d2f7b472810083860768519af4fe44aea8cf1464ba432d603639",
+          "source_sha256": "13421bf2165645289d48ce0973f6b9b608bee4fce6c23c37a1306761ce6d6624",
+          "missing_ayahs": [],
+          "arabic_characters": 22,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 50,
+          "ayahs": 45,
+          "bytes": 41743,
+          "sha256": "9425ef3c6edffd9b4e8acfd35044a6cd0d6ca98efa2e00fb106c899d1c4a35c1",
+          "source_sha256": "42981b528641532d12ad478873d070202eea6053bd13f6bf46ee5aa0ad7378e3",
+          "missing_ayahs": [],
+          "arabic_characters": 159,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 51,
+          "ayahs": 60,
+          "bytes": 50196,
+          "sha256": "5714c749dbb7fb23799470dc0afcc57296f8b4e325632c7a66475382f3596fe1",
+          "source_sha256": "b50798b37f13b1505a359d2ce1ee54ca1597179f3ad1d917541abcb167f16c23",
+          "missing_ayahs": [],
+          "arabic_characters": 307,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 52,
+          "ayahs": 49,
+          "bytes": 45890,
+          "sha256": "d1a235280ba16f859f255446c81b22d938f3b7d6ef83e1e41313cfdc30c3e6d1",
+          "source_sha256": "b23f0e972448129d5547db68335e04d8c9910b134aa2a056b51f3de3555fedcd",
+          "missing_ayahs": [],
+          "arabic_characters": 292,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 53,
+          "ayahs": 62,
+          "bytes": 76425,
+          "sha256": "5bba005564d183a5e9a8fb0d024bac9adbbdf72af7cb3c2172fe2c002c705437",
+          "source_sha256": "f882cb6a30a04dd6578b62eb9a835d5936840dcf22852a07517c7b596515e580",
+          "missing_ayahs": [],
+          "arabic_characters": 294,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 54,
+          "ayahs": 55,
+          "bytes": 55874,
+          "sha256": "e7202c9fbf2cf74ed182f0118c18ae31f7333fd7f412e735a94046454bfcbeaf",
+          "source_sha256": "b6254935964feb18d16f419960f0fb7a4dc3299db654aa469356be0ea8bca86a",
+          "missing_ayahs": [],
+          "arabic_characters": 99,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 55,
+          "ayahs": 78,
+          "bytes": 74301,
+          "sha256": "a26df583b703ff386b8ac096a5da6175b7946c0316ba1d0deb14ebd9861d400b",
+          "source_sha256": "f32ec800764dfc17d29b9c8aa6ec71f8a205923d7b7fbfcfaf14f4d96225efec",
+          "missing_ayahs": [],
+          "arabic_characters": 783,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 56,
+          "ayahs": 96,
+          "bytes": 126480,
+          "sha256": "fae9d929cbcaa654314a82300e43a2f8cdbe8bee2aa5197f5fcaaae5ada202ba",
+          "source_sha256": "dccf991266f02025faef0cc862c5f91d2ee76fcd846d6c4e7bf442fc590211e8",
+          "missing_ayahs": [],
+          "arabic_characters": 499,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 57,
+          "ayahs": 29,
+          "bytes": 100629,
+          "sha256": "701f62fdabfc4b63d9b81a757a3b0ff9bf42b364f30be66349a56657cc2b7f18",
+          "source_sha256": "78ad8280282f37bb8fe8d79d58cb54aafaf7c65976cb7f09e423e89fecd2e50d",
+          "missing_ayahs": [],
+          "arabic_characters": 554,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 58,
+          "ayahs": 22,
+          "bytes": 53249,
+          "sha256": "d1f73dfa4f04550b46116351ef9a6941cdff80bbabae4a578f07ff9e7953fa4e",
+          "source_sha256": "d7ecc91b145bff9968311cd605555aade691e00349fdee54df3999cdcab6c83f",
+          "missing_ayahs": [],
+          "arabic_characters": 166,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 59,
+          "ayahs": 24,
+          "bytes": 58554,
+          "sha256": "f6198f66c33769e59219459f4e1bae05448e6cf7963ff2a049c928e235b1f847",
+          "source_sha256": "6c17fd498dbef1f3084645191a99aff8b2e69d7c2ae7ca78a927b6c73e5053fc",
+          "missing_ayahs": [],
+          "arabic_characters": 254,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 60,
+          "ayahs": 13,
+          "bytes": 52102,
+          "sha256": "050f6fee1dba7e29d75f2e159721323bba5914ed83dedb100b181e020fb831f9",
+          "source_sha256": "75fa447fa1543b802ad1c4d1623e6cf680972b909f343c06f67df8e14efd234f",
+          "missing_ayahs": [],
+          "arabic_characters": 273,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 61,
+          "ayahs": 14,
+          "bytes": 18862,
+          "sha256": "d637009fe82399aa08721d3af318e7c9133251a4dfcd6fa90648321e316300f2",
+          "source_sha256": "b77b1e6f28198d1fc8db4771d71d4a137c458db9bddf87b3cbf715552895f0a0",
+          "missing_ayahs": [],
+          "arabic_characters": 104,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 62,
+          "ayahs": 11,
+          "bytes": 32878,
+          "sha256": "139ce304ece1471a177b567375228a42312d0b2c4f92519450832d4c6a6562c3",
+          "source_sha256": "fc1821205d8d23c9655b2b7bfd531972fb51391fa3763a5efa84bee2716ef2c6",
+          "missing_ayahs": [],
+          "arabic_characters": 129,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 63,
+          "ayahs": 11,
+          "bytes": 31835,
+          "sha256": "cfae7b2df9e68df0baf859f51185da73111aeabb09a5dead3bbf0c977872a9d0",
+          "source_sha256": "3a736cc3a2103581b15cb1534ff075851cc197c66402045f0ac5d7aae14e2cd0",
+          "missing_ayahs": [],
+          "arabic_characters": 32,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 64,
+          "ayahs": 18,
+          "bytes": 16028,
+          "sha256": "7119662b42bed63d1ac8282dccd1649bb65f3151d6c0e0cde0593fc3cc910f92",
+          "source_sha256": "2ac4a6a4c0a2c2133e266f65347a19dc3f971556841e2325d481cb87537bd4dc",
+          "missing_ayahs": [],
+          "arabic_characters": 41,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 65,
+          "ayahs": 12,
+          "bytes": 16142,
+          "sha256": "83f6d26ddb41f94e830feb7a856a6381aa38de56e103ccbc291d9a08f2a2abe3",
+          "source_sha256": "e26fc6e1d324af94cd63ea3f96ab8f103e7d0c6a4e113ad881262c5053c2fa5b",
+          "missing_ayahs": [],
+          "arabic_characters": 0,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 66,
+          "ayahs": 12,
+          "bytes": 26620,
+          "sha256": "2cfcf9dcb1802e0b0a9cc2b3a89e29195571d15f5a4169f9728e92c14c8896df",
+          "source_sha256": "6f88410aa3543acab06c146a12ad598c13505ad24c0874cb97c97bb81d908e41",
+          "missing_ayahs": [],
+          "arabic_characters": 13,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 67,
+          "ayahs": 30,
+          "bytes": 16271,
+          "sha256": "2c40f7aa2f05311d890464036b25ab8be26e3a948eda93b84e4fdfb1a6b8bb45",
+          "source_sha256": "9c70fdd351b4a4d3363f4e5dac09f256b0f7205a7aebfaf7d2506f4415f38a0c",
+          "missing_ayahs": [],
+          "arabic_characters": 14,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 68,
+          "ayahs": 52,
+          "bytes": 22557,
+          "sha256": "3ca248db263852a6f3e1c5d091e30ac77f88f2be26b7f827bbd8b0821b5636be",
+          "source_sha256": "030153d0fca769ee0956b0d6583a0b990835b2a1e9e76c1bede85f68f50337dc",
+          "missing_ayahs": [],
+          "arabic_characters": 9,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 69,
+          "ayahs": 52,
+          "bytes": 16710,
+          "sha256": "4b97923fa863062ca205b1af9e8fa4dc8a176b63d237b610f6eefd82628b2498",
+          "source_sha256": "0bb243fdacef1eeef9a2be0e4c2a49b9ea68d0e18273f671e5c478c61abf404a",
+          "missing_ayahs": [],
+          "arabic_characters": 52,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 70,
+          "ayahs": 44,
+          "bytes": 38237,
+          "sha256": "6529fd29fed3ba4b21e526f36f932e7ec8dfa0d793c88a84193a6fb81e47c65f",
+          "source_sha256": "3fdd2fa2c65783be4d1dd7aab234250d804b2b3abc7f372e2f627794fe3e7cee",
+          "missing_ayahs": [],
+          "arabic_characters": 235,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 71,
+          "ayahs": 28,
+          "bytes": 32834,
+          "sha256": "33b67ce2d668f62c4c0c077d0329b419068255e9629fcaaed90faf5b6a287c4f",
+          "source_sha256": "a1798d050bd3e6ae8fcc20d64528a8746bcac99cc717e9055ebd0f1f096aeaf0",
+          "missing_ayahs": [],
+          "arabic_characters": 51,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 72,
+          "ayahs": 28,
+          "bytes": 34106,
+          "sha256": "96af37796d70fdaf2d5af4449535c6704d4ee0f2cb16bb6bef0f27da4dacdc5b",
+          "source_sha256": "caa7eb678d8083b1f296856ee353e7a8586c04c46452d51745ddbd54cc531a66",
+          "missing_ayahs": [],
+          "arabic_characters": 29,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 73,
+          "ayahs": 20,
+          "bytes": 40402,
+          "sha256": "0bdbad0c8ef2f598c1b9c0e2076722c8da41146c23c10e3a43b004aeec2ac888",
+          "source_sha256": "8b84fe950552a1a73dfec4669b5cf000b7c260341ed8997e68a2ffd28d5a2183",
+          "missing_ayahs": [],
+          "arabic_characters": 187,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 74,
+          "ayahs": 56,
+          "bytes": 39647,
+          "sha256": "b60734e2c7d169a476934c30a346f6eda181449460e494f10f87fde1946c4b77",
+          "source_sha256": "25a962d7a996bcee89188a435dc55fa3a98ea0c7d24ef8fd53644e81f51bf946",
+          "missing_ayahs": [],
+          "arabic_characters": 112,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 75,
+          "ayahs": 40,
+          "bytes": 38546,
+          "sha256": "861cb1bdba7c321c530dc0085a9e66b782f19de458d6f4d93e965edb0793352d",
+          "source_sha256": "9c7de6534aa965e184b3d8cc96c8b0aac9d0ec29cd62fd6182e8365aa37197d1",
+          "missing_ayahs": [],
+          "arabic_characters": 67,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 76,
+          "ayahs": 31,
+          "bytes": 39884,
+          "sha256": "5f11768ba59c86f8ccec8e6a42ea06bf7f2ae5223d2bb78bc0ed8fb11c878dfe",
+          "source_sha256": "2b24c98c8f904105eacace212a6b2903c4f808e436f3d133042c921975cbc7a2",
+          "missing_ayahs": [],
+          "arabic_characters": 28,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 77,
+          "ayahs": 50,
+          "bytes": 26683,
+          "sha256": "3bb736070beef4400c72dc4bb6fd2e753b2276aac39518c3741a475ab2c052ac",
+          "source_sha256": "bf0f64216c6273305876149a746b6d3bdb04cd060a809c7e5b324bc779472751",
+          "missing_ayahs": [],
+          "arabic_characters": 3,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 78,
+          "ayahs": 40,
+          "bytes": 25019,
+          "sha256": "3c6d3a74f9c5f3a8c602f034a581e9ba6ced75ef9de731546364be11cb44bfad",
+          "source_sha256": "a023196d879624679e712471db817ac5645da43d23b391e4cdb2dcd91ddb1c89",
+          "missing_ayahs": [],
+          "arabic_characters": 24,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 79,
+          "ayahs": 46,
+          "bytes": 28046,
+          "sha256": "a776004562267b28472ee5f35a2b3d3d05c0274c84d61a9d11d657453ee5dc11",
+          "source_sha256": "3f6b1c2cdc59a8d935a2dca2d00d3270429740ff150708f6f291238d60b23a09",
+          "missing_ayahs": [],
+          "arabic_characters": 20,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 80,
+          "ayahs": 42,
+          "bytes": 23929,
+          "sha256": "e8e6c684149b8ce506d7caa535471fab803540784d7991687543862f8d8f57e4",
+          "source_sha256": "f9a781747985bd8da2bcfa3dd0022896a442022ab6e9fc15b22397d58eb31df5",
+          "missing_ayahs": [],
+          "arabic_characters": 74,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 81,
+          "ayahs": 29,
+          "bytes": 28123,
+          "sha256": "6df90bd7904ca8d6ee70e4c30b00241f41be94a765f34b6a04a5ac256152a247",
+          "source_sha256": "c930ca6d9cf5da01e024926c2921d9daf8874d33669f148e6720848b9acf9fee",
+          "missing_ayahs": [],
+          "arabic_characters": 66,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 82,
+          "ayahs": 19,
+          "bytes": 15976,
+          "sha256": "f79a3c7601f50e6ea67f15e58ff5edadd04f0fa47a4fe097eabb5bbb8b52947b",
+          "source_sha256": "b23cbdaa27a2c16ddfa780001a514501d5c2a9e89fbcd8447f0b1c889c0c3efa",
+          "missing_ayahs": [],
+          "arabic_characters": 47,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 83,
+          "ayahs": 36,
+          "bytes": 32413,
+          "sha256": "efa10e18a7c3b43d41f97e7eb5e08754973c92663486dc32b9b3f5ae609253b9",
+          "source_sha256": "833cb4522ee9693d7d4b7a83f0c04115aa331ac8d0cd5fb4c092fb5bec1038bc",
+          "missing_ayahs": [],
+          "arabic_characters": 255,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 84,
+          "ayahs": 25,
+          "bytes": 27480,
+          "sha256": "e70f72833de086675219e505bf0b929c914a7095e84c8bf679c9a97ad97c8e7a",
+          "source_sha256": "1587f1f272ec2e59d233aaf2b465e6e104144ac5585d263120aa1314e7bd62cb",
+          "missing_ayahs": [],
+          "arabic_characters": 91,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 85,
+          "ayahs": 22,
+          "bytes": 22472,
+          "sha256": "bdb6469d53dd9e0adc4bcbda37ed753e48a337a2c04db9d19ceaf329da4c2372",
+          "source_sha256": "dd44149d689b23b73329f0b9f9e232481fde23fc0af0228fc019de85014713b5",
+          "missing_ayahs": [],
+          "arabic_characters": 88,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 86,
+          "ayahs": 17,
+          "bytes": 18924,
+          "sha256": "78aa69ba475a3a0f3bd57cd51fbeeadc2dc97f5930fc6decab67920e2ec500ae",
+          "source_sha256": "6920150781078a693bbde7e30357a73a01d4277750836174f2cff5b3036f08a7",
+          "missing_ayahs": [],
+          "arabic_characters": 104,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 87,
+          "ayahs": 19,
+          "bytes": 29215,
+          "sha256": "4e2d2f779c81357c2fe27e8a6c019c749e7bac424b0ad47e4fcfa4a7f678e979",
+          "source_sha256": "8ca7784661b01b0a46b4f0f45abf5798bb697c8368d4c0f2f909375f529ab3d6",
+          "missing_ayahs": [],
+          "arabic_characters": 59,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 88,
+          "ayahs": 26,
+          "bytes": 21987,
+          "sha256": "2c97403499a637ad894a2cd7a6b8f83ccf964c21e8a2ca027a496f5bc251a680",
+          "source_sha256": "018bfdc647f12eda579d533d8229b1cb308b458a3c8c0bbf5b2b40f1715cc7ca",
+          "missing_ayahs": [],
+          "arabic_characters": 153,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 89,
+          "ayahs": 30,
+          "bytes": 36659,
+          "sha256": "dc5521b16b6a15995c6d7f5092115459eade78da105e4420cb7ce76cbdb10695",
+          "source_sha256": "6c9cc2d23d7671e3dadf5ba1d2bfd6d4b17469348b48ba8c556f2dfe971cc046",
+          "missing_ayahs": [],
+          "arabic_characters": 225,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 90,
+          "ayahs": 20,
+          "bytes": 19981,
+          "sha256": "f8c4455605da2aaf62c6e8311a216e098d135eea617cefa62a23a256ed96c486",
+          "source_sha256": "926f6cc8707cd1e6433c40597efa64d4d69381a697510ef83c6fd68ae9644407",
+          "missing_ayahs": [],
+          "arabic_characters": 74,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 91,
+          "ayahs": 15,
+          "bytes": 23105,
+          "sha256": "9179bbb322f61a44ce17b855d5c837e6c8aea7575beafa234864b76e9e0e68a4",
+          "source_sha256": "ba937db104ba031ab612057792d28599b783532bc9b9aecb7783927d1c3c3fb8",
+          "missing_ayahs": [],
+          "arabic_characters": 110,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 92,
+          "ayahs": 21,
+          "bytes": 23270,
+          "sha256": "d758f15ceb19dffd0ca6bbd821460628a4334a6ca30282dec2a2ea1999a016bc",
+          "source_sha256": "c38ae98b8e1d9daa72107e2832d44b92051d3504f133b7aa7522506de0baaf1b",
+          "missing_ayahs": [],
+          "arabic_characters": 4,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 93,
+          "ayahs": 11,
+          "bytes": 20056,
+          "sha256": "fe5628b2b2d8a9fcc63bb98dfc9809b101181d90624e07b1636d37210bb257f1",
+          "source_sha256": "4332f1b58c1be7bdaf88059c67af1756504cfeb27ad2a4dc929b49423ce70173",
+          "missing_ayahs": [],
+          "arabic_characters": 37,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 94,
+          "ayahs": 8,
+          "bytes": 11414,
+          "sha256": "bd54b3c3a439f942b870e0e74a720eb8c22114f256e902b8544aba06454820c2",
+          "source_sha256": "7005eaa46d87c50deef0bd49d95066832a370d525cba47bb10bc36515fe572c3",
+          "missing_ayahs": [],
+          "arabic_characters": 52,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 95,
+          "ayahs": 8,
+          "bytes": 16903,
+          "sha256": "b1f475149ceb0284ae1a7b4b581625b2de769ce194ed79f26cffe97e3177b87c",
+          "source_sha256": "6b8920b8e9e361b1a28d30ded472ba5a6fd51bc5d56593463a6f18680395cf8b",
+          "missing_ayahs": [],
+          "arabic_characters": 5,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 96,
+          "ayahs": 19,
+          "bytes": 22555,
+          "sha256": "2540623acbeeb095fb000a191e12d30049458f8534e83088a88624d45a231b92",
+          "source_sha256": "e1b18899abaacbc7729e23bac785735198d66586af64ad6b058e618219d52a42",
+          "missing_ayahs": [],
+          "arabic_characters": 28,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 97,
+          "ayahs": 5,
+          "bytes": 13208,
+          "sha256": "989bd8ad0d3e2709370bd0c28754fc88bcf57e9adff5afa254528f662dcfdb17",
+          "source_sha256": "cbd6a0adbd71dfec6d6a5ad51fdd63960107045442d748948ebb8598f649cdb0",
+          "missing_ayahs": [],
+          "arabic_characters": 27,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 98,
+          "ayahs": 8,
+          "bytes": 14591,
+          "sha256": "6e69fee8e4a3726fc7f6eb0037fca11480d20dd7b9b47ea1465c369fd2f9d76d",
+          "source_sha256": "1c54600ec616bd5e1e65849da1f28793e436f7403f9c6674aad5c945577def17",
+          "missing_ayahs": [],
+          "arabic_characters": 80,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 99,
+          "ayahs": 8,
+          "bytes": 18126,
+          "sha256": "400e004afa1a4a1b2f7bd3eb0854cc09387c52eb0829a60cb305adecee6724d0",
+          "source_sha256": "64402796a88b6ae859101dee83d7eb6cd969b808d8c4c538f71d7a2f0d73780a",
+          "missing_ayahs": [],
+          "arabic_characters": 3,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 100,
+          "ayahs": 11,
+          "bytes": 14849,
+          "sha256": "1552fb99f71ece9eb1eb3913b475364d5e9b930c052ea92dec58543f6074d5b1",
+          "source_sha256": "00852bf9c35c10d1f7ba9e9b93c2c760c935a62a7a946c3cbc4c35b45202ea90",
+          "missing_ayahs": [],
+          "arabic_characters": 90,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 101,
+          "ayahs": 11,
+          "bytes": 15589,
+          "sha256": "605415094f3b36fefdeb85fc7e57fe8c377b14a5d654be62d7a3300a84a40a75",
+          "source_sha256": "b29f939b4ec2be6feabce6e6008e4954ec985808dff76e9e08e5700df7d7de0e",
+          "missing_ayahs": [],
+          "arabic_characters": 12,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 102,
+          "ayahs": 8,
+          "bytes": 24418,
+          "sha256": "4210fe429d210d441076597c22b0d5fbb6b92dd9384da36648a0650ce1443829",
+          "source_sha256": "33cb6d17e18502d34d06af59c0c1c31f36b634eca079b92059eeee900227c0a7",
+          "missing_ayahs": [],
+          "arabic_characters": 94,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 103,
+          "ayahs": 3,
+          "bytes": 23195,
+          "sha256": "5302808853a1f163bd2fddc3098db1161806f4952ca237b3d964b1a4286203ab",
+          "source_sha256": "3c9d9e9184362bca8d56022b7d1b5aca9ad8bb192da92cf90bc84647aed7caf2",
+          "missing_ayahs": [],
+          "arabic_characters": 0,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 104,
+          "ayahs": 9,
+          "bytes": 15003,
+          "sha256": "3f9aa7626efe3176a79dacf64051639d6eea0682c1fec8d399c083902eb858f9",
+          "source_sha256": "184e273e1a7e6de4437272c2991e7b1a412b48a3c4ff0bd23313dc5800bc9cdf",
+          "missing_ayahs": [],
+          "arabic_characters": 17,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 105,
+          "ayahs": 5,
+          "bytes": 7526,
+          "sha256": "3a53232ab0b7d4c39e3b05023dbe84a24827374105e8ed52ba3200c98334171e",
+          "source_sha256": "3fd9ae7bd3ea83c7c5c4e5ba80d4b7ffe751ec005082dfc5a6043670c74f4df6",
+          "missing_ayahs": [],
+          "arabic_characters": 22,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 106,
+          "ayahs": 4,
+          "bytes": 21615,
+          "sha256": "b561666cacc9256d4e203f11101c371257abe0cc32d133407ab74e87b3489a52",
+          "source_sha256": "5d70e05f830c0d9bb20a26153318d8dbca2a3802c84f4ed802ebd2a68d0107d5",
+          "missing_ayahs": [],
+          "arabic_characters": 51,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 107,
+          "ayahs": 7,
+          "bytes": 10062,
+          "sha256": "df2474438afb68bb82c9bf151401dd19403c5bef5aaa684d9ce6ad7e6b10e31c",
+          "source_sha256": "e1efb362214579c0561a94e96227687583e70b893047424d8f8cbeca0821ce13",
+          "missing_ayahs": [],
+          "arabic_characters": 49,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 108,
+          "ayahs": 3,
+          "bytes": 19521,
+          "sha256": "a84825c87814c16469d5b07a53f050c12f8b15d7028d5f0ae8f135b49d619ee9",
+          "source_sha256": "3434475c057b058f9e5e0c9399f3ffb49f3d186fd1ea8ad378e1cc79be28daeb",
+          "missing_ayahs": [],
+          "arabic_characters": 14,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 109,
+          "ayahs": 6,
+          "bytes": 24917,
+          "sha256": "6b6d4491ab623de861597e2584a96e0339da02a0f28f2014dddda149374c39c3",
+          "source_sha256": "ee4600e00b3c05277e6007c01de8b540bbb1c160b43bdce06464593ee7fd4f3c",
+          "missing_ayahs": [],
+          "arabic_characters": 122,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 110,
+          "ayahs": 3,
+          "bytes": 13626,
+          "sha256": "daa09601700a8fb7191bcfbfa5324a6794fd56353ef6c293ad39664c815ba09a",
+          "source_sha256": "127f86794d389ba6026133b92eb3b87f2a81c12765c97983939149db8d36f6fa",
+          "missing_ayahs": [],
+          "arabic_characters": 213,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 111,
+          "ayahs": 5,
+          "bytes": 26363,
+          "sha256": "c8fbf428938c9c07c1e18ec7d1b3aecc7b970e8faaffca95bfc9c3e941664991",
+          "source_sha256": "76b09524683a4a35f0b2e84a775732df972f4f15200646e51d1f5e6eac6f353b",
+          "missing_ayahs": [],
+          "arabic_characters": 102,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 112,
+          "ayahs": 4,
+          "bytes": 31556,
+          "sha256": "6f399bf7d7a01457d09b3470df0f91f7d940d3de1d46f5883350c384bffa26cb",
+          "source_sha256": "f61cf96a6ee14c65b366cf4d483013657750e7d673d8b9b2bc3c0f4d0669d547",
+          "missing_ayahs": [],
+          "arabic_characters": 81,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 113,
+          "ayahs": 5,
+          "bytes": 35304,
+          "sha256": "2c85b2d2b6f0b6923a44c123dcb09b06a027645a7b0c95a3b0ce715116b2e8ce",
+          "source_sha256": "2888d6cc042551109d716ef29baf5112a469420f58493b74e5c36c22b856c90b",
+          "missing_ayahs": [],
+          "arabic_characters": 114,
+          "arabic_placeholders": 0
+        },
+        {
+          "surah": 114,
+          "ayahs": 6,
+          "bytes": 5151,
+          "sha256": "c7f0b88905d62165f626d48219d39751e02381739c9dba2b5bfb02686559002c",
+          "source_sha256": "f27a236d75ebd475bd1980bf54f31c531ac50dc23f38a2f31287927387780d65",
+          "missing_ayahs": [],
+          "arabic_characters": 3,
+          "arabic_placeholders": 0
+        }
+      ],
+      "source_quality": {
+        "surahs": 114,
+        "ayahs": 6236,
+        "bytes": 13556678,
+        "arabic_characters": 29458,
+        "arabic_placeholders": 5
+      }
     }
   ],
   "unavailable": [
