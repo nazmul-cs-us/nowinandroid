@@ -526,6 +526,10 @@ private fun CategoryCard(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                state.modelVersion?.let { version ->
+                    Text("Model version $version", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (state.description.isNotEmpty()) {
                     Text(
                         text = state.description,

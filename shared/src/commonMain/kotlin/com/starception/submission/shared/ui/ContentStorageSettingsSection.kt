@@ -67,6 +67,7 @@ data class ContentStorageCategoryState(
     val isAvailable: Boolean,
     val isDownloading: Boolean = false,
     val progress: Float = 0f,
+    val modelVersion: String? = null,
 )
 
 data class ContentStorageState(
@@ -335,6 +336,10 @@ private fun StorageCategoryRow(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
+            state.modelVersion?.let { version ->
+                Text("Model version $version", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (state.description.isNotEmpty()) {
                 Text(
                     text = state.description,

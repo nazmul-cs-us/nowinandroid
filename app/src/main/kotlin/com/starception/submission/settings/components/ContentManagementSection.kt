@@ -271,6 +271,10 @@ internal fun ContentCategoryRow(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(state.displayName, style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                state.modelVersion?.let { version ->
+                    Text("Model version $version", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Text(
                     text = when {
                         state.isDownloading -> "Downloading · ${(state.progress * 100).toInt()}%"

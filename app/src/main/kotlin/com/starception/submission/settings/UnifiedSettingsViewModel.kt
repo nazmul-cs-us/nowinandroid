@@ -1241,6 +1241,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                             categoryKey = key,
                             displayName = AssetDownloadViewModel.formatCategoryName(key),
                             description = AssetDownloadViewModel.categoryDescription(key),
+                            modelVersion = if (key.startsWith("model_")) com.starception.submission.feature.ai.modelVersion(key,
+                                m.assets.filterValues { it.category == key }.keys) else null,
                             totalSize = info.totalSize,
                             downloadedSize = downloadedSize,
                             fileCount = info.fileCount,

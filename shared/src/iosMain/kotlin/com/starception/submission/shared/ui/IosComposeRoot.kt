@@ -1489,6 +1489,8 @@ private suspend fun loadIosContentStorageState(): ContentStorageState =
                         categoryKey = category,
                         displayName = storageCategoryDisplayName(category),
                         description = storageCategoryDescription(category),
+                        modelVersion = if (category.startsWith("model_")) com.starception.submission.feature.ai.modelVersion(category,
+                            manifest.assets.filterValues { it.category == category }.keys) else null,
                         totalSize = status.totalBytes.takeIf { it > 0L } ?: info.totalSize,
                         downloadedSize = status.downloadedBytes,
                         availableSize = status.availableBytes,

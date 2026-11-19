@@ -49,6 +49,7 @@ data class CategoryDownloadState(
     val isDownloading: Boolean = false,
     val progress: Float = 0f,
     val error: String? = null,
+    val modelVersion: String? = null,
 )
 
 /** Merge live transfer bytes with the last completed-file snapshot without rescanning disk per tick. */
@@ -192,6 +193,8 @@ class AssetDownloadViewModel @Inject constructor(
                 categoryKey = key,
                 displayName = formatCategoryName(key),
                 description = categoryDescription(key),
+                modelVersion = if (key.startsWith("model_")) com.starception.submission.feature.ai.modelVersion(key,
+                    m.assets.filterValues { it.category == key }.keys) else null,
                 totalSize = info.totalSize,
                 downloadedSize = downloadedSize,
                 fileCount = info.fileCount,
