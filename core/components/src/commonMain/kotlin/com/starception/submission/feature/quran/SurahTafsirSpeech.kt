@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -135,25 +136,24 @@ fun SurahTafsirPlaybackControls(player: SurahTafsirSpeechPlayer, surahTitle: Str
         val preparing = state.status == TafsirSpeechStatus.PREPARING
         val playing = state.status == TafsirSpeechStatus.PLAYING
         val paused = state.status == TafsirSpeechStatus.PAUSED
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(enabled = !preparing, onClick = {
                     when { playing -> player.pause(); paused -> player.resume(); else -> player.start() }
                 }, modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(0.dp), contentPadding = PaddingValues(vertical = 4.dp),
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
-                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
-                        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            if (playing) "Pause surah tafsir" else if (paused) "Resume surah tafsir" else "Play full surah tafsir",
-                            modifier = Modifier.padding(8.dp).size(18.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (playing) "Pause surah tafsir" else if (paused) "Resume surah tafsir" else "Play full surah tafsir",
+                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
                         Text(when { preparing -> "Preparing tafsir…"; playing -> "Listening to tafsir"; paused -> "Tafsir paused"; else -> "Play full surah tafsir" },
-                            style = MaterialTheme.typography.labelLarge)
+                            style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(ayahs?.let { if (it.first == it.last) "Ayah ${it.first} of ${player.totalAyahs}" else "Ayahs ${it.first}–${it.last} of ${player.totalAyahs}" }
                             ?: if (state.finished) "Finished · Listen again" else "${player.totalAyahs} ayahs",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 if (playing || paused || preparing) IconButton(onClick = player::stop) {

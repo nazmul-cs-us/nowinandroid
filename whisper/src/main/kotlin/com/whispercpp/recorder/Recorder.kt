@@ -30,6 +30,7 @@ import android.util.Log
 import com.whispercpp.media.encodeWaveFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.Executors
@@ -37,9 +38,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.sqrt
 
 class Recorder(private val audioManager: AudioManager? = null) {
-    private val scope: CoroutineScope = CoroutineScope(
-        Executors.newSingleThreadExecutor().asCoroutineDispatcher(),
-    )
+    private val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+    private val scope: CoroutineScope = CoroutineScope(dispatcher)
     private var recorder: AudioRecordThread? = null
 
     suspend fun startRecording(outputFile: File, onError: (Exception) -> Unit) = withContext(scope.coroutineContext) {
@@ -72,6 +72,12 @@ class Recorder(private val audioManager: AudioManager? = null) {
         @Suppress("BlockingMethodInNonBlockingContext")
         recorder?.join()
         recorder = null
+    }
+
+    suspend fun release() {
+        stopRecording()
+        scope.cancel()
+        dispatcher.close()
     }
 }
 

@@ -2,12 +2,10 @@ package com.starception.submission.feature.quran
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -19,6 +17,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.starception.submission.core.designsystem.icon.TafsirIcon
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
@@ -31,23 +33,22 @@ fun InlineTafsirHeader(book: String, onSelect: (String) -> Unit, onHide: () -> U
     val uri = LocalUriHandler.current
     val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Column(Modifier.widthIn(max = 680.dp).fillMaxWidth()
+        Column(Modifier.widthIn(max = 680.dp).fillMaxWidth().testTag("inline-tafsir-header")
             .background(colors.surfaceContainerLow)
-            .padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.MenuBook, null, tint = colors.primary, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(12.dp))
-                Box(Modifier.weight(1f)) { TafsirBookPicker(book, onSelect) }
-                IconButton(onClick = onHide) { Icon(Icons.Default.Close, "Hide tafsir") }
-            }
-            if (edition != null) Row(
-                Modifier.clickable(onClickLabel = "Open source") { uri.openUri(edition.sourceUrl) }
-                    .heightIn(min = 48.dp).padding(start = 36.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(edition.attribution, modifier = Modifier.weight(1f, fill = false),
-                    style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-                Icon(Icons.Default.OpenInNew, null, tint = colors.primary, modifier = Modifier.size(14.dp))
+            .padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                TafsirIcon(modifier = Modifier.size(20.dp).testTag("inline-tafsir-icon"))
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.weight(1f)) { TafsirBookPicker(book, onSelect, compact = true) }
+                if (edition != null) IconButton(onClick = { uri.openUri(edition.sourceUrl) },
+                    modifier = Modifier.size(48.dp).semantics {
+                        contentDescription = "Open tafsir source: ${edition.attribution}"
+                    }) {
+                    Icon(Icons.Default.OpenInNew, null, tint = colors.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onHide, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.Close, "Hide tafsir", modifier = Modifier.size(20.dp))
+                }
             }
             playback?.invoke()
         }
@@ -82,7 +83,8 @@ fun InlineTafsirCommentary(surah: Int, ayah: Int, book: String, revision: Int = 
             colors = CardDefaults.cardColors(containerColor = if (embedded) MaterialTheme.colorScheme.surfaceContainerLow
                 else MaterialTheme.colorScheme.surfaceContainerLowest),
         ) {
-            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(if (embedded) 12.dp else 18.dp)) {
+            Column(Modifier.fillMaxWidth().padding(if (embedded) 16.dp else 20.dp),
+                verticalArrangement = Arrangement.spacedBy(if (embedded) 8.dp else 18.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (!embedded) Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primaryContainer) {
@@ -115,7 +117,7 @@ fun InlineTafsirCommentary(surah: Int, ayah: Int, book: String, revision: Int = 
                             overflow = TextOverflow.Ellipsis,
                             onTextLayout = { if (embedded && !expanded && !narrating) overflows = it.hasVisualOverflow },
                             style = MaterialTheme.typography.bodyLarge.copy(
-                                fontSize = (18f * fontScale).sp, lineHeight = ((if (embedded) 32f else 30f) * fontScale).sp,
+                                fontSize = (18f * fontScale).sp, lineHeight = ((if (embedded) 28f else 30f) * fontScale).sp,
                                 fontFamily = if (embedded) FontFamily.Serif else MaterialTheme.typography.bodyLarge.fontFamily,
                                 textDirection = TextDirection.Content),
                             textAlign = if (language == "ar" || language == "ur") TextAlign.Right else TextAlign.Start)

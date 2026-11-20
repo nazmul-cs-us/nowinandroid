@@ -113,7 +113,14 @@ enum class VoiceRecognitionEngine(
         description = "Complete speech-to-text using Whisper.cpp for accurate offline transcription",
         speed = "~2 sec",
         iconGlyph = FlaticonIcons.VOICE,
-    ),
+    );
+
+    companion object {
+        val DEFAULT = WHISPER
+
+        fun fromPreference(value: String?): VoiceRecognitionEngine =
+            entries.firstOrNull { it.name == value } ?: DEFAULT
+    }
 }
 
 /**
@@ -131,7 +138,7 @@ enum class VoiceTestState {
  * Voice settings state
  */
 data class VoiceSettingsState(
-    val selectedEngine: VoiceRecognitionEngine = VoiceRecognitionEngine.SHERPA_KWS,
+    val selectedEngine: VoiceRecognitionEngine = VoiceRecognitionEngine.DEFAULT,
     val testState: VoiceTestState = VoiceTestState.IDLE,
     val testResult: String? = null,
     val testError: String? = null,

@@ -419,6 +419,19 @@ fun UnifiedSettingsScreen(
 
                     item { SettingsGroupLabel("Voice & Salah intelligence") }
 
+                    item {
+                        SettingsSection(
+                            title = "Voice assistant",
+                            subtitle = "Hey Deenly & default assistant",
+                            iconGlyph = FlaticonIcons.MICROPHONE,
+                            isExpanded = expandedSections.contains("assistant"),
+                            onToggleExpanded = { viewModel.toggleSection("assistant") },
+                        ) {
+                            com.starception.submission.settings.components.HandsFreeVoiceSection(
+                                viewModel.getDownloadManager(), onModelsChanged = viewModel::refreshAfterModelDownload)
+                        }
+                    }
+
                     // Voice Settings Section
                     item {
                         SettingsSection(

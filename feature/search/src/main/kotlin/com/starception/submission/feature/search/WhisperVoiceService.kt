@@ -32,7 +32,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -51,7 +54,12 @@ import java.io.File
  */
 class WhisperVoiceService(
     private val context: Context,
+    private val recordingFileName: String = RECORDING_FILE,
+    private val logTranscripts: Boolean = true,
+    private val useCacheDirectory: Boolean = false,
 ) {
+    init { require(File(recordingFileName).name == recordingFileName && recordingFileName.endsWith(".wav")) }
+    @Volatile private var released = false
     companion object {
         private const val TAG = "WhisperVoiceService"
         private const val MODEL_ASSET_PATH = "models/ggml-tiny.en.bin"
@@ -159,17 +167,22 @@ class WhisperVoiceService(
      * Should be called before starting transcription.
      */
     fun initialize(onComplete: ((Boolean) -> Unit)? = null) {
+        if (released) { onComplete?.invoke(false); return }
         if (_isInitialized.value) {
             onComplete?.invoke(true)
             return
         }
 
         if (_isInitializing.value) {
+            scope.launch {
+                _isInitializing.first { !it }
+                if (!released) onComplete?.invoke(_isInitialized.value)
+            }
             return
         }
 
+        _isInitializing.value = true
         initJob = scope.launch {
-            _isInitializing.value = true
             _statusMessage.value = "Loading Whisper model..."
 
             try {
@@ -180,7 +193,8 @@ class WhisperVoiceService(
                 _isInitialized.value = success
                 _statusMessage.value = if (success) "Whisper ready" else "Failed to load model"
                 onComplete?.invoke(success)
-            } catch (e: Exception) {
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (e: Exception) {
                 Log.e(TAG, "Error initializing Whisper", e)
                 _error.value = "Failed to initialize: ${e.message}"
                 _statusMessage.value = "Initialization failed"
@@ -265,7 +279,7 @@ class WhisperVoiceService(
     }
 
     private fun getRecordingFile(): File {
-        return File(context.filesDir, RECORDING_FILE)
+        return File(if (useCacheDirectory) context.cacheDir else context.filesDir, recordingFileName)
     }
 
     /**
@@ -290,6 +304,7 @@ class WhisperVoiceService(
      * Records audio and transcribes using the local whisper.cpp model.
      */
     fun startListening(onResult: (VoiceSearchService.VoiceSearchResult) -> Unit) {
+        if (released) { onResult(VoiceSearchService.VoiceSearchResult.Cancelled); return }
         if (!hasPermission()) {
             Log.e(TAG, "Microphone permission not granted")
             onResult(VoiceSearchService.VoiceSearchResult.Error("Microphone permission required"))
@@ -658,7 +673,7 @@ class WhisperVoiceService(
             _recognizedText.value = text
 
             if (text.isNotBlank()) {
-                Log.i(TAG, "Transcription result: $text")
+                if (logTranscripts) Log.i(TAG, "Transcription result: $text")
                 _statusMessage.value = "Done"
                 callback?.invoke(VoiceSearchService.VoiceSearchResult.Success(text))
             } else {
@@ -673,39 +688,37 @@ class WhisperVoiceService(
      * Cancel listening and transcription
      */
     fun cancel(reportEmptyResult: Boolean = true) {
-        scope.launch {
-            transcriptionGeneration++
-            transcriptionJob?.cancel()
-            transcriptionJob = null
-            _isListening.value = false
-            _isTranscribing.value = false
+        scope.launch { cancelAndAwait(reportEmptyResult) }
+    }
 
-            try {
-                recorder?.stopRecording()
-            } catch (e: Exception) {
-                Log.w(TAG, "Error stopping recorder during cancel", e)
-            }
-
-            val callback = currentCallback
-            currentCallback = null
-            if (reportEmptyResult) {
-                callback?.invoke(VoiceSearchService.VoiceSearchResult.Cancelled)
-            }
-        }
+    /** Release the microphone before a wake-word listener is allowed to acquire it. */
+    suspend fun cancelAndAwait(reportEmptyResult: Boolean = false) = withContext(Dispatchers.Main.immediate) {
+        transcriptionGeneration++
+        val callback = currentCallback
+        currentCallback = null
+        _isListening.value = false
+        _isTranscribing.value = false
+        _voiceLevel.value = 0f
+        autoStopJob?.cancel()
+        recordJob?.cancelAndJoin()
+        recorder?.stopRecording()
+        transcriptionJob?.cancelAndJoin()
+        transcriptionJob = null
+        if (reportEmptyResult) callback?.invoke(VoiceSearchService.VoiceSearchResult.Cancelled)
     }
 
     /**
      * Release all resources
      */
     fun release() {
+        if (released) return
+        released = true
         scope.launch {
             // Lifecycle cleanup is not a failed recognition attempt and must
             // not surface the Pull-to-Sync "try again" prompt.
-            cancel(reportEmptyResult = false)
-            initJob?.cancel()
-            recordJob?.cancel()
-            autoStopJob?.cancel()
-            transcriptionJob?.cancel()
+            cancelAndAwait(reportEmptyResult = false)
+            initJob?.cancelAndJoin()
+            recorder?.release()
 
             try {
                 vad?.release()
@@ -723,6 +736,7 @@ class WhisperVoiceService(
             whisperContext = null
             recorder = null
             _isInitialized.value = false
+            scope.cancel()
         }
     }
 

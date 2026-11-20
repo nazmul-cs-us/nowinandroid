@@ -35,6 +35,7 @@ private const val PRIVACY_POLICY_URL = "https://policies.google.com/privacy"
 private const val BRAND_GUIDELINES_URL = "https://developer.android.com/distribute/marketing-tools/brand-guidelines"
 private const val FEEDBACK_URL = "https://goo.gle/nia-app-feedback"
 private const val FLATICON_URL = "https://www.flaticon.com/uicons"
+private const val TAFSIR_ICON_URL = "https://www.flaticon.com/free-icon/quran_5452447"
 private const val OPEN_METEO_URL = "https://open-meteo.com/"
 private const val METEOCONS_URL = "https://meteocons.com/"
 
@@ -78,6 +79,7 @@ fun AboutSection(
         )
         Text(
             text = "Interface, location, and weather PNG icons by Flaticon creators. " +
+                "Tafsir Quran icon by smashingstocks from Flaticon. " +
                 "Animated weather icons by Meteocons. Weather data by Open-Meteo.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -128,6 +130,10 @@ fun AboutSection(
                 onClick = { uriHandler.openUri(FLATICON_URL) },
             ) {
                 Text(text = "UIcons by Flaticon")
+            }
+
+            TextButton(onClick = { uriHandler.openUri(TAFSIR_ICON_URL) }) {
+                Text(text = "Tafsir icon by smashingstocks")
             }
 
             TextButton(

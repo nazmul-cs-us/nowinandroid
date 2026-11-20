@@ -53,7 +53,7 @@ class BengaliZakariaArabicTest {
             override fun release() = Unit
         }
         val narrating = mutableStateOf(false)
-        compose.setContent {
+        compose.setTafsirContent {
             val density = androidx.compose.ui.platform.LocalDensity.current
             CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides
                 androidx.compose.ui.unit.Density(density.density, fontScale)) {

@@ -38,7 +38,7 @@ class FullSurahTafsirControlsTest {
     @Test fun fullSurahPlaybackSurvivesScrollingControlsAwayAndCanPauseResumeAndStop() {
         val visible = mutableStateOf(true)
         val engine = Engine()
-        compose.setContent { MaterialTheme { Surface { Column {
+        compose.setTafsirContent { MaterialTheme { Surface { Column {
             val session = remember { TafsirSpeechSession() }
             val player = rememberSurahTafsirSpeechPlayer(1, "ibn_kathir_en", session,
                 engineFactory = { engine }, loadAyah = { "Ayah $it commentary" })
@@ -67,7 +67,7 @@ class FullSurahTafsirControlsTest {
         val readerVisible = mutableStateOf(true)
         val engine = Engine()
         var created = 0
-        compose.setContent { MaterialTheme {
+        compose.setTafsirContent { MaterialTheme {
             if (readerVisible.value) {
                 val session = remember { TafsirSpeechSession() }
                 val player = rememberSurahTafsirSpeechPlayer(1, "ibn_kathir_en", session,
@@ -94,7 +94,7 @@ class FullSurahTafsirControlsTest {
     @Test fun changingEditionKeepsExistingPlaybackUntilTheNewBookIsStarted() {
         val book = mutableStateOf("ibn_kathir_en")
         val engines = mutableListOf<Engine>()
-        compose.setContent { MaterialTheme {
+        compose.setTafsirContent { MaterialTheme {
             val session = remember { TafsirSpeechSession() }
             val player = rememberSurahTafsirSpeechPlayer(1, book.value, session,
                 engineFactory = { Engine().also(engines::add) }, loadAyah = { "Ayah $it" })
@@ -117,7 +117,7 @@ class FullSurahTafsirControlsTest {
     fun compactPlayerKeepsPlayAndStopUsableWithLargerTextInBothThemes() {
         val dark = mutableStateOf(false)
         val engine = Engine()
-        compose.setContent {
+        compose.setTafsirContent {
             val density = androidx.compose.ui.platform.LocalDensity.current
             CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides
                 androidx.compose.ui.unit.Density(density.density, 1.3f)) {

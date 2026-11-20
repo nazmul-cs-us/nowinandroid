@@ -100,6 +100,14 @@ fun NiaNavHost(
     val recategorizeScope = androidx.compose.runtime.rememberCoroutineScope()
     val quranRepository = remember { QuranRepository(context) }
 
+    val assistantEntry by com.starception.submission.voice.assistant.AssistantEntryBus.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(assistantEntry) {
+        assistantEntry?.takeIf { !it.routed }?.let {
+            appState.navigateToTopLevelDestination(TopLevelDestination.HOME)
+            com.starception.submission.voice.assistant.AssistantEntryBus.routed(it)
+        }
+    }
+
     // A tap on the Daily Reminder widget lands here. MainActivity reads the hadith or dua
     // off the launch intent and posts it; this is the first place in the tree that holds a
     // NavController, so it is where the tap can finally be acted on.

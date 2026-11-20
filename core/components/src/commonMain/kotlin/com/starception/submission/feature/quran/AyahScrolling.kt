@@ -170,11 +170,11 @@ fun AyahNarrationGroup(ayah: Int, narrating: Boolean, studyMode: Boolean = false
     }
     if (studyMode) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Column(Modifier.widthIn(max = 680.dp).then(group).padding(vertical = 12.dp).background(
+            Column(Modifier.widthIn(max = 680.dp).then(group).padding(vertical = 8.dp).background(
                 if (narrating) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
                 else androidx.compose.ui.graphics.Color.Transparent)) {
                 content()
-                HorizontalDivider(Modifier.padding(horizontal = 24.dp).padding(top = 20.dp),
+                HorizontalDivider(Modifier.padding(horizontal = 20.dp).padding(top = 12.dp),
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
             }
         }

@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -36,13 +37,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.starception.submission.R
+import com.starception.submission.core.designsystem.component.DeenlySparkWordmark
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -52,18 +52,25 @@ import kotlin.random.Random
 internal fun DeenlySparkSplash(onFinished: () -> Unit) {
     val progress = remember { Animatable(0f) }
     val finished = rememberUpdatedState(onFinished)
+    val completed = remember { mutableStateOf(false) }
+    val finish = {
+        if (!completed.value) {
+            completed.value = true
+            finished.value()
+        }
+    }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(lifecycle) {
         // Pause when backgrounded; never launch MainActivity over another app.
         // Animatable also honours the system animator-duration scale (including zero).
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             progress.animateTo(1f, tween((1650 * (1f - progress.value)).toInt(), easing = LinearEasing))
-            finished.value()
+            finish()
         }
     }
-    BackHandler { finished.value() }
+    BackHandler(onBack = finish)
     MaterialTheme {
-        SparkSplashArtwork(progress = { progress.value }, onContinue = { finished.value() })
+        SparkSplashArtwork(progress = { progress.value }, onContinue = finish)
     }
 }
 
@@ -90,8 +97,10 @@ internal fun SparkSplashArtwork(progress: () -> Float, onContinue: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         val compact = maxHeight < 420.dp
-        val artworkSize = minOf(maxWidth - 24.dp, if (compact) 220.dp else 340.dp)
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        val artworkSize = minOf(maxWidth - 24.dp,
+            if (compact) (maxHeight - 128.dp).coerceIn(96.dp, 220.dp) else 340.dp)
+        Column(Modifier.padding(bottom = if (compact) 64.dp else 0.dp),
+            horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(artworkSize), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.fillMaxSize()) {
                     val p = progress()
@@ -153,14 +162,9 @@ internal fun SparkSplashArtwork(progress: () -> Float, onContinue: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(if (compact) 0.dp else 8.dp))
-            Text(
-                stringResource(R.string.app_name),
-                color = Color(0xFFF7F3F9),
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Light,
-                letterSpacing = 2.sp,
-                modifier = Modifier.graphicsLayer { alpha = splashPhase(progress(), .20f, .48f) },
-            )
+            DeenlySparkWordmark(progress, Modifier.size(
+                width = if (compact) 136.dp else 160.dp,
+                height = if (compact) 46.dp else 54.dp))
         }
         TextButton(
             onClick = onContinue,

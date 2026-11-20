@@ -214,6 +214,7 @@ class MainActivity : FragmentActivity() {
         // NavController that can act on it is several composables below here, and
         // deepLinkCourseId already shows what that plumbing costs.
         WidgetNavigationBus.consume(intent)?.let(WidgetNavigationBus::request)
+        com.starception.submission.voice.assistant.AssistantEntryBus.accept(intent)
 
         // GOOGLE SAMPLE LIVE UPDATE - Initialize for prayer notifications
         if (Build.VERSION.SDK_INT >= 35) { // Android 16+ (BAKLAVA = 35)
@@ -558,6 +559,7 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         WidgetNavigationBus.consume(intent)?.let(WidgetNavigationBus::request)
+        com.starception.submission.voice.assistant.AssistantEntryBus.accept(intent)
     }
 
     /**

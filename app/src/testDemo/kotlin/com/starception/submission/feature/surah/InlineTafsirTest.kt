@@ -41,7 +41,7 @@ class InlineTafsirTest {
         val repo = PublishedTafsirRepository {
             """{"surah":1,"ayahCount":7,"passages":["Commentary for the first ayah.","Commentary for the second ayah."],"ayahPassage":[0,1,1,1,1,1,1]}"""
         }
-        compose.setContent { MaterialTheme { Surface { LazyColumn {
+        compose.setTafsirContent { MaterialTheme { Surface { LazyColumn {
             item { InlineTafsirHeader("ibn_kathir_en", {}, {}) }
             items(2) { index -> Column {
                 Text(if (index == 0) "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ" else "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
@@ -63,7 +63,7 @@ class InlineTafsirTest {
         val scale = mutableFloatStateOf(1f)
         var reads = 0
         val commentary = "Commentary that follows the reader’s pinch zoom. ".repeat(8)
-        compose.setContent { MaterialTheme {
+        compose.setTafsirContent { MaterialTheme {
             InlineTafsirCommentary(1, 1, "ibn_kathir_en",
                 fontScale = scale.floatValue,
                 loadText = { reads++; commentary }, speechPlayerFactory = { SilentPlayer() },
@@ -90,7 +90,7 @@ class InlineTafsirTest {
     @Test fun changingAyahCancelsAnOldReadEvenWhenItFinishesLater() {
         val ayah = mutableIntStateOf(1)
         val started = CompletableDeferred<Unit>(); val gate = CompletableDeferred<Unit>()
-        compose.setContent { MaterialTheme {
+        compose.setTafsirContent { MaterialTheme {
             InlineTafsirCommentary(1, ayah.intValue, "ibn_kathir_en", loadText = {
                 if (ayah.intValue == 1) { started.complete(Unit); gate.await(); "Old commentary" }
                 else "New commentary"
@@ -105,7 +105,7 @@ class InlineTafsirTest {
     }
     @Test fun missingAssetsStayInlineAndReloadAfterDownload() {
         var available = false
-        compose.setContent { MaterialTheme {
+        compose.setTafsirContent { MaterialTheme {
             InlineTafsirCommentary(1, 1, "ibn_kathir_en", loadText = {
                 if (!available) throw PublishedTafsirAssetMissing()
                 "Saved commentary"

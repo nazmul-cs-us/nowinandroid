@@ -334,12 +334,7 @@ class VoiceCompletionManager @Inject constructor(
      */
     private fun getSelectedEngine(): VoiceRecognitionEngine {
         val prefs = context.getSharedPreferences("voice_settings", Context.MODE_PRIVATE)
-        val engineName = prefs.getString("voice_engine", VoiceRecognitionEngine.SHERPA_KWS.name)
-        return try {
-            VoiceRecognitionEngine.valueOf(engineName ?: VoiceRecognitionEngine.SHERPA_KWS.name)
-        } catch (e: Exception) {
-            VoiceRecognitionEngine.SHERPA_KWS
-        }
+        return VoiceRecognitionEngine.fromPreference(prefs.getString("voice_engine", null))
     }
 
     private suspend fun preloadVoiceEngine(engine: VoiceRecognitionEngine): Boolean {

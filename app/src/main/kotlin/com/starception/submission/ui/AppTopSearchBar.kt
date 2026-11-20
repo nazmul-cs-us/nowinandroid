@@ -294,6 +294,11 @@ fun AppTopSearchBar(
         )
     }
     val whisperService = remember(context) { WhisperVoiceService(context.applicationContext) }
+    LaunchedEffect(whisperService) {
+        com.starception.submission.family.FamilyAudioSession.state.collect { active ->
+            if (active) whisperService.cancel(reportEmptyResult = false)
+        }
+    }
     // Drive the listening UI (wave + glow + hidden chrome) from the service's
     // actual recording state so it ends the instant recording stops — during
     // transcription the field must not look like it's still capturing.
@@ -385,6 +390,17 @@ fun AppTopSearchBar(
     // created in the AndroidView factory (it needs the SearchView), so it's
     // published through this holder.
     val micTapHolder = remember { mutableStateOf<(() -> Unit)?>(null) }
+    val assistantEntry by com.starception.submission.voice.assistant.AssistantEntryBus.pending.collectAsStateWithLifecycle()
+    val assistantLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val assistantLifecycleState by assistantLifecycle.currentStateFlow.collectAsStateWithLifecycle()
+    LaunchedEffect(assistantEntry, micTapHolder.value, assistantLifecycleState) {
+        val request = assistantEntry
+        val tap = micTapHolder.value
+        if (request?.routed == true && tap != null && assistantLifecycleState == androidx.lifecycle.Lifecycle.State.RESUMED &&
+            searchViewHolder.value?.isAttachedToWindow == true) {
+            if (com.starception.submission.voice.assistant.AssistantEntryBus.consumed(request)) tap()
+        }
+    }
     LaunchedEffect(Unit) {
         com.starception.submission.ui.search.SearchPrefillBus.voiceRequests.collect {
             val micTap = micTapHolder.value
@@ -2139,6 +2155,12 @@ private fun startVoiceCapture(
     whisper: WhisperVoiceService,
     onModelMissing: () -> Unit,
 ) {
+    if (com.starception.submission.family.FamilyAudioSession.isActive ||
+        ctx.getSystemService(android.media.AudioManager::class.java).mode != android.media.AudioManager.MODE_NORMAL) {
+        whisper.cancel(reportEmptyResult = false)
+        Toast.makeText(ctx, "Finish the call or other voice session before voice search.", Toast.LENGTH_SHORT).show()
+        return
+    }
     if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
         != PackageManager.PERMISSION_GRANTED
     ) {
@@ -2175,16 +2197,16 @@ private fun startVoiceCapture(
                 val text = result.text.trim()
                 if (text.isNotEmpty()) {
                     com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
-                    // Mic always opens the in-place SearchView with the transcribed
-                    // text so the user sees our suggestion UI (recents + popular
-                    // verses filtered by the query) instead of being pushed to the
-                    // old feature:search results page. They can pick a suggestion
-                    // or hit IME-search to submit.
-                    if (!searchView.isShowing) {
-                        searchView.show()
+                    val commandFeedback = com.starception.submission.voice.handsfree.executeVoicePlaybackCommand(ctx, text)
+                    if (commandFeedback != null) {
+                        if (searchView.isShowing) searchView.hide()
+                        Toast.makeText(ctx, commandFeedback, Toast.LENGTH_SHORT).show()
+                    } else {
+                        // Other speech stays ordinary in-place search; typed queries never auto-execute.
+                        if (!searchView.isShowing) searchView.show()
+                        searchView.setText(text)
+                        searchView.getEditText().setSelection(text.length)
                     }
-                    searchView.setText(text)
-                    searchView.getEditText().setSelection(text.length)
                 }
             }
             is VoiceSearchService.VoiceSearchResult.Error -> {

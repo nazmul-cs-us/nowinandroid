@@ -39,6 +39,7 @@ import androidx.core.app.NotificationCompat
 import androidx.media.session.MediaButtonReceiver
 import com.starception.submission.R
 import com.starception.submission.download.AudioDownloadHelper
+import com.starception.submission.download.AssetDownloadManager
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 import javax.inject.Inject
@@ -92,10 +93,30 @@ class QuranPlaybackService : Service() {
         private const val NOTIFICATION_ID = 2001
         private const val CHANNEL_ID = "quran_playback_channel"
         const val ACTION_PLAY = "com.starception.submission.ACTION_PLAY"
+        const val ACTION_PLAY_SURAH = "com.starception.submission.ACTION_PLAY_SURAH"
+        const val ACTION_RESUME = "com.starception.submission.ACTION_RESUME"
+        const val EXTRA_SURAH_NUMBER = "surah_number"
         const val ACTION_PAUSE = "com.starception.submission.ACTION_PAUSE"
         const val ACTION_NEXT = "com.starception.submission.ACTION_NEXT"
         const val ACTION_PREVIOUS = "com.starception.submission.ACTION_PREVIOUS"
         const val ACTION_STOP = "com.starception.submission.ACTION_STOP"
+
+        /** Control only an existing player; do not create an idle service/wake lock for “pause”. */
+        internal fun handleHandsFreeControl(action: String): Boolean {
+            val service = activeService?.get() ?: return false
+            val active = service.mediaSession?.controller?.playbackState?.state in
+                listOf(PlaybackStateCompat.STATE_PLAYING, PlaybackStateCompat.STATE_PAUSED) || service.reciterJob?.isActive == true
+            return when (action) {
+                ACTION_PAUSE -> if (service.isPlaying()) { service.togglePlayPause(); true } else false
+                ACTION_RESUME -> if (service.mediaSession?.controller?.playbackState?.state == PlaybackStateCompat.STATE_PAUSED) {
+                    service.togglePlayPause(); true
+                } else false
+                ACTION_NEXT -> if (active) { service.playNext(); true } else false
+                ACTION_PREVIOUS -> if (active) { service.playPrevious(); true } else false
+                ACTION_STOP -> if (active) { service.stopPlayback(); true } else false
+                else -> false
+            }
+        }
     }
 
     inner class QuranBinder : Binder() {
@@ -638,7 +659,7 @@ class QuranPlaybackService : Service() {
     }
 
     private fun updatePlaybackState(state: Int) {
-        val position = getCurrentPosition().toLong()
+        val position = if (state == PlaybackStateCompat.STATE_STOPPED) 0L else getCurrentPosition().toLong()
         mediaSession?.setPlaybackState(
             PlaybackStateCompat.Builder()
                 .setActions(
@@ -764,16 +785,61 @@ class QuranPlaybackService : Service() {
         MediaButtonReceiver.handleIntent(mediaSession, intent)
 
         when (intent?.action) {
+            ACTION_PLAY_SURAH -> {
+                val number = intent.getIntExtra(EXTRA_SURAH_NUMBER, 0)
+                if (number !in 1..114) { stopSelf(); return START_NOT_STICKY }
+                currentSurahIndex = number - 1
+                audioLanguage = AudioLanguage.ARABIC_ONLY
+                // Meet the foreground-service deadline even while the first recording downloads.
+                startForeground(NOTIFICATION_ID, createNotification())
+                reciterJob?.cancel()
+                reciterJob = reciterScope.launch {
+                    try {
+                        val selected = getSharedPreferences("quran_reciter", Context.MODE_PRIVATE).getString("selected_id", null)
+                        val alternateReciter = selected?.matches(Regex("[0-9]+-[0-9]+")) == true
+                        if (!alternateReciter && withContext(Dispatchers.IO) { resolveAudioFile(number - 1) } == null) {
+                            val key = audioDownloadHelper.getQuranCdnKey(number - 1, AudioLanguage.ARABIC_ONLY)
+                                ?: error("No recording is available for this surah")
+                            check(audioDownloadHelper.downloadAudio(key) is AssetDownloadManager.DownloadState.Completed) {
+                                "Download the recitation in Deenly before playing offline."
+                            }
+                        }
+                        ensureActive()
+                        reciterJob = null
+                        playSurah(number - 1, shouldAutoPlay = true)
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) {
+                        Log.w("QuranService", "Unable to prepare hands-free Quran playback", error)
+                        stopPlayback()
+                    }
+                }
+            }
             ACTION_PLAY -> togglePlayPause()
+            ACTION_RESUME -> handleHandsFreeControl(ACTION_RESUME)
             ACTION_PAUSE -> {
                 com.starception.submission.media.TravelDuaInterruption.controller.cancel(this)
                 if (mediaPlayer?.isPlaying == true) togglePlayPause()
             }
             ACTION_NEXT -> playNext()
             ACTION_PREVIOUS -> playPrevious()
-            ACTION_STOP -> stopSelf()
+            ACTION_STOP -> stopPlayback()
         }
         return START_STICKY
+    }
+
+    private fun stopPlayback() {
+        reciterJob?.cancel()
+        reciterJob = null
+        wasPlayingBeforeChange = false
+        runCatching { mediaPlayer?.stop() }
+        stopProgressUpdates()
+        stopCoursePositionUpdates()
+        isPlayingForCourse = false
+        onPlaybackStateChanged?.invoke(false)
+        onGlobalPlaybackStateChanged?.invoke(false)
+        updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     override fun onDestroy() {

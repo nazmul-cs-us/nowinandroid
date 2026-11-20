@@ -796,12 +796,7 @@ class UnifiedSettingsViewModel @Inject constructor(
             try {
                 Log.i(TAG, "Loading voice settings...")
                 val prefs = context.getSharedPreferences("voice_settings", Context.MODE_PRIVATE)
-                val engineName = prefs.getString("voice_engine", VoiceRecognitionEngine.SHERPA_KWS.name)
-                val engine = try {
-                    VoiceRecognitionEngine.valueOf(engineName ?: VoiceRecognitionEngine.SHERPA_KWS.name)
-                } catch (e: Exception) {
-                    VoiceRecognitionEngine.SHERPA_KWS
-                }
+                val engine = VoiceRecognitionEngine.fromPreference(prefs.getString("voice_engine", null))
                 val needsDownload = !checkVoiceModelAvailable(engine)
                 val downloadCategory = if (needsDownload) voiceEngineDownloadCategory(engine) else null
                 _voiceSettings.value = VoiceSettingsState(

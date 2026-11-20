@@ -41,24 +41,31 @@ fun PublishedTafsirPicker(selectedBook: String?, onSelect: (PublishedTafsirEditi
 
 /** A single selector for Arabic books and published language editions. */
 @Composable
-fun TafsirBookPicker(selectedBook: String, onSelect: (String) -> Unit, includeWordMeanings: Boolean = false) {
+fun TafsirBookPicker(selectedBook: String, onSelect: (String) -> Unit, includeWordMeanings: Boolean = false,
+    compact: Boolean = false) {
     var expanded by remember { mutableStateOf(false) }
     val arabic = listOf("saadi" to "As-Sa'di", "moysar" to "Al-Moyassar", "baghawi" to "Al-Baghawi") +
         if (includeWordMeanings) listOf("word_meanings" to "Word meanings") else emptyList()
     val edition = PublishedTafsirs.forBook(selectedBook)
     Box(Modifier.fillMaxWidth()) {
         TextButton(onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth().testTag("published-tafsir-picker"),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("published-tafsir-picker"),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
             contentPadding = PaddingValues(vertical = 4.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(edition?.languageName ?: "العربية · Arabic", style = MaterialTheme.typography.labelMedium)
+                if (!compact) Text(edition?.languageName ?: "العربية · Arabic", style = MaterialTheme.typography.labelMedium)
                 Text(edition?.title ?: arabic.firstOrNull { it.first == selectedBook }?.second ?: "Choose commentary",
-                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif), maxLines = 3,
+                    style = if (compact) MaterialTheme.typography.titleSmall else
+                        MaterialTheme.typography.titleLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif),
+                    maxLines = if (compact) 1 else 3,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                if (compact) Text(edition?.let { "${it.languageName} · ${it.attribution}" } ?: "العربية · Arabic",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
-            Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.padding(start = 12.dp).size(20.dp))
+            Icon(Icons.Default.ExpandMore, contentDescription = null,
+                modifier = Modifier.padding(start = if (compact) 4.dp else 12.dp).size(if (compact) 16.dp else 20.dp))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 440.dp)) {
             arabic.forEach { (key, title) ->

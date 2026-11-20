@@ -22,10 +22,6 @@ import com.starception.submission.feature.quran.BengaliIbnKathir
 import com.starception.submission.feature.quran.PublishedTafsirContent
 import com.starception.submission.feature.quran.PublishedTafsirs
 
-import androidx.compose.foundation.basicMarquee
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.starception.submission.feature.quran.ReciterSelectionStore
-
 import android.Manifest
 import android.content.ComponentName
 import android.content.Context
@@ -149,6 +145,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -177,6 +174,7 @@ import com.starception.submission.core.designsystem.component.scrollbar.Draggabl
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
 import com.starception.submission.core.designsystem.theme.QuranFonts
+import com.starception.submission.core.designsystem.icon.TafsirIcon
 import com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.QuranRepository
@@ -205,6 +203,7 @@ import kotlin.math.sqrt
 
 private const val SURAH_ARTWORK_PORTRAIT_ASPECT_RATIO = 3f / 2f
 private val SurahArtworkLandscapeHeight = 180.dp
+private val SurahToolbarHeight = 64.dp
 private val MushafEdgeControlTouchWidth = 96.dp
 private val MushafEdgeControlTouchHeight = 112.dp
 private val MushafEdgeControlVisualSize = 44.dp
@@ -451,10 +450,6 @@ fun SurahDetailScreen(
     val quranRepository: QuranRepository = hiltViewModel<QuranRepositoryHolder>().repository
     val userDataRepository: UserDataRepository = hiltViewModel<UserDataRepositoryHolder>().repository
     val context = LocalContext.current
-    val reciterSelectionStore = remember(context) { ReciterSelectionStore(context) }
-    val reciterSelection by reciterSelectionStore.selections.collectAsStateWithLifecycle(
-        initialValue = reciterSelectionStore.current(),
-    )
 
     // Landscape detection
     val configuration = LocalConfiguration.current
@@ -574,6 +569,7 @@ fun SurahDetailScreen(
     var showTranslationDialog by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
     var showTajweedLegendDialog by remember { mutableStateOf(false) }
+    var showTtsVoiceSheet by remember { mutableStateOf(false) }
 
     // Enhanced database features
     val wordStudyData by viewModel.wordStudyData.collectAsState()
@@ -590,14 +586,14 @@ fun SurahDetailScreen(
     }
     val inlineSpeechSession = remember { com.starception.submission.feature.quran.TafsirSpeechSession() }
     val inlineSpeechFactory = remember(context) {
-        { inlineSpeechSession.createPlayer { AndroidTafsirSpeechPlayer(context) } }
+        { inlineSpeechSession.createPlayer { createAppTafsirSpeechPlayer(context) } }
     }
     val speechContext = context.applicationContext
     val speechSurah = currentPlayingSurahNumber
     val arabicTafsirReader = remember(speechSurah, selectedTafseerBook) { viewModel.tafsirReader(speechSurah, selectedTafseerBook) }
     val surahTafsirPlayer = if (showInlineTafsir) com.starception.submission.feature.quran.rememberSurahTafsirSpeechPlayer(
         currentPlayingSurahNumber, selectedTafseerBook, inlineSpeechSession,
-        engineFactory = { AndroidTafsirSpeechPlayer(speechContext, fullSurah = true) },
+        engineFactory = { createAppTafsirSpeechPlayer(speechContext, fullSurah = true) },
         onActivate = { com.starception.submission.services.ChapterRecitationService.playTafsir(speechContext) },
         loadAyah = { verse -> inlineTafsirRepository?.text(speechSurah, verse) ?: arabicTafsirReader(verse) }) else null
     val tafsirSpeechStatus = surahTafsirPlayer?.state?.collectAsState()?.value?.status
@@ -884,6 +880,8 @@ fun SurahDetailScreen(
     // Keep the toolbar transparent over the artwork, then smoothly add its
     // surface as the header scrolls away.
     val toolbarCollapseDistancePx = with(LocalDensity.current) { 112.dp.toPx() }
+    val toolbarDensity = LocalDensity.current
+    var toolbarHeight by remember { mutableStateOf(SurahToolbarHeight) }
     val collapseProgress = remember(scrollState, toolbarCollapseDistancePx) {
         derivedStateOf {
             if (scrollState.firstVisibleItemIndex > 0) {
@@ -904,7 +902,6 @@ fun SurahDetailScreen(
     // Track scroll direction for floating toolbar and FAB animation with stable detection
     var previousScrollOffset by remember { mutableStateOf(0) }
     var previousItemIndex by remember { mutableStateOf(0) }
-    var showReciterPicker by remember { mutableStateOf(false) }
     var showFloatingToolbar by remember { mutableStateOf(false) } // Floating toolbar hidden initially, shown via More menu
     val openHeaderTafsir: () -> Unit = {
         if (uiState is SurahDetailUiState.Success) {
@@ -1263,6 +1260,7 @@ fun SurahDetailScreen(
                             // page-jump to its same-numbered ayah.
                             highlightedAyahNumber = if (num == surahNumber) highlightedAyahNumber else null,
                             scrollToAyahForMushafJump = if (num == surahNumber) scrollToAyah else 0,
+                            toolbarHeight = toolbarHeight,
                             modifier = Modifier,
                         )
                     }
@@ -1307,38 +1305,6 @@ fun SurahDetailScreen(
                             },
                         )
                     }
-                }
-            }
-        }
-
-        if (showReciterPicker) {
-            val reciterSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            val reciterSheetScope = rememberCoroutineScope()
-            ModalBottomSheet(
-                onDismissRequest = { showReciterPicker = false },
-                sheetState = reciterSheetState,
-            ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
-                    Text("Choose reciter", style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(bottom = 12.dp))
-                    com.starception.submission.settings.components.ReciterStorageSection(
-                        initiallyExpanded = true,
-                        manageDownloads = false,
-                        surahNumber = surahNumber,
-                        modifier = Modifier.weight(1f, fill = false),
-                        onPreviewStart = {
-                            playbackService?.let { service ->
-                                if (service.isPlaying()) service.togglePlayPause()
-                            }
-                        },
-                        onReciterSelected = {
-                            reciterSheetScope.launch {
-                                reciterSheetState.hide()
-                                showReciterPicker = false
-                            }
-                            playSelectedArabicReciter()
-                        },
-                    )
                 }
             }
         }
@@ -1413,16 +1379,8 @@ fun SurahDetailScreen(
                         android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "✅ CLICK_COMPLETE | surah=$surahNumber | bookmarkId=$bookmarkId | state=$newState")
                     }
                 },
-                onReciterClick = {
-                    showReciterPicker = true
-                },
                 onTafsirClick = openHeaderTafsir.takeIf { uiState is SurahDetailUiState.Success },
                 isTafsirVisible = showInlineTafsir,
-                selectedReciterName = if (currentAudioLanguage == AudioLanguage.ARABIC_ONLY) {
-                    reciterSelection.name
-                } else {
-                    com.starception.submission.feature.quran.DEFAULT_RECITER_NAME
-                },
                 onMoreClick = {
                     // Toggle floating toolbar visibility
                     showFloatingToolbar = !showFloatingToolbar
@@ -1431,12 +1389,15 @@ fun SurahDetailScreen(
                         isFloatingToolbarExpanded = true
                     }
                 },
-                modifier = Modifier.align(Alignment.TopCenter),
+                modifier = Modifier.align(Alignment.TopCenter).onSizeChanged {
+                    toolbarHeight = with(toolbarDensity) { it.height.toDp() }
+                },
             )
         }
 
-        // Floating Surah name that moves from info card to toolbar when scrolling.
-        if (uiState is SurahDetailUiState.Success && showTopBar.value) {
+        // Crossfade the album title into the toolbar's measured title slot. Never
+        // draw this independent overlay over the toolbar's interactive controls.
+        if (uiState is SurahDetailUiState.Success && showTopBar.value && collapseProgress.value < 1f) {
             // Prefer the currently-playing surah from the cache so the floating
             // name matches the AlbumInfoCard / mini-bar when audio advances to a
             // different surah than the route param.
@@ -1461,7 +1422,7 @@ fun SurahDetailScreen(
             val endXPx = with(density) { 56.dp.toPx() } // Position after back button
 
             // Use derivedStateOf for stable, optimized updates
-            val floatingState by remember {
+            val floatingState by remember(scrollState, headerYPx, toolbarYPx, startXPx, endXPx) {
                 derivedStateOf {
                     val scrollOffset = if (scrollState.firstVisibleItemIndex == 0) {
                         scrollState.firstVisibleItemScrollOffset.toFloat()
@@ -1481,6 +1442,9 @@ fun SurahDetailScreen(
             Box(
                 modifier = Modifier
                     .graphicsLayer {
+                        val clearance = ((namesYPx - with(density) { toolbarHeight.toPx() }) /
+                            with(density) { 48.dp.toPx() }).coerceIn(0f, 1f)
+                        alpha = minOf(1f - collapseProgress.value, clearance)
                         translationX = xOffsetPx
                         translationY = namesYPx
                         scaleX = scale
@@ -1806,6 +1770,14 @@ fun SurahDetailScreen(
                         }
                     }
 
+                    // Use the app's shared Kokoro/VCTK picker, not Android speech settings.
+                    SurahTtsSettingsEntry(onClick = {
+                        inlineSpeechSession.stop()
+                        com.starception.submission.feature.quran.SurahTafsirPlayback.owner.stop()
+                        showFloatingToolbar = false
+                        showTtsVoiceSheet = true
+                    })
+
                     // Mushaf page — plain label + switch row.
                     Row(
                         modifier = Modifier
@@ -1878,7 +1850,7 @@ fun SurahDetailScreen(
                         )
                     }
 
-                    // Same picker as the direct toolbar action, also available in reading settings.
+                    // Secondary reading controls live in More, keeping the top bar compact.
                     com.starception.submission.settings.components.ReciterStorageSection(
                         sectionTitle = "Reciter",
                         manageDownloads = false,
@@ -1895,7 +1867,7 @@ fun SurahDetailScreen(
                     )
 
                     TextButton(onClick = openHeaderTafsir, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.MenuBook, contentDescription = null)
+                        TafsirIcon()
                         Spacer(Modifier.width(8.dp))
                         Text(if (showInlineTafsir) "Hide inline tafsir" else "Show tafsir beneath each ayah")
                     }
@@ -2096,6 +2068,10 @@ fun SurahDetailScreen(
                     }
                 }
             }
+        }
+
+        if (showTtsVoiceSheet) {
+            SurahTtsVoiceSettingsSheet(onDismiss = { showTtsVoiceSheet = false })
         }
 
         // Word Study dialog
@@ -2398,9 +2374,7 @@ internal fun AlbumPlayerTopBar(
     onTajweedClick: () -> Unit = {},
     onBookmarkClick: () -> Unit = {},
     onMoreClick: () -> Unit = {},
-    onReciterClick: () -> Unit = {},
     onTafsirClick: (() -> Unit)? = null,
-    selectedReciterName: String = "Mishary Rashid Al-Alafasy",
     onAllSurahsClick: () -> Unit = onBackClick,
     isTafsirVisible: Boolean = false,
     modifier: Modifier = Modifier,
@@ -2436,212 +2410,78 @@ internal fun AlbumPlayerTopBar(
         else -> "??"
     }
 
-    // Dynamic toolbar layout based on camera cutout
-    // Measure available space after camera cutout and fit as many icons as possible
-
-    val view = LocalView.current
-    val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    val screenWidthDp = configuration.screenWidthDp.dp
-
-    // Get camera cutout bounds
-    val cutoutRightDp = remember(view) {
-        val displayCutout = view.rootWindowInsets?.displayCutout
-        if (displayCutout != null && displayCutout.boundingRects.isNotEmpty()) {
-            // Find the rightmost edge of any cutout
-            val maxRight = displayCutout.boundingRects.maxOfOrNull { it.right } ?: 0
-            with(density) { maxRight.toDp() }
-        } else {
-            0.dp // No cutout
-        }
-    }
-
-    // Calculate available width for icons on the right side
-    // Screen width - cutout right edge - some padding
-    val availableWidthDp = screenWidthDp - cutoutRightDp - 16.dp
-
-    // Define icon sizes
-    val iconButtonSize = 44.dp
-    val translationButtonSize = 48.dp
-
-    // Keep Save, language selection and More visible; only secondary actions may collapse.
-    val moreButtonSize = 44.dp
-    val backButtonSize = 44.dp
-    val bookmarkButtonSize = 44.dp
-    val reciterButtonWidth = if (screenWidthDp < 360.dp) 72.dp else 112.dp
-    val remainingWidth = (availableWidthDp - backButtonSize - translationButtonSize - bookmarkButtonSize - moreButtonSize - reciterButtonWidth - 48.dp)
-        .coerceAtLeast(0.dp)
-    val maxIconsThatFit = (remainingWidth / iconButtonSize).toInt()
-    val showTranslation = true
-    val showBookmark = true
-    val showFont = false
-    val showTajweedButton = maxIconsThatFit >= 1
-
     Surface(
         color = backgroundColor,
         tonalElevation = (4 * collapseProgress).dp, // Smooth elevation transition
         modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp), // Minimal top padding since status bar is hidden by immersive mode
+            .fillMaxWidth(),
     ) {
-        Row(
+        // Keep one compact row with a constrained title slot. Reciter selection
+        // remains in More; narrow windows and large text also use its language picker.
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+                // Keep the top gap inside the surface so scrolled text cannot
+                // peek through between the playback banner and the toolbar.
+                .padding(start = 8.dp, top = 8.dp, end = 8.dp),
         ) {
-            // LEFT SIDE - Back button only (floating surah name will animate here)
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = CircleShape,
-                color = contentColor.copy(alpha = 0.15f),
+            val showLanguage = maxWidth >= 304.dp && LocalDensity.current.fontScale <= 1.5f
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBackClick) {
+                IconButton(onClick = onBackClick, modifier = Modifier.size(48.dp)) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         tint = contentColor,
                     )
                 }
-            }
-
-            // RIGHT SIDE - Dynamic icons based on available space after camera cutout
-            // Shows as many icons as can fit, rest accessible via More menu
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(0.dp),
-            ) {
-                if (true) {
-                    // Open the existing language picker directly from the toolbar.
-                    if (showTranslation) {
-                        Surface(
-                            onClick = onTranslationClick,
-                            modifier = Modifier
-                                .size(translationButtonSize)
-                                .semantics {
-                                    contentDescription = "Change translation language, current: $translationDisplay"
-                                },
-                            shape = RoundedCornerShape(8.dp),
-                            color = contentColor.copy(alpha = 0.12f),
-                            contentColor = contentColor,
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize(),
-                            ) {
-                                Text(
-                                    text = translationDisplay,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = contentColor,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
-                        }
-                    }
-
-                    // Save remains available alongside language selection.
-                    if (showBookmark) {
-                        IconButton(
-                            onClick = onBookmarkClick,
-                            modifier = Modifier.size(44.dp),
-                        ) {
-                            Icon(
-                                imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                                contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
-                                tint = contentColor,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                    }
-
-                    // Font button - shown if space allows (priority 3)
-                    if (showFont) {
-                        val fontDisplay = when (selectedArabicFont) {
-                            "pdms_saleem" -> "ص"
-                            "noor_e_hidayat" -> "ن"
-                            "thabit" -> "ث"
-                            "uthmani_script" -> "ع"
-                            "indopak_script" -> "پ"
-                            else -> "F"
-                        }
-                        Surface(
-                            onClick = onFontClick,
-                            modifier = Modifier.size(40.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            color = contentColor.copy(alpha = 0.12f),
-                            contentColor = contentColor,
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize(),
-                            ) {
-                                Text(
-                                    text = fontDisplay,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = contentColor,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
-                        }
-                    }
-
-                    // Tajweed toggle - shown if space allows (priority 4)
-                    if (showTajweedButton) {
-                        IconButton(
-                            onClick = onTajweedClick,
-                            modifier = Modifier.size(44.dp),
-                        ) {
-                            Icon(
-                                imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                                contentDescription = if (showTajweed) "Disable Tajweed" else "Enable Tajweed",
-                                tint = contentColor,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                    }
-                } // end hidden actions block
-
-                Surface(
-                    onClick = onReciterClick,
-                    modifier = Modifier.width(reciterButtonWidth).height(44.dp)
-                        .semantics { contentDescription = "Change reciter, selected: $selectedReciterName" },
-                    shape = RoundedCornerShape(12.dp),
-                    color = contentColor.copy(alpha = 0.12f),
-                    contentColor = contentColor,
+                Column(
+                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                        .graphicsLayer { alpha = collapseProgress },
                 ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(selectedReciterName, style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 10.dp).basicMarquee(),
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                    Text(surahName, style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold, color = contentColor,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(surahNameArabic, style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)),
+                        color = contentColor.copy(alpha = 0.7f),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                TextButton(
-                    onClick = { onTafsirClick?.invoke() }, enabled = onTafsirClick != null,
+                if (showLanguage) IconButton(
+                    onClick = onTranslationClick,
+                    modifier = Modifier.size(48.dp).semantics {
+                        contentDescription = "Change translation language, current: $translationDisplay"
+                    },
+                ) {
+                    Text(translationDisplay, style = MaterialTheme.typography.labelMedium,
+                        color = contentColor, fontWeight = FontWeight.Bold, maxLines = 1)
+                }
+                IconButton(onClick = onBookmarkClick, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                        contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                        tint = contentColor,
+                    )
+                }
+                IconToggleButton(
+                    checked = isTafsirVisible,
+                    onCheckedChange = { onTafsirClick?.invoke() }, enabled = onTafsirClick != null,
                     modifier = Modifier.size(48.dp).semantics {
                         contentDescription = if (isTafsirVisible) "Hide tafsir" else "Tafsir"
                         stateDescription = if (isTafsirVisible) "Shown" else "Hidden"
                     },
-                    contentPadding = PaddingValues(0.dp),
-                    colors = ButtonDefaults.textButtonColors(contentColor = contentColor,
-                        containerColor = if (isTafsirVisible) contentColor.copy(alpha = 0.12f) else Color.Transparent),
+                    colors = IconButtonDefaults.iconToggleButtonColors(
+                        contentColor = contentColor,
+                        checkedContentColor = if (collapseProgress > 0.5f) MaterialTheme.colorScheme.primary else contentColor,
+                        checkedContainerColor = Color.Transparent),
                 ) {
-                    Text(if (isTafsirVisible) "Hide" else "Tafsir", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                    TafsirIcon(modifier = Modifier.size(24.dp))
                 }
-                // More options menu - always shown (floating toolbar has all options)
-                IconButton(
-                    onClick = onMoreClick,
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "More options",
-                        tint = contentColor,
-                        modifier = Modifier.size(24.dp),
-                    )
+                IconButton(onClick = onMoreClick, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = contentColor)
                 }
             }
         }
@@ -2726,6 +2566,7 @@ private fun AlbumPlayerContent(
     /** Search-driven jump target — forwarded to the Mushaf pager so it can
      *  snap to the page containing this ayah. 0 = no jump. */
     scrollToAyahForMushafJump: Int = 0,
+    toolbarHeight: Dp = SurahToolbarHeight,
     modifier: Modifier = Modifier,
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
@@ -2734,10 +2575,10 @@ private fun AlbumPlayerContent(
     var inlineHeaderHeight by remember(displaySurah.number, selectedTafseerBook) { mutableIntStateOf(0) }
     val firstAyahIndex = 1 + if (showBismillahRow) 1 else 0
     val ayahFling = com.starception.submission.feature.quran.rememberAyahFlingBehavior(
-        scrollState, firstAyahIndex, inlineHeaderHeight, 64.dp)
+        scrollState, firstAyahIndex, inlineHeaderHeight, toolbarHeight)
     val ayahScrollGuide = com.starception.submission.feature.quran.rememberAyahScrollGuide(
         scrollState, "${displaySurah.number}:$selectedTafseerBook", inlineTafsirContent != null,
-        tafsirNarration, firstAyahIndex, inlineHeaderHeight, 64.dp)
+        tafsirNarration, firstAyahIndex, inlineHeaderHeight, toolbarHeight)
 
 
     val quranRepository = hiltViewModel<QuranRepositoryHolder>().repository
@@ -3487,7 +3328,8 @@ private fun AlbumPlayerContent(
                                                 )
 
                                                 BottomSheetOption(
-                                                    icon = Icons.Default.MenuBook,
+                                                    icon = null,
+                                                    iconContent = { TafsirIcon() },
                                                     title = "Tafseer",
                                                     description = "",
                                                     containerColor = Color.Transparent,
@@ -3571,13 +3413,14 @@ private fun AlbumPlayerContent(
 
 @Composable
 private fun BottomSheetOption(
-    icon: ImageVector,
+    icon: ImageVector?,
     title: String,
     description: String,
     containerColor: Color,
     contentColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    iconContent: (@Composable () -> Unit)? = null,
 ) {
     // YouTube-style clean list item
     Surface(
@@ -3593,7 +3436,7 @@ private fun BottomSheetOption(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Simple icon (no background container)
-            Icon(
+            if (iconContent != null) iconContent() else if (icon != null) Icon(
                 imageVector = icon,
                 contentDescription = title,
                 tint = MaterialTheme.colorScheme.onSurface,
@@ -3939,7 +3782,7 @@ private fun BottomSheetTafseerContent(
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
     val tafsirContext = LocalContext.current.applicationContext
-    val speechFactory = remember(tafsirContext) { { AndroidTafsirSpeechPlayer(tafsirContext) } }
+    val speechFactory = remember(tafsirContext) { { createAppTafsirSpeechPlayer(tafsirContext) } }
     val publishedEdition = PublishedTafsirs.forBook(selectedTafseerBook)
     val publishedRepository = remember(tafsirContext, publishedEdition?.bookKey) {
         publishedEdition?.let { createPublishedTafsirRepository(tafsirContext, it) }
@@ -8389,7 +8232,7 @@ private fun AyahTrackItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = if (studyMode) 8.dp else 12.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -9430,7 +9273,7 @@ fun TafseerDialog(
         { edition, reload -> MissingTafsirAssetCard(edition, reload) },
 ) {
     val tafsirContext = LocalContext.current.applicationContext
-    val speechFactory = remember(tafsirContext) { { AndroidTafsirSpeechPlayer(tafsirContext) } }
+    val speechFactory = remember(tafsirContext) { { createAppTafsirSpeechPlayer(tafsirContext) } }
     val edition = PublishedTafsirs.forBook(selectedTafseerBook)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
