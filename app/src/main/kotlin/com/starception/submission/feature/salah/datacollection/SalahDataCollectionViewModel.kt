@@ -452,6 +452,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     private fun selectedVoiceCategories(): List<String> = when (selectedTtsVoice()) {
         TtsVoice.KOKORO_EN -> listOf("model_tts_kokoro", "model_tts_espeak")
         TtsVoice.VITS_VCTK -> listOf("model_tts_vits")
+        TtsVoice.MMS_BENGALI -> emptyList() // Non-commercial preview assets are bundled explicitly.
     }
 
     fun checkTtsAvailability() {

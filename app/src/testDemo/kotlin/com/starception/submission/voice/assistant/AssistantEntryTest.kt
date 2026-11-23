@@ -62,7 +62,8 @@ class AssistantEntryTest {
         val mic = pm.getServiceInfo(ComponentName(context, HandsFreeVoiceService::class.java), 0)
         assertFalse(mic.exported)
         assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE, mic.foregroundServiceType)
-        assertTrue(mic.flags and ServiceInfo.FLAG_STOP_WITH_TASK != 0)
+        assertEquals("Closing the UI must not stop an explicitly enabled listening session", 0,
+            mic.flags and ServiceInfo.FLAG_STOP_WITH_TASK)
         val recognition = pm.getServiceInfo(ComponentName(context, DeenlyRecognitionService::class.java), 0)
         assertEquals("android.permission.BIND_SPEECH_RECOGNITION_SERVICE", recognition.permission)
         assertFalse(HandsFreeVoiceState.status.value.enabled)

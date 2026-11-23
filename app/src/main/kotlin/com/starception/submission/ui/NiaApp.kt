@@ -543,6 +543,7 @@ private fun NiaFloatingBottomBar(
             }
         }
     }
+    com.starception.submission.feature.surah.MissingBengaliVoiceCard()
     val glassAppearance = rememberNavigationGlassAppearance(backdrop, LocalDarkTheme.current)
     val glassColors = animatedNavigationGlassColors(glassAppearance.dark)
     val latestGlassColors = rememberUpdatedState(glassColors)

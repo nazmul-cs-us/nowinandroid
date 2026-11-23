@@ -53,9 +53,10 @@ import kotlin.coroutines.resume
  * Provides high-quality, fully offline text-to-speech without network dependency.
  */
 @Singleton
-class SherpaOnnxTtsService @Inject constructor(
+class SherpaOnnxTtsService(
     @ApplicationContext private val context: Context,
     private val assetRepository: AssetRepository,
+    private val initialVoice: TtsVoice = TtsVoice.KOKORO_EN,
 ) {
     companion object {
         private const val TAG = "SherpaOnnxTtsService"
@@ -126,7 +127,7 @@ class SherpaOnnxTtsService @Inject constructor(
     }
     private var isInitialized = false
     private var isInitializing = false
-    private var currentVoice: TtsVoice = TtsVoice.KOKORO_EN
+    private var currentVoice: TtsVoice = initialVoice
 
     /**
      * Checks the files that native Sherpa actually needs, rather than trusting that one model
@@ -158,7 +159,7 @@ class SherpaOnnxTtsService @Inject constructor(
 
     // Persistent cache directory
     private val cacheDir: File by lazy {
-        File(context.cacheDir, "tts_audio_cache").also {
+        File(context.cacheDir, if (initialVoice.languageCode == "en") "tts_audio_cache" else "tts_audio_cache_${initialVoice.languageCode}").also {
             it.mkdirs()
             Log.d(TAG, "📂 TTS cache directory: ${it.absolutePath}")
         }
@@ -178,6 +179,7 @@ class SherpaOnnxTtsService @Inject constructor(
      * Thread-safe: waits for any ongoing generation to complete before releasing.
      */
     fun setVoice(voice: TtsVoice) {
+        require(voice.languageCode == initialVoice.languageCode) { "Use a language-specific TTS engine for ${voice.languageCode}" }
         if (currentVoice != voice) {
             Log.i(TAG, "Switching TTS voice from ${currentVoice.displayName} to ${voice.displayName}")
             currentVoice = voice
@@ -210,6 +212,7 @@ class SherpaOnnxTtsService @Inject constructor(
      * Thread-safe: multiple callers will wait for initialization to complete.
      */
     suspend fun initialize(): Boolean {
+        if (currentVoice.nonCommercialOnly && !com.starception.submission.BuildConfig.BENGALI_MMS_PREVIEW) return false
         // Fast path: already initialized
         if (isInitialized) return true
 
@@ -352,7 +355,7 @@ class SherpaOnnxTtsService @Inject constructor(
                                 provider = "cpu",
                             )
                         }
-                        TtsModelType.VITS -> {
+                        TtsModelType.VITS, TtsModelType.MMS -> {
                             Log.i(TAG, "Configuring VITS model...")
                             val vitsConfig = OfflineTtsVitsModelConfig(
                                 model = modelPath,
@@ -418,7 +421,7 @@ class SherpaOnnxTtsService @Inject constructor(
         onPlaybackStart: (() -> Unit)? = null,
     ): Boolean {
         if (com.starception.submission.family.FamilyAudioSession.isActive) return false
-        val speechText = EnglishTtsTextNormalizer.normalize(text)
+        val speechText = normalizeTtsSpeechText(currentVoice, text)
         _isPreparingAudio.value = true
         stopRequested = false
         playbackPaused = false
@@ -826,7 +829,7 @@ class SherpaOnnxTtsService @Inject constructor(
         speakerId: Int = DEFAULT_SPEAKER_ID,
         speed: Float = DEFAULT_SPEED,
     ) {
-        val speechText = EnglishTtsTextNormalizer.normalize(text)
+        val speechText = normalizeTtsSpeechText(currentVoice, text)
         val textHash = speechText.hashCode()
 
         // Skip if already cached
@@ -940,7 +943,7 @@ class SherpaOnnxTtsService @Inject constructor(
             return false
         }
         val pending = texts
-            .map(EnglishTtsTextNormalizer::normalize)
+            .map { normalizeTtsSpeechText(currentVoice, it) }
             .filter { it.isNotBlank() }
             .distinct()
             .filterNot { audioCache.containsKey(it.hashCode()) }
@@ -980,7 +983,7 @@ class SherpaOnnxTtsService @Inject constructor(
      */
     fun releaseCachedTexts(texts: List<String>) {
         texts
-            .map(EnglishTtsTextNormalizer::normalize)
+            .map { normalizeTtsSpeechText(currentVoice, it) }
             .distinct()
             .forEach { audioCache.remove(it.hashCode()) }
         Log.i(TAG, "🧹 Released prepared voice lines (${audioCache.size} entries remain)")
@@ -990,7 +993,7 @@ class SherpaOnnxTtsService @Inject constructor(
      * Check if audio for given text is pre-generated and cached (memory or disk).
      */
     fun isCached(text: String): Boolean {
-        val hash = EnglishTtsTextNormalizer.normalize(text).hashCode()
+        val hash = normalizeTtsSpeechText(currentVoice, text).hashCode()
 
         // First check memory cache
         if (audioCache.containsKey(hash)) {
@@ -1097,7 +1100,7 @@ class SherpaOnnxTtsService @Inject constructor(
         if (com.starception.submission.family.FamilyAudioSession.isActive) return false
         stopRequested = false
         playbackPaused = false
-        val speechText = EnglishTtsTextNormalizer.normalize(text)
+        val speechText = normalizeTtsSpeechText(currentVoice, text)
         val textHash = speechText.hashCode()
         // Show "Preparing audio" while the cache is checked/loaded; cleared when
         // playback starts (playAudioSamples) or by speak()'s finally on the
@@ -1457,7 +1460,7 @@ class SherpaOnnxTtsService @Inject constructor(
             TtsModelType.KOKORO -> kokoroRequiredDataFiles.all { relativePath ->
                 File(directory, relativePath).let { it.isFile && it.length() > 0L }
             }
-            TtsModelType.VITS -> true
+            TtsModelType.VITS, TtsModelType.MMS -> true
         }
 
     private fun extractAssetDirRecursive(assetPath: String, outputDir: File) {

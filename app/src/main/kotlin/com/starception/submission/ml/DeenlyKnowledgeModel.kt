@@ -268,7 +268,9 @@ class DeenlyKnowledgeModel(context: Context) {
             // file at most once per cache window instead of every recomposition.
             val now = SystemClock.elapsedRealtime()
             val cached = cachedModelDownloaded[task]
-            if (!forceRefresh && cached != null && now - cached.first < MODEL_DOWNLOAD_CACHE_TTL_MS) {
+            // A missing model may finish downloading while its sheet is closed.
+            // Never retain that negative result; the final-file stat is inexpensive.
+            if (!forceRefresh && cached?.second == true && now - cached.first < MODEL_DOWNLOAD_CACHE_TTL_MS) {
                 return cached.second
             }
             val file = File(
@@ -280,7 +282,7 @@ class DeenlyKnowledgeModel(context: Context) {
             return downloaded
         }
 
-        private val cachedModelDownloaded = mutableMapOf<DeenlyKnowledgeTask, Pair<Long, Boolean>>()
+        private val cachedModelDownloaded = java.util.concurrent.ConcurrentHashMap<DeenlyKnowledgeTask, Pair<Long, Boolean>>()
 
         private const val MODEL_DOWNLOAD_CACHE_TTL_MS = 30_000L
 

@@ -10,6 +10,10 @@ Settings → **Voice assistant** offers two independent, explicit choices:
    (with the system default-app settings as a fallback). Only Android and the user
    change the default. Assistant-button/gesture behavior and unlocking requirements
    depend on the device. Assistant binding does not start a microphone.
+   On Samsung, **Side button settings** opens the device's side-key page where
+   supported, with Advanced features/system Settings as fallbacks. Choose Long press
+   → Digital assistant and select Deenly as the default assistant. One UI options vary.
+   This shortcut does not programmatically remap hardware keys or change defaults.
 
 The normal mic button/default-assistant entry also recognizes these explicit playback
 commands. Other utterances open the existing in-place search results. Typed searches
@@ -31,8 +35,10 @@ recording downloads may need internet; downloaded Quran audio plays offline.
 
 The persistent **Deenly hands-free microphone** notification includes **Turn off
 microphone**. Revoking microphone/notification access or blocking this notification
-channel stops listening. Sessions end after 12 hours, when the app's task is closed,
-on process death/force-stop, or on restart. There is deliberately no boot receiver,
+channel stops listening. Dismissing the microphone notification also stops listening
+on devices that allow dismissing an ongoing notification. Closing/swiping away the
+app UI does **not** stop an explicitly enabled session. Sessions end after 12 hours,
+when turned off, on process death/force-stop, or on restart. There is deliberately no boot receiver,
 sticky restart, remote enable action, or battery-optimization bypass.
 
 Family calls, foreground voice search and other microphone users take priority.
@@ -51,8 +57,10 @@ the user's selected keyword/transcription mode for other workflows.
   The custom phrase's sensitivity and pronunciation variants require real-device QA.
 - Start a family/phone call and foreground voice search. Verify the background mic
   yields, then returns to the wake phrase after the other capture ends.
-- Stop from the notification, revoke permissions, close the task, force-stop and
-  reboot. Verify no microphone resumes until the user explicitly enables it again.
+- Close/swipe away the app UI with hands-free enabled. Verify the microphone
+  notification and keyword listener remain active and “Hey Deenly” still works.
+- Stop/dismiss the notification, revoke permissions, force-stop and reboot.
+  Verify no microphone resumes until the user explicitly enables it again.
 - Choose Deenly in Android's default-assistant chooser and invoke the system gesture
   on cold/warm starts, from a detail page, after rotation and after permission denial.
 - Check battery use over several hours. This is software wake-word detection, not

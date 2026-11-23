@@ -294,6 +294,7 @@ fun AppTopSearchBar(
         )
     }
     val whisperService = remember(context) { WhisperVoiceService(context.applicationContext) }
+    val foregroundVoiceLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(whisperService) {
         com.starception.submission.family.FamilyAudioSession.state.collect { active ->
             if (active) whisperService.cancel(reportEmptyResult = false)
@@ -321,10 +322,12 @@ fun AppTopSearchBar(
     // voice-assistant button animates in sync with the real listening session
     // (it lives in NiaApp, outside this bar, and has no direct service handle).
     LaunchedEffect(isListening) {
-        com.starception.submission.ui.search.SearchPrefillBus.setListening(isListening)
+        com.starception.submission.ui.search.SearchPrefillBus.setListening(isListening &&
+            foregroundVoiceLifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
     }
     LaunchedEffect(isProcessing) {
-        com.starception.submission.ui.search.SearchPrefillBus.setProcessing(isProcessing)
+        com.starception.submission.ui.search.SearchPrefillBus.setProcessing(isProcessing &&
+            foregroundVoiceLifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
     }
     LaunchedEffect(whisperService) {
         whisperService.voiceLevel.collect {
@@ -358,11 +361,18 @@ fun AppTopSearchBar(
         ReciterDownloadSheet(reciter = reciter, onDismiss = { reciterDownloads = null })
     }
 
-    DisposableEffect(whisperService) {
+    DisposableEffect(whisperService, foregroundVoiceLifecycle) {
+        val observer = com.starception.submission.voice.ForegroundVoiceCaptureObserver {
+            whisperService.cancel(reportEmptyResult = false)
+        }
+        foregroundVoiceLifecycle.addObserver(observer)
         // Warm the model only when its file is actually present (bundled or
         // CDN-downloaded); otherwise the mic tap offers the download instead.
         if (whisperService.isModelAvailable()) whisperService.initialize()
-        onDispose { whisperService.release() }
+        onDispose {
+            foregroundVoiceLifecycle.removeObserver(observer)
+            whisperService.release()
+        }
     }
 
     // Mic tapped with no Whisper model on disk: show the standard missing-content

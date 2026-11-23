@@ -94,6 +94,46 @@ class AppTafsirSpeechPlayerTest {
         assertTrue(other.released)
     }
 
+    @Test fun bengaliRoutingRequiresOptInAndNeverChangesEnglishEngine() = runTest {
+        val english = Player()
+        val other = Player()
+        val bengali = Player()
+        var enabled = false
+        val router = TafsirSpeechRouter({ english }, { other }, StandardTestDispatcher(testScheduler),
+            bengaliVoice = { bengali }, bengaliEnabled = { enabled })
+        try {
+            router.play("বাংলা তাফসীর", "bn-BD")
+            runCurrent()
+            assertEquals("bn-BD", other.language)
+            assertNull(bengali.language)
+            enabled = true
+            router.play("বাংলা তাফসীর", "bn-BD")
+            runCurrent()
+            assertEquals("bn-BD", bengali.language)
+            router.pause()
+            assertEquals(TafsirSpeechStatus.PAUSED, bengali.state.value.status)
+            router.resume()
+            assertEquals(TafsirSpeechStatus.PLAYING, bengali.state.value.status)
+            router.play("English commentary", "en")
+            runCurrent()
+            assertEquals("en", english.language)
+            assertEquals(1, bengali.stops)
+        } finally { router.release() }
+        assertTrue(bengali.released)
+    }
+
+    @Test fun bengaliAppPlayerAcceptsBengaliSelection() = runTest {
+        val engine = Engine()
+        val player = AppVoiceTafsirSpeechPlayer(engine, { SurahTtsSelection(TtsVoice.MMS_BENGALI, 0) },
+            dispatcher = StandardTestDispatcher(testScheduler))
+        try {
+            player.play("বাংলা তাফসীর", "bn-BD")
+            runCurrent()
+            assertEquals(TtsVoice.MMS_BENGALI, engine.voices.single().voice)
+            assertEquals(TafsirSpeechStatus.PLAYING, player.state.value.status)
+        } finally { player.release() }
+    }
+
     private class Engine(private val startImmediately: Boolean = true) : AppTafsirSpeechEngine {
         val voices = mutableListOf<SurahTtsSelection>()
         var complete = CompletableDeferred<Boolean>()

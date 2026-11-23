@@ -45,8 +45,8 @@ internal class AppVoiceTafsirSpeechPlayer(
         if (released) return
         stop()
         if (text.isBlank()) return
-        if (!language.substringBefore('-').equals("en", ignoreCase = true)) {
-            mutableState.value = TafsirSpeechState(TafsirSpeechStatus.ERROR, "The selected app voice supports English narration.")
+        if (!language.substringBefore('-').equals(selection().voice.languageCode, ignoreCase = true)) {
+            mutableState.value = TafsirSpeechState(TafsirSpeechStatus.ERROR, "The selected app voice does not support this language.")
             return
         }
         val token = ++generation
@@ -119,21 +119,27 @@ internal class TafsirSpeechRouter(
     private val appVoice: () -> TafsirSpeechPlayer,
     private val otherLanguages: () -> TafsirSpeechPlayer,
     dispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val bengaliVoice: (() -> TafsirSpeechPlayer)? = null,
+    private val bengaliEnabled: () -> Boolean = { false },
 ) : TafsirSpeechPlayer {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val mutableState = MutableStateFlow(TafsirSpeechState())
     override val state = mutableState.asStateFlow()
     private var english: TafsirSpeechPlayer? = null
     private var other: TafsirSpeechPlayer? = null
+    private var bengali: TafsirSpeechPlayer? = null
     private var current: TafsirSpeechPlayer? = null
     private var observer: Job? = null
     private var released = false
 
     override fun play(text: String, language: String) {
         if (released) return
-        val next = if (language.substringBefore('-').equals("en", ignoreCase = true))
-            english ?: appVoice().also { english = it }
-        else other ?: otherLanguages().also { other = it }
+        val next = when {
+            language.substringBefore('-').equals("en", ignoreCase = true) -> english ?: appVoice().also { english = it }
+            language.substringBefore('-').equals("bn", ignoreCase = true) && bengaliEnabled() && bengaliVoice != null ->
+                bengali ?: bengaliVoice.invoke().also { bengali = it }
+            else -> other ?: otherLanguages().also { other = it }
+        }
         if (current !== next) {
             current?.stop()
             observer?.cancel()
@@ -150,7 +156,7 @@ internal class TafsirSpeechRouter(
     override fun release() {
         released = true
         observer?.cancel()
-        setOfNotNull(english, other).forEach { it.release() }
+        setOfNotNull(english, other, bengali).forEach { it.release() }
         scope.cancel()
         mutableState.value = TafsirSpeechState()
     }
@@ -158,8 +164,9 @@ internal class TafsirSpeechRouter(
 
 internal fun createAppTafsirSpeechPlayer(context: Context, fullSurah: Boolean = false): TafsirSpeechPlayer {
     val app = context.applicationContext
-    return TafsirSpeechRouter(appVoice = {
-        val speech = EntryPointAccessors.fromApplication(app, SherpaOnnxTtsEntryPoint::class.java).sherpaOnnxTtsService()
+    fun voicePlayer(bengali: Boolean): TafsirSpeechPlayer {
+        val entry = EntryPointAccessors.fromApplication(app, SherpaOnnxTtsEntryPoint::class.java)
+        val speech = if (bengali) entry.bengaliMmsTtsService() else entry.sherpaOnnxTtsService()
         val audio = app.getSystemService(AudioManager::class.java)
         lateinit var player: AppVoiceTafsirSpeechPlayer
         val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
@@ -173,6 +180,12 @@ internal fun createAppTafsirSpeechPlayer(context: Context, fullSurah: Boolean = 
         player = AppVoiceTafsirSpeechPlayer(
             engine = object : AppTafsirSpeechEngine {
                 override suspend fun speak(text: String, voice: TtsVoice, speakerId: Int, onStart: () -> Unit): Boolean {
+                    if (bengali && !withContext(Dispatchers.IO) {
+                            com.starception.submission.settings.components.isTtsVoiceModelAvailable(app, voice)
+                        }) {
+                        MissingBengaliVoice.requested.value = true
+                        return false
+                    }
                     speech.setVoice(voice)
                     return speech.speak(text, speakerId = speakerId, onPlaybackStart = onStart)
                 }
@@ -180,7 +193,8 @@ internal fun createAppTafsirSpeechPlayer(context: Context, fullSurah: Boolean = 
                 override fun resume() = speech.resumeSpeaking()
                 override fun stop() = speech.stopSpeaking()
             },
-            selection = { readSurahTtsSelection(app.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)) },
+            selection = { if (bengali) SurahTtsSelection(TtsVoice.MMS_BENGALI, 0)
+                else readSurahTtsSelection(app.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)) },
             beforePlay = {
                 check(audio.requestAudioFocus(focus) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) { "Audio is busy. Try again." }
                 QuranPlaybackService.pauseActive()
@@ -191,6 +205,11 @@ internal fun createAppTafsirSpeechPlayer(context: Context, fullSurah: Boolean = 
             },
             afterPlayback = { audio.abandonAudioFocusRequest(focus) },
         )
-        player
-    }, otherLanguages = { AndroidTafsirSpeechPlayer(app, fullSurah) })
+        return player
+    }
+    return TafsirSpeechRouter(appVoice = { voicePlayer(false) },
+        otherLanguages = { AndroidTafsirSpeechPlayer(app, fullSurah) },
+        bengaliVoice = { voicePlayer(true) },
+        bengaliEnabled = { com.starception.submission.BuildConfig.BENGALI_MMS_PREVIEW &&
+            app.getSharedPreferences("tts_settings", Context.MODE_PRIVATE).getBoolean("bengali_mms_enabled", false) })
 }

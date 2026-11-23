@@ -470,6 +470,7 @@ fun UnifiedSettingsScreen(
                                 downloadManager = viewModel.getDownloadManager(),
                                 onDownloadComplete = viewModel::refreshAfterModelDownload,
                             )
+                            com.starception.submission.settings.components.BengaliMmsVoiceSection()
                         }
                     }
 

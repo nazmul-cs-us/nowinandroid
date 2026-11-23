@@ -180,6 +180,9 @@ class HandsFreeVoiceService : Service() {
         .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE))
         .setOngoing(true).setOnlyAlertOnce(true).setSilent(true)
+        // Android 14+ can dismiss ongoing notifications; dismissal must stop this microphone.
+        .setDeleteIntent(PendingIntent.getService(this, 1,
+            Intent(this, HandsFreeVoiceService::class.java).setAction(STOP), PendingIntent.FLAG_IMMUTABLE))
         .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
         .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
         .addAction(0, "Turn off microphone", PendingIntent.getService(this, 1,

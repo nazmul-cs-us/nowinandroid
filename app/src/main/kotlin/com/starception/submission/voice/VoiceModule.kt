@@ -24,6 +24,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import javax.inject.Named
+import com.starception.submission.settings.components.TtsVoice
 
 /**
  * Hilt module for voice recognition and TTS services.
@@ -45,4 +47,12 @@ object VoiceModule {
         @ApplicationContext context: Context,
         assetRepository: AssetRepository,
     ): SherpaOnnxTtsService = SherpaOnnxTtsService(context, assetRepository)
+
+    @Provides
+    @Singleton
+    @Named("bengaliMmsTts")
+    fun provideBengaliMmsTtsService(
+        @ApplicationContext context: Context,
+        assetRepository: AssetRepository,
+    ): SherpaOnnxTtsService = SherpaOnnxTtsService(context, assetRepository, TtsVoice.MMS_BENGALI)
 }

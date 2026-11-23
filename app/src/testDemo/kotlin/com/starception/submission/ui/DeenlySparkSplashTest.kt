@@ -32,11 +32,13 @@ class DeenlySparkSplashTest {
     @Test fun splashFinishesOnce() {
         var finishes = 0
         compose.mainClock.autoAdvance = false
-        compose.setContent { DeenlySparkSplash { finishes++ } }
+        compose.setContent { DeenlySparkSplash(reminderLoader = {
+            com.starception.submission.core.designsystem.component.deenlySplashReminder(0, false, false)
+        }) { finishes++ } }
         compose.mainClock.advanceTimeBy(1200)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/deenly_spark_splash_mid.png")
         assertEquals(0, finishes)
-        compose.mainClock.advanceTimeBy(600)
+        compose.mainClock.advanceTimeBy(2200)
         compose.waitForIdle()
         assertEquals(1, finishes)
         compose.mainClock.advanceTimeBy(2000)
@@ -54,8 +56,45 @@ class DeenlySparkSplashTest {
         assertEquals(1, continues)
     }
 
-    @Test fun sparksWriteTheWordmarkBeforeSettling() {
-        val progress = mutableFloatStateOf(.32f)
+    @Test fun appVersionIsVisibleWithoutCoveringContinue() {
+        compose.setContent { MaterialTheme { SparkSplashArtwork({ 1f }, {}) } }
+        val version = compose.onNodeWithText("v${com.starception.submission.BuildConfig.VERSION_NAME}")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val continueButton = compose.onNodeWithText("Continue").fetchSemanticsNode().boundsInRoot
+        assertFalse("Version must not cover Continue", version.overlaps(continueButton))
+        assertTrue("Version belongs to the right of Continue", version.center.x > continueButton.center.x)
+    }
+
+    @Test fun wordmarkStartsBehindTheLowerEdgeThenCrescentReveals() {
+        val progress = mutableFloatStateOf(0f)
+        compose.setContent { MaterialTheme { SparkSplashArtwork({ progress.floatValue }, {}) } }
+        val wordmark = compose.onNodeWithContentDescription("Deenly").assertIsDisplayed()
+        val file = File("src/testDemo/screenshots/deenly_first_frame_wordmark.png")
+        wordmark.captureRoboImage(file.absolutePath)
+        val bitmap = requireNotNull(BitmapFactory.decodeFile(file.absolutePath))
+        var visible = 0
+        for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) {
+            val pixel = bitmap.getPixel(x, y)
+            if (Color.red(pixel) > 140 && Color.green(pixel) > 130 && Color.blue(pixel) > 140) visible++
+        }
+        bitmap.recycle()
+        assertEquals("Wordmark must start hidden behind the opening", 0, visible)
+        compose.runOnIdle { progress.floatValue = .5f }
+        val scene = File("src/testDemo/screenshots/deenly_crescent_reveal.png")
+        compose.onRoot().captureRoboImage(scene.absolutePath)
+        val frame = requireNotNull(BitmapFactory.decodeFile(scene.absolutePath))
+        var crescentPixels = 0
+        for (y in (frame.height * .34f).toInt() until (frame.height * .55f).toInt()) {
+            for (x in (frame.width * .3f).toInt() until (frame.width * .7f).toInt()) {
+                if (Color.red(frame.getPixel(x, y)) > 100) crescentPixels++
+            }
+        }
+        frame.recycle()
+        assertTrue("The restored crescent must reveal its purple-and-gold strokes", crescentPixels > 20)
+    }
+
+    @Test fun wordmarkRisesThroughTheMaskBeforeSettling() {
+        val progress = mutableFloatStateOf(.12f)
         compose.setContent { MaterialTheme { SparkSplashArtwork({ progress.floatValue }, {}) } }
         val wordmark = compose.onNodeWithContentDescription("Deenly").assertIsDisplayed()
         fun brightPixels(stage: String): Int {
@@ -70,25 +109,27 @@ class DeenlySparkSplashTest {
             pixels.recycle()
             return count
         }
-        val firstLetter = brightPixels("first")
+        val early = brightPixels("first")
         compose.runOnIdle { progress.floatValue = .58f }
-        val halfWritten = brightPixels("writing")
+        val fadingIn = brightPixels("writing")
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/deenly_splash_writing.png")
         compose.runOnIdle { progress.floatValue = 1f }
         val complete = brightPixels("complete")
-        assertTrue("The spark must leave visible strokes behind", firstLetter > 0 && halfWritten > firstLetter)
-        assertTrue("The whole name must be drawn before exit", complete > halfWritten)
+        assertTrue("More of the wordmark must rise above the edge", fadingIn > early)
+        assertTrue("The full wordmark must be visible before exit", complete >= fadingIn && complete > 0)
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/deenly_splash_wordmark.png")
     }
 
     @Test fun continueStillSkipsImmediatelyAndFinishesOnlyOnce() {
         var finishes = 0
         compose.mainClock.autoAdvance = false
-        compose.setContent { DeenlySparkSplash { finishes++ } }
+        compose.setContent { DeenlySparkSplash(reminderLoader = {
+            com.starception.submission.core.designsystem.component.deenlySplashReminder(0, false, false)
+        }) { finishes++ } }
         compose.mainClock.advanceTimeBy(300)
         compose.onNodeWithText("Continue").performClick()
         assertEquals(1, finishes)
-        compose.mainClock.advanceTimeBy(2000)
+        compose.mainClock.advanceTimeBy(4000)
         compose.waitForIdle()
         assertEquals(1, finishes)
     }

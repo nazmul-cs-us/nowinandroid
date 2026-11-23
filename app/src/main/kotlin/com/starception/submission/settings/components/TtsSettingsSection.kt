@@ -80,6 +80,7 @@ enum class TtsTestState {
 enum class TtsModelType {
     VITS,
     KOKORO,
+    MMS,
 }
 
 /**
@@ -98,6 +99,8 @@ enum class TtsVoice(
     val voicesFile: String,
     val icon: ImageVector,
     val iconGlyph: String,
+    val languageCode: String = "en",
+    val nonCommercialOnly: Boolean = false,
 ) {
     KOKORO_EN(
         displayName = "Kokoro",
@@ -126,6 +129,22 @@ enum class TtsVoice(
         voicesFile = "",
         icon = Icons.Outlined.RecordVoiceOver,
         iconGlyph = FlaticonIcons.VOLUME,
+    ),
+    MMS_BENGALI(
+        displayName = "MMS Bengali",
+        description = "Bengali · local non-commercial preview · CC BY-NC 4.0",
+        isMultiSpeaker = false,
+        totalSpeakers = 1,
+        modelType = TtsModelType.MMS,
+        modelFile = "vits-mms-ben/model.onnx",
+        tokensFile = "vits-mms-ben/tokens.txt",
+        dataDir = "",
+        lexiconFile = "",
+        voicesFile = "",
+        icon = Icons.Outlined.RecordVoiceOver,
+        iconGlyph = FlaticonIcons.VOICE,
+        languageCode = "bn",
+        nonCommercialOnly = true,
     ),
 }
 
@@ -196,11 +215,13 @@ fun TtsSettingsSection(
                 resourceName = when (state.selectedVoice) {
                     TtsVoice.KOKORO_EN -> "Kokoro TTS Engine"
                     TtsVoice.VITS_VCTK -> "VITS TTS Engine"
+                    TtsVoice.MMS_BENGALI -> "MMS Bengali preview"
                 },
                 category = state.downloadCategory,
                 description = when (state.selectedVoice) {
                     TtsVoice.KOKORO_EN -> "Download the Kokoro neural voice model for high-quality speech"
                     TtsVoice.VITS_VCTK -> "Download the VITS multi-speaker voice model"
+                    TtsVoice.MMS_BENGALI -> "Local non-commercial preview assets are required."
                 },
                 downloadManager = downloadManager,
                 onDownloadComplete = onDownloadComplete,

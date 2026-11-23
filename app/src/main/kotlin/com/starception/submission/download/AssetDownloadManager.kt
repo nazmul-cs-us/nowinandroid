@@ -80,6 +80,7 @@ class AssetDownloadManager @Inject constructor(
 
     private val cdnAssetsDir = File(context.filesDir, CDN_ASSETS_DIR)
     private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val categoryDownloadJobs = CategoryDownloadJobs(downloadScope)
     private val downloadStates = mutableMapOf<String, MutableStateFlow<DownloadState>>()
     private val mutableCategoryTransfers = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
     val categoryTransfers = mutableCategoryTransfers.asStateFlow()
@@ -160,9 +161,11 @@ class AssetDownloadManager @Inject constructor(
         manifest: AssetManifest,
         onProgress: ((Float, Long, Long) -> Unit)? = null,
         onFinished: ((Boolean) -> Unit)? = null,
-    ): Job = downloadScope.launch {
+    ): Job = categoryDownloadJobs.launch(category) {
         val success = try {
             downloadCategory(category, manifest, onProgress)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "Background category download failed for $category", e)
             false
@@ -384,7 +387,12 @@ class AssetDownloadManager @Inject constructor(
         onProgress: ((Float, Long, Long) -> Unit)? = null,
     ): Boolean = withContext(Dispatchers.IO) {
         val assets = manifest.getAssetsByCategory(category)
-        if (assets.isEmpty()) return@withContext true
+        if (assets.isEmpty()) {
+            mutableCategoryTransfers.update {
+                it + (category to DownloadState.Failed("This download is missing from the catalog. Please refresh and retry."))
+            }
+            return@withContext false
+        }
 
         _globalDownloadLabel.value = AssetDownloadViewModel.formatCategoryName(category)
         beginGlobalDownload()
