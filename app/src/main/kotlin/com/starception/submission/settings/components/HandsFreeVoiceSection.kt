@@ -97,6 +97,11 @@ internal fun HandsFreeVoiceSection(downloadManager: AssetDownloadManager?, onMod
                     try { assistantPicker.launch(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }
                     catch (_: RuntimeException) { error = "Default-assistant selection is unavailable on this device." }
                 }
+            },
+            showSideButtonSettings = Build.MANUFACTURER.equals("samsung", ignoreCase = true),
+            onSideButtonSettings = {
+                if (!openSamsungSideButtonSettings(context::startActivity))
+                    error = "Open Samsung Settings → Advanced features → Side button to configure the assistant button."
             })
         error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         if (models?.first == false && downloadManager != null) MissingContentCard(
@@ -110,9 +115,9 @@ internal fun HandsFreeVoiceSection(downloadManager: AssetDownloadManager?, onMod
     }
     if (consent) AlertDialog(onDismissRequest = { consent = false },
         title = { Text("Enable hands-free microphone?") },
-        text = { Text("Deenly will listen for “Hey Deenly” while the screen is off, then recognize a Quran playback command. " +
+        text = { Text("Deenly will listen for “Hey Deenly” while the screen is off or the app is closed, then recognize a Quran playback command. " +
             "Audio is processed on-device. A microphone notification stays visible. This uses extra battery and stops after 12 hours, " +
-            "when you turn it off, close the app, or restart your phone. It does not start automatically.",
+            "when you turn it off, dismiss its microphone notification, force-stop the app, or restart your phone. It does not start automatically.",
             modifier = Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) },
         confirmButton = { TextButton(onClick = {
             consent = false
@@ -127,7 +132,8 @@ internal fun HandsFreeVoiceSection(downloadManager: AssetDownloadManager?, onMod
 
 @Composable
 internal fun HandsFreeVoiceOptions(status: HandsFreeStatus, modelsReady: Boolean, assistantSelected: Boolean,
-    onToggle: (Boolean) -> Unit, onChooseAssistant: () -> Unit) {
+    onToggle: (Boolean) -> Unit, onChooseAssistant: () -> Unit,
+    showSideButtonSettings: Boolean = false, onSideButtonSettings: () -> Unit = {}) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
             .toggleable(status.enabled, enabled = modelsReady || status.enabled, role = Role.Switch, onValueChange = onToggle),
@@ -151,5 +157,12 @@ internal fun HandsFreeVoiceOptions(status: HandsFreeStatus, modelsReady: Boolean
         }
         Text("Android controls the assistant button/gesture and may require unlocking. Choosing Deenly does not enable hands-free listening.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (showSideButtonSettings) {
+            OutlinedButton(onClick = onSideButtonSettings, modifier = Modifier.fillMaxWidth()) {
+                Text("Side button settings")
+            }
+            Text("Samsung: Advanced features → Side button → Long press → Digital assistant. Choose Deenly as the default assistant above. Options vary by One UI version.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

@@ -34,6 +34,8 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 interface SherpaOnnxTtsEntryPoint {
     fun sherpaOnnxTtsService(): SherpaOnnxTtsService
+    @javax.inject.Named("bengaliMmsTts")
+    fun bengaliMmsTtsService(): SherpaOnnxTtsService
     fun assetDownloadManager(): AssetDownloadManager
     fun assetRepository(): AssetRepository
     fun audioDownloadHelper(): AudioDownloadHelper

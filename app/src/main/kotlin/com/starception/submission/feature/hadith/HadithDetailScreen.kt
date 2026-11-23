@@ -3642,4 +3642,5 @@ private fun TranslationLanguageCard(
 private fun ttsVoiceDownloadCategory(voice: TtsVoice): String = when (voice) {
     TtsVoice.KOKORO_EN -> "model_tts_kokoro"
     TtsVoice.VITS_VCTK -> "model_tts_vits"
+    TtsVoice.MMS_BENGALI -> error("MMS Bengali is not an English Hadith voice")
 }

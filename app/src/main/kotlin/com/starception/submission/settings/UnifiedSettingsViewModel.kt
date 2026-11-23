@@ -1373,9 +1373,10 @@ class UnifiedSettingsViewModel @Inject constructor(
         VoiceRecognitionEngine.SHERPA_KWS -> "model_kws"
     }
 
-    private fun ttsVoiceDownloadCategory(voice: TtsVoice): String = when (voice) {
+    private fun ttsVoiceDownloadCategory(voice: TtsVoice): String? = when (voice) {
         TtsVoice.KOKORO_EN -> "model_tts_kokoro"
         TtsVoice.VITS_VCTK -> "model_tts_vits"
+        TtsVoice.MMS_BENGALI -> null // Local preview only; no commercial CDN distribution.
     }
 
     fun refreshAfterModelDownload() {

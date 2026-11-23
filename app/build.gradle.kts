@@ -34,7 +34,13 @@ plugins {
 
 android {
     compileSdk = 36
+    buildFeatures.buildConfig = true
+    val mmsPreviewAssets = providers.gradleProperty("bengaliMmsAssetsDir").orNull
+    require(mmsPreviewAssets == null || providers.gradleProperty("allowNonCommercialTts").orNull == "true") {
+        "MMS Bengali is CC BY-NC 4.0. Local preview bundling requires -PallowNonCommercialTts=true."
+    }
     defaultConfig {
+        buildConfigField("boolean", "BENGALI_MMS_PREVIEW", "false")
         applicationId = "com.starception.submission"
         versionCode = 8
         versionName = "0.1.2" // X.Y.Z; X = Major, Y = minor, Z = Patch level
@@ -62,6 +68,8 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField("boolean", "BENGALI_MMS_PREVIEW",
+                (providers.gradleProperty("allowNonCommercialTts").orNull != "false").toString())
             applicationIdSuffix = NiaBuildType.DEBUG.applicationIdSuffix
             // Coverage instrumentation is breaking Hilt generated injector packaging at runtime.
             enableUnitTestCoverage = false
@@ -118,6 +126,7 @@ android {
         // it is staged under src/main/assets for the R2 upload only.
         ignoreAssetsPattern = "!audio:!surah_artwork"
     }
+    if (mmsPreviewAssets != null) sourceSets.maybeCreate("demoDebug").assets.srcDir(file(mmsPreviewAssets))
     testOptions.unitTests.isIncludeAndroidResources = true
     // android.util.Log is an unimplemented stub on the JVM and throws by default,
     // which fails every unit test that reaches the prayer engine

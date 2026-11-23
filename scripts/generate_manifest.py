@@ -23,11 +23,11 @@ IMPORTANT — partial vs full manifest:
     Only run a full regenerate when every CDN asset is present locally.
 """
 
+import argparse
 import hashlib
 import json
 import os
 import sys
-import argparse
 from pathlib import Path
 
 ASSETS_DIR = Path(__file__).parent.parent / "app" / "src" / "main" / "assets"
@@ -80,6 +80,7 @@ CATEGORY_RULES = [
     ("models/now_nudge/", "model_now_nudge"),
     ("models/", "model_whisper"),
     ("tts/kokoro", "model_tts_kokoro"),
+    ("tts/vits-mms-ben/", "model_tts_mms_bengali"),
     ("tts/vits", "model_tts_vits"),
     ("tts/en_US-ryan", "model_tts_ryan"),
     ("tts/espeak-ng-data", "model_tts_espeak"),
@@ -88,6 +89,7 @@ CATEGORY_RULES = [
 
 # Required assets that must be downloaded at first launch
 REQUIRED_CATEGORIES = {"quran_core", "json_data", "news"}
+
 
 # CDN path mapping: local asset path -> CDN key
 def get_cdn_key(asset_rel_path: str) -> str:
@@ -152,9 +154,7 @@ def should_skip(rel_path: str) -> bool:
         return True
     if rel_path.startswith("."):
         return True
-    if rel_path.endswith(".DS_Store"):
-        return True
-    return False
+    return rel_path.endswith(".DS_Store")
 
 
 def scan_assets(assets_dir: Path) -> list:
@@ -180,14 +180,16 @@ def scan_assets(assets_dir: Path) -> list:
             cdn_key = get_cdn_key(rel_path)
             category = get_category(rel_path)
 
-            entries.append({
-                "local_path": rel_path,
-                "cdn_key": cdn_key,
-                "size": size,
-                "sha256": checksum,
-                "category": category,
-                "required": category in REQUIRED_CATEGORIES,
-            })
+            entries.append(
+                {
+                    "local_path": rel_path,
+                    "cdn_key": cdn_key,
+                    "size": size,
+                    "sha256": checksum,
+                    "category": category,
+                    "required": category in REQUIRED_CATEGORIES,
+                }
+            )
 
     return entries
 
@@ -211,7 +213,11 @@ def generate_manifest(assets_dir: Path, base_url: str) -> dict:
     for entry in entries:
         cat = entry["category"]
         if cat not in categories:
-            categories[cat] = {"total_size": 0, "file_count": 0, "required": entry["required"]}
+            categories[cat] = {
+                "total_size": 0,
+                "file_count": 0,
+                "required": entry["required"],
+            }
         categories[cat]["total_size"] += entry["size"]
         categories[cat]["file_count"] += 1
 
@@ -230,7 +236,9 @@ def generate_manifest(assets_dir: Path, base_url: str) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate Cloudflare R2 asset manifest")
+    parser = argparse.ArgumentParser(
+        description="Generate Cloudflare R2 asset manifest"
+    )
     parser.add_argument(
         "--base-url",
         default="https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
@@ -264,14 +272,16 @@ def main():
 
     print(f"\nManifest written to: {output_path}")
     print(f"Total files: {manifest['total_files']}")
-    print(f"Total size: {manifest['total_size'] / (1024*1024):.1f} MB")
-    print(f"\nCategories:")
+    print(f"Total size: {manifest['total_size'] / (1024 * 1024):.1f} MB")
+    print("\nCategories:")
     for cat, info in sorted(manifest["categories"].items()):
         req = " (REQUIRED)" if info["required"] else ""
-        print(f"  {cat}: {info['file_count']} files, {info['total_size'] / (1024*1024):.1f} MB{req}")
+        print(
+            f"  {cat}: {info['file_count']} files, {info['total_size'] / (1024 * 1024):.1f} MB{req}"
+        )
 
     # Also print the list of files that will stay bundled
-    print(f"\nFiles staying bundled in APK:")
+    print("\nFiles staying bundled in APK:")
     for f in sorted(BUNDLED_FILES):
         fp = assets_dir / f
         if fp.exists():

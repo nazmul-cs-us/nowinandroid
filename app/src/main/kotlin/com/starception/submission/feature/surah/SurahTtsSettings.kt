@@ -36,7 +36,7 @@ import dagger.hilt.android.EntryPointAccessors
 internal data class SurahTtsSelection(val voice: TtsVoice, val speakerId: Int)
 
 internal fun readSurahTtsSelection(prefs: SharedPreferences): SurahTtsSelection {
-    val voice = TtsVoice.entries.firstOrNull { it.name == prefs.getString("selected_voice", null) }
+    val voice = TtsVoice.entries.firstOrNull { it.languageCode == "en" && it.name == prefs.getString("selected_voice", null) }
         ?: TtsVoice.KOKORO_EN
     return SurahTtsSelection(voice, prefs.getInt("selected_speaker_id", 0).coerceIn(0, voice.totalSpeakers - 1))
 }
@@ -99,6 +99,7 @@ internal fun SurahTtsVoiceSettingsSheet(onDismiss: () -> Unit) {
             speech.clearCache()
         },
         onDismiss = onDismiss,
+        footer = { com.starception.submission.settings.components.BengaliMmsVoiceSection() },
     )
 }
 

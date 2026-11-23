@@ -76,6 +76,7 @@ fun TtsVoiceSelectionSheet(
     onVoiceSelected: (TtsVoice) -> Unit,
     onSpeakerChanged: (Int) -> Unit,
     onDismiss: () -> Unit,
+    footer: @Composable () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var previewJob by remember { mutableStateOf<Job?>(null) }
@@ -89,7 +90,8 @@ fun TtsVoiceSelectionSheet(
     var availability by remember { mutableStateOf<Map<TtsVoice, Boolean>>(emptyMap()) }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            availability = TtsVoice.entries.associateWith { voice -> isVoiceAvailable(voice) }
+            availability = TtsVoice.entries.filter { it.languageCode == selectedVoice.languageCode }
+                .associateWith { voice -> isVoiceAvailable(voice) }
         }
     }
     val selectedVoiceAvailable = availability[selectedVoice] ?: true
@@ -140,7 +142,7 @@ fun TtsVoiceSelectionSheet(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    TtsVoice.entries.forEach { voice ->
+                    TtsVoice.entries.filter { it.languageCode == selectedVoice.languageCode }.forEach { voice ->
                         val selected = voice == selectedVoice
                         Row(
                             modifier = Modifier
@@ -281,6 +283,7 @@ fun TtsVoiceSelectionSheet(
                             }
                         },
                     )
+                    footer()
                 }
             }
         }
@@ -289,6 +292,16 @@ fun TtsVoiceSelectionSheet(
 
 /** Returns whether a Sherpa TTS model is available from extraction, CDN, or assets. */
 fun isTtsVoiceModelAvailable(context: Context, voice: TtsVoice): Boolean {
+    if (voice == TtsVoice.MMS_BENGALI) {
+        return listOf(voice.modelFile, voice.tokensFile).all { relative ->
+            val minimum = if (relative == voice.modelFile) 1024 else 0
+            val extracted = File(File(context.filesDir, "tts_model"), relative)
+            val downloaded = File(File(context.filesDir, "cdn_assets"), "models/tts/$relative")
+            (extracted.isFile && extracted.length() > minimum) ||
+                (downloaded.isFile && downloaded.length() > minimum) ||
+                runCatching { context.assets.open("tts/$relative").use { it.available() > minimum } }.getOrDefault(false)
+        }
+    }
     val modelFile = voice.modelFile
     return try {
         val extractedFile = File(File(context.filesDir, "tts_model"), modelFile)

@@ -52,6 +52,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.animation.NiaTransitions
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -85,6 +87,28 @@ fun MissingContentCard(
         mutableStateOf<DownloadCardState>(DownloadCardState.Idle)
     }
     var categorySize by remember(category) { mutableLongStateOf(0L) }
+    val completeCallback by rememberUpdatedState(onDownloadComplete)
+
+    // Reattach to the app-owned transfer whenever the sheet is reopened.
+    LaunchedEffect(category, downloadManager) {
+        downloadManager.categoryTransfers.collect { transfers ->
+            when (val transfer = transfers[category]) {
+                is AssetDownloadManager.DownloadState.Downloading ->
+                    downloadState = DownloadCardState.Downloading(transfer.progress)
+                is AssetDownloadManager.DownloadState.Failed ->
+                    downloadState = DownloadCardState.Failed(transfer.error)
+                else -> Unit
+            }
+        }
+    }
+    LaunchedEffect(category, downloadManager) {
+        downloadManager.categoryCompleted.collect { completed ->
+            if (completed == category) {
+                downloadState = DownloadCardState.Completed
+                completeCallback()
+            }
+        }
+    }
 
     // Load manifest to get size info
     LaunchedEffect(category) {
@@ -218,19 +242,9 @@ fun MissingContentCard(
                                                 downloadState = DownloadCardState.Failed("No manifest available")
                                                 return@launch
                                             }
-                                            val completed = withContext(Dispatchers.IO) {
-                                                downloadManager.downloadCategory(category, manifest) { progress, _, _ ->
-                                                    downloadState = DownloadCardState.Downloading(progress)
-                                                }
-                                            }
-                                            if (!completed) {
-                                                downloadState = DownloadCardState.Failed(
-                                                    "Some files could not be downloaded. Please try again.",
-                                                )
-                                                return@launch
-                                            }
-                                            downloadState = DownloadCardState.Completed
-                                            onDownloadComplete()
+                                            downloadManager.launchCategoryDownload(category, manifest)
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
                                         } catch (e: Exception) {
                                             Log.e("MissingContentCard", "Download failed", e)
                                             downloadState = DownloadCardState.Failed(
@@ -256,7 +270,8 @@ fun MissingContentCard(
                                 ?: state.progress
                             if (compact) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Downloading", style = MaterialTheme.typography.labelMedium,
+                                    Text(if (progress >= 1f) "Verifying model files" else "Downloading",
+                                        style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.primary)

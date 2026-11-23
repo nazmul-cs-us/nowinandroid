@@ -72,7 +72,7 @@ fun MissingAiModelCards(
                 if (needsQuestion && !DeenlyKnowledgeModel.isModelDownloaded(
                         context,
                         DeenlyKnowledgeTask.KNOWLEDGE,
-                        forceRefresh = reloadTrigger > 0,
+                        forceRefresh = true,
                     )
                 ) {
                     add(
@@ -87,7 +87,7 @@ fun MissingAiModelCards(
                 if (needsAnswer && !DeenlyKnowledgeModel.isModelDownloaded(
                         context,
                         DeenlyKnowledgeTask.ANSWER,
-                        forceRefresh = reloadTrigger > 0,
+                        forceRefresh = true,
                     )
                 ) {
                     add(

@@ -82,6 +82,7 @@ class BengaliZakariaArabicTest {
             }
         }
         compose.waitForIdle()
+        compose.onNodeWithTag("tafsir-toggle-73-4").performClick()
         compose.waitUntil(5000) { compose.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("tafsir-ayah-4").assertExists()
         compose.onNodeWithText("Translation").assertExists()
