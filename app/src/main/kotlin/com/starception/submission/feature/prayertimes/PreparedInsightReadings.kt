@@ -75,7 +75,7 @@ internal object PreparedInsightReadings {
                         transliteration.orEmpty(), translation.orEmpty(), this.context.orEmpty(), instruction.orEmpty(), note.orEmpty(),
                         postContext.orEmpty(), description.orEmpty(), audioUrl.orEmpty())
                 }
-            }
+            } + listOf("model-generated-v1", item.modelGenerated.toString())
     }
 
     private fun decodeAiFields(fields: List<String>): NowNudgeKnowledgeCandidate {
@@ -88,6 +88,7 @@ internal object PreparedInsightReadings {
         }
         return NowNudgeKnowledgeCandidate(DeenlyNudge(fields[0], DeenlyNudgeAction.valueOf(fields[1]), fields[2],
             fields[3].ifEmpty { null }, fields[4], fields[5].ifEmpty { null }, fields[6].ifEmpty { null }),
-            target, fields[7], fields[8], fields[9], fields[10].toFloat())
+            target, fields[7], fields[8], fields[9], fields[10].toFloat(),
+            modelGenerated = fields.getOrNull(fields.lastIndex - 1) == "model-generated-v1" && fields.last() == "true")
     }
 }

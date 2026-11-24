@@ -89,7 +89,20 @@ class DeenlyKnowledgeModel(context: Context) {
     suspend fun generate(
         task: DeenlyKnowledgeTask,
         source: DeenlySourceEnvelope,
-    ): DeenlyKnowledgeDecision? = generateCompletion(task, source, task.systemPrompt, source.toPrompt(task))
+    ): DeenlyKnowledgeDecision? {
+        if (task != DeenlyKnowledgeTask.KNOWLEDGE) {
+            return generateCompletion(task, source, task.systemPrompt, source.toPrompt(task))
+        }
+        // The knowledge-v3 artifact is trained for grounded answers, not the
+        // question-v5 title schema. Derive a heading from its verified answer span.
+        val request = source.copy(userQuestion = "Which brief phrase from this passage expresses its central teaching?")
+        val answer = generateCompletion(DeenlyKnowledgeTask.ANSWER, request, ANSWER_SYSTEM_PROMPT,
+            request.toPrompt(DeenlyKnowledgeTask.ANSWER)) as? DeenlyKnowledgeDecision.GroundedAnswer
+        val heading = answer?.let { knowledgeHeading(source.sourceText, it.answer) }
+        if (heading == null) Log.w(TAG, "Knowledge-v3 produced no validated heading; retaining the verified source fallback")
+        else Log.i(TAG, "Validated knowledge-v3 heading generated")
+        return heading?.let(DeenlyKnowledgeDecision::Knowledge)
+    }
 
     suspend fun selectPrayerHadith(
         context: String,
@@ -287,21 +300,29 @@ class DeenlyKnowledgeModel(context: Context) {
         private const val MODEL_DOWNLOAD_CACHE_TTL_MS = 30_000L
 
         private val DeenlyKnowledgeTask.modelFileName: String
-            get() = when (this) {
-                DeenlyKnowledgeTask.ANSWER -> ANSWER_MODEL_FILE_NAME
-                else -> MODEL_FILE_NAME
-            }
+            get() = modelFileForTask(this)
+
+        internal fun modelFileForTask(task: DeenlyKnowledgeTask): String = when (task) {
+            DeenlyKnowledgeTask.QUESTION -> MODEL_FILE_NAME
+            else -> ANSWER_MODEL_FILE_NAME
+        }
+
+        internal fun knowledgeHeading(source: String, answer: String): String? {
+            if (answer.isBlank() || answer !in source) return null
+            val bounded = if (answer.length > 84) answer.take(84).substringBeforeLast(' ') else answer
+            return bounded.trim().takeIf { it.length >= 10 && it.split(Regex("\\s+")).size >= 2 }
+        }
 
         private val DeenlyKnowledgeTask.modelSizeBytes: Long
             get() = when (this) {
-                DeenlyKnowledgeTask.ANSWER -> ANSWER_MODEL_SIZE_BYTES
-                else -> MODEL_SIZE_BYTES
+                DeenlyKnowledgeTask.QUESTION -> MODEL_SIZE_BYTES
+                else -> ANSWER_MODEL_SIZE_BYTES
             }
 
         private val DeenlyKnowledgeTask.modelSha256: String
             get() = when (this) {
-                DeenlyKnowledgeTask.ANSWER -> ANSWER_MODEL_SHA256
-                else -> MODEL_SHA256
+                DeenlyKnowledgeTask.QUESTION -> MODEL_SHA256
+                else -> ANSWER_MODEL_SHA256
             }
 
         private val DeenlyKnowledgeTask.systemPrompt: String

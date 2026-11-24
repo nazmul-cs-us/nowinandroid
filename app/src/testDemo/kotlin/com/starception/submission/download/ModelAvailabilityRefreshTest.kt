@@ -26,7 +26,7 @@ class ModelAvailabilityRefreshTest {
             override fun getApplicationContext(): android.content.Context = this
             override fun getFilesDir() = directory
         }
-        val task = DeenlyKnowledgeTask.KNOWLEDGE
+        val task = DeenlyKnowledgeTask.QUESTION
         val file = File(directory, "cdn_assets/models/now_nudge/${DeenlyKnowledgeModel.MODEL_FILE_NAME}")
         assertFalse(DeenlyKnowledgeModel.isModelDownloaded(context, task, forceRefresh = true))
         file.parentFile!!.mkdirs()
@@ -34,7 +34,7 @@ class ModelAvailabilityRefreshTest {
             // Sparse test fixture: no model inference or gigabyte allocation required.
             RandomAccessFile(file, "rw").use { it.setLength(DeenlyKnowledgeModel.MODEL_SIZE_BYTES) }
             assertTrue(DeenlyKnowledgeModel.isModelDownloaded(context, task))
-            assertTrue(DeenlyKnowledgeModel.isModelDownloaded(context, DeenlyKnowledgeTask.QUESTION))
+            assertFalse(DeenlyKnowledgeModel.isModelDownloaded(context, DeenlyKnowledgeTask.KNOWLEDGE, forceRefresh = true))
         } finally {
             file.delete()
             DeenlyKnowledgeTask.entries.forEach { DeenlyKnowledgeModel.isModelDownloaded(context, it, forceRefresh = true) }

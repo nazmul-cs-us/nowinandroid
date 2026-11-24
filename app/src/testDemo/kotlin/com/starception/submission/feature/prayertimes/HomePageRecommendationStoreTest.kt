@@ -10,10 +10,59 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import com.starception.submission.core.model.deenly.packInsightFields
 import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class HomePageRecommendationStoreTest {
+    @Test fun fallbackOrWrongContextNeverPreventsANewModelAttempt() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = context.getSharedPreferences("home_model_freshness_test", Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+        val store = HomePageRecommendationStore(prefs)
+        val day = "2026-11-24"
+        store.save(day, 0, candidate(0, "Fallback").copy(modelGenerated = false), "knowledge-v3|Fajr")
+        store.save(day, 1, candidate(1, "Older model"), "question-v5|Fajr")
+        store.save(day, 2, candidate(2, "Older prayer"), "knowledge-v3|Isha")
+        store.save(day, 3, candidate(3, "Fresh"), "knowledge-v3|Fajr")
+        prefs.edit().putString("page_4", packInsightFields(listOf(day,
+            PreparedInsightReadings.encodeAiCandidate(candidate(4, "Legacy"))))).commit()
+        val state = HomePageGenerationState()
+        store.restore(day, state, "knowledge-v3|Fajr")
+        for (page in listOf(0, 1, 2, 4)) {
+            assertFalse(state.attempted[page] == true)
+            assertTrue(state.generated[page] != null)
+        }
+        assertTrue(state.attempted[3] == true)
+        assertTrue(state.generated[3]?.modelGenerated == true)
+        assertFalse(state.generated[0]?.modelGenerated == true)
+    }
+
+    @Test fun modelProvenanceSurvivesSerializationAndRetryBudgetIsBounded() {
+        val original = candidate(0, "Generated")
+        assertTrue(PreparedInsightReadings.decodeAiCandidate(PreparedInsightReadings.encodeAiCandidate(original)).modelGenerated)
+        val fallback = original.copy(modelGenerated = false)
+        assertFalse(PreparedInsightReadings.decodeAiCandidate(PreparedInsightReadings.encodeAiCandidate(fallback)).modelGenerated)
+        val state = HomePageGenerationState()
+        assertTrue(state.needsGeneration(0))
+        state.attempts[0] = 1
+        assertTrue(state.needsGeneration(0))
+        state.attempts[0] = 2
+        assertFalse(state.needsGeneration(0))
+        state.attempted[1] = true
+        assertFalse(state.needsGeneration(1))
+        assertEquals("Generated heading", homeReflectionHeading("Fixed prompt", original.copy(
+            nudge = original.nudge.copy(label = "Generated heading"))))
+        assertEquals("Fixed prompt", homeReflectionHeading("Fixed prompt", fallback))
+    }
+
+    @Test fun prayerContextChangesStartAFreshGenerationWindow() {
+        val first = HomePageGenerationCache.forDay("2026-11-24", "Fajr|knowledge-v3")
+        first.attempted[0] = true
+        assertTrue(HomePageGenerationCache.forDay("2026-11-24", "Fajr|knowledge-v3").attempted[0] == true)
+        assertFalse(HomePageGenerationCache.forDay("2026-11-24", "Dhuhr|knowledge-v3").attempted[0] == true)
+    }
+
     @Test
     fun lastRecommendationForEveryPageSurvivesRestartAndIsReplacedWhenRefreshed() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -67,5 +116,6 @@ class HomePageRecommendationStoreTest {
         collection = "Quran",
         topic = "Reading",
         rankingScore = 1f,
+        modelGenerated = true,
     )
 }

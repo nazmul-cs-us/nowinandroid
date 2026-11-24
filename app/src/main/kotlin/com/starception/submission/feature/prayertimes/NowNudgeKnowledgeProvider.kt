@@ -73,6 +73,7 @@ internal data class NowNudgeKnowledgeCandidate(
     val topic: String,
     val rankingScore: Float,
     val quizQuestion: IslamicQuizQuestion? = null,
+    val modelGenerated: Boolean = false,
 )
 
 internal data class NowNudgeKnowledgeRankingContext(
@@ -534,6 +535,7 @@ internal class NowNudgeKnowledgeProvider(
                 collection = source.collection,
                 topic = source.topic,
                 rankingScore = rankingScore,
+                modelGenerated = decision is DeenlyKnowledgeDecision.Knowledge,
             )
         }
 
@@ -577,6 +579,7 @@ internal class NowNudgeKnowledgeProvider(
                 topic = source.topic,
                 rankingScore = rankingScore,
                 quizQuestion = question,
+                modelGenerated = true,
             )
         }
 
@@ -611,6 +614,7 @@ internal class NowNudgeKnowledgeProvider(
                 collection = source.collection,
                 topic = source.topic,
                 rankingScore = rankingScore,
+                modelGenerated = true,
             )
         }
 

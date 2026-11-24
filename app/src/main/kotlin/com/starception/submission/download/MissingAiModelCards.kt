@@ -66,12 +66,12 @@ fun MissingAiModelCards(
     var reloadTrigger by remember { mutableIntStateOf(0) }
     LaunchedEffect(tasks, reloadTrigger) {
         missingModels = withContext(Dispatchers.IO) {
-            val needsQuestion = tasks.any { it != DeenlyKnowledgeTask.ANSWER }
-            val needsAnswer = DeenlyKnowledgeTask.ANSWER in tasks
+            val needsQuestion = DeenlyKnowledgeTask.QUESTION in tasks
+            val needsAnswer = tasks.any { it != DeenlyKnowledgeTask.QUESTION }
             buildList {
                 if (needsQuestion && !DeenlyKnowledgeModel.isModelDownloaded(
                         context,
-                        DeenlyKnowledgeTask.KNOWLEDGE,
+                        DeenlyKnowledgeTask.QUESTION,
                         forceRefresh = true,
                     )
                 ) {

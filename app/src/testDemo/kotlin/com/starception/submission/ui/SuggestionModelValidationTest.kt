@@ -9,6 +9,21 @@ import org.junit.Test
 class SuggestionModelValidationTest {
     private val source = "And say, \"My Lord, increase me in knowledge.\""
 
+    @Test fun suggestionAndAnswerUseKnowledgeArtifactWhileQuizUsesQuestionArtifact() {
+        assertEquals(DeenlyKnowledgeModel.ANSWER_MODEL_FILE_NAME,
+            DeenlyKnowledgeModel.modelFileForTask(DeenlyKnowledgeTask.KNOWLEDGE))
+        assertEquals(DeenlyKnowledgeModel.ANSWER_MODEL_FILE_NAME,
+            DeenlyKnowledgeModel.modelFileForTask(DeenlyKnowledgeTask.ANSWER))
+        assertEquals(DeenlyKnowledgeModel.MODEL_FILE_NAME,
+            DeenlyKnowledgeModel.modelFileForTask(DeenlyKnowledgeTask.QUESTION))
+    }
+
+    @Test fun suggestionHeadingMustComeFromTheVerifiedPassageAndNotBeGeneric() {
+        assertEquals("increase me in knowledge.", DeenlyKnowledgeModel.knowledgeHeading(source, "increase me in knowledge."))
+        assertNull(DeenlyKnowledgeModel.knowledgeHeading(source, "Knowledge"))
+        assertNull(DeenlyKnowledgeModel.knowledgeHeading(source, "An invented recommendation"))
+    }
+
     @Test fun invalidQuizObservedDuringOnDeviceSmokeTestCannotBeDisplayed() {
         val raw = """{"contentType":"question","questionKind":"food","question":"How is knowledge described?","answer":"And say, \"My Lord, increase me in knowledge.\" To: ","evidence":"And say, \"My Lord, increase me in knowledge.","options":["And say, \"My Lord, increase me in knowledge.","and establish prayer and give zakah and obey the","the Most Merciful is patient with His servants and does not","He has taught you what you do not know"]}"""
         assertNull(DeenlyKnowledgeModel.parseDecision(raw, DeenlyKnowledgeTask.QUESTION, source))

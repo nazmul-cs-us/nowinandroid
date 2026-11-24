@@ -1255,9 +1255,10 @@ fun PrayerTimesScreen(
     // pager's collapse control returns to the compact grid for the session.
     var expandedInsightPage by rememberSaveable { mutableStateOf<Int?>(0) }
     val preparedAiReadings = remember(screenContext.applicationContext) { PreparedInsightReadings.ai(screenContext) }
-    val expandedAiKey = "$nudgeDay|knowledge|${com.starception.submission.ml.DeenlyKnowledgeModel(screenContext).isKnowledgeModelAvailable()}"
+    val suggestionContextKey = "$nudgeDay|${prayerTimes?.getActualPrayers(currentTime)?.firstOrNull { it.isCurrently }?.name ?: (currentTime.hour / 3)}|grounded-heading-v1|${com.starception.submission.ml.DeenlyKnowledgeModel.ANSWER_MODEL_SHA256}"
+    val expandedAiKey = "$suggestionContextKey|${com.starception.submission.ml.DeenlyKnowledgeModel(screenContext).isKnowledgeModelAvailable()}"
     var expandedAiCandidate by remember(expandedAiKey) {
-        mutableStateOf(preparedAiReadings.peek(expandedAiKey))
+        mutableStateOf(preparedAiReadings.peek(expandedAiKey)?.takeIf { it.modelGenerated })
     }
     var expandedAiProgress by remember(nudgeDay) { mutableStateOf(InsightSearchProgress()) }
     var expandedAiSearchFailed by remember(nudgeDay) { mutableStateOf(false) }
@@ -1475,8 +1476,9 @@ fun PrayerTimesScreen(
                         appSituation = appSituation,
                         rankingContext = rankingContext,
                         task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
-                    )
+                    )?.takeIf { it.modelGenerated }
                 }
+                if (expandedAiCandidate == null) expandedAiSearchFailed = true
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -3086,8 +3088,10 @@ fun PrayerTimesScreen(
                 val homeRecommendationStore = remember(screenContext.applicationContext) {
                     HomePageRecommendationStore(screenContext.applicationContext)
                 }
-                val homePageGeneration = remember(nudgeDay) {
-                    HomePageGenerationCache.forDay(nudgeDay).also { homeRecommendationStore.restore(nudgeDay, it) }
+                val homePageGeneration = remember(nudgeDay, suggestionContextKey) {
+                    HomePageGenerationCache.forDay(nudgeDay, suggestionContextKey).also {
+                        homeRecommendationStore.restore(nudgeDay, it, suggestionContextKey)
+                    }
                 }
                 val generatedHomePages = homePageGeneration.generated
                 val homeGenerationScope = rememberCoroutineScope()
@@ -3115,7 +3119,7 @@ fun PrayerTimesScreen(
                 val homeScrollEngaged by remember(portraitScrollState, homeScrollThreshold) {
                     derivedStateOf { portraitScrollState.value > homeScrollThreshold }
                 }
-                LaunchedEffect(coverPage, homeScrollEngaged, homePageGeneration.generatingPage, homeModelAvailable, expandedAiCandidate) {
+                LaunchedEffect(coverPage, homeScrollEngaged, homePageGeneration.generatingPage, homeModelAvailable, expandedAiCandidate, suggestionContextKey) {
                     val page = coverPage.coerceIn(0, 4)
                     val readingSurah = com.starception.submission.feature.quran.dailyReading(
                         kotlinx.datetime.LocalDate.parse(nudgeDay),
@@ -3127,20 +3131,22 @@ fun PrayerTimesScreen(
                         homePageGeneration.attempted.remove(page)
                     }
                     if (!homeModelAvailable || (!homeScrollEngaged && page == 0) ||
-                        homePageGeneration.generatingPage != -1 || homePageGeneration.attempted[page] == true
+                        homePageGeneration.generatingPage != -1 || !homePageGeneration.needsGeneration(page)
                     ) return@LaunchedEffect
+                    val retryDelay = (homePageGeneration.retryAfter[page] ?: 0L) - android.os.SystemClock.elapsedRealtime()
+                    if (retryDelay > 0L) delay(retryDelay)
                     // Only the settled page may claim a turn. Fast swipes cancel
                     // this delay; one active job and a per-day cache prevent
                     // scroll frames from repeatedly invoking the on-device model.
                     delay(500)
                     val preparedCandidate = expandedAiCandidate
-                    if (page == 4 && preparedCandidate != null) {
+                    if (page == 4 && preparedCandidate?.modelGenerated == true) {
                         generatedHomePages[page] = preparedCandidate
                         homePageGeneration.attempted[page] = true
-                        homeRecommendationStore.save(nudgeDay, page, preparedCandidate)
+                        homeRecommendationStore.save(nudgeDay, page, preparedCandidate, suggestionContextKey)
                         return@LaunchedEffect
                     }
-                    homePageGeneration.attempted[page] = true
+                    homePageGeneration.attempts[page] = (homePageGeneration.attempts[page] ?: 0) + 1
                     homePageGeneration.generatingPage = page
                     homeGenerationScope.launch {
                         try {
@@ -3155,7 +3161,8 @@ fun PrayerTimesScreen(
                             )
                             if (candidate != null) {
                                 generatedHomePages[page] = candidate
-                                homeRecommendationStore.save(nudgeDay, page, candidate)
+                                homePageGeneration.attempted[page] = candidate.modelGenerated
+                                homeRecommendationStore.save(nudgeDay, page, candidate, suggestionContextKey)
                             }
                         } catch (cancelled: kotlinx.coroutines.CancellationException) {
                             // Navigation can dispose Home mid-turn. An unfinished
@@ -3165,6 +3172,8 @@ fun PrayerTimesScreen(
                         } catch (error: Exception) {
                             android.util.Log.w("HomeReflection", "Could not prepare page $page", error)
                         } finally {
+                            if (homePageGeneration.attempted[page] != true)
+                                homePageGeneration.retryAfter[page] = android.os.SystemClock.elapsedRealtime() + 30_000L
                             homePageGeneration.generatingPage = -1
                         }
                     }
@@ -3903,7 +3912,9 @@ fun PrayerTimesScreen(
                                                     preferred = preferredHomeReaderHeight.value,
                                                     reflection = if (homeReflectionHeightPx > 0)
                                                         homeReflectionHeightPx.toDp().value else 148f,
-                                                    spacing = feedTopPadding.value + 24f,
+                                                    // Reflection already owns 16dp bottom padding;
+                                                    // add just 8dp, not another large empty band.
+                                                    spacing = feedTopPadding.value + 8f,
                                                 ).dp
                                             }
                                         }
@@ -4072,6 +4083,7 @@ fun PrayerTimesScreen(
                                                 readingSurahNumber = coverReading.number,
                                                 modifier = Modifier.onSizeChanged { homeReflectionHeightPx = it.height },
                                                 translationLanguage = homeTranslationLanguage,
+                                                onSwipePage = { coverPage = it },
                                                 exploreContent = {
                                                     HomeArtworkRail(
                                                         focusedPage = coverPage,

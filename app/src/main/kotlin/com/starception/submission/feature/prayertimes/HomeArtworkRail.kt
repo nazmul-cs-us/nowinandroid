@@ -80,6 +80,15 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.LaunchedEffect
 
 /** The feed and its transition render the same scene and carry the same page identity. */
 internal data class HomeArtworkCard(
@@ -118,16 +127,22 @@ internal fun homeFeedKnowledgeQuery(page: Int): String = when (page) {
 internal class HomePageGenerationState {
     val generated = mutableStateMapOf<Int, NowNudgeKnowledgeCandidate>()
     val attempted = mutableStateMapOf<Int, Boolean>()
+    val attempts = mutableStateMapOf<Int, Int>()
+    val retryAfter = mutableStateMapOf<Int, Long>()
     var generatingPage by mutableIntStateOf(-1)
+
+    fun needsGeneration(page: Int): Boolean = attempted[page] != true && (attempts[page] ?: 0) < 2
 }
 
 internal object HomePageGenerationCache {
     private var day: String? = null
+    private var context: String? = null
     private var state = HomePageGenerationState()
 
-    fun forDay(requestedDay: String): HomePageGenerationState {
-        if (day != requestedDay) {
+    fun forDay(requestedDay: String, contextKey: String = "default"): HomePageGenerationState {
+        if (day != requestedDay || context != contextKey) {
             day = requestedDay
+            context = contextKey
             state = HomePageGenerationState()
         }
         return state
@@ -253,9 +268,12 @@ internal fun HomeReflectionPrompt(
     readingSurahNumber: Int = 0,
     modifier: Modifier = Modifier,
     translationLanguage: String = "en",
+    onSwipePage: (Int) -> Unit = {},
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current.applicationContext
+    val direction = LocalLayoutDirection.current
+    val swipePage by rememberUpdatedState(onSwipePage)
     val ink = if (onDarkCover) Color.White else MaterialTheme.colorScheme.onBackground
     val haptics = LocalHapticFeedback.current
     val arrowRotation by animateFloatAsState(
@@ -297,10 +315,35 @@ internal fun HomeReflectionPrompt(
                 }
             }
         }
-        // Keep all five keyed scenes measured and translations retained. Adding/removing
-        // layers while dragging changed this Box's height and resized the entire cover.
+        // Retain all scenes/translations, but reserve space only for the settled page.
+        // Freeze the selected measurement during a gesture, then fit it smoothly afterward.
         val position = ((scrollPosition % 5f) + 5f) % 5f
-        Box(Modifier.fillMaxWidth().clipToBounds()) {
+        val heights = remember { mutableStateMapOf<Int, Int>() }
+        var layoutPage by remember { mutableIntStateOf(focusedPage) }
+        LaunchedEffect(position, focusedPage) {
+            if (abs(homeSwipePageOffset(position, focusedPage)) < .001f) layoutPage = focusedPage
+        }
+        val activeHeight = heights[layoutPage]
+        val heightModifier = if (activeHeight != null) {
+            val fittedHeight by animateDpAsState(with(LocalDensity.current) { activeHeight.toDp() },
+                animationSpec = tween(320, easing = FastOutSlowInEasing), label = "settledReflectionHeight")
+            Modifier.height(fittedHeight)
+        } else Modifier
+        Box(Modifier.fillMaxWidth().then(heightModifier).clipToBounds().testTag("homeReflectionSwipeArea")
+            .pointerInput(focusedPage, direction) {
+                var distance = 0f
+                val threshold = 56.dp.toPx()
+                detectHorizontalDragGestures(
+                    onDragStart = { distance = 0f },
+                    onDragCancel = { distance = 0f },
+                    onDragEnd = {
+                        homeReflectionSwipeTarget(focusedPage, distance, threshold, direction == LayoutDirection.Rtl)
+                            ?.let(swipePage)
+                        distance = 0f
+                    },
+                    onHorizontalDrag = { change, delta -> change.consume(); distance += delta },
+                )
+            }) {
             repeat(5) { page ->
                 key(page) {
                     val offset = homeSwipePageOffset(position, page)
@@ -317,19 +360,21 @@ internal fun HomeReflectionPrompt(
                     }
                     Column(
                         Modifier.fillMaxWidth()
+                            .wrapContentHeight(align = Alignment.Top, unbounded = true)
+                            .onSizeChanged { if (heights[page] != it.height) heights[page] = it.height }
                             .graphicsLayer {
                                 translationX = -offset * 16.dp.toPx()
                                 translationY = abs(offset) * 8.dp.toPx()
                                 alpha = homeCoverCopyOpacity(offset)
                             }
-                            .then(if (page != focusedPage) Modifier.clearAndSetSemantics { } else Modifier)
-                            .clickable(enabled = page == focusedPage, onClick = onClick),
+                            .then(if (page == focusedPage) Modifier.clickable(onClick = onClick)
+                                else Modifier.clearAndSetSemantics { }),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(feed.eyebrow, style = HomeTypography.eyebrow,
                             color = ink.copy(alpha = .72f))
                         Text(
-                            feed.prompt,
+                            homeReflectionHeading(feed.prompt, generatedCandidate),
                             style = HomeTypography.reflection,
                             color = ink,
                             maxLines = 2,
@@ -367,6 +412,15 @@ internal fun homeEvidencePreview(sourceText: String): String =
 
 internal fun homeReflectionMatchesReading(page: Int, surahNumber: Int, target: NowNudgeKnowledgeTarget): Boolean =
     page != 2 || (target as? NowNudgeKnowledgeTarget.QuranAyah)?.surahNumber == surahNumber
+
+internal fun homeReflectionHeading(fallback: String, candidate: NowNudgeKnowledgeCandidate?): String =
+    candidate?.takeIf { it.modelGenerated }?.nudge?.label?.takeIf(String::isNotBlank) ?: fallback
+
+internal fun homeReflectionSwipeTarget(page: Int, distance: Float, threshold: Float, rtl: Boolean): Int? {
+    if (!distance.isFinite() || abs(distance) < threshold || distance == 0f) return null
+    val step = if ((distance < 0f) != rtl) 1 else -1
+    return (page.coerceIn(0, 4) + step + 5) % 5
+}
 
 /** Give measured reflection/citation text its space before assigning the decorative cover height. */
 internal fun homeRestingCoverHeight(viewport: Float, preferred: Float, reflection: Float, spacing: Float): Float {

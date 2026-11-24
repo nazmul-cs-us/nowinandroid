@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -63,10 +64,11 @@ class HomeScreenBugFixTest {
         }
     }
 
-    @Test fun reflectionKeepsItsMeasuredHeightAcrossSwipesAndWraparound() {
+    @Test fun reflectionHoldsDuringTheSwipeThenFitsTheSettledBengaliPassage() {
         val position = mutableFloatStateOf(0f)
-        val short = "A short source passage."
-        val long = "A longer source passage has several sentences so its citation and content occupy more vertical space. ".repeat(3).trim()
+        val page = mutableIntStateOf(0)
+        val short = "পরীক্ষার জন্য একটি ছোট বাংলা বাক্য।"
+        val long = "পরীক্ষার জন্য বাংলা লেখা, যা ছোট অনুচ্ছেদের চেয়ে বেশি জায়গা নেয়। ".repeat(5).trim()
         fun candidate(id: Int, text: String) = NowNudgeKnowledgeCandidate(
             DeenlyNudge(id = "stable-$id", action = DeenlyNudgeAction.OPEN_CONTEXTUAL_RECOMMENDATION,
                 label = "Source", supportingText = text, sourceLabel = "Quran 94:5"),
@@ -74,17 +76,30 @@ class HomeScreenBugFixTest {
         )
         val candidates = mapOf(0 to candidate(0, short), 1 to candidate(1, long))
         compose.setContent {
-            MaterialTheme { HomeReflectionPrompt(focusedPage = if (position.floatValue == 1f) 1 else 0,
+            MaterialTheme { HomeReflectionPrompt(focusedPage = page.intValue,
                 scrollPosition = position.floatValue, generatedInsights = candidates,
                 modifier = Modifier.testTag("stable-reflection"), onClick = {}) }
         }
         val initialHeight = compose.onNodeWithTag("stable-reflection").fetchSemanticsNode().boundsInRoot.height
         compose.onNodeWithText(long).assertDoesNotExist()
-        for (next in listOf(.01f, .25f, .5f, .99f, 1f, 4f, 4.5f, 4.99f, 0f)) {
+        for (next in listOf(.01f, .25f, .5f, .99f)) {
             compose.runOnIdle { position.floatValue = next }
             val height = compose.onNodeWithTag("stable-reflection").fetchSemanticsNode().boundsInRoot.height
             assertEquals("Swiping must not resize the cover through reflection height changes", initialHeight, height, .5f)
         }
+        compose.runOnIdle { page.intValue = 1; position.floatValue = 1f }
+        compose.waitForIdle()
+        val longHeight = compose.onNodeWithTag("stable-reflection").fetchSemanticsNode().boundsInRoot.height
+        assertTrue("The long passage must receive its own measured space", longHeight > initialHeight)
+        for (next in listOf(.99f, .75f, .5f, .01f)) {
+            compose.runOnIdle { position.floatValue = next }
+            val height = compose.onNodeWithTag("stable-reflection").fetchSemanticsNode().boundsInRoot.height
+            assertEquals("Do not collapse text while the finger is still moving", longHeight, height, .5f)
+        }
+        compose.runOnIdle { page.intValue = 0; position.floatValue = 0f }
+        compose.waitForIdle()
+        val fittedHeight = compose.onNodeWithTag("stable-reflection").fetchSemanticsNode().boundsInRoot.height
+        assertEquals("Do not retain the long passage's empty space after returning", initialHeight, fittedHeight, .5f)
     }
 
     @Test fun reflectionBackgroundContinuesBehindNavigationWithoutRevealingAPhotoStrip() {
