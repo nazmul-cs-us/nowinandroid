@@ -167,8 +167,8 @@ import com.google.android.material.R as MaterialR
 @Composable
 internal fun HomeHeaderGreeting(text: String, color: ComposeColor, onDarkArtwork: Boolean) {
     Text(text = text, style = HomeHeaderTypography.greeting.copy(
-        shadow = Shadow(color = ComposeColor.Black.copy(alpha = if (onDarkArtwork) .32f else .04f),
-            offset = Offset(0f, 1f), blurRadius = 3f)),
+        shadow = Shadow(color = ComposeColor.Black.copy(alpha = if (onDarkArtwork) .18f else .03f),
+            offset = Offset(0f, .5f), blurRadius = 2f)),
         color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
@@ -905,7 +905,7 @@ fun AppTopSearchBar(
                     modifier = Modifier.weight(1f)
                         .clickable { currentOnProfileClick() }
                         .semantics { contentDescription = "Open profile" },
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     HomeHeaderGreeting(
                         text = homeGreetingText,
@@ -917,11 +917,11 @@ fun AppTopSearchBar(
                             texts = homeSupportingTexts,
                             style = HomeHeaderTypography.detail.copy(
                                 shadow = Shadow(
-                                    color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .32f else .04f),
-                                    offset = Offset(0f, 1f), blurRadius = 3f,
+                                    color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .18f else .03f),
+                                    offset = Offset(0f, .5f), blurRadius = 2f,
                                 ),
                             ),
-                            color = greetingColor.copy(alpha = .92f),
+                            color = greetingColor.copy(alpha = .86f),
                             fontWeight = FontWeight.Normal,
                         )
                     }

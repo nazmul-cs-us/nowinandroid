@@ -1308,14 +1308,14 @@ private fun PrayerHomeHeader(
     if (onArtwork) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 val ink = if (lightHeaderInk) Color.White else Color(0xFF101827)
                 val headerShadow = androidx.compose.ui.graphics.Shadow(
-                    color = Color.Black.copy(alpha = if (lightHeaderInk) .32f else .04f),
-                    offset = androidx.compose.ui.geometry.Offset(0f, 1f), blurRadius = 3f,
+                    color = Color.Black.copy(alpha = if (lightHeaderInk) .18f else .03f),
+                    offset = androidx.compose.ui.geometry.Offset(0f, .5f), blurRadius = 2f,
                 )
                 Text(greeting, style = HomeHeaderTypography.greeting.copy(shadow = headerShadow), color = ink, maxLines = 1)
-                HomeRotatingHeaderText(supportingTexts, style = HomeHeaderTypography.detail.copy(shadow = headerShadow), color = ink.copy(alpha = .92f))
+                HomeRotatingHeaderText(supportingTexts, style = HomeHeaderTypography.detail.copy(shadow = headerShadow), color = ink.copy(alpha = .86f))
             }
             AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings)
         }

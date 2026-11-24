@@ -55,6 +55,7 @@ internal fun artworkReviewFailureMessage(theme: ArtworkTheme, failure: Exception
 }
 
 internal fun artworkReviewMetadataUrl(url: String): Boolean = url == HOME_ARTWORK_FEED_URL ||
+    url.startsWith("https://commons.wikimedia.org/w/api.php?") ||
     url.startsWith("https://picsum.photos/v2/list?") ||
     url.startsWith("https://api.openverse.org/v1/images/?") ||
     url.startsWith("https://images-api.nasa.gov/search?") ||
@@ -181,20 +182,21 @@ class ArtworkReviewRepository(
     private suspend fun discover(theme: ArtworkTheme, page: Int): Discovery {
         if (theme == ArtworkTheme.NATURE) {
             try {
-                val primary = platform.download("https://picsum.photos/v2/list?page=$page&limit=20", 2_000_000).decodeToString()
+                val primary = platform.download(natureCommonsSearchUrl(page), 2_000_000).decodeToString()
                 val candidates = parseArtworkReviewCandidates(theme, primary)
-                if (candidates.isNotEmpty()) return Discovery(candidates)
+                if (candidates.isNotEmpty()) return Discovery(candidates,
+                    "Nature photographs from Wikimedia Commons · Check the image, photographer credit and license before approval.")
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { /* An independent source keeps Nature discovery available. */ }
             coroutineContext.ensureActive()
             // Anonymous Openverse searches allow 240 results: 12 pages of 20.
             // Other providers use up to 20 pages; wrap before requesting Openverse.
             val openversePage = 1 + (page - 1) % 12
-            val fallback = platform.download("https://api.openverse.org/v1/images/?q=nature&aspect_ratio=tall&license=cc0&page_size=20&page=$openversePage", 2_000_000)
+            val fallback = platform.download("https://api.openverse.org/v1/images/?q=nature&aspect_ratio=tall&size=large&license=cc0&page_size=20&page=$openversePage", 2_000_000)
             return Discovery(parseArtworkReviewCandidates(theme, fallback.decodeToString()), "Nature previews supplied by Openverse.")
         }
         val url = when (theme) {
-            ArtworkTheme.NATURE -> "https://picsum.photos/v2/list?page=$page&limit=20"
+            ArtworkTheme.NATURE -> natureCommonsSearchUrl(page)
             ArtworkTheme.SPACE -> "https://images-api.nasa.gov/search?q=nebula&media_type=image&page_size=20&page=$page"
             ArtworkTheme.ISLAMIC -> "https://openaccess-api.clevelandart.org/api/artworks/?q=tile&cc0=1&has_image=1&department=Islamic%20Art&limit=20&skip=${(page - 1) * 20}"
         }
@@ -231,7 +233,8 @@ internal fun parseArtworkReviewCandidates(theme: ArtworkTheme, text: String): Li
         return OnlineHomeArtwork(id, title, credit, source, image, licenseName = license, licenseUrl = rights)
     }
     return when (theme) {
-        ArtworkTheme.NATURE -> if (root is JsonArray) root.mapNotNull { value ->
+        ArtworkTheme.NATURE -> if (root is JsonObject && root["query"] != null) parseCommonsNatureCandidates(root)
+        else if (root is JsonArray) root.mapNotNull { value ->
             val row = value.jsonObject
             val id = row.string("id")
             val width = row["width"]?.jsonPrimitive?.intOrNull
@@ -242,15 +245,16 @@ internal fun parseArtworkReviewCandidates(theme: ArtworkTheme, text: String): Li
         } else root.jsonObject["results"]?.jsonArray.orEmpty().mapNotNull { value ->
             val row = value.jsonObject
             if (row.string("license") != "cc0") return@mapNotNull null
-            val width = row["width"]?.jsonPrimitive?.intOrNull
-            val height = row["height"]?.jsonPrimitive?.intOrNull
-            if (width != null && height != null && height <= width) return@mapNotNull null
+            val width = row["width"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+            val height = row["height"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+            if (!highResolutionNatureWallpaper(width, height) || width > 4096 || height > 4096) return@mapNotNull null
             val id = row.string("id")
-            val thumbnail = row.string("thumbnail").takeIf { allowedArtworkDownload(it) && !artworkReviewMetadataUrl(it) }
-                ?: "https://api.openverse.org/v1/images/$id/thumb/"
+            // Never install Openverse's small preview redirect as a full-screen wallpaper.
+            val original = row.string("url").takeIf { allowedArtworkDownload(it) && !artworkReviewMetadataUrl(it) }
+                ?: return@mapNotNull null
             candidate("openverse-$id", row.string("title").ifBlank { "Nature photograph" },
                 row.string("creator").ifBlank { "Creator listed at source" } + " · via Openverse",
-                "https://openverse.org/image/$id", thumbnail, "CC0", "https://creativecommons.org/publicdomain/zero/1.0/")
+                "https://openverse.org/image/$id", original, "CC0", "https://creativecommons.org/publicdomain/zero/1.0/")
         }
         ArtworkTheme.SPACE -> root.jsonObject["collection"]?.jsonObject?.get("items")?.jsonArray.orEmpty().mapNotNull { value ->
             val row = value.jsonObject

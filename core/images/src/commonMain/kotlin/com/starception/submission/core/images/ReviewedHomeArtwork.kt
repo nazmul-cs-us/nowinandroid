@@ -15,6 +15,9 @@ data class ReviewedHomeArtwork(val artwork: OnlineHomeArtwork, val sha256: Strin
 
 internal expect fun artworkSha256(bytes: ByteArray): String
 
+/** Full-size, bounded Home decode. Never install a small picker thumbnail as the wallpaper. */
+internal expect fun decodeArtworkHomeImage(bytes: ByteArray): ImageBitmap
+
 internal fun cropArtwork(image: ImageBitmap, crop: ArtworkCrop): ImageBitmap {
     if (crop == ArtworkCrop()) return image
     val left = (image.width * crop.left).toInt()

@@ -73,7 +73,7 @@ class AndroidArtworkReviewPlatform(
 internal actual fun decodeArtworkReviewPreview(bytes: ByteArray): ImageBitmap {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    require(bounds.outWidth in 100..1800 && bounds.outHeight in 100..1800)
+    require(bounds.outWidth in 100..4096 && bounds.outHeight in 100..4096)
     val maximum = maxOf(bounds.outWidth, bounds.outHeight)
     var sample = 1
     while (maximum / sample > 1440) sample *= 2
@@ -89,4 +89,19 @@ internal actual fun decodeArtworkReviewPreview(bytes: ByteArray): ImageBitmap {
         (bitmap.height * scale).toInt().coerceAtLeast(1), true)
     if (preview !== bitmap) bitmap.recycle()
     return preview.asImageBitmap()
+}
+
+internal actual fun decodeArtworkHomeImage(bytes: ByteArray): ImageBitmap {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    require(bounds.outWidth in 100..4096 && bounds.outHeight in 100..4096)
+    val bitmap = requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size,
+        BitmapFactory.Options().apply { inScaled = false; inPreferredConfig = Bitmap.Config.ARGB_8888 }))
+    val longest = maxOf(bitmap.width, bitmap.height)
+    if (longest <= 3200) return bitmap.asImageBitmap()
+    val scale = 3200f / longest
+    val home = Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt().coerceAtLeast(1),
+        (bitmap.height * scale).toInt().coerceAtLeast(1), true)
+    if (home !== bitmap) bitmap.recycle()
+    return home.asImageBitmap()
 }

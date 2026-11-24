@@ -13,6 +13,10 @@ import com.starception.submission.feature.prayertimes.HomeRotatingHeaderText
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalInspectionMode
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.PreviewContextConfigurationEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -39,12 +43,14 @@ import org.robolectric.annotation.GraphicsMode
 class HomeHeaderDepthActionTest {
     @get:Rule val compose = createComposeRule()
 
+    @OptIn(ExperimentalResourceApi::class)
     @Test fun sculptedHomeActionsKeepSeparateAccessibleTargets() {
         var searchClicks = 0
         var settingsClicks = 0
         val headerDetail = androidx.compose.runtime.mutableStateOf(
             HomeHeaderDetail("6 Jumada II 1448 AH", HomeHeaderDetailKind.Calendar))
         compose.setContent {
+            CompositionLocalProvider(LocalInspectionMode provides true) { PreviewContextConfigurationEffect() }
             MaterialTheme {
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
                     Color(0xFF6C8190), Color(0xFFB4B6B8),

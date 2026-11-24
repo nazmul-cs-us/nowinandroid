@@ -16,7 +16,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.*
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.decodeToImageBitmap
 import org.jetbrains.compose.resources.painterResource
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -31,6 +30,7 @@ data class OnlineHomeArtwork(
     val bitmap: ImageBitmap? = null,
     val licenseName: String = "CC0",
     val licenseUrl: String = "https://creativecommons.org/publicdomain/zero/1.0/",
+    val theme: ArtworkTheme? = null,
 )
 
 data class HomeArtworkCollectionState(
@@ -68,7 +68,9 @@ class HomeArtworkRepository(
     val state = mutable.asStateFlow()
     private val mutex = Mutex()
     private var activeRotation: Int? = null
+    private var activeTheme: ArtworkTheme? = null
     private var requestedRotation: Int? = null
+    private var requestedTheme: ArtworkTheme? = null
     private var lastManualRevision = 0
     private var request: Job? = null
     private var manualRequest = false
@@ -92,16 +94,18 @@ class HomeArtworkRepository(
             }
             return
         }
-        if (!manual && (activeRotation == rotation || (request?.isActive == true && requestedRotation == rotation))) return
+        if (!manual && ((activeRotation == rotation && activeTheme == theme) ||
+                (request?.isActive == true && requestedRotation == rotation && requestedTheme == theme))) return
         if (!manual && lastFailure?.let { clock.now().epochSeconds - it.epochSeconds < 300 } == true) return
         request?.cancel()
         val version = ++generation
         requestedRotation = rotation
+        requestedTheme = theme
         manualRequest = manual
         request = scope.launch {
             mutex.withLock {
                 restored.await()
-                if (!manual && activeRotation == rotation) return@withLock
+                if (!manual && activeRotation == rotation && activeTheme == theme) return@withLock
                 var previous = mutable.value
                 mutable.value = previous.copy(loading = true, error = null, notice = null)
                 try {
@@ -114,7 +118,7 @@ class HomeArtworkRepository(
                         legacyMetadata = null
                         previous = mutable.value.copy(loading = false)
                     }
-                    if (!manual && activeRotation == rotation) {
+                    if (!manual && activeRotation == rotation && activeTheme == theme) {
                         mutable.value = previous
                         return@withLock
                     }
@@ -128,6 +132,7 @@ class HomeArtworkRepository(
                     platform.writeMetadata(encodeCollection(downloaded, rotation, updated, updatedSeen, activeCatalog))
                     seen.addAll(downloaded.map { it.id })
                     activeRotation = rotation
+                    activeTheme = theme
                     lastFailure = null
                     mutable.value = HomeArtworkCollectionState(downloaded, updatedAt = updated,
                         notice = if (reusedImages > 0) {
@@ -182,10 +187,9 @@ class HomeArtworkRepository(
                     requireNotNull(platform.readImage(artwork.id))
                 } else platform.download(artwork.imageUrl, 8_000_000)
                 require(artworkSha256(bytes) == reviewed.sha256) { "Artwork changed since visual review" }
-                val image = bytes.decodeToImageBitmap()
-                require(image.width in 100..1800 && image.height in 100..1800)
+                val image = decodeArtworkHomeImage(bytes)
                 platform.writeImage(artwork.id, bytes)
-                artwork.copy(bitmap = cropArtwork(image, reviewed.crop))
+                artwork.copy(bitmap = cropArtwork(image, reviewed.crop), theme = reviewed.theme)
             }.getOrElse {
                 if (it is CancellationException) throw it
                 null
@@ -223,14 +227,14 @@ class HomeArtworkRepository(
                 val approved = requireNotNull(reviewed.find { it.artwork.id == id })
                 val bytes = requireNotNull(platform.readImage(id))
                 require(artworkSha256(bytes) == approved.sha256)
-                val bitmap = bytes.decodeToImageBitmap()
-                require(bitmap.width in 100..1800 && bitmap.height in 100..1800)
-                approved.artwork.copy(bitmap = cropArtwork(bitmap, approved.crop))
+                val bitmap = decodeArtworkHomeImage(bytes)
+                approved.artwork.copy(bitmap = cropArtwork(bitmap, approved.crop), theme = approved.theme)
             }
             require(artworks.size in 1..5 && artworks.distinctBy { it.id }.size == artworks.size)
             require(artworks.size == 5 || artworks.all { image -> personalApprovals.any { it.artwork.id == image.id } })
             val updatedAt = Instant.parse(root.getValue("updated").jsonPrimitive.content)
             activeRotation = root.getValue("rotation").jsonPrimitive.int
+            activeTheme = artworks.mapNotNull { it.theme }.distinct().singleOrNull()
             mutable.value = HomeArtworkCollectionState(artworks, updatedAt = updatedAt)
     }
 
@@ -240,8 +244,8 @@ class HomeArtworkRepository(
         mutex.withLock {
             withContext(ioDispatcher) {
                 require(artworkSha256(bytes) == candidate.sha256) { "Image changed since preview; review it again" }
-                val bitmap = decodeArtworkReviewPreview(bytes)
-                val image = candidate.artwork.copy(id = "personal-" + candidate.artwork.id, bitmap = bitmap)
+                val bitmap = decodeArtworkHomeImage(bytes)
+                val image = candidate.artwork.copy(id = "personal-" + candidate.artwork.id, bitmap = bitmap, theme = theme)
                 require(image.id.length <= 80)
                 val approved = ReviewedHomeArtwork(image.copy(bitmap = null), candidate.sha256, theme = theme)
                 val updatedApprovals = (personalApprovals.filterNot { it.artwork.id == image.id } + approved).takeLast(100)
@@ -249,7 +253,7 @@ class HomeArtworkRepository(
                 platform.writePersonalApprovals(encodeReviewedArtworkFeed(updatedApprovals).toString())
                 personalApprovals = updatedApprovals
                 activeCatalog = (activeCatalog.filterNot { it.artwork.id == image.id } + approved)
-                val images = (listOf(image) + mutable.value.artworks.filterNot { it.id == image.id }).take(5)
+                val images = (listOf(image) + mutable.value.artworks.filter { it.id != image.id && it.theme == theme }).take(5)
                 val updated = clock.now()
                 platform.writeMetadata(encodeCollection(images, activeRotation ?: 0, updated, (seen + image.id).toList(), activeCatalog))
                 seen.add(image.id)
@@ -299,8 +303,12 @@ fun rememberHomeArtworkCollection(
             awaitCancellation()
         }
     }
-    return repository.state.collectAsStateWithLifecycle().value
+    return repository.state.collectAsStateWithLifecycle().value.forTheme(settings.theme)
 }
+
+/** A cached collection is not permission to display another theme's images. */
+internal fun HomeArtworkCollectionState.forTheme(theme: ArtworkTheme): HomeArtworkCollectionState =
+    copy(artworks = artworks.filter { it.theme == theme })
 
 @Composable
 fun currentHomeArtworkBitmap(page: Int): ImageBitmap? =

@@ -7,7 +7,8 @@ data class ArtworkService(val name: String, val status: String)
 val artworkServices = listOf(
     ArtworkService("The Met / Cleveland", "Enabled · reviewed Islamic artwork"),
     ArtworkService("NASA Image Library", "Enabled · reviewed Space collection"),
-    ArtworkService("Lorem Picsum", "Enabled · reviewed Nature IDs only"),
+    ArtworkService("Wikimedia Commons", "Enabled · high-resolution Nature discovery and individual image approval"),
+    ArtworkService("Lorem Picsum", "Disabled · generic photo feed replaced for Nature discovery"),
     ArtworkService("NASA APOD", "Disabled · API key not configured"),
     ArtworkService("Unsplash API", "Disabled · credentials and API terms review required"),
     ArtworkService("Pexels / Pixabay", "Disabled · API keys not configured"),

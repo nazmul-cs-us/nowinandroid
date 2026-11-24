@@ -14,7 +14,7 @@ fun splashReminderCitation(reference: String): String {
         "112" -> "Al-Ikhlas"
         else -> return reference
     }
-    return "Surah $surah · Ayah ${match.groupValues[2]}"
+    return "Surah $surah  ·  ${match.groupValues[1]}:${match.groupValues[2]}"
 }
 
 /** Short English translation excerpts. Never synthesize scripture or a hadith quotation. */

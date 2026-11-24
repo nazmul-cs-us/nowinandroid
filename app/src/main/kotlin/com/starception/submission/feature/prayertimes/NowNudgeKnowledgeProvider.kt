@@ -130,6 +130,8 @@ private object EmptyKnowledgeEngagementStore : KnowledgeEngagementStore {
 internal fun interface GroundedKnowledgeSourceLoader {
     suspend fun load(date: LocalDate, variation: Int): GroundedKnowledgeSource?
 
+    suspend fun quranSurah(surahNumber: Int): GroundedKnowledgeSource? = null
+
     suspend fun search(query: String, limit: Int): List<GroundedKnowledgeSource> = emptyList()
 }
 
@@ -159,10 +161,15 @@ internal class NowNudgeKnowledgeProvider(
         query: String? = null,
         rankingContext: NowNudgeKnowledgeRankingContext = NowNudgeKnowledgeRankingContext(),
         task: DeenlyKnowledgeTask = DeenlyKnowledgeTask.KNOWLEDGE,
+        requiredSurahNumber: Int? = null,
         onProgress: suspend (InsightSearchProgress) -> Unit = {},
     ): NowNudgeKnowledgeCandidate? {
         val sources = withContext(Dispatchers.IO) {
-            buildList {
+            if (requiredSurahNumber != null) {
+                listOfNotNull(sourceLoader.quranSurah(requiredSurahNumber)).filter {
+                    (it.target as? NowNudgeKnowledgeTarget.QuranAyah)?.surahNumber == requiredSurahNumber
+                }
+            } else buildList {
                 query?.takeIf(String::isNotBlank)?.let { searchQuery ->
                     addAll(sourceLoader.search(searchQuery, QUERY_SEARCH_LIMIT))
                 }
@@ -1440,6 +1447,20 @@ private class AndroidGroundedKnowledgeSourceLoader(
         }
 
         return results.distinctBy(GroundedKnowledgeSource::id)
+    }
+
+    override suspend fun quranSurah(surahNumber: Int): GroundedKnowledgeSource? {
+        if (surahNumber !in 1..114) return null
+        val ayah = quranRepository.getAyahsBySurahNumber(surahNumber)
+            .firstOrNull { it.text.isGroundedText() } ?: return null
+        val surah = quranRepository.getSurahByNumber(surahNumber)
+        return GroundedKnowledgeSource(
+            id = "quran-$surahNumber-${ayah.numberInSurah}", collection = "quran",
+            reference = "Quran $surahNumber:${ayah.numberInSurah}",
+            topic = surah?.nameEnglish?.takeIf(String::isNotBlank) ?: "Surah $surahNumber",
+            sourceText = ayah.text,
+            target = NowNudgeKnowledgeTarget.QuranAyah(surahNumber, ayah.numberInSurah),
+        )
     }
 
     private suspend fun loadQuran(date: LocalDate): GroundedKnowledgeSource? {

@@ -44,7 +44,7 @@ class UnreviewedArtworkTest {
     }
 
     @Test fun openverseNatureFallbackPreservesCreditAndFiltersOutOtherLicenses() {
-        val text = """{"results":[{"id":"nature-1","title":"Quiet valley","creator":"Photographer","license":"cc0","thumbnail":"https://upload.wikimedia.org/wikipedia/commons/example.jpg"},{"id":"nature-2","title":"Other license","license":"by"}]}"""
+        val text = """{"results":[{"id":"nature-1","title":"Quiet valley","creator":"Photographer","license":"cc0","width":1600,"height":3000,"url":"https://upload.wikimedia.org/wikipedia/commons/example.jpg","thumbnail":"https://api.openverse.org/v1/images/nature-1/thumb/"},{"id":"nature-2","title":"Other license","license":"by"}]}"""
         val image = parseArtworkReviewCandidates(ArtworkTheme.NATURE, text).single()
         assertEquals("openverse-nature-1", image.id)
         assertTrue(image.artist.contains("Photographer"))
@@ -59,10 +59,10 @@ class UnreviewedArtworkTest {
     @Test fun knownLandscapeMetadataIsExcludedBeforeDownloadingNatureImages() {
         val picsum = """[{"id":"88","author":"Photographer","url":"https://unsplash.com/photos/example","width":1600,"height":900}]"""
         assertTrue(parseArtworkReviewCandidates(ArtworkTheme.NATURE, picsum).isEmpty())
-        val openverse = """{"results":[{"id":"photo","title":"Nature","creator":"Photographer","license":"cc0","width":1600,"height":900}]}"""
+        val openverse = """{"results":[{"id":"photo","title":"Nature","creator":"Photographer","license":"cc0","width":3000,"height":1600,"url":"https://upload.wikimedia.org/wikipedia/commons/example.jpg"}]}"""
         assertTrue(parseArtworkReviewCandidates(ArtworkTheme.NATURE, openverse).isEmpty())
         assertEquals(1, parseArtworkReviewCandidates(ArtworkTheme.NATURE,
-            openverse.replace("\"width\":1600,\"height\":900", "\"width\":900,\"height\":1600")).size)
+            openverse.replace("\"width\":3000,\"height\":1600", "\"width\":1600,\"height\":3000")).size)
     }
 
     @Test fun unsafeCandidateIdsAndSourceLinksAreRejected() {

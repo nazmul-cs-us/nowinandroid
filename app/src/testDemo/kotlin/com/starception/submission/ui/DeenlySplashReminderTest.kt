@@ -9,8 +9,8 @@ import org.junit.Test
 
 class DeenlySplashReminderTest {
     @Test fun quranCitationUsesSurahNameAndAyahWithoutChangingOtherSources() {
-        assertEquals("Surah Ta-Ha · Ayah 114", splashReminderCitation("Quran 20:114"))
-        assertEquals("Surah Al-Ikhlas · Ayah 2", splashReminderCitation("Quran 112:2"))
+        assertEquals("Surah Ta-Ha  ·  20:114", splashReminderCitation("Quran 20:114"))
+        assertEquals("Surah Al-Ikhlas  ·  112:2", splashReminderCitation("Quran 112:2"))
         assertEquals("Sahih al-Bukhari 5027", splashReminderCitation("Sahih al-Bukhari 5027"))
         assertEquals("Quran 1:1", splashReminderCitation("Quran 1:1"))
     }

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.starception.submission.core.images.resources.Res
+import com.starception.submission.core.images.resources.lora_regular
 import com.starception.submission.core.images.resources.ubuntu_regular
 import org.jetbrains.compose.resources.Font
 
@@ -45,17 +46,17 @@ fun DeenlySplashScene(
             Column(Modifier.align(Alignment.TopCenter).padding(top = maxHeight * .72f + 46.dp)
                 .widthIn(max = 350.dp).padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("“${reminder.text}”", style = MaterialTheme.typography.bodyMedium.copy(
-                    // Match the wordmark, retaining native shaping for Bengali and Arabic.
+                    // Editorial quotation; retain native shaping for Bengali and Arabic.
                     fontFamily = if (reminder.text.any { it in '\u0600'..'\u06ff' || it in '\u0900'..'\u0dff' })
-                        FontFamily.Default else FontFamily(Font(Res.font.ubuntu_regular)),
+                        FontFamily.Default else FontFamily(Font(Res.font.lora_regular)),
                     fontWeight = FontWeight.Normal,
-                    fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.sp),
-                    color = Color(0xFFE7DDEB), textAlign = TextAlign.Center, maxLines = 3)
-                Text(splashReminderCitation(reminder.reference), style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 20.sp, lineHeight = 28.sp, letterSpacing = (-.2).sp),
+                    color = Color(0xFFF0E9F3), textAlign = TextAlign.Center, maxLines = 3)
+                Text(splashReminderCitation(reminder.reference).uppercase(), style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily(Font(Res.font.ubuntu_regular)),
-                    fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.sp),
+                    fontSize = 10.sp, lineHeight = 16.sp, letterSpacing = 1.6.sp),
                     color = Color(0xFFA99BB4), textAlign = TextAlign.Center)
             }
         }

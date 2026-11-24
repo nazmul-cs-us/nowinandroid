@@ -3066,6 +3066,8 @@ fun PrayerTimesScreen(
                 var insightHeightPx by remember { mutableIntStateOf(0) }
                 var prayerHeaderHeightPx by remember { mutableIntStateOf(0) }
                 var homeFooterHeightPx by remember { mutableIntStateOf(0) }
+                var homeReflectionHeightPx by remember { mutableIntStateOf(0) }
+                val homeTranslationLanguage = rememberHomeTranslationLanguage(screenContext.applicationContext)
                 // Content scrolls naturally after the insight reaches its resize limit.
                 val pullGestureScrollState = rememberScrollableState { 0f }
                 // Dynamic top inset: full at rest, collapses during pull (Fitbit-style)
@@ -3073,6 +3075,8 @@ fun PrayerTimesScreen(
                     .asPaddingValues().calculateTopPadding()
                 val navigationBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
                     .asPaddingValues().calculateBottomPadding()
+                val floatingNavigationClearance = if (!outerIsLandscape && !insightTileExpanded)
+                    navigationBarInset + 80.dp else 0.dp
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
                 val darkHome = LocalDarkTheme.current
                 val homeFeed = homeFeedPalette(MaterialTheme.colorScheme)
@@ -3113,6 +3117,15 @@ fun PrayerTimesScreen(
                 }
                 LaunchedEffect(coverPage, homeScrollEngaged, homePageGeneration.generatingPage, homeModelAvailable, expandedAiCandidate) {
                     val page = coverPage.coerceIn(0, 4)
+                    val readingSurah = com.starception.submission.feature.quran.dailyReading(
+                        kotlinx.datetime.LocalDate.parse(nudgeDay),
+                    ).number
+                    if (generatedHomePages[page]?.let {
+                            !homeReflectionMatchesReading(page, readingSurah, it.target)
+                        } == true) {
+                        generatedHomePages.remove(page)
+                        homePageGeneration.attempted.remove(page)
+                    }
                     if (!homeModelAvailable || (!homeScrollEngaged && page == 0) ||
                         homePageGeneration.generatingPage != -1 || homePageGeneration.attempted[page] == true
                     ) return@LaunchedEffect
@@ -3138,6 +3151,7 @@ fun PrayerTimesScreen(
                                 appSituation = latestExpandedAppSituation,
                                 rankingContext = latestExpandedKnowledgeContext,
                                 task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
+                                requiredSurahNumber = readingSurah.takeIf { page == 2 },
                             )
                             if (candidate != null) {
                                 generatedHomePages[page] = candidate
@@ -3242,6 +3256,9 @@ fun PrayerTimesScreen(
                     else Modifier.background(mainPageBackgroundBrush()),
                 ).drawWithContent {
                     drawContent()
+                    // The content viewport ends above the floating bar. Carry its
+                    // opaque reflection surface through the reserved area as well.
+                    drawHomeNavigationBackground(homeFeed.background, floatingNavigationClearance.toPx())
                     if (insightTileExpanded && !outerIsLandscape) {
                         // The scrolling feed can extend beyond the reader into
                         // the gesture inset. Never expose that unrelated content
@@ -3273,7 +3290,8 @@ fun PrayerTimesScreen(
                     // motion has cleared the header, including its fluid recess.
                     homeHeaderActionsVisible = !insightTileExpanded && !insightReaderOpen,
                     homeHeaderLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
-                    homeGreetingText = homeGreetingForHour(currentTime.hour),
+                    homeGreetingText = homeGreetingForHour(currentTime.hour,
+                        (currentHomeWeather as? CurrentWeatherLoadState.Available)?.weather?.isDay ?: !prayerArtworkNight),
                     homeSupportingTexts = homeSupportingTexts,
                     homeHeaderVisibility = {
                         if (insightTileExpanded || insightReaderOpen) 0f else
@@ -3289,6 +3307,7 @@ fun PrayerTimesScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
+                            .padding(bottom = floatingNavigationClearance)
                             .clipToBounds()
                             .onSizeChanged { homeViewport = it }
                             .onGloballyPositioned {
@@ -3405,7 +3424,7 @@ fun PrayerTimesScreen(
                                 // beneath both the floating navigation and the
                                 // system gesture area. The reader adds scroll
                                 // padding so verses remain reachable above them.
-                                val navigationClearance = if (insightTileExpanded) {
+                                val navigationClearance = if (insightTileExpanded || !isLandscape) {
                                     0.dp
                                 } else {
                                     navigationBarInset + 64.dp
@@ -3807,6 +3826,8 @@ fun PrayerTimesScreen(
                                                             size = androidx.compose.ui.geometry.Size(size.width, lowerHeight),
                                                         )
                                                         drawHomeFeedGlow(homeFeed, coverBottom)
+                                                        drawHomeNavigationFade(homeFeed.background,
+                                                            homeViewport.height.toFloat() + portraitScrollState.value)
                                                     }
                                                 }
                                             }
@@ -3868,13 +3889,24 @@ fun PrayerTimesScreen(
                                         ) { expanded ->
                                             if (expanded) 180f else 0f
                                         }
-                                        val homeRestingReaderHeight =
+                                        val preferredHomeReaderHeight =
                                             (configuration.screenHeightDp.dp * 0.69f)
                                                 .coerceIn(450.dp, 640.dp)
                                                 .coerceAtMost(
                                                     (portraitImmersiveInsightHeight - 104.dp)
                                                         .coerceAtLeast(320.dp),
-                                                )
+                                                 )
+                                        val homeRestingReaderHeight = if (insightTileExpanded) preferredHomeReaderHeight else {
+                                            with(dashboardDensity) {
+                                                homeRestingCoverHeight(
+                                                    viewport = homeViewport.height.toDp().value,
+                                                    preferred = preferredHomeReaderHeight.value,
+                                                    reflection = if (homeReflectionHeightPx > 0)
+                                                        homeReflectionHeightPx.toDp().value else 148f,
+                                                    spacing = feedTopPadding.value + 24f,
+                                                ).dp
+                                            }
+                                        }
                                         // Swipeable Big Tiles
                                         Box(
                                             // requiredWidth overflows the padded feed symmetrically,
@@ -4037,6 +4069,9 @@ fun PrayerTimesScreen(
                                                 exploreExpanded = exploreExpanded,
                                                 onExploreToggle = { exploreExpanded = !exploreExpanded },
                                                 generatedInsights = generatedHomePages,
+                                                readingSurahNumber = coverReading.number,
+                                                modifier = Modifier.onSizeChanged { homeReflectionHeightPx = it.height },
+                                                translationLanguage = homeTranslationLanguage,
                                                 exploreContent = {
                                                     HomeArtworkRail(
                                                         focusedPage = coverPage,
@@ -4069,7 +4104,9 @@ fun PrayerTimesScreen(
                                                     }
                                                 },
                                             ) {
-                                                val generated = generatedHomePages[coverPage]
+                                                val generated = generatedHomePages[coverPage]?.takeIf {
+                                                    homeReflectionMatchesReading(coverPage, coverReading.number, it.target)
+                                                }
                                                 if (generated != null) openExpandedAiCandidate(generated)
                                                 else feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
                                             }

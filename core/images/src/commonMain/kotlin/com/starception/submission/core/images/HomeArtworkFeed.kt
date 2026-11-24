@@ -12,7 +12,8 @@ internal fun allowedArtworkDownload(url: String): Boolean = url == HOME_ARTWORK_
     url.startsWith("https://images-assets.nasa.gov/image/") ||
     url.startsWith("https://fastly.picsum.photos/id/") ||
     (url.startsWith("https://api.openverse.org/v1/images/") && url.substringBefore('?').endsWith("/thumb/")) ||
-    url.startsWith("https://live.staticflickr.com/") || url.startsWith("https://upload.wikimedia.org/")
+    url.startsWith("https://live.staticflickr.com/") || url.startsWith("https://upload.wikimedia.org/") ||
+    url.startsWith("https://thumb.wikimedia.org/wikipedia/commons/")
 
 fun parseReviewedArtworkFeed(text: String, personalDeviceApproval: Boolean = false): List<ReviewedHomeArtwork> {
     val root = Json.parseToJsonElement(text).jsonObject

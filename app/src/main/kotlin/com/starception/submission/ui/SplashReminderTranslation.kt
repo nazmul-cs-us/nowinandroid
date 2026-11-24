@@ -4,16 +4,12 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.starception.submission.core.designsystem.component.DeenlySplashReminder
 import com.starception.submission.core.designsystem.component.nextDeenlySplashReminder
-import com.starception.submission.core.qurandatabase.QuranTranslationHelper
-import java.io.File
+import com.starception.submission.core.qurandatabase.existingQuranTranslationFile
 
 /** Read only existing content: no Room creation/copy, model inference, or network on startup. */
 internal fun translatedSplashReminder(context: Context, code: String, previousReference: String?): DeenlySplashReminder? {
     if (!code.matches(Regex("[a-z]{2,3}")) || code == "en") return null
-    val source = listOf(
-        File(context.filesDir, "cdn_assets/${QuranTranslationHelper.cdnKeyFor(code)}"),
-        context.getDatabasePath("quran_${code}_instance"),
-    ).firstOrNull { it.isFile && it.length() > 1024 } ?: return null
+    val source = existingQuranTranslationFile(context, code) ?: return null
     return runCatching {
         SQLiteDatabase.openDatabase(source.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { database ->
             var candidate = nextDeenlySplashReminder(previousReference, false, false)

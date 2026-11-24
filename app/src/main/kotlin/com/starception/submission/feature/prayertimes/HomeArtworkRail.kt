@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,7 +76,10 @@ import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.abs
-import kotlin.math.floor
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** The feed and its transition render the same scene and carry the same page identity. */
 internal data class HomeArtworkCard(
@@ -246,8 +250,12 @@ internal fun HomeReflectionPrompt(
     onExploreToggle: () -> Unit = {},
     exploreContent: @Composable () -> Unit = {},
     generatedInsights: Map<Int, NowNudgeKnowledgeCandidate> = emptyMap(),
+    readingSurahNumber: Int = 0,
+    modifier: Modifier = Modifier,
+    translationLanguage: String = "en",
     onClick: () -> Unit,
 ) {
+    val context = LocalContext.current.applicationContext
     val ink = if (onDarkCover) Color.White else MaterialTheme.colorScheme.onBackground
     val haptics = LocalHapticFeedback.current
     val arrowRotation by animateFloatAsState(
@@ -255,7 +263,7 @@ internal fun HomeReflectionPrompt(
         label = "homeExploreDividerArrow",
     )
     Column(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(bottom = 16.dp),
         // The arrow is tucked just below the cover's page marks. Give the
         // following reflection the same clear space below the arrow.
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -289,21 +297,24 @@ internal fun HomeReflectionPrompt(
                 }
             }
         }
-        // Mirror the cover headline's swipe-driven fade and small drift. Both
-        // text areas change at the same point, with no separate timed animation.
+        // Keep all five keyed scenes measured and translations retained. Adding/removing
+        // layers while dragging changed this Box's height and resized the entire cover.
         val position = ((scrollPosition % 5f) + 5f) % 5f
-        val current = floor(position).toInt()
-        val visiblePages = if (position - current < .001f) {
-            listOf(current)
-        } else {
-            listOf(current, (current + 1) % 5)
-        }
         Box(Modifier.fillMaxWidth().clipToBounds()) {
-            visiblePages.forEach { page ->
+            repeat(5) { page ->
                 key(page) {
                     val offset = homeSwipePageOffset(position, page)
                     val feed = homeFeedPage(page)
-                    val generatedCandidate = generatedInsights[page]
+                    val generatedCandidate = generatedInsights[page]?.takeIf {
+                        homeReflectionMatchesReading(page, readingSurahNumber, it.target)
+                    }
+                    val localized by produceState<HomePassageTranslation?>(null, generatedCandidate?.target, translationLanguage) {
+                        if (generatedCandidate != null && translationLanguage != "en") {
+                            value = withContext(Dispatchers.IO) {
+                                HomePassageTranslation(readHomePassageTranslation(context, generatedCandidate.target, translationLanguage))
+                            }
+                        }
+                    }
                     Column(
                         Modifier.fillMaxWidth()
                             .graphicsLayer {
@@ -311,7 +322,8 @@ internal fun HomeReflectionPrompt(
                                 translationY = abs(offset) * 8.dp.toPx()
                                 alpha = homeCoverCopyOpacity(offset)
                             }
-                            .clickable(onClick = onClick),
+                            .then(if (page != focusedPage) Modifier.clearAndSetSemantics { } else Modifier)
+                            .clickable(enabled = page == focusedPage, onClick = onClick),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(feed.eyebrow, style = HomeTypography.eyebrow,
@@ -324,14 +336,15 @@ internal fun HomeReflectionPrompt(
                             overflow = TextOverflow.Ellipsis,
                         )
                         generatedCandidate?.nudge?.supportingText?.takeIf(String::isNotBlank)?.let { sourceText ->
-                            val preview = remember(sourceText) { homeEvidencePreview(sourceText) }
+                            val selectedText = if (translationLanguage == "en") sourceText else localized?.text
+                            val preview = selectedText?.let(::homeEvidencePreview) ?: if (localized == null) {
+                                if (translationLanguage == "bn") "অনুবাদ লোড হচ্ছে…" else "Loading selected translation…"
+                            } else homeTranslationUnavailable(translationLanguage)
                             Text(preview, style = HomeTypography.body,
-                                color = ink.copy(alpha = .82f), maxLines = 1,
-                                overflow = TextOverflow.Ellipsis)
+                                color = ink.copy(alpha = .88f))
                             generatedCandidate.nudge.sourceLabel?.let { reference ->
-                                Text(reference, style = HomeTypography.caption,
-                                    color = ink.copy(alpha = .68f), maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis)
+                                Text(homeTranslationReference(generatedCandidate.target, reference, translationLanguage), style = HomeTypography.caption,
+                                    color = ink.copy(alpha = .76f))
                             }
                         }
                     }
@@ -349,11 +362,17 @@ internal fun homeEvidencePreview(sourceText: String): String =
             ?.trim(' ', '\'', '"', '“', '”', '‘', '’')
             ?.takeIf(String::isNotBlank)
             ?: text
-        if (quotedTeaching.length > 96) {
-            val prefix = quotedTeaching.take(96)
-            prefix.substringBeforeLast(' ', missingDelimiterValue = prefix).trimEnd() + "…"
-        } else quotedTeaching
+        quotedTeaching
     }
+
+internal fun homeReflectionMatchesReading(page: Int, surahNumber: Int, target: NowNudgeKnowledgeTarget): Boolean =
+    page != 2 || (target as? NowNudgeKnowledgeTarget.QuranAyah)?.surahNumber == surahNumber
+
+/** Give measured reflection/citation text its space before assigning the decorative cover height. */
+internal fun homeRestingCoverHeight(viewport: Float, preferred: Float, reflection: Float, spacing: Float): Float {
+    if (viewport <= 0f) return preferred
+    return minOf(preferred, (viewport - reflection - spacing).coerceAtLeast(minOf(240f, preferred)))
+}
 
 @Composable
 private fun HomeSectionDivider(ink: Color) {

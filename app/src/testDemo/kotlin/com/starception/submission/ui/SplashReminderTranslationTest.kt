@@ -13,6 +13,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import com.starception.submission.feature.prayertimes.NowNudgeKnowledgeTarget
+import com.starception.submission.feature.prayertimes.readHomePassageTranslation
+import com.starception.submission.feature.prayertimes.homeTranslationReference
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [35])
@@ -53,6 +56,15 @@ class SplashReminderTranslationTest {
     @Test fun missingTranslationReturnsNoInventedOrMachineTranslatedText() {
         assertNull(translatedSplashReminder(context(), "bn", null))
         assertNull(translatedSplashReminder(context(), "../bn", null))
+    }
+
+    @Test fun homePassageReadsTheSameCanonicalVerseInBengaliWithoutUsingTheEnglishCache() {
+        val context = context()
+        addBengaliFixture(context)
+        val target = NowNudgeKnowledgeTarget.QuranAyah(94, 5)
+        assertEquals("বাংলা অনুবাদ এক", readHomePassageTranslation(context, target, "bn"))
+        assertNull(readHomePassageTranslation(context, target, "fr"))
+        assertEquals("কুরআন ৯৪:৫", homeTranslationReference(target, "Quran 94:5", "bn"))
     }
 
     @Test fun startupUsesSavedTranslationAndPersistsPreviousReference() {

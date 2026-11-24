@@ -18,6 +18,8 @@ package com.starception.submission.core.images
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.resources.DrawableResource
+import com.starception.submission.core.images.resources.Res
+import com.starception.submission.core.images.resources.home_artwork_neutral
 
 enum class HomeArtworkSubject {
     ISLAMIC_ARCHITECTURE,
@@ -42,6 +44,19 @@ fun homeArtworkIndex(page: Int, rotation: Int): Int =
 @Composable
 fun currentHomeArtwork(page: Int, useNightArtwork: Boolean = false): DrawableResource {
     // Bundled images are a stable fallback, not a pretend online refresh.
-    val artwork = homeArtworkGallery[homeArtworkIndex(page, 0)]
+    val artwork = bundledHomeArtwork(page, rememberHomeArtworkSettings().theme)
+        ?: return Res.drawable.home_artwork_neutral
     return if (useNightArtwork) artwork.night else artwork.day
+}
+
+internal fun bundledHomeArtwork(page: Int, theme: ArtworkTheme): HomeArtwork? {
+    val candidates = homeArtworkGallery.filter { artwork ->
+        when (theme) {
+            ArtworkTheme.NATURE -> artwork.subject == HomeArtworkSubject.CALM_NATURE
+            ArtworkTheme.ISLAMIC -> artwork.subject == HomeArtworkSubject.ISLAMIC_ARCHITECTURE ||
+                artwork.subject == HomeArtworkSubject.ISLAMIC_PATTERN
+            ArtworkTheme.SPACE -> false
+        }
+    }
+    return candidates.takeIf { it.isNotEmpty() }?.let { it[page.coerceIn(0, 4) % it.size] }
 }

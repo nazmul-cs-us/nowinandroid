@@ -80,11 +80,26 @@ private class IosArtworkReviewPlatform : ArtworkReviewPlatform {
 internal actual fun decodeArtworkReviewPreview(bytes: ByteArray): ImageBitmap {
     val data = bytes.usePinned { NSData.create(bytes = it.addressOf(0), length = bytes.size.toULong()) }
     val image = requireNotNull(UIImage.imageWithData(data))
-    image.size.useContents { require(width in 100.0..1800.0 && height in 100.0..1800.0) }
+    image.size.useContents { require(width in 100.0..4096.0 && height in 100.0..4096.0) }
     val bitmap = bytes.decodeToImageBitmap()
     val longest = maxOf(bitmap.width, bitmap.height)
     if (longest <= 720) return bitmap
     val scale = 720f / longest
+    val targetSize = IntSize((bitmap.width * scale).toInt().coerceAtLeast(1), (bitmap.height * scale).toInt().coerceAtLeast(1))
+    return ImageBitmap(targetSize.width, targetSize.height).also {
+        Canvas(it).drawImageRect(bitmap, IntOffset.Zero, IntSize(bitmap.width, bitmap.height), IntOffset.Zero, targetSize, Paint())
+    }
+}
+
+@OptIn(ExperimentalResourceApi::class)
+internal actual fun decodeArtworkHomeImage(bytes: ByteArray): ImageBitmap {
+    val data = bytes.usePinned { NSData.create(bytes = it.addressOf(0), length = bytes.size.toULong()) }
+    val image = requireNotNull(UIImage.imageWithData(data))
+    image.size.useContents { require(width in 100.0..4096.0 && height in 100.0..4096.0) }
+    val bitmap = bytes.decodeToImageBitmap()
+    val longest = maxOf(bitmap.width, bitmap.height)
+    if (longest <= 3200) return bitmap
+    val scale = 3200f / longest
     val targetSize = IntSize((bitmap.width * scale).toInt().coerceAtLeast(1), (bitmap.height * scale).toInt().coerceAtLeast(1))
     return ImageBitmap(targetSize.width, targetSize.height).also {
         Canvas(it).drawImageRect(bitmap, IntOffset.Zero, IntSize(bitmap.width, bitmap.height), IntOffset.Zero, targetSize, Paint())
