@@ -1076,6 +1076,7 @@ private fun createPrayerTimesViewController(
                     PrayerTimesScreen(
                         placeName = place.placeName.ifEmpty { "Locating…" },
                         homeCountryName = country?.countryName.orEmpty(),
+                        homeCountryCode = place.countryCode,
                         day = day,
                         salah = SalahProgress.from(completed),
                         onTogglePrayer = { completed = tracker.toggle(today, it) },

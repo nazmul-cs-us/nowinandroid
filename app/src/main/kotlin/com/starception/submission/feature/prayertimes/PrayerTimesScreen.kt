@@ -3192,19 +3192,11 @@ fun PrayerTimesScreen(
                     "${it.temperatureCelsius.roundToInt()}°C · ${weatherConditionLabel(it)}"
                 }
                 val homePlace = remember(location, prayerTimes?.location) {
-                    prayerLocationLabel(prayerTimes?.location) {
-                        getLocationWithCountryCode(location, prayerTimes?.location)
-                    }.singleLine.let { place ->
-                        val data = prayerTimes?.location
-                        val country = data?.country?.trim().orEmpty().ifBlank {
-                            data?.countryCode?.takeIf { it.length == 2 }?.let {
-                                java.util.Locale.Builder().setRegion(it.uppercase(java.util.Locale.ROOT))
-                                    .build().getDisplayCountry(java.util.Locale.getDefault())
-                            }.orEmpty()
-                        }
-                        if (country.isBlank() || place.contains(country, ignoreCase = true)) place
-                        else listOf(place, country).filter(String::isNotBlank).joinToString(" · ")
-                    }
+                    val data = prayerTimes?.location
+                    val place = prayerLocationLabel(data) {
+                        getLocationWithCountryCode(location, data)
+                    }.singleLine
+                    homeHeaderLocation(place, data?.country.orEmpty(), data?.countryCode.orEmpty())
                 }
                 val homeHijriDate = remember(coverReadingDate, java.util.Locale.getDefault()) {
                     runCatching {
@@ -3321,6 +3313,9 @@ fun PrayerTimesScreen(
                             .fillMaxSize()
                             .padding(bottom = floatingNavigationClearance)
                             .clipToBounds()
+                            .then(if (floatingNavigationClearance > 0.dp) {
+                                Modifier.homeNavigationReveal(homeFeed.background)
+                            } else Modifier)
                             .onSizeChanged { homeViewport = it }
                             .onGloballyPositioned {
                                 homeViewportBottomInWindowPx = it.positionInWindow().y + it.size.height
@@ -3846,7 +3841,7 @@ fun PrayerTimesScreen(
                                             .padding(horizontal = feedGutter)
                                             .padding(
                                                 top = feedTopPadding,
-                                                bottom = 0.dp,
+                                                bottom = if (floatingNavigationClearance > 0.dp) HomeNavigationRevealHeight else 0.dp,
                                             ),
                                         verticalArrangement = Arrangement.Top,
                                     ) {

@@ -18,6 +18,9 @@ package com.starception.submission.shared.ui
 
 import com.starception.submission.settings.components.GuideSection
 import com.starception.submission.settings.components.appGuideAnchor
+import com.starception.submission.feature.prayertimes.HomeNavigationRevealHeight
+import com.starception.submission.feature.prayertimes.homeNavigationReveal
+import com.starception.submission.feature.prayertimes.homeHeaderLocation
 import com.starception.submission.feature.prayertimes.HomeHeaderDetail
 import com.starception.submission.feature.prayertimes.HomeHeaderDetailKind
 import com.starception.submission.feature.prayertimes.HomeHeaderTypography
@@ -252,6 +255,7 @@ fun PrayerTimesScreen(
     forceSunForTesting: Boolean = false,
     onInsightImmersiveChange: (Boolean) -> Unit = {},
     homeCountryName: String = "",
+    homeCountryCode: String = "",
 ) {
     val prayerContentHeights = remember(LocalDensity.current.fontScale) { mutableStateMapOf<String, Dp>() }
     var showAllPrayers by remember { mutableStateOf(initialShowAllPrayers) }
@@ -928,10 +932,17 @@ fun PrayerTimesScreen(
                                   // Captured for the scrolling column below: its content
                                   // lambda leaves the BoxWithConstraints receiver scope.
                                   val phoneViewportWidth = if (isPhoneHome) maxWidth - 48.dp else maxWidth
+                                  val revealAtNavigation = isPhoneHome && LocalShowBottomNavigation.current &&
+                                      !useSideNavigation && !isInsightImmersive
                                   Column(
                                       modifier = Modifier.fillMaxSize()
+                                          .then(if (revealAtNavigation) Modifier.homeNavigationReveal(homeFeed.background) else Modifier)
                                           .verticalScroll(homePortraitScroll)
-                                          .padding(horizontal = if (isPhoneHome) 24.dp else 0.dp),
+                                          .padding(
+                                              start = if (isPhoneHome) 24.dp else 0.dp,
+                                              end = if (isPhoneHome) 24.dp else 0.dp,
+                                              bottom = if (revealAtNavigation) HomeNavigationRevealHeight else 0.dp,
+                                          ),
                                       verticalArrangement = Arrangement.spacedBy(sectionGap),
                                   ) {
                                       // The insight reader slot, Android home order: it
@@ -1130,8 +1141,8 @@ fun PrayerTimesScreen(
                                 greeting = homeGreetingForHour(day.nowMinute / 60),
                                 supportingTexts = listOfNotNull(
                                     HomeHeaderDetail("${today.dayOfMonth} ${today.month.name.lowercase().replaceFirstChar { it.uppercase() }}, ${today.year}", HomeHeaderDetailKind.Calendar),
-                                    listOf(placeName, homeCountryName.takeUnless { placeName.contains(it, ignoreCase = true) }.orEmpty())
-                                        .filter(String::isNotBlank).joinToString(" · ").takeIf(String::isNotBlank)?.let { HomeHeaderDetail(it, HomeHeaderDetailKind.Location) },
+                                    homeHeaderLocation(placeName, homeCountryName, homeCountryCode)
+                                        .takeIf(String::isNotBlank)?.let { HomeHeaderDetail(it, HomeHeaderDetailKind.Location) },
                                     day.temperatureCelsius?.let { HomeHeaderDetail("${it.toInt()}°C · ${day.currentPrayer.orEmpty()}", HomeHeaderDetailKind.Weather) }),
                                 onOpenSettings = onOpenSettings,
                                 onOpenProfile = onOpenProfile,

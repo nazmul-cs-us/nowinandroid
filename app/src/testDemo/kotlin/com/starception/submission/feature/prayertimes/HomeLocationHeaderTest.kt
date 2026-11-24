@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.RoborazziTaskType
 import com.github.takahirom.roborazzi.captureRoboImage
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -35,6 +36,15 @@ import org.jetbrains.compose.resources.PreviewContextConfigurationEffect
 class HomeLocationHeaderTest {
     @get:Rule val compose = createComposeRule()
     @get:Rule val temporary = TemporaryFolder()
+
+    @Test fun homeLocationUsesShortCountryWithoutRepeatingIt() {
+        assertEquals("Al Safouh Second · Dubai · UAE",
+            homeHeaderLocation("Al Safouh Second · Dubai · United Arab Emirates", "United Arab Emirates", "ae"))
+        assertEquals("Dubai · UAE", homeHeaderLocation("Dubai, AE", "United Arab Emirates", "AE"))
+        assertEquals("London · UK", homeHeaderLocation("London", "United Kingdom", "GB"))
+        assertEquals("Dhaka · BD", homeHeaderLocation("Dhaka", "Bangladesh", "BD"))
+        assertEquals("Paris · France", homeHeaderLocation("Paris", "France", ""))
+    }
 
     @OptIn(ExperimentalResourceApi::class)
     @Test fun longLocationStaysStillRatherThanScrollingHorizontally() {

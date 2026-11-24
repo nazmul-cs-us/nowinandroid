@@ -159,6 +159,25 @@ class HomeScreenBugFixTest {
         bitmap.recycle()
     }
 
+    @Test fun foregroundContentBlendsIntoTheNavigationSurface() {
+        val feed = Color(0xFF352C28)
+        compose.setContent {
+            Box(Modifier.size(width = 200.dp, height = 88.dp)
+                .testTag("navigation-reveal").homeNavigationReveal(feed).background(Color.White))
+        }
+        val file = temporary.newFile("navigation-reveal.png")
+        compose.onNodeWithTag("navigation-reveal").captureRoboImage(file.absolutePath,
+            roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
+        val bitmap = requireNotNull(BitmapFactory.decodeFile(file.absolutePath))
+        val x = bitmap.width / 2
+        assertEquals(android.graphics.Color.WHITE, bitmap.getPixel(x, 2))
+        assertEquals(0xff352c28.toInt(), bitmap.getPixel(x, bitmap.height - 2))
+        val blended = bitmap.getPixel(x, bitmap.height * 3 / 4)
+        assertNotEquals(android.graphics.Color.WHITE, blended)
+        assertNotEquals(0xff352c28.toInt(), blended)
+        bitmap.recycle()
+    }
+
     @Test fun coverShrinksToKeepReflectionAndWrappedCitationAboveNavigation() {
         assertEquals(428f, homeRestingCoverHeight(660f, 560f, 200f, 32f), .01f)
         for (reflection in listOf(148f, 180f, 240f, 300f)) {

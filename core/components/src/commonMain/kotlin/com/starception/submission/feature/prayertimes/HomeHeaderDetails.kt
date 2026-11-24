@@ -43,6 +43,24 @@ enum class HomeHeaderDetailKind { Calendar, Location, Weather }
 
 data class HomeHeaderDetail(val text: String, val kind: HomeHeaderDetailKind)
 
+/** Keeps the Home metadata compact while leaving the full location data intact. */
+fun homeHeaderLocation(place: String, country: String, countryCode: String): String {
+    val countryName = country.trim()
+    val isoCode = countryCode.trim().uppercase().takeIf { code ->
+        code.length == 2 && code.all { it in 'A'..'Z' }
+    }.orEmpty()
+    val shortCountry = when {
+        isoCode == "AE" || countryName.equals("United Arab Emirates", ignoreCase = true) -> "UAE"
+        isoCode == "GB" || countryName.equals("United Kingdom", ignoreCase = true) -> "UK"
+        isoCode == "US" || countryName.equals("United States", ignoreCase = true) -> "US"
+        else -> isoCode.ifBlank { countryName }
+    }
+    return (place.split(" · ", ", ").map(String::trim).filter { part ->
+        part.isNotBlank() && !part.equals(countryName, ignoreCase = true) &&
+            !part.equals(isoCode, ignoreCase = true) && !part.equals(shortCountry, ignoreCase = true)
+    } + shortCountry).filter(String::isNotBlank).distinctBy { it.lowercase() }.joinToString(" · ")
+}
+
 /** Use the same quiet Ubuntu family as the brand, with a deliberate title/detail hierarchy. */
 object HomeHeaderTypography {
     val greeting: TextStyle

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.filled.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -182,6 +183,7 @@ private fun FamilyScreenBody(
 ) {
     if (state.chatPeer != null) { FamilyChatContent(state, actions); return }
     val signedIn = state.connected || state.reconnecting
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val presenceTime = rememberFamilyPresenceTime()
     val portrait = androidx.compose.ui.platform.LocalConfiguration.current.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val colors = familyPalette()
@@ -227,7 +229,7 @@ private fun FamilyScreenBody(
         else { password = ""; confirmation = ""; creatingAccount = false }
     }
     Box(Modifier.fillMaxSize().background(colors.panel)) {
-    Column(Modifier.fillMaxSize().background(colors.panel)) {
+    Column(Modifier.fillMaxSize().then(if (!signedIn) Modifier.imePadding() else Modifier).background(colors.panel)) {
         Column(Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(bottomEnd = if (signedIn) 40.dp else 0.dp))
             .background(brand).statusBarsPadding()) {
@@ -270,7 +272,7 @@ private fun FamilyScreenBody(
                     }
                 }
             }
-        } else {
+        } else if (!keyboardVisible) {
             LandingIllustration(Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 24.dp).padding(bottom = 16.dp))
         }
         }
@@ -278,7 +280,7 @@ private fun FamilyScreenBody(
             // The app-wide pill overlays signed-out Family in portrait. Reserve
             // its viewport, rather than letting it obscure partially visible form content.
             LazyColumn(
-                modifier = Modifier.then(if (!signedIn && portrait) {
+                modifier = Modifier.then(if (!signedIn && portrait && !keyboardVisible) {
                     Modifier.padding(bottom = 72.dp).navigationBarsPadding()
                 } else Modifier).testTag("familyContentViewport"),
                 contentPadding = PaddingValues(top = if (signedIn) 16.dp else 24.dp, bottom = if (signedIn) 112.dp else 24.dp),
