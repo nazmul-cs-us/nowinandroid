@@ -1,6 +1,6 @@
 package com.starception.submission.settings.components
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.composed
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -45,21 +45,43 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 
 /** Stable IDs are also used by the native iOS Family screen. Visits never leave this device. */
-enum class GuideSection(val label: String, val title: String, val tip: String, val detail: String, val icon: ImageVector) {
-    HOME("Home", "Your day, at a glance", "Check your next prayer and today's schedule on Home.",
-        "Use Home for prayer times and daily insights. Open prayer settings to check your location, calculation method and reminders.", Icons.Outlined.Home),
-    READING("Reading", "Make time for today's reading", "Read an ayah with its translation. Open Tafsir for its explanation.",
-        "Tap today's reading to expand it. Use the play control to listen, and open the Quran library to choose a surah.", Icons.Outlined.MenuBook),
-    SEARCH("Search", "Find what you need", "Search for Quran passages, hadith, duas and reciters.",
-        "Tap the search field and enter a name or topic. The microphone starts voice search when voice setup is available.", Icons.Outlined.Search),
-    FAMILY("Family", "Stay close to your family", "Accept a family invitation before starting a chat or call.",
-        "Sign in or create an account, add trusted family members, and accept invitations. Then use chat, voice or video calls. Background call alerts need notification setup.", Icons.Outlined.FavoriteBorder),
-    SAVED("Saved", "Keep meaningful passages close", "Find bookmarked content in Saved.",
-        "Use the bookmark control while reading. Open Saved from navigation to return to those passages.", Icons.Outlined.BookmarkBorder),
-    RECITERS("Reciters", "Listen online or offline", "Search by name, then tap Play to preview a reciter.",
-        "Open Content & Storage in Settings for the reciter library. Portraits help identify supported reciters; styles identify recordings. Download audio explicitly for offline listening.", Icons.Outlined.Headphones),
-    SETTINGS("Settings", "Make Deenly yours", "Adjust themes, prayer settings, audio and notifications here.",
-        "Choose a curated theme in Appearance, manage content in Content & Storage, and configure prayer reminders. You can replay this guide here at any time.", Icons.Outlined.Settings),
+enum class GuideSection(val label: String, val title: String, val tip: String, val steps: List<String>, val icon: ImageVector) {
+    HOME("Home", "Check your prayer schedule", "See the next prayer and its time on Home.", listOf(
+        "Open Home and find Prayer times.",
+        "Read the time beside the prayer you want.",
+        "If the times look wrong, open prayer settings and check your location and calculation method."
+    ), Icons.Outlined.Home),
+    READING("Reading", "Read an ayah with tafsir", "Open Tafsir to see the explanation beside the ayah.", listOf(
+        "Open the Quran library and choose a surah.",
+        "Use the language control to choose your translation.",
+        "Tap Tafsir in the reader toolbar and choose an edition. If prompted, download the edition.",
+        "Scroll to the ayah and expand its explanation. Use the play control to hear it aloud."
+    ), Icons.Outlined.MenuBook),
+    SEARCH("Search", "Find a passage or dua", "Search by a name, a phrase or a topic.", listOf(
+        "Tap the search field on Home.",
+        "Enter a name or topic, or use the microphone if voice search is available.",
+        "Choose a result to open the passage."
+    ), Icons.Outlined.Search),
+    FAMILY("Family", "Connect with a family member", "Accept a family invitation to start a conversation.", listOf(
+        "Open Family and sign in or create an account.",
+        "Invite your family member using their Family username, or accept their invitation.",
+        "Open the accepted contact to send a message or start a voice or video call."
+    ), Icons.Outlined.FavoriteBorder),
+    SAVED("Saved", "Bookmark and find a surah", "Tap the bookmark while reading. Find the surah here later.", listOf(
+        "Open the surah you want to keep.",
+        "Tap the bookmark icon in the reader toolbar.",
+        "Open Saved from the main navigation and select the surah to return to it."
+    ), Icons.Outlined.BookmarkBorder),
+    RECITERS("Reciters", "Download a reciter for offline listening", "Search by name, then tap Play to preview a reciter.", listOf(
+        "Open Settings, then Content & Storage.",
+        "Open Reciters & offline audio and search for a reciter.",
+        "Preview the recording, then choose Download. Wait until the recording is available offline."
+    ), Icons.Outlined.Headphones),
+    SETTINGS("Settings", "Change the look of Deenly", "Choose a theme and display mode in Appearance.", listOf(
+        "Open Settings from Home.",
+        "Expand Appearance and choose a theme.",
+        "Select Light, Dark or System for the display mode."
+    ), Icons.Outlined.Settings),
 }
 
 interface AppGuideStore {
@@ -130,6 +152,10 @@ fun AppGuideHost(section: GuideSection?, enabled: Boolean = true, store: AppGuid
             store.visit(section)
         }
     }
+    var guideTopic by rememberSaveable(section) { mutableStateOf<GuideSection?>(null) }
+    guideTopic?.takeIf { allowed && resumed }?.let { topic ->
+        AppGuideTour(store, initial = topic, onClose = { guideTopic = null })
+    }
     tip?.takeIf { allowed && resumed && !tourOpen && section == it && GuidePresentation.activeTip == it }?.let { current ->
         DisposableEffect(current) {
             store.markTipSeen(current)
@@ -173,6 +199,9 @@ fun AppGuideHost(section: GuideSection?, enabled: Boolean = true, store: AppGuid
                         verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(current.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
                         Text(current.tip, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                        TextButton(onClick = { tip = null; guideTopic = current }, contentPadding = PaddingValues(horizontal = 2.dp)) {
+                            Text("Show steps")
+                        }
                     }
                     IconButton(onClick = { tip = null }, modifier = Modifier.testTag("appGuideTipDismiss")) {
                         Icon(Icons.Outlined.Close, "Dismiss tip", Modifier.size(18.dp), tint = colors.onSurfaceVariant)
@@ -214,44 +243,64 @@ fun AppGuideSettings(store: AppGuideStore = rememberAppGuideStore()) {
 }
 
 @Composable
-private fun AppGuideTour(store: AppGuideStore, onClose: () -> Unit) {
-    // Unvisited sections come first. Reading a tip does not count as visiting the actual section.
-    val steps = remember { GuideSection.entries.sortedBy { store.visited(it) } }
-    var step by rememberSaveable { mutableIntStateOf(0) }
-    val current = steps[step.coerceIn(steps.indices)]
-    LaunchedEffect(current) { store.markTipSeen(current) }
+private fun AppGuideTour(store: AppGuideStore, initial: GuideSection? = null, onClose: () -> Unit) {
+    val topics = remember(store) { GuideSection.entries.sortedBy { store.visited(it) } }
+    var selected by rememberSaveable { mutableStateOf(initial) }
+    val topic = selected
+    LaunchedEffect(topic) { topic?.let(store::markTipSeen) }
     DisposableEffect(Unit) { GuidePresentation.tourOpen = true; onDispose { GuidePresentation.tourOpen = false } }
-    Dialog(onDismissRequest = onClose, properties = artworkDialogProperties()) {
-        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp)) {
-            val compact = maxHeight < 480.dp
-            Surface(Modifier.align(if (maxWidth < 560.dp) Alignment.BottomCenter else Alignment.Center).widthIn(max = 520.dp).fillMaxWidth().heightIn(max = maxHeight)
-                .testTag("appGuideTour"), shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
-                Column(Modifier.padding(if (compact) 16.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("App guide · ${step + 1} of ${steps.size}", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-                        TextButton(onClick = onClose, modifier = Modifier.testTag("appGuideSkip")) { Text("Close") }
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        steps.indices.forEach { index ->
-                            Spacer(Modifier.weight(1f).height(3.dp).background(
-                                if (index <= step) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                RoundedCornerShape(2.dp)))
-                        }
-                    }
-                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)) {
-                        if (!compact) Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                            Icon(current.icon, null, Modifier.padding(12.dp).size(28.dp))
-                        }
-                        Text(current.title, Modifier.semantics { heading() }, style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall)
-                        Text(if (store.visited(current)) "Already explored" else "Not explored yet",
-                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(current.detail, style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge)
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { step-- }, enabled = step > 0, modifier = Modifier.testTag("appGuideBack")) { Text("Back") }
+    Dialog(onDismissRequest = { if (topic == null) onClose() else selected = null }, properties = artworkDialogProperties()) {
+        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp),
+            contentAlignment = Alignment.Center) {
+            val colors = MaterialTheme.colorScheme
+            Surface(Modifier.widthIn(max = 540.dp).fillMaxWidth().heightIn(max = minOf(maxHeight, 680.dp))
+                .testTag("appGuideTour"), shape = RoundedCornerShape(24.dp), color = colors.surface) {
+                Column {
+                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        if (topic != null) TextButton(onClick = { selected = null }, modifier = Modifier.testTag("appGuideBack")) {
+                            Text("All topics")
+                        } else Text("App guide", style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.semantics { heading() })
                         Spacer(Modifier.weight(1f))
-                        Button(onClick = { if (step == steps.lastIndex) onClose() else step++ }, modifier = Modifier.testTag("appGuideNext")) {
-                            Text(if (step == steps.lastIndex) "Done" else "Next")
+                        IconButton(onClick = onClose, modifier = Modifier.testTag("appGuideSkip")) {
+                            Icon(Icons.Outlined.Close, "Close guide")
+                        }
+                    }
+                    HorizontalDivider(color = colors.outlineVariant)
+                    key(topic) {
+                        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                            if (topic == null) topics.forEach { item ->
+                                ListItem(
+                                    modifier = Modifier.clickable { selected = item },
+                                    leadingContent = { Icon(item.icon, null, tint = colors.primary) },
+                                    overlineContent = { Text(item.label) },
+                                    headlineContent = { Text(item.title) },
+                                    trailingContent = { Icon(Icons.Outlined.ChevronRight, null) },
+                                )
+                            } else Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                                verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                                Text(topic.label, style = MaterialTheme.typography.labelLarge, color = colors.primary)
+                                Text(topic.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+                                topic.steps.forEachIndexed { index, instruction ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                        Surface(color = colors.secondaryContainer, shape = RoundedCornerShape(10.dp)) {
+                                            Box(Modifier.sizeIn(minWidth = 32.dp, minHeight = 32.dp), contentAlignment = Alignment.Center) {
+                                                Text((index + 1).toString(), style = MaterialTheme.typography.labelLarge)
+                                            }
+                                        }
+                                        Text(instruction, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (topic != null) {
+                        val next = topics.getOrNull(topics.indexOf(topic) + 1)
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { if (next == null) onClose() else selected = next }, modifier = Modifier.testTag("appGuideNext")) {
+                                Text(if (next == null) "Done" else "Next topic")
+                            }
                         }
                     }
                 }

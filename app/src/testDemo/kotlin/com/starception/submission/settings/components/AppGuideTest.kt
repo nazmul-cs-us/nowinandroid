@@ -93,13 +93,30 @@ class AppGuideTest {
         assertEquals(1, taps)
     }
 
+    @Test fun tipOpensItsOwnInstructionsAndCanSwitchTopics() {
+        val store = Store()
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+            AppGuideHost(GuideSection.SAVED, store = store)
+        } } }
+        waitForTip()
+        compose.onNodeWithText("Show steps").performClick()
+        compose.onNodeWithText(GuideSection.SAVED.steps.first()).assertIsDisplayed()
+        compose.onNodeWithTag("appGuideBack").performClick()
+        compose.onNodeWithText(GuideSection.FAMILY.title).performScrollTo().performClick()
+        compose.onNodeWithText(GuideSection.FAMILY.steps.first()).assertIsDisplayed()
+        compose.onNodeWithTag("appGuideSkip").performClick()
+        assertEquals(setOf(GuideSection.SAVED), store.visits)
+    }
+
     @Test fun replayPrioritizesUnvisitedSectionsWithoutInventingVisits() {
         val store = Store().apply { visits += GuideSection.HOME; visits += GuideSection.SETTINGS; tips = false }
         compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) { AppGuideSettings(store) } }
         compose.onNodeWithTag("appGuideReplay").performClick()
-        compose.onNodeWithText("Make time for today's reading").assertIsDisplayed()
-        compose.onNodeWithText("Not explored yet").assertIsDisplayed()
-        compose.onNodeWithTag("appGuideBack").assertIsNotEnabled()
+        compose.onNodeWithTag("appGuideTour").captureRoboImage("src/testDemo/screenshots/app_guide_topics.png")
+        compose.onNodeWithText(GuideSection.READING.title).assertIsDisplayed()
+        compose.onNodeWithText(GuideSection.READING.title).performClick()
+        compose.onNodeWithText(GuideSection.READING.steps.first()).assertIsDisplayed()
+        compose.onNodeWithTag("appGuideBack").assertIsEnabled()
         compose.onNodeWithTag("appGuideTour").captureRoboImage("src/testDemo/screenshots/app_guide_tour_dark.png")
         repeat(GuideSection.entries.size) { compose.onNodeWithTag("appGuideNext").assertIsDisplayed().performClick() }
         compose.onNodeWithTag("appGuideTour").assertDoesNotExist()
@@ -114,6 +131,7 @@ class AppGuideTest {
         RuntimeEnvironment.setFontScale(1.5f)
         compose.setContent { MaterialTheme { AppGuideSettings(Store()) } }
         compose.onNodeWithTag("appGuideReplay").assertIsDisplayed().performClick()
+        compose.onNodeWithText(GuideSection.HOME.title).performClick()
         compose.onNodeWithTag("appGuideNext").assertIsDisplayed()
         compose.onNodeWithTag("appGuideSkip").assertIsDisplayed()
         compose.onNodeWithTag("appGuideTour").captureRoboImage("src/testDemo/screenshots/app_guide_tour_landscape.png")
@@ -143,6 +161,7 @@ class AppGuideTest {
             AppGuideSettings(store)
         } } }
         compose.onNodeWithTag("appGuideReplay").performClick()
+        compose.onNodeWithText(GuideSection.HOME.title).performClick()
         repeat(GuideSection.entries.size) { compose.onNodeWithTag("appGuideNext").performClick() }
         assertTrue(store.visits.isEmpty())
         assertEquals(GuideSection.entries.toSet(), store.seenTips)
