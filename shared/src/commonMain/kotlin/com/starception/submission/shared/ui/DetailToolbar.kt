@@ -16,6 +16,8 @@
 
 package com.starception.submission.shared.ui
 
+import com.starception.submission.settings.components.GuideSection
+import com.starception.submission.settings.components.appGuideAnchor
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
@@ -255,7 +257,9 @@ private fun MaterialDetailToolbar(
                     IconButton(
                         onClick = action.onClick,
                         modifier = (if (action.id == "reciter") Modifier.width(112.dp).height(44.dp)
-                            else Modifier.size(44.dp)).semantics { contentDescription = action.label },
+                            else Modifier.size(44.dp))
+                                    .appGuideAnchor(GuideSection.READING.takeIf { action.id == "tafsir" })
+                                    .semantics { contentDescription = action.label },
                         colors = IconButtonDefaults.iconButtonColors(
                             contentColor = contentColor,
                         ),
@@ -384,7 +388,9 @@ private fun CupertinoDetailToolbar(
                             IconButton(
                                 onClick = action.onClick,
                                 modifier = (if (action.id == "reciter") Modifier.width(if (compactReciter) 64.dp else 112.dp).height(52.dp)
-                                    else Modifier.size(52.dp)).semantics { contentDescription = action.label },
+                                    else Modifier.size(52.dp))
+                                    .appGuideAnchor(GuideSection.READING.takeIf { action.id == "tafsir" })
+                                    .semantics { contentDescription = action.label },
                             ) {
                                 action.icon?.let { icon ->
                                     Icon(
