@@ -137,9 +137,20 @@ struct FamilyView: View {
             }
             .overlay(alignment: .bottom) {
                 if store.signedIn {
-                    FamilyFeatureBar(directory: directory, unread: store.unreadCount,
-                        contacts: { directory = true; invitations = false }, chats: { directory = false; invitations = false },
-                        invite: { inviting = true }, alerts: { inbox = true; store.acknowledgeNotifications() }, settings: { settings = true })
+                    VStack(spacing: 8) {
+                        if showGuideTip && store.chatPeer == nil && store.call == nil {
+                            inviteGuideTip
+                        }
+                        FamilyFeatureBar(
+                            directory: directory, unread: store.unreadCount,
+                            contacts: { directory = true; invitations = false },
+                            chats: { directory = false; invitations = false },
+                            invite: { showGuideTip = false; inviting = true },
+                            alerts: { inbox = true; store.acknowledgeNotifications() },
+                            settings: { settings = true },
+                            highlightInvite: showGuideTip && store.chatPeer == nil && store.call == nil
+                        )
+                    }
                 }
             }
         }
@@ -162,37 +173,11 @@ struct FamilyView: View {
         .sheet(isPresented: $inbox) { notificationInbox }
         .sheet(isPresented: $settings) { familySettings }
         .refreshable { store.refresh() }
-        .overlay(alignment: .bottom) {
-            if showGuideTip && store.chatPeer == nil && store.call == nil {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "heart").foregroundStyle(colors.accent)
-                        .frame(width: 36, height: 36).background(colors.field, in: RoundedRectangle(cornerRadius: 12))
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Family").font(.subheadline.weight(.semibold))
-                        Text("Accept a family invitation before starting a chat or call.")
-                            .font(.subheadline).fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 0)
-                    Button { showGuideTip = false } label: {
-                        Image(systemName: "xmark").frame(width: 44, height: 44)
-                    }.accessibilityLabel("Dismiss tip")
-                }
-                .padding(14).foregroundStyle(colors.ink).tint(colors.accent)
-                .background(colors.panel, in: RoundedRectangle(cornerRadius: 20))
-                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(colors.muted.opacity(0.24)))
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
-                .frame(maxWidth: 460).padding(.horizontal, 16).padding(.bottom, 96)
-            }
-        }
         .onDisappear { showGuideTip = false }
         .onChange(of: store.call?.id) { _ in showGuideTip = false }
         .onAppear {
-            let defaults = UserDefaults.standard
-            let firstVisit = !defaults.bool(forKey: "deenly_guide_visited_FAMILY")
-            defaults.set(true, forKey: "deenly_guide_visited_FAMILY")
-            let enabled = defaults.object(forKey: "deenly_guide_tips_enabled") == nil || defaults.bool(forKey: "deenly_guide_tips_enabled")
-            showGuideTip = firstVisit && !defaults.bool(forKey: "deenly_guide_tip_seen_FAMILY") && enabled && store.call == nil
-            if showGuideTip { defaults.set(true, forKey: "deenly_guide_tip_seen_FAMILY") }
+            UserDefaults.standard.set(true, forKey: "deenly_guide_visited_FAMILY")
+            showInviteGuideIfNeeded()
             suggestPeer(); NativeAppearanceBridge.shared.update(owner: 7, lightIcons: store.signedIn || colorScheme == .dark)
         }
         .onChange(of: colorScheme) { _ in NativeAppearanceBridge.shared.update(owner: 7, lightIcons: store.signedIn || colorScheme == .dark) }
@@ -200,6 +185,7 @@ struct FamilyView: View {
         .onChange(of: store.signedIn) { connected in
             NativeAppearanceBridge.shared.update(owner: 7, lightIcons: connected || colorScheme == .dark)
             if connected { password = ""; confirmation = ""; creatingAccount = false }
+            showInviteGuideIfNeeded()
         }
         .sheet(isPresented: $inviting) { invitationSheet }
         .navigationDestination(isPresented: Binding(get: { selected != nil }, set: { if !$0 { selected = nil } })) {
@@ -213,6 +199,35 @@ struct FamilyView: View {
             if let member = removing { Button("Remove", role: .destructive) { store.removeMember(member.jid); removing = nil } }
         } message: { Text("Removing this member also deletes your shared chat history. You’ll need a new accepted invitation to connect again.") }
     }
+    private func showInviteGuideIfNeeded() {
+        let defaults = UserDefaults.standard
+        let enabled = defaults.object(forKey: "deenly_guide_tips_enabled") == nil || defaults.bool(forKey: "deenly_guide_tips_enabled")
+        showGuideTip = store.signedIn && store.call == nil && store.chatPeer == nil &&
+            enabled && !defaults.bool(forKey: "deenly_guide_tip_seen_FAMILY")
+        if showGuideTip { defaults.set(true, forKey: "deenly_guide_tip_seen_FAMILY") }
+    }
+
+    private var inviteGuideTip: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "heart").foregroundStyle(colors.accent)
+                .frame(width: 36, height: 36).background(colors.field, in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Family").font(.subheadline.weight(.semibold))
+                Text("Tap + to invite a family member. You can chat or call after they accept.")
+                    .font(.subheadline).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button { showGuideTip = false } label: {
+                Image(systemName: "xmark").frame(width: 44, height: 44)
+            }.accessibilityLabel("Dismiss tip")
+        }
+        .padding(14).foregroundStyle(colors.ink).tint(colors.accent)
+        .background(colors.panel, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(colors.muted.opacity(0.24)))
+        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+        .frame(maxWidth: 460).padding(.horizontal, 16)
+    }
+
     private var contactHeader: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
@@ -1298,6 +1313,8 @@ private struct FamilyFeatureBar: View {
     let invite: () -> Void
     let alerts: () -> Void
     let settings: () -> Void
+    var highlightInvite = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var appearance = FamilyAppearance.shared
     private var colors: FamilyColors { appearance.palette(dark: colorScheme == .dark) }
@@ -1318,11 +1335,41 @@ private struct FamilyFeatureBar: View {
             Button(action: invite) {
                 Image(systemName: "plus").font(.system(size: 26, weight: .medium)).foregroundStyle(colors.onTertiary)
                     .frame(width: 64, height: 64).background(colors.tertiary, in: Circle())
-            }.accessibilityLabel("Invite a member")
+            }
+            .accessibilityLabel("Invite a member")
+            .overlay {
+                if highlightInvite {
+                    ZStack {
+                        Circle().strokeBorder(colors.accent.opacity(0.84), lineWidth: 1.5)
+                            .padding(-3)
+                        if !reduceMotion {
+                            FamilyInviteRipple(color: colors.accent)
+                        }
+                    }
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
+            }
         }.frame(maxWidth: .infinity).background(colors.panel.ignoresSafeArea(edges: .bottom))
     }
     private func barButton(_ symbol: String, title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: symbol).font(.system(size: 22)).foregroundStyle(colors.accent.opacity(active ? 1 : 0.4)).frame(width: 44, height: 44) }
             .accessibilityLabel(title)
+    }
+}
+
+
+private struct FamilyInviteRipple: View {
+    let color: Color
+    @State private var expanded = false
+
+    var body: some View {
+        Circle().strokeBorder(color, lineWidth: 1.5)
+            .padding(-3)
+            .scaleEffect(expanded ? 1.28 : 1)
+            .opacity(expanded ? 0 : 0.36)
+            .task {
+                withAnimation(.easeOut(duration: 0.95)) { expanded = true }
+            }
     }
 }

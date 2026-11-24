@@ -86,6 +86,8 @@ import com.starception.submission.settings.components.ReciterStorageSection
 import com.starception.submission.settings.components.DeveloperSettingsSection
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
+import com.starception.submission.settings.components.GuideSection
+import com.starception.submission.settings.components.appGuideAnchor
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
 import com.starception.submission.settings.components.TtsSettingsSection
@@ -276,14 +278,13 @@ fun UnifiedSettingsScreen(
                         )
                     }
 
-                    item { com.starception.submission.settings.components.AppGuideSettings() }
-
                     item { SettingsGroupLabel("Prayer & personalization") }
 
                     // Appearance Section
                     item {
                         SettingsSection(
                             title = "Appearance",
+                            modifier = Modifier.appGuideAnchor(GuideSection.SETTINGS),
                             subtitle = "Curated themes & display mode",
                             iconGlyph = FlaticonIcons.APPEARANCE,
                             isExpanded = expandedSections.contains("appearance"),

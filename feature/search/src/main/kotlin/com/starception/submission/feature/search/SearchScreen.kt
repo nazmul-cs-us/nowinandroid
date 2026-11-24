@@ -16,6 +16,8 @@
 
 package com.starception.submission.feature.search
 
+import com.starception.submission.settings.components.GuideSection
+import com.starception.submission.settings.components.appGuideAnchor
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -918,6 +920,7 @@ private fun SearchTextField(
                     false
                 }
             }
+            .appGuideAnchor(GuideSection.SEARCH)
             .testTag("searchTextField"),
         shape = RoundedCornerShape(32.dp),
         value = searchQuery,

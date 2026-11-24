@@ -17,7 +17,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLooper
@@ -28,16 +27,6 @@ import java.util.concurrent.TimeUnit
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AppGuideTest {
     @get:Rule val compose = createComposeRule()
-    @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
-    private fun setGuideContent(content: @Composable () -> Unit) {
-        compose.setContent {
-            CompositionLocalProvider(androidx.compose.ui.platform.LocalInspectionMode provides true) {
-                org.jetbrains.compose.resources.PreviewContextConfigurationEffect()
-            }
-            content()
-        }
-    }
-
     private class Store : AppGuideStore {
         val visits = mutableSetOf<GuideSection>()
         val seenTips = mutableSetOf<GuideSection>()
@@ -63,10 +52,10 @@ class AppGuideTest {
         val store = Store()
         var section by mutableStateOf(GuideSection.HOME)
         var taps = 0
-        setGuideContent { MaterialTheme { Surface(Modifier.fillMaxSize()) {
+        compose.setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) {
             Column(Modifier.padding(24.dp)) {
                 Text("Home", style = MaterialTheme.typography.headlineLarge)
-                Button(onClick = { taps++ }) { Text("Use the page") }
+                Button(modifier = Modifier.appGuideAnchor(section), onClick = { taps++ }) { Text("Use the page") }
             }
             AppGuideHost(section, store = store)
         } } }
@@ -89,7 +78,7 @@ class AppGuideTest {
     @Test fun tipSitsAboveItsControlAndLeavesTheControlTappable() {
         val store = Store()
         var taps = 0
-        setGuideContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
             Button(modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
                 .appGuideAnchor(GuideSection.SAVED), onClick = { taps++ }) { Text("Open Saved") }
             AppGuideHost(GuideSection.SAVED, store = store)
@@ -103,89 +92,45 @@ class AppGuideTest {
         assertEquals(1, taps)
     }
 
-    @Test fun tipOpensItsOwnInstructionsAndCanSwitchTopics() {
+    @Test fun waitsForTheControlBeforeShowingTheTip() {
         val store = Store()
-        setGuideContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
-            AppGuideHost(GuideSection.SAVED, store = store)
+        var showControl by mutableStateOf(false)
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+            if (showControl) Button(
+                modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).appGuideAnchor(GuideSection.SEARCH),
+                onClick = {},
+            ) { Text("Search") }
+            AppGuideHost(GuideSection.SEARCH, store = store)
         } } }
+        ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
+        compose.onNodeWithTag("appGuideTip").assertDoesNotExist()
+        assertFalse(store.tipSeen(GuideSection.SEARCH))
+        compose.runOnIdle { showControl = true }
         waitForTip()
-        compose.onNodeWithText("Show steps").performClick()
-        compose.onNodeWithText(GuideSection.SAVED.steps.first()).assertIsDisplayed()
-        compose.onNodeWithTag("appGuideBack").performClick()
-        compose.onNodeWithText(GuideSection.FAMILY.title).performScrollTo().performClick()
-        compose.onNodeWithText(GuideSection.FAMILY.steps.first()).assertIsDisplayed()
-        compose.onNodeWithTag("appGuideSkip").performClick()
-        assertEquals(setOf(GuideSection.SAVED), store.visits)
+        compose.onNodeWithTag("appGuideTip").assertIsDisplayed()
+        compose.onNodeWithText("Show steps").assertDoesNotExist()
+        compose.runOnIdle { showControl = false }
+        compose.onNodeWithTag("appGuideTip").assertDoesNotExist()
     }
 
-    @Test fun replayPrioritizesUnvisitedSectionsWithoutInventingVisits() {
-        val store = Store().apply { visits += GuideSection.HOME; visits += GuideSection.SETTINGS; tips = false }
-        setGuideContent { MaterialTheme(colorScheme = darkColorScheme()) { AppGuideSettings(store) } }
-        compose.onNodeWithTag("appGuideReplay").performClick()
-        compose.onNodeWithTag("appGuideTour").captureRoboImage("src/testDemo/screenshots/app_guide_topics.png")
-        compose.onNodeWithText(GuideSection.READING.title).assertIsDisplayed()
-        compose.onNodeWithText(GuideSection.READING.title).performClick()
-        compose.onNodeWithText(GuideSection.READING.steps.first()).assertIsDisplayed()
-        compose.onNodeWithTag("appGuideBack").assertIsEnabled()
-        compose.onNodeWithTag("appGuideTour").captureRoboImage("src/testDemo/screenshots/app_guide_tour_dark.png")
-        repeat(GuideSection.entries.size) { compose.onNodeWithTag("appGuideNext").assertIsDisplayed().performClick() }
-        compose.onNodeWithTag("appGuideTour").assertDoesNotExist()
-        assertEquals(setOf(GuideSection.HOME, GuideSection.SETTINGS), store.visits)
-        compose.onNodeWithTag("appGuideReplay").performClick()
-        compose.onNodeWithTag("appGuideSkip").performClick()
-        compose.onNodeWithTag("appGuideTour").assertDoesNotExist()
-    }
-
-    @Test @Config(qualifiers = "w640dp-h360dp-land-mdpi")
-    fun largeTextLandscapeKeepsTourNavigationVisible() {
-        RuntimeEnvironment.setFontScale(1.5f)
-        setGuideContent { MaterialTheme { AppGuideSettings(Store()) } }
-        compose.onNodeWithTag("appGuideReplay").assertIsDisplayed().performClick()
-        compose.onNodeWithText(GuideSection.HOME.title).performClick()
-        compose.onNodeWithTag("appGuideNext").assertIsDisplayed()
-        compose.onNodeWithTag("appGuideSkip").assertIsDisplayed()
-        compose.onNodeWithTag("appGuideTour").captureRoboImage("src/testDemo/screenshots/app_guide_tour_landscape.png")
-        compose.onNodeWithTag("appGuideNext").performClick()
-        compose.onNodeWithTag("appGuideBack").assertIsEnabled().performClick()
-        compose.onNodeWithTag("appGuideSkip").performClick()
-    }
-
-    @Test fun disabledTipsStillAllowReplayAndTrackRealVisits() {
+    @Test fun existingOptOutStillPreventsTips() {
         val store = Store().apply { tips = false }
-        setGuideContent { MaterialTheme { Column { AppGuideHost(GuideSection.SEARCH, store = store); AppGuideSettings(store) } } }
-        compose.waitForIdle()
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+            Box(Modifier.size(48.dp).appGuideAnchor(GuideSection.SEARCH))
+            AppGuideHost(GuideSection.SEARCH, store = store)
+        } } }
         ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
         compose.onNodeWithTag("appGuideTip").assertDoesNotExist()
         assertTrue(store.visited(GuideSection.SEARCH))
-        compose.onNodeWithTag("appGuideTipsSwitch").performClick()
-        assertTrue(store.tips)
-        compose.onNodeWithTag("appGuideReplay").performClick()
-        compose.onNodeWithTag("appGuideTour").assertIsDisplayed()
-    }
-
-    @Test fun aReplayedTipIsNotRepeatedOnTheFirstActualVisit() {
-        val store = Store()
-        var section by mutableStateOf<GuideSection?>(null)
-        setGuideContent { MaterialTheme { Column {
-            AppGuideHost(section, store = store)
-            AppGuideSettings(store)
-        } } }
-        compose.onNodeWithTag("appGuideReplay").performClick()
-        compose.onNodeWithText(GuideSection.HOME.title).performClick()
-        repeat(GuideSection.entries.size) { compose.onNodeWithTag("appGuideNext").performClick() }
-        assertTrue(store.visits.isEmpty())
-        assertEquals(GuideSection.entries.toSet(), store.seenTips)
-        compose.runOnIdle { section = GuideSection.SEARCH }
-        compose.waitForIdle()
-        ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
-        compose.onNodeWithTag("appGuideTip").assertDoesNotExist()
-        assertEquals(setOf(GuideSection.SEARCH), store.visits)
     }
 
     @Test fun inactiveScreensAreNotCountedAsVisits() {
         val store = Store()
         var enabled by mutableStateOf(false)
-        setGuideContent { MaterialTheme { AppGuideHost(GuideSection.HOME, enabled, store) } }
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+            Box(Modifier.size(48.dp).appGuideAnchor(GuideSection.HOME))
+            AppGuideHost(GuideSection.HOME, enabled, store)
+        } } }
         compose.waitForIdle()
         assertTrue(store.visits.isEmpty())
         compose.runOnIdle { enabled = true }
@@ -195,10 +140,12 @@ class AppGuideTest {
 
     @Test fun nestedSectionsNeverStackMultipleTips() {
         val store = Store()
-        setGuideContent { MaterialTheme {
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+            Box(Modifier.size(48.dp).appGuideAnchor(GuideSection.SETTINGS))
+            Box(Modifier.size(48.dp).appGuideAnchor(GuideSection.RECITERS))
             AppGuideHost(GuideSection.SETTINGS, store = store)
             AppGuideHost(GuideSection.RECITERS, store = store)
-        } }
+        } } }
         waitForTip()
         compose.onAllNodesWithTag("appGuideTip").assertCountEquals(1)
         assertEquals(setOf(GuideSection.SETTINGS, GuideSection.RECITERS), store.visits)
@@ -206,7 +153,10 @@ class AppGuideTest {
 
     @Test fun persistedVisitPreventsAnotherTipAfterCompositionRecreation() {
         var generation by mutableIntStateOf(0)
-        setGuideContent { MaterialTheme { key(generation) { AppGuideHost(GuideSection.FAMILY) } } }
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+            Box(Modifier.size(48.dp).appGuideAnchor(GuideSection.FAMILY))
+            key(generation) { AppGuideHost(GuideSection.FAMILY) }
+        } } }
         waitForTip()
         compose.runOnIdle { generation++ }
         compose.waitForIdle()
