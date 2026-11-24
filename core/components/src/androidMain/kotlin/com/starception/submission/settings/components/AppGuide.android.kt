@@ -13,8 +13,8 @@ actual fun rememberAppGuideStore(): AppGuideStore {
         object : AppGuideStore {
             override fun visited(section: GuideSection) = preferences.getBoolean("visited_" + section.name, false)
             override fun visit(section: GuideSection) { preferences.edit().putBoolean("visited_" + section.name, true).apply() }
-            override fun tipSeen(section: GuideSection) = preferences.getBoolean("tip_seen_" + section.name, false)
-            override fun markTipSeen(section: GuideSection) { preferences.edit().putBoolean("tip_seen_" + section.name, true).apply() }
+            override fun tipSeen(section: GuideSection) = preferences.getBoolean("tip_seen_" + (section.tipKey ?: section.name), false)
+            override fun markTipSeen(section: GuideSection) { preferences.edit().putBoolean("tip_seen_" + (section.tipKey ?: section.name), true).apply() }
             override fun tipsEnabled() = preferences.getBoolean("tips_enabled", true)
             override fun setTipsEnabled(enabled: Boolean) { preferences.edit().putBoolean("tips_enabled", enabled).apply() }
         }

@@ -41,8 +41,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 
 /** Stable IDs are also used by the native iOS Family screen. Visits never leave this device. */
-enum class GuideSection(val label: String, val tip: String, val icon: ImageVector) {
-    HOME("Home", "See the next prayer and its time on Home.", Icons.Outlined.Home),
+enum class GuideSection(val label: String, val tip: String, val icon: ImageVector, val tipKey: String? = null) {
+    HOME("Home", "Tap Tune schedule to adjust your prayer times.", Icons.Outlined.Home, tipKey = "HOME_TUNE_SCHEDULE"),
     READING("Reading", "Open Tafsir to see the explanation beside the ayah.", Icons.Outlined.MenuBook),
     SEARCH("Search", "Search by a name, a phrase or a topic.", Icons.Outlined.Search),
     FAMILY("Family", "Accept a family invitation to start a conversation.", Icons.Outlined.FavoriteBorder),

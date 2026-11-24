@@ -16,6 +16,8 @@
 
 package com.starception.submission.shared.ui
 
+import com.starception.submission.settings.components.GuideSection
+import com.starception.submission.settings.components.appGuideAnchor
 import com.starception.submission.feature.prayertimes.HomeHeaderDetail
 import com.starception.submission.feature.prayertimes.HomeHeaderDetailKind
 import com.starception.submission.feature.prayertimes.HomeHeaderTypography
@@ -2099,7 +2101,8 @@ private fun PrayerScheduleSection(
                     },
                     modifier = Modifier
                         .widthIn(min = tuneButtonMinWidth)
-                        .heightIn(min = tuneButtonMinHeight),
+                        .heightIn(min = tuneButtonMinHeight)
+                        .appGuideAnchor(GuideSection.HOME.takeUnless { isTuning }),
                 ) {
                 Row(
                     modifier = Modifier.padding(horizontal = if (compact) 5.dp else 6.dp),

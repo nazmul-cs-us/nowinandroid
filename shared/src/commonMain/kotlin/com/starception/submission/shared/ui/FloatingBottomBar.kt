@@ -78,7 +78,7 @@ data class BottomBarItem(
  * implementation backed by the platform key-value store.
  */
 val SharedBottomBarItems = listOf(
-    BottomBarItem("Home", NiaIcons.Home, NiaIcons.HomeBorder, guideSection = GuideSection.HOME),
+    BottomBarItem("Home", NiaIcons.Home, NiaIcons.HomeBorder),
     BottomBarItem("For you", NiaIcons.Upcoming, NiaIcons.UpcomingBorder,
         visible = com.starception.submission.family.FamilyRollout.showForYou()),
     BottomBarItem("Saved", NiaIcons.Bookmarks, NiaIcons.BookmarksBorder, guideSection = GuideSection.SAVED),

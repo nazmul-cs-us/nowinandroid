@@ -60,8 +60,6 @@ import com.starception.submission.settings.components.PrayerFocusGuide
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SalahTrainingSection
-import com.starception.submission.settings.components.GuideSection
-import com.starception.submission.settings.components.appGuideAnchor
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
 import com.starception.submission.shared.settings.VoiceRecognitionMode
@@ -162,7 +160,6 @@ fun PrayerSettingsScreen(
 
                     SettingsSection(
                         title = "Appearance",
-                        modifier = Modifier.appGuideAnchor(GuideSection.SETTINGS),
                         subtitle = "Curated themes & display mode",
                         iconGlyph = FlaticonIcons.APPEARANCE,
                         isExpanded = expanded == SECTION_APPEARANCE,

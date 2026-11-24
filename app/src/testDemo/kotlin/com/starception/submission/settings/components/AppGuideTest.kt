@@ -151,6 +151,21 @@ class AppGuideTest {
         assertEquals(setOf(GuideSection.SETTINGS, GuideSection.RECITERS), store.visits)
     }
 
+    @Test fun existingHomeUsersSeeTheNewTuneScheduleTip() {
+        val preferences = ApplicationProvider.getApplicationContext<Context>()
+            .getSharedPreferences("deenly_app_guide", Context.MODE_PRIVATE)
+        preferences.edit().putBoolean("tip_seen_HOME", true).commit()
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+            Button(onClick = {}, modifier = Modifier.appGuideAnchor(GuideSection.HOME)) {
+                Text("Tune schedule")
+            }
+            AppGuideHost(GuideSection.HOME)
+        } } }
+        waitForTip()
+        compose.onNodeWithText(GuideSection.HOME.tip).assertIsDisplayed()
+        assertTrue(preferences.getBoolean("tip_seen_HOME_TUNE_SCHEDULE", false))
+    }
+
     @Test fun persistedVisitPreventsAnotherTipAfterCompositionRecreation() {
         var generation by mutableIntStateOf(0)
         compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {

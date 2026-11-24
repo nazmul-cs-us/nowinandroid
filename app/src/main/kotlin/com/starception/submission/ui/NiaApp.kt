@@ -325,7 +325,7 @@ fun NiaApp(
             val guideDestination = appState.currentDestination
             val guideSection = when {
                 guideDestination?.hasRoute<com.starception.submission.feature.surah.navigation.SurahRoute>() == true -> com.starception.submission.settings.components.GuideSection.READING
-                guideDestination?.hasRoute<com.starception.submission.settings.navigation.SettingsRoute>() == true -> com.starception.submission.settings.components.GuideSection.SETTINGS
+                guideDestination?.hasRoute<com.starception.submission.settings.navigation.SettingsRoute>() == true -> null
                 guideDestination?.hasRoute<com.starception.submission.feature.search.navigation.SearchRoute>() == true -> com.starception.submission.settings.components.GuideSection.SEARCH
                 selectedDestination == TopLevelDestination.HOME -> com.starception.submission.settings.components.GuideSection.HOME
                 selectedDestination == TopLevelDestination.BOOKMARKS -> com.starception.submission.settings.components.GuideSection.SAVED
@@ -723,7 +723,6 @@ private fun NiaFloatingBottomBar(
                                     indication = null,
                                 ) { appState.navigateToTopLevelDestination(destination) }
                                 .appGuideAnchor(if (!selected) null else when (destination) {
-                                    TopLevelDestination.HOME -> GuideSection.HOME
                                     TopLevelDestination.FAMILY -> GuideSection.FAMILY
                                     TopLevelDestination.BOOKMARKS -> GuideSection.SAVED
                                     else -> null

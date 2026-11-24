@@ -305,7 +305,6 @@ fun SharedNavHost(
     val guideSection = when {
         searchController.active -> com.starception.submission.settings.components.GuideSection.SEARCH
         currentRoute == PrayerTimesRoute::class.qualifiedName -> com.starception.submission.settings.components.GuideSection.HOME
-        currentRoute == PrayerSettingsRoute::class.qualifiedName -> com.starception.submission.settings.components.GuideSection.SETTINGS
         currentRoute == SavedRoute::class.qualifiedName -> com.starception.submission.settings.components.GuideSection.SAVED
         currentRoute == SearchRoute::class.qualifiedName -> com.starception.submission.settings.components.GuideSection.SEARCH
         currentRoute == QuranLibraryRoute::class.qualifiedName || currentRoute?.startsWith(QuranDetailRoute::class.qualifiedName.orEmpty()) == true -> com.starception.submission.settings.components.GuideSection.READING
