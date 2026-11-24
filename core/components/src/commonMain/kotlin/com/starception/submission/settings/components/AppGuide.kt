@@ -43,9 +43,11 @@ import kotlinx.coroutines.delay
 /** Stable IDs are also used by the native iOS Family screen. Visits never leave this device. */
 enum class GuideSection(val label: String, val tip: String, val icon: ImageVector, val tipKey: String? = null) {
     HOME("Home", "Tap Search to find a surah, hadith, or dua.", Icons.Outlined.Search, tipKey = "HOME_SEARCH"),
+    PRAYER_SCHEDULE("Prayer times", "Tap Tune schedule to adjust prayer times for your location.", Icons.Outlined.Tune),
+    BOOKMARK("Reading", "Tap the bookmark to find this surah later in Saved.", Icons.Outlined.BookmarkBorder),
     READING("Reading", "Open Tafsir to see the explanation beside the ayah.", Icons.Outlined.MenuBook),
     SEARCH("Search", "Search by a name, a phrase or a topic.", Icons.Outlined.Search),
-    FAMILY("Family", "Accept a family invitation to start a conversation.", Icons.Outlined.FavoriteBorder),
+    FAMILY("Family", "Tap + to invite a family member. You can chat or call after they accept.", Icons.Outlined.FavoriteBorder, tipKey = "FAMILY_INVITE"),
     SAVED("Saved", "Tap the bookmark while reading. Find the surah here later.", Icons.Outlined.BookmarkBorder),
     RECITERS("Reciters", "Search by name, then tap Play to preview a reciter.", Icons.Outlined.Headphones),
     SETTINGS("Settings", "Tap Settings to change your theme, prayer preferences, or downloads.", Icons.Outlined.Settings, tipKey = "HOME_SETTINGS"),
@@ -108,13 +110,20 @@ fun AppGuideHost(section: GuideSection?, enabled: Boolean = true, store: AppGuid
     val allowed = enabled && LocalAppGuideEnabled.current
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val resumed = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    val tipSection = remember(section, allowed, resumed, store) {
-        if (section == GuideSection.HOME && store.tipSeen(GuideSection.HOME)) GuideSection.SETTINGS
-        else section
+    val remainingTips = remember(section, allowed, resumed, store) {
+        when (section) {
+            GuideSection.HOME -> listOf(GuideSection.HOME, GuideSection.SETTINGS, GuideSection.PRAYER_SCHEDULE)
+            GuideSection.READING -> listOf(GuideSection.READING, GuideSection.BOOKMARK)
+            else -> listOfNotNull(section)
+        }.filterNot(store::tipSeen)
+    }
+    var presented by remember(section, allowed, resumed) { mutableStateOf<GuideSection?>(null) }
+    val tipSection = presented ?: remainingTips.firstOrNull { candidate ->
+        guideAnchors.values.any { it.first == candidate && !it.second.isEmpty }
     }
     val anchor = guideAnchors.values.lastOrNull { it.first == tipSection && !it.second.isEmpty }?.second
     val hasAnchor = anchor != null
-    var tip by remember(section) { mutableStateOf<GuideSection?>(null) }
+    var tip by remember(section, allowed, resumed) { mutableStateOf<GuideSection?>(null) }
     LaunchedEffect(section, allowed, resumed) {
         if (section != null && allowed && resumed) store.visit(section)
     }
@@ -122,6 +131,7 @@ fun AppGuideHost(section: GuideSection?, enabled: Boolean = true, store: AppGuid
         tip = null
         if (tipSection != null && allowed && resumed && hasAnchor && !store.tipSeen(tipSection) && store.tipsEnabled()) {
             delay(650)
+            presented = tipSection
             GuidePresentation.activeTip = tipSection
             tip = tipSection
         }

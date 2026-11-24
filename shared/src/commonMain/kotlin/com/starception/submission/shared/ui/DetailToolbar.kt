@@ -258,7 +258,11 @@ private fun MaterialDetailToolbar(
                         onClick = action.onClick,
                         modifier = (if (action.id == "reciter") Modifier.width(112.dp).height(44.dp)
                             else Modifier.size(44.dp))
-                                    .appGuideAnchor(GuideSection.READING.takeIf { action.id == "tafsir" })
+                                    .appGuideAnchor(when {
+                                        action.id == "tafsir" -> GuideSection.READING
+                                        inlineActions.any { it.id == "tafsir" } && action.id == "bookmark" && !action.selected -> GuideSection.BOOKMARK
+                                        else -> null
+                                    })
                                     .semantics { contentDescription = action.label },
                         colors = IconButtonDefaults.iconButtonColors(
                             contentColor = contentColor,
@@ -389,7 +393,11 @@ private fun CupertinoDetailToolbar(
                                 onClick = action.onClick,
                                 modifier = (if (action.id == "reciter") Modifier.width(if (compactReciter) 64.dp else 112.dp).height(52.dp)
                                     else Modifier.size(52.dp))
-                                    .appGuideAnchor(GuideSection.READING.takeIf { action.id == "tafsir" })
+                                    .appGuideAnchor(when {
+                                        action.id == "tafsir" -> GuideSection.READING
+                                        inlineActions.any { it.id == "tafsir" } && action.id == "bookmark" && !action.selected -> GuideSection.BOOKMARK
+                                        else -> null
+                                    })
                                     .semantics { contentDescription = action.label },
                             ) {
                                 action.icon?.let { icon ->

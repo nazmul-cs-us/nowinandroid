@@ -176,6 +176,20 @@ class AppGuideTest {
         compose.onNodeWithText(GuideSection.SETTINGS.tip).assertIsDisplayed()
     }
 
+    @Test fun readerGuidesBookmarkWhenTafsirControlIsUnavailable() {
+        val store = Store()
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+            Button(onClick = {}, modifier = Modifier.appGuideAnchor(GuideSection.BOOKMARK)) {
+                Text("Add bookmark")
+            }
+            AppGuideHost(GuideSection.READING, store = store)
+        } } }
+        waitForTip()
+        compose.onNodeWithText(GuideSection.BOOKMARK.tip).assertIsDisplayed()
+        assertTrue(store.tipSeen(GuideSection.BOOKMARK))
+        assertFalse(store.tipSeen(GuideSection.READING))
+    }
+
     @Test fun persistedVisitPreventsAnotherTipAfterCompositionRecreation() {
         var generation by mutableIntStateOf(0)
         compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {

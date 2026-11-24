@@ -419,6 +419,7 @@ private fun FamilyScreenBody(
     if (signedIn) FamilyBottomBar(directory, state.unreadCount,
         contacts = { directory = true; invitations = false }, chats = { directory = false; invitations = false },
         invite = { inviting = true }, alerts = { inbox = true; actions.acknowledgeNotifications() }, settings = { settings = true },
+        guideInvite = !inviting && !inbox && !settings && selected == null && state.chatPeer == null,
         modifier = Modifier.align(Alignment.BottomCenter))
     }
     if (settings) {

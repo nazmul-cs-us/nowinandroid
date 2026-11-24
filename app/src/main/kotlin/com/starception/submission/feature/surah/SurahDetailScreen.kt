@@ -2461,7 +2461,10 @@ internal fun AlbumPlayerTopBar(
                     Text(translationDisplay, style = MaterialTheme.typography.labelMedium,
                         color = contentColor, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
-                IconButton(onClick = onBookmarkClick, modifier = Modifier.size(48.dp)) {
+                IconButton(
+                    onClick = onBookmarkClick,
+                    modifier = Modifier.size(48.dp).appGuideAnchor(GuideSection.BOOKMARK.takeUnless { isBookmarked }),
+                ) {
                     Icon(
                         imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
                         contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",

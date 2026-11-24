@@ -1,5 +1,7 @@
 package com.starception.submission.family
 
+import com.starception.submission.settings.components.GuideSection
+import com.starception.submission.settings.components.appGuideAnchor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -71,7 +73,9 @@ internal fun FamilyDesign(referenceColors: Boolean = true, content: @Composable 
 @Composable
 internal fun FamilyBottomBar(directory: Boolean, unread: Int, contacts: () -> Unit, chats: () -> Unit,
     invite: () -> Unit, alerts: () -> Unit, settings: () -> Unit, modifier: Modifier = Modifier,
-    navigationInsets: WindowInsets = WindowInsets.navigationBars) {
+    navigationInsets: WindowInsets = WindowInsets.navigationBars,
+    guideInvite: Boolean = false,
+) {
     val colors = MaterialTheme.colorScheme
     Box(modifier.fillMaxWidth()) {
         Column {
@@ -104,7 +108,7 @@ internal fun FamilyBottomBar(directory: Boolean, unread: Int, contacts: () -> Un
         }
         }
         Box(Modifier.align(Alignment.TopCenter).size(76.dp).background(colors.surface, CircleShape).padding(7.dp)) {
-        FilledIconButton(onClick = invite, modifier = Modifier.fillMaxSize(),
+        FilledIconButton(onClick = invite, modifier = Modifier.fillMaxSize().appGuideAnchor(GuideSection.FAMILY.takeIf { guideInvite }),
             colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.tertiaryContainer, contentColor = colors.onTertiaryContainer)) {
             Icon(Icons.Default.Add, "Invite a member", Modifier.size(27.dp))
         }

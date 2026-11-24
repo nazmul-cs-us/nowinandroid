@@ -2103,7 +2103,8 @@ private fun PrayerScheduleSection(
                     },
                     modifier = Modifier
                         .widthIn(min = tuneButtonMinWidth)
-                        .heightIn(min = tuneButtonMinHeight),
+                        .heightIn(min = tuneButtonMinHeight)
+                        .appGuideAnchor(GuideSection.PRAYER_SCHEDULE.takeUnless { isTuning }),
                 ) {
                 Row(
                     modifier = Modifier.padding(horizontal = if (compact) 5.dp else 6.dp),

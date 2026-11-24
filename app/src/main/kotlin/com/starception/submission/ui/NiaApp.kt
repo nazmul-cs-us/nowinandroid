@@ -723,7 +723,6 @@ private fun NiaFloatingBottomBar(
                                     indication = null,
                                 ) { appState.navigateToTopLevelDestination(destination) }
                                 .appGuideAnchor(if (!selected) null else when (destination) {
-                                    TopLevelDestination.FAMILY -> GuideSection.FAMILY
                                     TopLevelDestination.BOOKMARKS -> GuideSection.SAVED
                                     else -> null
                                 })

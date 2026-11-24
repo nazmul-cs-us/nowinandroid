@@ -16,6 +16,8 @@
 
 package com.starception.submission.feature.prayertimes
 
+import com.starception.submission.settings.components.GuideSection
+import com.starception.submission.settings.components.appGuideAnchor
 import com.starception.submission.core.model.deenly.InsightSearchProgress
 import android.Manifest
 import android.content.Context
@@ -5379,7 +5381,8 @@ private fun PrayerHeaderAction(
     Surface(
         modifier = Modifier
             .width(actionWidth)
-            .height(if (compact) 36.dp else 44.dp),
+            .height(if (compact) 36.dp else 44.dp)
+            .appGuideAnchor(GuideSection.PRAYER_SCHEDULE.takeUnless { active }),
         onClick = onClick,
         shape = RoundedCornerShape(50),
         color = containerColor,
