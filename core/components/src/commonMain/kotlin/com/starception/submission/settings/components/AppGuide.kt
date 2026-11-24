@@ -3,9 +3,8 @@ package com.starception.submission.settings.components
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,8 +25,6 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -49,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -132,7 +130,13 @@ private class GuideTipPosition(val target: Rect?, val gap: Int, val bottomInset:
         val x = target?.let { (it.center.x - popupContentSize.width / 2f).roundToInt() } ?: maxX / 2
         val y = target?.let {
             val above = it.top.roundToInt() - gap - popupContentSize.height
-            if (above >= topInset) above else it.bottom.roundToInt() + gap
+            val below = it.bottom.roundToInt() + gap
+            when {
+                above >= topInset -> above
+                below <= maxY -> below
+                topInset - above <= below - maxY -> topInset
+                else -> maxY
+            }
         } ?: maxY
         return IntOffset(x.coerceIn(0, maxX), y.coerceIn(topInset.coerceAtMost(maxY), maxY))
     }
@@ -191,7 +195,6 @@ fun AppGuideHost(section: GuideSection?, enabled: Boolean = true, store: AppGuid
             }
             onDrawBehind {
                 if (opening != null) {
-                    clipPath(opening, ClipOp.Difference) { drawRect(colors.scrim.copy(alpha = .32f)) }
                     drawPath(opening, colors.primary.copy(alpha = .8f), style = Stroke(1.5.dp.toPx()))
                 }
             }
@@ -286,11 +289,13 @@ private fun AppGuideTour(store: AppGuideStore, initial: GuideSection? = null, on
     LaunchedEffect(topic) { topic?.let(store::markTipSeen) }
     DisposableEffect(Unit) { GuidePresentation.tourOpen = true; onDispose { GuidePresentation.tourOpen = false } }
     Dialog(onDismissRequest = { if (topic == null) onClose() else selected = null }, properties = artworkDialogProperties()) {
-        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp),
+        BoxWithConstraints(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(
+            MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.tertiaryContainer
+        ))).windowInsetsPadding(WindowInsets.safeDrawing),
             contentAlignment = Alignment.Center) {
             val colors = MaterialTheme.colorScheme
-            Surface(Modifier.widthIn(max = 540.dp).fillMaxWidth().heightIn(max = minOf(maxHeight, 680.dp))
-                .testTag("appGuideTour"), shape = RoundedCornerShape(24.dp), color = colors.surface) {
+            Surface(Modifier.widthIn(max = 580.dp).fillMaxSize()
+                .testTag("appGuideTour").semantics { paneTitle = "App guide" }, color = Color.Transparent) {
                 Column {
                     Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically) {
@@ -303,27 +308,34 @@ private fun AppGuideTour(store: AppGuideStore, initial: GuideSection? = null, on
                             Icon(Icons.Outlined.Close, "Close guide")
                         }
                     }
-                    HorizontalDivider(color = colors.outlineVariant)
-                    AnimatedContent(targetState = topic, modifier = Modifier.weight(1f, fill = false),
+                    AnimatedContent(targetState = topic, modifier = Modifier.weight(1f),
                         transitionSpec = {
-                            (fadeIn() + scaleIn(initialScale = .96f)) togetherWith
-                                (fadeOut() + scaleOut(targetScale = 1.02f))
+                            fadeIn() togetherWith fadeOut()
                         }, label = "Guide topic") { page ->
-                        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                            if (page == null) Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                val rows = listOf(topics.take(1)) + topics.drop(1).chunked(2)
-                                rows.forEach { row ->
-                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        row.forEach { item ->
-                                            Surface(onClick = { selected = item }, modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(16.dp)) {
-                                                GuideArtwork(item, Modifier.fillMaxWidth().heightIn(min = if (row.size == 1) 132.dp else 108.dp))
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                            verticalArrangement = if (page == null) Arrangement.Center else Arrangement.Top) {
+                            if (page == null) {
+                                Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    val featured = topics.first()
+                                    Surface(onClick = { selected = featured }, shape = RoundedCornerShape(26.dp),
+                                        shadowElevation = 6.dp) {
+                                        GuideArtwork(featured, Modifier.widthIn(max = 280.dp).fillMaxWidth().heightIn(min = 220.dp))
+                                    }
+                                    Row(
+                                        Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        topics.drop(1).forEach { item ->
+                                            Surface(onClick = { selected = item }, shape = RoundedCornerShape(18.dp)) {
+                                                GuideArtwork(item, Modifier.width(144.dp).heightIn(min = 144.dp))
                                             }
                                         }
                                     }
                                 }
                             } else {
-                                GuideArtwork(page, Modifier.fillMaxWidth().heightIn(min = if (this@BoxWithConstraints.maxHeight < 400.dp) 76.dp else 180.dp))
+                                GuideArtwork(page, Modifier.fillMaxWidth().heightIn(min = if (this@BoxWithConstraints.maxHeight < 400.dp) 76.dp else 240.dp))
                                 Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                                     verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                     page.steps.forEachIndexed { index, instruction ->
