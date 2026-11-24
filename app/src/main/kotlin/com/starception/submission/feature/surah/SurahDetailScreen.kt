@@ -16,6 +16,8 @@
 
 package com.starception.submission.feature.surah
 
+import com.starception.submission.settings.components.appGuideAnchor
+import com.starception.submission.settings.components.GuideSection
 import androidx.compose.foundation.horizontalScroll
 
 import com.starception.submission.feature.quran.BengaliIbnKathir
@@ -2469,7 +2471,7 @@ internal fun AlbumPlayerTopBar(
                 IconToggleButton(
                     checked = isTafsirVisible,
                     onCheckedChange = { onTafsirClick?.invoke() }, enabled = onTafsirClick != null,
-                    modifier = Modifier.size(48.dp).semantics {
+                    modifier = Modifier.size(48.dp).appGuideAnchor(GuideSection.READING).semantics {
                         contentDescription = if (isTafsirVisible) "Hide tafsir" else "Tafsir"
                         stateDescription = if (isTafsirVisible) "Shown" else "Hidden"
                     },

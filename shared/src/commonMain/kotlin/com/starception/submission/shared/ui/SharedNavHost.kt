@@ -311,7 +311,6 @@ fun SharedNavHost(
         currentRoute == QuranLibraryRoute::class.qualifiedName || currentRoute?.startsWith(QuranDetailRoute::class.qualifiedName.orEmpty()) == true -> com.starception.submission.settings.components.GuideSection.READING
         else -> null
     }
-    com.starception.submission.settings.components.AppGuideHost(guideSection)
     val ownsSyncContainer = currentRoute in tabRouteNames ||
         currentRoute == PrayerSettingsRoute::class.qualifiedName
     val detailMediaBar = if (ownsSyncContainer) {
@@ -753,6 +752,7 @@ fun SharedNavHost(
 
         // The shared search surface floats above every destination.
         SharedSearchOverlay(searchController)
+        com.starception.submission.settings.components.AppGuideHost(guideSection, modifier = Modifier.matchParentSize())
     }
 }
 

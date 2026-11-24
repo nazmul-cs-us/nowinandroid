@@ -61,6 +61,7 @@ class AppGuideTest {
             AppGuideHost(section, store = store)
         } } }
         waitForTip()
+        compose.onAllNodes(isPopup()).assertCountEquals(0)
         compose.onNodeWithTag("appGuideTip").assertIsDisplayed()
         compose.onNodeWithText("Use the page").performClick()
         assertEquals(1, taps)
@@ -73,6 +74,22 @@ class AppGuideTest {
         ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
         compose.onNodeWithTag("appGuideTip").assertDoesNotExist()
         assertEquals(setOf(GuideSection.HOME, GuideSection.SAVED), store.visits)
+    }
+
+    @Test fun tipSitsAboveItsControlAndLeavesTheControlTappable() {
+        val store = Store()
+        var taps = 0
+        compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
+            Button(modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+                .appGuideAnchor(GuideSection.SAVED), onClick = { taps++ }) { Text("Open Saved") }
+            AppGuideHost(GuideSection.SAVED, store = store)
+        } } }
+        waitForTip()
+        val control = compose.onNodeWithText("Open Saved")
+        val tip = compose.onNodeWithTag("appGuideTip").fetchSemanticsNode().boundsInRoot
+        assertTrue(tip.bottom <= control.fetchSemanticsNode().boundsInRoot.top)
+        control.performTouchInput { click() }
+        assertEquals(1, taps)
     }
 
     @Test fun replayPrioritizesUnvisitedSectionsWithoutInventingVisits() {

@@ -212,6 +212,8 @@ import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.media.MediaControllerUiState
 import com.starception.submission.navigation.NiaNavHost
+import com.starception.submission.settings.components.appGuideAnchor
+import com.starception.submission.settings.components.GuideSection
 import com.starception.submission.navigation.TopLevelDestination
 import com.starception.submission.navigation.navigateToMediaSourceDetail
 import com.starception.submission.settings.navigation.navigateToSettings
@@ -720,6 +722,12 @@ private fun NiaFloatingBottomBar(
                                     interactionSource = interactionSource,
                                     indication = null,
                                 ) { appState.navigateToTopLevelDestination(destination) }
+                                .appGuideAnchor(if (!selected) null else when (destination) {
+                                    TopLevelDestination.HOME -> GuideSection.HOME
+                                    TopLevelDestination.FAMILY -> GuideSection.FAMILY
+                                    TopLevelDestination.BOOKMARKS -> GuideSection.SAVED
+                                    else -> null
+                                })
                                 .testTag("NiaNavItem")
                                 .then(if (hasUnread) Modifier.notificationDot() else Modifier),
                             contentAlignment = Alignment.Center,

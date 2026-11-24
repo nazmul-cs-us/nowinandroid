@@ -164,23 +164,21 @@ struct FamilyView: View {
         .refreshable { store.refresh() }
         .overlay(alignment: .bottom) {
             if showGuideTip && store.chatPeer == nil && store.call == nil {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Image(systemName: "heart").foregroundStyle(colors.accent)
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "heart").padding(.top, 3)
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("Family").font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Button { showGuideTip = false } label: {
-                            Image(systemName: "xmark").font(.system(size: 14)).frame(width: 40, height: 40)
-                        }.accessibilityLabel("Dismiss tip")
+                        Text("Accept a family invitation before starting a chat or call.")
+                            .font(.subheadline).fixedSize(horizontal: false, vertical: true)
                     }
-                    Text("Accept a family invitation before starting a chat or call.")
-                        .font(.subheadline).foregroundStyle(colors.muted)
-                    HStack { Spacer(); Button("Got it") { showGuideTip = false }.font(.subheadline.weight(.medium)) }
+                    Spacer(minLength: 0)
+                    Button { showGuideTip = false } label: {
+                        Image(systemName: "xmark").frame(width: 44, height: 44)
+                    }.accessibilityLabel("Dismiss tip")
                 }
-                .padding(16).foregroundStyle(colors.ink).tint(colors.accent)
-                .background(colors.panel, in: RoundedRectangle(cornerRadius: 20))
-                .overlay(RoundedRectangle(cornerRadius: 20).stroke(colors.muted.opacity(0.2)))
-                .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+                .padding(14).foregroundStyle(colors.panel).tint(colors.panel)
+                .background(colors.ink, in: RoundedRectangle(cornerRadius: 18))
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
                 .frame(maxWidth: 460).padding(.horizontal, 16).padding(.bottom, 96)
             }
         }
