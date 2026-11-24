@@ -1,6 +1,19 @@
 package com.starception.submission.settings.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import com.starception.submission.core.images.resources.*
+import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.composed
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -243,6 +256,29 @@ fun AppGuideSettings(store: AppGuideStore = rememberAppGuideStore()) {
 }
 
 @Composable
+private fun GuideArtwork(topic: GuideSection, modifier: Modifier = Modifier) {
+    val image = when (topic) {
+        GuideSection.HOME -> Res.drawable.home_cover_prayer_day_portrait
+        GuideSection.READING -> Res.drawable.home_cover_quran_portrait
+        GuideSection.SEARCH -> Res.drawable.home_cover_qibla_portrait
+        GuideSection.FAMILY -> Res.drawable.home_getty_courtyard_night
+        GuideSection.SAVED -> Res.drawable.home_getty_arches_night
+        GuideSection.RECITERS -> Res.drawable.home_cover_prayer_night_portrait
+        GuideSection.SETTINGS -> Res.drawable.home_getty_tiles_day
+    }
+    Box(modifier, contentAlignment = Alignment.BottomStart) {
+        Image(painterResource(image), null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+        Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent,
+            Color.Black.copy(alpha = .84f)))))
+        Column(Modifier.padding(16.dp)) {
+            Text(topic.label, style = MaterialTheme.typography.labelMedium, color = Color.White)
+            Text(topic.title, style = MaterialTheme.typography.titleMedium, color = Color.White,
+                modifier = Modifier.semantics { heading() })
+        }
+    }
+}
+
+@Composable
 private fun AppGuideTour(store: AppGuideStore, initial: GuideSection? = null, onClose: () -> Unit) {
     val topics = remember(store) { GuideSection.entries.sortedBy { store.visited(it) } }
     var selected by rememberSaveable { mutableStateOf(initial) }
@@ -268,28 +304,37 @@ private fun AppGuideTour(store: AppGuideStore, initial: GuideSection? = null, on
                         }
                     }
                     HorizontalDivider(color = colors.outlineVariant)
-                    key(topic) {
-                        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                            if (topic == null) topics.forEach { item ->
-                                ListItem(
-                                    modifier = Modifier.clickable { selected = item },
-                                    leadingContent = { Icon(item.icon, null, tint = colors.primary) },
-                                    overlineContent = { Text(item.label) },
-                                    headlineContent = { Text(item.title) },
-                                    trailingContent = { Icon(Icons.Outlined.ChevronRight, null) },
-                                )
-                            } else Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
-                                verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                                Text(topic.label, style = MaterialTheme.typography.labelLarge, color = colors.primary)
-                                Text(topic.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-                                topic.steps.forEachIndexed { index, instruction ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                        Surface(color = colors.secondaryContainer, shape = RoundedCornerShape(10.dp)) {
-                                            Box(Modifier.sizeIn(minWidth = 32.dp, minHeight = 32.dp), contentAlignment = Alignment.Center) {
-                                                Text((index + 1).toString(), style = MaterialTheme.typography.labelLarge)
+                    AnimatedContent(targetState = topic, modifier = Modifier.weight(1f, fill = false),
+                        transitionSpec = {
+                            (fadeIn() + scaleIn(initialScale = .96f)) togetherWith
+                                (fadeOut() + scaleOut(targetScale = 1.02f))
+                        }, label = "Guide topic") { page ->
+                        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                            if (page == null) Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                val rows = listOf(topics.take(1)) + topics.drop(1).chunked(2)
+                                rows.forEach { row ->
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        row.forEach { item ->
+                                            Surface(onClick = { selected = item }, modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(16.dp)) {
+                                                GuideArtwork(item, Modifier.fillMaxWidth().heightIn(min = if (row.size == 1) 132.dp else 108.dp))
                                             }
                                         }
-                                        Text(instruction, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                                    }
+                                }
+                            } else {
+                                GuideArtwork(page, Modifier.fillMaxWidth().heightIn(min = if (this@BoxWithConstraints.maxHeight < 400.dp) 76.dp else 180.dp))
+                                Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    page.steps.forEachIndexed { index, instruction ->
+                                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                            Surface(color = colors.secondaryContainer, shape = RoundedCornerShape(10.dp)) {
+                                                Box(Modifier.sizeIn(minWidth = 32.dp, minHeight = 32.dp), contentAlignment = Alignment.Center) {
+                                                    Text((index + 1).toString(), style = MaterialTheme.typography.labelLarge)
+                                                }
+                                            }
+                                            Text(instruction, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                                        }
                                     }
                                 }
                             }
