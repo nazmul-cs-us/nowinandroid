@@ -1319,7 +1319,7 @@ private fun PrayerHomeHeader(
                 Text(greeting, style = HomeHeaderTypography.greeting.copy(shadow = headerShadow), color = ink, maxLines = 1)
                 HomeRotatingHeaderText(supportingTexts, style = HomeHeaderTypography.detail.copy(shadow = headerShadow), color = ink.copy(alpha = .86f))
             }
-            AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings)
+            AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings, guideHomeActions = true)
         }
         return
     }
@@ -1388,7 +1388,8 @@ private fun PrayerHomeHeader(
             material = {
                 Surface(
                     onClick = pillSurfaceTap,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                        .appGuideAnchor(GuideSection.HOME.takeUnless { inPlaceListening }),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1451,7 +1452,8 @@ private fun PrayerHomeHeader(
                 // view when the app forces dark mode.
                 Surface(
                     onClick = pillSurfaceTap,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                        .appGuideAnchor(GuideSection.HOME.takeUnless { inPlaceListening }),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1510,7 +1512,7 @@ private fun PrayerHomeHeader(
                 }
             },
         )
-        Box(Modifier.size(48.dp).clip(CircleShape).background(
+        Box(Modifier.size(48.dp).appGuideAnchor(GuideSection.SETTINGS).clip(CircleShape).background(
             if (onArtwork) Color.Black.copy(alpha = 0.32f) else Color.Transparent,
         )) {
             IconTapTarget(
@@ -2101,8 +2103,7 @@ private fun PrayerScheduleSection(
                     },
                     modifier = Modifier
                         .widthIn(min = tuneButtonMinWidth)
-                        .heightIn(min = tuneButtonMinHeight)
-                        .appGuideAnchor(GuideSection.HOME.takeUnless { isTuning }),
+                        .heightIn(min = tuneButtonMinHeight),
                 ) {
                 Row(
                     modifier = Modifier.padding(horizontal = if (compact) 5.dp else 6.dp),

@@ -151,19 +151,29 @@ class AppGuideTest {
         assertEquals(setOf(GuideSection.SETTINGS, GuideSection.RECITERS), store.visits)
     }
 
-    @Test fun existingHomeUsersSeeTheNewTuneScheduleTip() {
+    @Test fun existingHomeUsersSeeTheNewSearchTip() {
         val preferences = ApplicationProvider.getApplicationContext<Context>()
             .getSharedPreferences("deenly_app_guide", Context.MODE_PRIVATE)
-        preferences.edit().putBoolean("tip_seen_HOME", true).commit()
+        preferences.edit().putBoolean("tip_seen_HOME", true).putBoolean("tip_seen_HOME_TUNE_SCHEDULE", true).commit()
+        var section by mutableStateOf<GuideSection?>(GuideSection.HOME)
         compose.setContent { MaterialTheme { Box(Modifier.fillMaxSize()) {
-            Button(onClick = {}, modifier = Modifier.appGuideAnchor(GuideSection.HOME)) {
-                Text("Tune schedule")
-            }
-            AppGuideHost(GuideSection.HOME)
+            com.starception.submission.ui.AppHeaderActions(
+                onDarkArtwork = true,
+                onSearchClick = {},
+                onSettingsClick = {},
+                guideHomeActions = true,
+            )
+            AppGuideHost(section)
         } } }
         waitForTip()
         compose.onNodeWithText(GuideSection.HOME.tip).assertIsDisplayed()
-        assertTrue(preferences.getBoolean("tip_seen_HOME_TUNE_SCHEDULE", false))
+        assertTrue(preferences.getBoolean("tip_seen_HOME_SEARCH", false))
+        compose.onNodeWithText(GuideSection.SETTINGS.tip).assertDoesNotExist()
+        compose.runOnIdle { section = null }
+        compose.onNodeWithTag("appGuideTip").assertDoesNotExist()
+        compose.runOnIdle { section = GuideSection.HOME }
+        waitForTip()
+        compose.onNodeWithText(GuideSection.SETTINGS.tip).assertIsDisplayed()
     }
 
     @Test fun persistedVisitPreventsAnotherTipAfterCompositionRecreation() {

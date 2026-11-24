@@ -16,8 +16,6 @@
 
 package com.starception.submission.feature.prayertimes
 
-import com.starception.submission.settings.components.GuideSection
-import com.starception.submission.settings.components.appGuideAnchor
 import com.starception.submission.core.model.deenly.InsightSearchProgress
 import android.Manifest
 import android.content.Context
@@ -3297,6 +3295,7 @@ fun PrayerTimesScreen(
                     pillContainerColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color(0xFF25362B) else Color(0xFFF7F5FB),
                     pillContentColor = if (outerIsLandscape) Color.Unspecified else if (darkHome) Color.White else Color(0xFF191724),
                     homeImmersiveHeader = !outerIsLandscape,
+                    guideHomeActions = true,
                     // Keep the home actions hidden until the reader's closing
                     // motion has cleared the header, including its fluid recess.
                     homeHeaderActionsVisible = !insightTileExpanded && !insightReaderOpen,
@@ -5380,8 +5379,7 @@ private fun PrayerHeaderAction(
     Surface(
         modifier = Modifier
             .width(actionWidth)
-            .height(if (compact) 36.dp else 44.dp)
-            .appGuideAnchor(GuideSection.HOME.takeUnless { active }),
+            .height(if (compact) 36.dp else 44.dp),
         onClick = onClick,
         shape = RoundedCornerShape(50),
         color = containerColor,

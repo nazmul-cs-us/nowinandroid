@@ -1,5 +1,7 @@
 package com.starception.submission.shared.ui
 
+import com.starception.submission.settings.components.GuideSection
+import com.starception.submission.settings.components.appGuideAnchor
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -43,6 +45,7 @@ internal fun AppHeaderActions(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     compact: Boolean = false,
+    guideHomeActions: Boolean = false,
 ) {
     Box(contentAlignment = Alignment.Center) {
         AppActionSurround(
@@ -50,13 +53,21 @@ internal fun AppHeaderActions(
             modifier = Modifier.matchParentSize(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(if (compact) (-4).dp else 0.dp)) {
-            AppActionButton(onSearchClick, showSurround = false) {
+            AppActionButton(
+                onClick = onSearchClick,
+                modifier = Modifier.appGuideAnchor(GuideSection.HOME.takeIf { guideHomeActions }),
+                showSurround = false,
+            ) {
                 HeaderActionIcon(
                     painter = Icons.Outlined.Search,
                     contentDescription = "Search",
                 )
             }
-            AppActionButton(onSettingsClick, showSurround = false) {
+            AppActionButton(
+                onClick = onSettingsClick,
+                modifier = Modifier.appGuideAnchor(GuideSection.SETTINGS.takeIf { guideHomeActions }),
+                showSurround = false,
+            ) {
                 HeaderActionIcon(
                     painter = Icons.Outlined.Settings,
                     contentDescription = "Settings",

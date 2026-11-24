@@ -42,13 +42,13 @@ import kotlinx.coroutines.delay
 
 /** Stable IDs are also used by the native iOS Family screen. Visits never leave this device. */
 enum class GuideSection(val label: String, val tip: String, val icon: ImageVector, val tipKey: String? = null) {
-    HOME("Home", "Tap Tune schedule to adjust your prayer times.", Icons.Outlined.Home, tipKey = "HOME_TUNE_SCHEDULE"),
+    HOME("Home", "Tap Search to find a surah, hadith, or dua.", Icons.Outlined.Search, tipKey = "HOME_SEARCH"),
     READING("Reading", "Open Tafsir to see the explanation beside the ayah.", Icons.Outlined.MenuBook),
     SEARCH("Search", "Search by a name, a phrase or a topic.", Icons.Outlined.Search),
     FAMILY("Family", "Accept a family invitation to start a conversation.", Icons.Outlined.FavoriteBorder),
     SAVED("Saved", "Tap the bookmark while reading. Find the surah here later.", Icons.Outlined.BookmarkBorder),
     RECITERS("Reciters", "Search by name, then tap Play to preview a reciter.", Icons.Outlined.Headphones),
-    SETTINGS("Settings", "Choose a theme and display mode in Appearance.", Icons.Outlined.Settings),
+    SETTINGS("Settings", "Tap Settings to change your theme, prayer preferences, or downloads.", Icons.Outlined.Settings, tipKey = "HOME_SETTINGS"),
 }
 
 interface AppGuideStore {
@@ -108,18 +108,22 @@ fun AppGuideHost(section: GuideSection?, enabled: Boolean = true, store: AppGuid
     val allowed = enabled && LocalAppGuideEnabled.current
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val resumed = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    val anchor = guideAnchors.values.lastOrNull { it.first == section && !it.second.isEmpty }?.second
+    val tipSection = remember(section, allowed, resumed, store) {
+        if (section == GuideSection.HOME && store.tipSeen(GuideSection.HOME)) GuideSection.SETTINGS
+        else section
+    }
+    val anchor = guideAnchors.values.lastOrNull { it.first == tipSection && !it.second.isEmpty }?.second
     val hasAnchor = anchor != null
     var tip by remember(section) { mutableStateOf<GuideSection?>(null) }
     LaunchedEffect(section, allowed, resumed) {
         if (section != null && allowed && resumed) store.visit(section)
     }
-    LaunchedEffect(section, allowed, resumed, hasAnchor) {
+    LaunchedEffect(tipSection, allowed, resumed, hasAnchor) {
         tip = null
-        if (section != null && allowed && resumed && hasAnchor && !store.tipSeen(section) && store.tipsEnabled()) {
+        if (tipSection != null && allowed && resumed && hasAnchor && !store.tipSeen(tipSection) && store.tipsEnabled()) {
             delay(650)
-            GuidePresentation.activeTip = section
-            tip = section
+            GuidePresentation.activeTip = tipSection
+            tip = tipSection
         }
     }
     val current = tip

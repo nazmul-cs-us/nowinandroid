@@ -196,6 +196,7 @@ fun AppTopSearchBar(
     homeHeaderVisibility: () -> Float = { 1f },
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
+    guideHomeActions: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     // All non-verse search tap callbacks (topic, news, fortress dua, quranic dua,
@@ -937,6 +938,7 @@ fun AppTopSearchBar(
                 AppHeaderActions(
                     onDarkArtwork = homeHeaderLightText,
                     onSearchClick = { searchViewHolder.value?.show() },
+                    guideHomeActions = guideHomeActions,
                     onSettingsClick = onSettingsClick,
                     compact = true,
                 )
@@ -960,6 +962,7 @@ fun AppTopSearchBar(
                 AppHeaderActions(
                     onDarkArtwork = isDarkTheme,
                     onSearchClick = { searchViewHolder.value?.show() },
+                    guideHomeActions = guideHomeActions,
                     onSettingsClick = onSettingsClick,
                 )
             }
