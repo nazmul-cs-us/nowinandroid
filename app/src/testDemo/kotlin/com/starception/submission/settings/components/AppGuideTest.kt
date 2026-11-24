@@ -88,6 +88,7 @@ class AppGuideTest {
         val control = compose.onNodeWithText("Open Saved")
         val tip = compose.onNodeWithTag("appGuideTip").fetchSemanticsNode().boundsInRoot
         assertTrue(tip.bottom <= control.fetchSemanticsNode().boundsInRoot.top)
+        compose.onRoot().captureRoboImage("src/testDemo/screenshots/app_guide_spotlight.png")
         control.performTouchInput { click() }
         assertEquals(1, taps)
     }

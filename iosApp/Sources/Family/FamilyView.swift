@@ -165,7 +165,8 @@ struct FamilyView: View {
         .overlay(alignment: .bottom) {
             if showGuideTip && store.chatPeer == nil && store.call == nil {
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "heart").padding(.top, 3)
+                    Image(systemName: "heart").foregroundStyle(colors.accent)
+                        .frame(width: 36, height: 36).background(colors.field, in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Family").font(.subheadline.weight(.semibold))
                         Text("Accept a family invitation before starting a chat or call.")
@@ -176,8 +177,9 @@ struct FamilyView: View {
                         Image(systemName: "xmark").frame(width: 44, height: 44)
                     }.accessibilityLabel("Dismiss tip")
                 }
-                .padding(14).foregroundStyle(colors.panel).tint(colors.panel)
-                .background(colors.ink, in: RoundedRectangle(cornerRadius: 18))
+                .padding(14).foregroundStyle(colors.ink).tint(colors.accent)
+                .background(colors.panel, in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(colors.muted.opacity(0.24)))
                 .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
                 .frame(maxWidth: 460).padding(.horizontal, 16).padding(.bottom, 96)
             }

@@ -8,7 +8,16 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.geometry.Offset
@@ -77,9 +86,7 @@ private val guideAnchors = mutableStateMapOf<Any, Pair<GuideSection, Rect>>()
 fun Modifier.appGuideAnchor(section: GuideSection?): Modifier = if (section == null) this else composed {
     val key = remember(section) { Any() }
     DisposableEffect(key) { onDispose { guideAnchors.remove(key) } }
-    val highlight = if (GuidePresentation.activeTip == section)
-        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else Modifier
-    highlight.onGloballyPositioned { guideAnchors[key] = section to it.boundsInWindow() }
+    Modifier.onGloballyPositioned { guideAnchors[key] = section to it.boundsInWindow() }
 }
 
 private class GuideTipPosition(val target: Rect?, val gap: Int, val bottomInset: Int, val topInset: Int) {
@@ -135,20 +142,40 @@ fun AppGuideHost(section: GuideSection?, enabled: Boolean = true, store: AppGuid
         val clearance = if (target == null && current in listOf(GuideSection.HOME, GuideSection.SAVED, GuideSection.FAMILY)) 88.dp else 8.dp
         val position = GuideTipPosition(target, with(density) { 6.dp.roundToPx() },
             insets.getBottom(density) + with(density) { clearance.roundToPx() }, insets.getTop(density))
-        Layout(modifier = modifier.onGloballyPositioned { origin = it.positionInWindow() }, content = {
-            Surface(Modifier.padding(8.dp).widthIn(max = 356.dp).fillMaxWidth().heightIn(max = 260.dp)
-                .testTag("appGuideTip"), shape = RoundedCornerShape(18.dp), shadowElevation = 5.dp,
-                color = MaterialTheme.colorScheme.inverseSurface, contentColor = MaterialTheme.colorScheme.inverseOnSurface) {
-                Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(current.icon, null, Modifier.padding(top = 8.dp).size(20.dp), tint = MaterialTheme.colorScheme.inversePrimary)
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(vertical = 6.dp),
+        val colors = MaterialTheme.colorScheme
+        val spotlight = modifier.onGloballyPositioned { origin = it.positionInWindow() }.drawWithCache {
+            val window = Rect(Offset.Zero, size)
+            val opening = target?.intersect(window)?.takeUnless { it.isEmpty }?.let { bounds ->
+                Path().apply {
+                    addRoundRect(RoundRect(bounds.inflate(4.dp.toPx()), CornerRadius(18.dp.toPx())))
+                }
+            }
+            onDrawBehind {
+                if (opening != null) {
+                    clipPath(opening, ClipOp.Difference) { drawRect(colors.scrim.copy(alpha = .32f)) }
+                    drawPath(opening, colors.primary.copy(alpha = .8f), style = Stroke(1.5.dp.toPx()))
+                }
+            }
+        }
+        Layout(modifier = spotlight, content = {
+            Surface(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).widthIn(max = 340.dp)
+                .fillMaxWidth().heightIn(max = 260.dp).testTag("appGuideTip")
+                .semantics { liveRegion = LiveRegionMode.Polite },
+                shape = RoundedCornerShape(20.dp), shadowElevation = 6.dp,
+                border = BorderStroke(1.dp, colors.outlineVariant), color = colors.surfaceContainerLow) {
+                Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Surface(Modifier.padding(top = 5.dp), color = colors.secondaryContainer,
+                        shape = RoundedCornerShape(12.dp)) {
+                        Icon(current.icon, null, Modifier.padding(9.dp).size(19.dp))
+                    }
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(current.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
-                        Text(current.tip, style = MaterialTheme.typography.bodyMedium)
+                        Text(current.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+                        Text(current.tip, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                     }
                     IconButton(onClick = { tip = null }, modifier = Modifier.testTag("appGuideTipDismiss")) {
-                        Icon(Icons.Outlined.Close, "Dismiss tip", Modifier.size(18.dp))
+                        Icon(Icons.Outlined.Close, "Dismiss tip", Modifier.size(18.dp), tint = colors.onSurfaceVariant)
                     }
                 }
             }

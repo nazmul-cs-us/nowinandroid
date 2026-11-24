@@ -16,6 +16,8 @@
 
 package com.starception.submission.shared.ui
 
+import com.starception.submission.settings.components.GuideSection
+import com.starception.submission.settings.components.appGuideAnchor
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -276,6 +278,7 @@ fun SharedSearchOverlay(controller: SharedSearchController, onOpenProfile: () ->
                              },
                              modifier = Modifier
                                  .weight(1f)
+                                 .appGuideAnchor(GuideSection.SEARCH)
                                  .graphicsLayer { alpha = chromeAlpha },
                          )
                          if (controller.query.isNotEmpty()) {

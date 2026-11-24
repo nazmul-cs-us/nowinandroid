@@ -16,6 +16,8 @@
 
 package com.starception.submission.shared.ui
 
+import com.starception.submission.settings.components.GuideSection
+import com.starception.submission.settings.components.appGuideAnchor
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -66,6 +68,7 @@ data class BottomBarItem(
     val unselectedIcon: ImageVector,
     val enabled: Boolean = true,
     val visible: Boolean = true,
+    val guideSection: GuideSection? = null,
 )
 
 /**
@@ -75,10 +78,10 @@ data class BottomBarItem(
  * implementation backed by the platform key-value store.
  */
 val SharedBottomBarItems = listOf(
-    BottomBarItem("Home", NiaIcons.Home, NiaIcons.HomeBorder),
+    BottomBarItem("Home", NiaIcons.Home, NiaIcons.HomeBorder, guideSection = GuideSection.HOME),
     BottomBarItem("For you", NiaIcons.Upcoming, NiaIcons.UpcomingBorder,
         visible = com.starception.submission.family.FamilyRollout.showForYou()),
-    BottomBarItem("Saved", NiaIcons.Bookmarks, NiaIcons.BookmarksBorder),
+    BottomBarItem("Saved", NiaIcons.Bookmarks, NiaIcons.BookmarksBorder, guideSection = GuideSection.SAVED),
     BottomBarItem("Course", NiaIcons.Course, NiaIcons.CourseBorder),
     BottomBarItem("Interests", NiaIcons.Grid3x3, NiaIcons.Grid3x3),
 )
@@ -208,6 +211,7 @@ internal fun MaterialFloatingBottomBar(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
+                                .appGuideAnchor(item.guideSection.takeIf { index == selectedIndex })
                                 .semantics { selected = index == selectedIndex }
                                 .clickable(enabled = item.enabled, role = Role.Tab) { onSelect(index) },
                             contentAlignment = Alignment.Center,
@@ -276,6 +280,7 @@ fun FloatingSideBar(
                                 androidx.compose.ui.graphics.Color.Transparent
                             },
                         )
+                        .appGuideAnchor(item.guideSection.takeIf { selected })
                         .semantics { this.selected = selected }
                         .clickable(enabled = item.enabled, role = Role.Tab) { onSelect(index) },
                     contentAlignment = Alignment.Center,
