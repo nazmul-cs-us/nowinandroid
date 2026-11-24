@@ -930,10 +930,15 @@ fun AppTopSearchBar(
                 Box(Modifier.width(92.dp))
             }
         }
-        if (homeImmersiveHeader && homeHeaderActionsVisible && !isSearchViewOpen) {
+        if (homeImmersiveHeader && homeHeaderActionsVisible && !isSearchViewOpen && showHomeHeader) {
             Box(
                 Modifier.align(Alignment.TopEnd)
-                    .padding(end = 16.dp, top = topInset.coerceAtLeast(24.dp) + 12.dp),
+                    .padding(end = 16.dp, top = topInset.coerceAtLeast(24.dp) + 12.dp)
+                    .graphicsLayer {
+                        val visibility = homeHeaderVisibility()
+                        alpha = visibility
+                        translationY = -(1f - visibility) * 24.dp.toPx()
+                    },
             ) {
                 AppHeaderActions(
                     onDarkArtwork = homeHeaderLightText,

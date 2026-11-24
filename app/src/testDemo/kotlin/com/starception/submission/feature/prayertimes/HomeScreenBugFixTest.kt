@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.database.sqlite.SQLiteDatabase
 import androidx.compose.foundation.background
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -17,8 +16,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -112,58 +109,11 @@ class HomeScreenBugFixTest {
         assertEquals("Do not retain the long passage's empty space after returning", initialHeight, fittedHeight, .5f)
     }
 
-    @Test fun reflectionBackgroundContinuesBehindNavigationWithoutRevealingAPhotoStrip() {
-        val feed = Color(0xFF352C28)
-        compose.setContent {
-            Canvas(Modifier.size(width = 200.dp, height = 400.dp).testTag("navigation-continuity")) {
-                drawRect(Color.Cyan) // A visibly different underlying photograph.
-                drawRect(feed, topLeft = Offset(0f, 200.dp.toPx()), size = Size(size.width, 120.dp.toPx()))
-                drawHomeNavigationBackground(feed, 80.dp.toPx())
-            }
-        }
-        val file = temporary.newFile("navigation-continuity.png")
-        compose.onNodeWithTag("navigation-continuity").captureRoboImage(file.absolutePath,
-            roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
-        val bitmap = requireNotNull(BitmapFactory.decodeFile(file.absolutePath))
-        val x = bitmap.width / 2
-        val boundary = (bitmap.height * .8f).toInt()
-        val expected = bitmap.getPixel(x, boundary - 2)
-        assertEquals(expected, bitmap.getPixel(x, boundary))
-        assertEquals(expected, bitmap.getPixel(x, boundary + 2))
-        assertEquals(expected, bitmap.getPixel(x, bitmap.height - 2))
-        assertNotEquals(expected, bitmap.getPixel(x, 2))
-        bitmap.recycle()
-    }
-
-    @Test fun reflectionGlowAlsoBlendsIntoTheFooterBeforeTheClippingEdge() {
-        val feed = Color(0xFF352C28)
-        compose.setContent {
-            Canvas(Modifier.size(width = 200.dp, height = 400.dp).testTag("glow-continuity")) {
-                drawRect(Color(0xFF806448))
-                drawHomeNavigationFade(feed, 320.dp.toPx())
-                drawHomeNavigationBackground(feed, 80.dp.toPx())
-            }
-        }
-        val file = temporary.newFile("glow-continuity.png")
-        compose.onNodeWithTag("glow-continuity").captureRoboImage(file.absolutePath,
-            roborazziOptions = RoborazziOptions(taskType = RoborazziTaskType.Record))
-        val bitmap = requireNotNull(BitmapFactory.decodeFile(file.absolutePath))
-        val x = bitmap.width / 2
-        val boundary = (bitmap.height * .8f).toInt()
-        val above = bitmap.getPixel(x, boundary - 1)
-        val below = bitmap.getPixel(x, boundary + 1)
-        assertTrue(kotlin.math.abs(android.graphics.Color.red(above) - android.graphics.Color.red(below)) <= 2)
-        assertTrue(kotlin.math.abs(android.graphics.Color.green(above) - android.graphics.Color.green(below)) <= 2)
-        assertTrue(kotlin.math.abs(android.graphics.Color.blue(above) - android.graphics.Color.blue(below)) <= 2)
-        assertNotEquals(below, bitmap.getPixel(x, 2))
-        bitmap.recycle()
-    }
-
     @Test fun foregroundContentBlendsIntoTheNavigationSurface() {
         val feed = Color(0xFF352C28)
         compose.setContent {
             Box(Modifier.size(width = 200.dp, height = 88.dp)
-                .testTag("navigation-reveal").homeNavigationReveal(feed).background(Color.White))
+                .testTag("navigation-reveal").homeNavigationReveal(feed, 44.dp).background(Color.White))
         }
         val file = temporary.newFile("navigation-reveal.png")
         compose.onNodeWithTag("navigation-reveal").captureRoboImage(file.absolutePath,
@@ -171,7 +121,8 @@ class HomeScreenBugFixTest {
         val bitmap = requireNotNull(BitmapFactory.decodeFile(file.absolutePath))
         val x = bitmap.width / 2
         assertEquals(android.graphics.Color.WHITE, bitmap.getPixel(x, 2))
-        assertEquals(0xff352c28.toInt(), bitmap.getPixel(x, bitmap.height - 2))
+        val nearBottom = bitmap.getPixel(x, bitmap.height - 2)
+        assertTrue(android.graphics.Color.red(nearBottom) in 0x35..0x49)
         val blended = bitmap.getPixel(x, bitmap.height * 3 / 4)
         assertNotEquals(android.graphics.Color.WHITE, blended)
         assertNotEquals(0xff352c28.toInt(), blended)

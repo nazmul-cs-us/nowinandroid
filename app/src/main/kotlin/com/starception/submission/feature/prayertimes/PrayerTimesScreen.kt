@@ -3064,8 +3064,8 @@ fun PrayerTimesScreen(
                         immersiveScrollArmed = true
                     }
                 }
-                var homeViewport by remember { mutableStateOf(IntSize.Zero) }
-                var homeViewportBottomInWindowPx by remember { mutableFloatStateOf(Float.NaN) }
+                var measuredHomeViewport by remember { mutableStateOf(IntSize.Zero) }
+                var homeViewportTopInWindowPx by remember { mutableFloatStateOf(Float.NaN) }
                 var insightTopInWindowPx by remember { mutableFloatStateOf(Float.NaN) }
                 var insightHeightPx by remember { mutableIntStateOf(0) }
                 var prayerHeaderHeightPx by remember { mutableIntStateOf(0) }
@@ -3081,6 +3081,9 @@ fun PrayerTimesScreen(
                     .asPaddingValues().calculateBottomPadding()
                 val floatingNavigationClearance = if (!outerIsLandscape && !insightTileExpanded)
                     navigationBarInset + 80.dp else 0.dp
+                val clearancePx = with(LocalDensity.current) { floatingNavigationClearance.roundToPx() }
+                val homeViewport = IntSize(measuredHomeViewport.width, (measuredHomeViewport.height - clearancePx).coerceAtLeast(0))
+                val homeViewportBottomInWindowPx = homeViewportTopInWindowPx + homeViewport.height
                 val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
                 val darkHome = LocalDarkTheme.current
                 val homeFeed = homeFeedPalette(MaterialTheme.colorScheme)
@@ -3259,9 +3262,6 @@ fun PrayerTimesScreen(
                     else Modifier.background(mainPageBackgroundBrush()),
                 ).drawWithContent {
                     drawContent()
-                    // The content viewport ends above the floating bar. Carry its
-                    // opaque reflection surface through the reserved area as well.
-                    drawHomeNavigationBackground(homeFeed.background, floatingNavigationClearance.toPx())
                     if (insightTileExpanded && !outerIsLandscape) {
                         // The scrolling feed can extend beyond the reader into
                         // the gesture inset. Never expose that unrelated content
@@ -3311,15 +3311,12 @@ fun PrayerTimesScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(bottom = floatingNavigationClearance)
                             .clipToBounds()
                             .then(if (floatingNavigationClearance > 0.dp) {
-                                Modifier.homeNavigationReveal(homeFeed.background)
+                                Modifier.homeNavigationReveal(homeFeed.background, floatingNavigationClearance)
                             } else Modifier)
-                            .onSizeChanged { homeViewport = it }
-                            .onGloballyPositioned {
-                                homeViewportBottomInWindowPx = it.positionInWindow().y + it.size.height
-                            }
+                            .onSizeChanged { measuredHomeViewport = it }
+                            .onGloballyPositioned { homeViewportTopInWindowPx = it.positionInWindow().y }
                             .then(syncState.pullModifier)
                             .then(
                                 if (!outerIsLandscape) {
@@ -3833,15 +3830,13 @@ fun PrayerTimesScreen(
                                                             size = androidx.compose.ui.geometry.Size(size.width, lowerHeight),
                                                         )
                                                         drawHomeFeedGlow(homeFeed, coverBottom)
-                                                        drawHomeNavigationFade(homeFeed.background,
-                                                            homeViewport.height.toFloat() + portraitScrollState.value)
                                                     }
                                                 }
                                             }
                                             .padding(horizontal = feedGutter)
                                             .padding(
                                                 top = feedTopPadding,
-                                                bottom = if (floatingNavigationClearance > 0.dp) HomeNavigationRevealHeight else 0.dp,
+                                                bottom = if (floatingNavigationClearance > 0.dp) floatingNavigationClearance + 12.dp else 0.dp,
                                             ),
                                         verticalArrangement = Arrangement.Top,
                                     ) {
@@ -5023,10 +5018,9 @@ fun PrayerTimesScreen(
                                             }
                                         }
 
-                                        // The ComposeView's viewport already ends above the floating
-                                        // bar. Reserving its height again here creates an empty band
-                                        // after Location at the end of the scrollable feed.
-                                        Spacer(Modifier.height(navigationBarInset + 8.dp))
+                                        if (floatingNavigationClearance == 0.dp) {
+                                            Spacer(Modifier.height(navigationBarInset + 8.dp))
+                                        }
                                         }
                                     }
                                     morphRequest?.takeIf { morphVisible }?.let { request ->

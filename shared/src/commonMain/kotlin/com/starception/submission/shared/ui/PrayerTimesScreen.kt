@@ -18,7 +18,6 @@ package com.starception.submission.shared.ui
 
 import com.starception.submission.settings.components.GuideSection
 import com.starception.submission.settings.components.appGuideAnchor
-import com.starception.submission.feature.prayertimes.HomeNavigationRevealHeight
 import com.starception.submission.feature.prayertimes.homeNavigationReveal
 import com.starception.submission.feature.prayertimes.homeHeaderLocation
 import com.starception.submission.feature.prayertimes.HomeHeaderDetail
@@ -717,6 +716,9 @@ fun PrayerTimesScreen(
                             }
                         }
                     }
+                    val bottomNavigationClearance =
+                        if (LocalShowBottomNavigation.current && !useSideNavigation && !isInsightImmersive) 72.dp else 0.dp
+                    val revealAtNavigation = isPhoneHome && bottomNavigationClearance > 0.dp
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -726,13 +728,7 @@ fun PrayerTimesScreen(
                                 if (useTwoPaneLayout) Modifier else syncState.directPullModifier,
                             )
                             .then(if (isPhoneHome && isPagerRevealed) Modifier else Modifier.safeDrawingPadding())
-                            .padding(
-                                bottom = if (LocalShowBottomNavigation.current && !useSideNavigation && !isInsightImmersive) {
-                                    72.dp
-                                } else {
-                                    0.dp
-                                },
-                            )
+                            .padding(bottom = if (revealAtNavigation) 0.dp else bottomNavigationClearance)
                             .clipToBounds()
                             .padding(
                                 // Phone feed shading paints before its own
@@ -932,16 +928,14 @@ fun PrayerTimesScreen(
                                   // Captured for the scrolling column below: its content
                                   // lambda leaves the BoxWithConstraints receiver scope.
                                   val phoneViewportWidth = if (isPhoneHome) maxWidth - 48.dp else maxWidth
-                                  val revealAtNavigation = isPhoneHome && LocalShowBottomNavigation.current &&
-                                      !useSideNavigation && !isInsightImmersive
                                   Column(
                                       modifier = Modifier.fillMaxSize()
-                                          .then(if (revealAtNavigation) Modifier.homeNavigationReveal(homeFeed.background) else Modifier)
+                                          .then(if (revealAtNavigation) Modifier.homeNavigationReveal(homeFeed.background, bottomNavigationClearance) else Modifier)
                                           .verticalScroll(homePortraitScroll)
                                           .padding(
                                               start = if (isPhoneHome) 24.dp else 0.dp,
                                               end = if (isPhoneHome) 24.dp else 0.dp,
-                                              bottom = if (revealAtNavigation) HomeNavigationRevealHeight else 0.dp,
+                                              bottom = if (revealAtNavigation) bottomNavigationClearance + 12.dp else 0.dp,
                                           ),
                                       verticalArrangement = Arrangement.spacedBy(sectionGap),
                                   ) {

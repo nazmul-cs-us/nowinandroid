@@ -5,30 +5,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.unit.dp
 
 private const val ReflectionOpaqueStart = .35f
 private const val ReflectionOpaqueEnd = .68f
-
-/** Continue the reflection surface underneath floating navigation, not the photograph. */
-internal fun DrawScope.drawHomeNavigationBackground(background: Color, clearance: Float) {
-    val height = clearance.coerceIn(0f, size.height)
-    if (height > 0f) drawRect(background, topLeft = Offset(0f, size.height - height),
-        size = Size(size.width, height))
-}
-
-/** Fade artwork/glows to the same footer tone before the scroll viewport's clipping edge. */
-internal fun DrawScope.drawHomeNavigationFade(background: Color, viewportBottom: Float) {
-    val bottom = viewportBottom.coerceIn(0f, size.height)
-    val top = (bottom - 96.dp.toPx()).coerceAtLeast(0f)
-    if (bottom > top) drawRect(
-        Brush.verticalGradient(listOf(Color.Transparent, background), startY = top, endY = bottom),
-        topLeft = Offset(0f, top), size = Size(size.width, bottom - top),
-    )
-}
 
 /** PullToSyncContainer's tertiary strip is fully opaque at a .15 reveal. */
 internal fun homeBannerUsesLightIcons(reveal: Float, bannerBackground: Color): Boolean? =
