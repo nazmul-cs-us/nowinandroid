@@ -56,6 +56,16 @@ class HomeScreenBugFixTest {
         assertEquals("Salam, morning", homeGreetingForHour(9, isDaylight = true))
     }
 
+    @Test fun sceneLightingDoesNotStartANewAnimationEveryClockSecond() {
+        val first = java.time.LocalTime.of(15, 5, 0)
+        assertEquals(insightArtworkTime(first), insightArtworkTime(first.plusSeconds(59)))
+        assertNotEquals(insightArtworkTime(first), insightArtworkTime(first.plusMinutes(1)))
+        assertFalse(shouldAnimateInsightScene(focused = false, expanded = false, fullBleed = false))
+        assertFalse(shouldAnimateInsightScene(focused = true, expanded = true, fullBleed = false))
+        assertFalse(shouldAnimateInsightScene(focused = true, expanded = false, fullBleed = true))
+        assertTrue(shouldAnimateInsightScene(focused = true, expanded = false, fullBleed = false))
+    }
+
     @Test fun swipeNeverFadesBothCopiesToZeroAtTheMidpoint() {
         for (step in 0..100) {
             val position = step / 100f

@@ -1,19 +1,14 @@
 package com.starception.submission.core.designsystem.component
 
+import com.starception.submission.feature.quran.QuranData
+
 data class DeenlySplashReminder(val text: String, val reference: String)
 
 /** Keep the canonical reference for rotation; use a readable source line in the artwork. */
 fun splashReminderCitation(reference: String): String {
     val match = Regex("Quran (\\d+):(\\d+)").matchEntire(reference) ?: return reference
-    val surah = when (match.groupValues[1]) {
-        "2" -> "Al-Baqarah"
-        "20" -> "Ta-Ha"
-        "94" -> "Ash-Sharh"
-        "103" -> "Al-Asr"
-        "108" -> "Al-Kawthar"
-        "112" -> "Al-Ikhlas"
-        else -> return reference
-    }
+    val surah = QuranData.surahs.firstOrNull { it.number == match.groupValues[1].toIntOrNull() }
+        ?.nameEnglish ?: return reference
     return "Surah $surah  ·  ${match.groupValues[1]}:${match.groupValues[2]}"
 }
 

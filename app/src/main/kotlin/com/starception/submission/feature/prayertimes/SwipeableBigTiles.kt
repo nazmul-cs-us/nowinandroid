@@ -1250,6 +1250,11 @@ private data class PrayerSkyKeyframe(
  * boundaries. This keeps the carousel visually in step with the user's local
  * salah day instead of relying on fixed clock-hour assumptions.
  */
+internal fun insightArtworkTime(time: LocalTime): LocalTime = time.withSecond(0).withNano(0)
+
+internal fun shouldAnimateInsightScene(focused: Boolean, expanded: Boolean, fullBleed: Boolean): Boolean =
+    focused && !expanded && !fullBleed
+
 private fun prayerSkyPalette(
     currentTime: LocalTime,
     prayerTimes: DayPrayerTimes?,
@@ -1580,8 +1585,11 @@ internal fun SwipeableBigTiles(
             goToMosqueDurationMinutes = goToMosqueDurationMinutes,
         )
     }
-    val livePrayerSkyPalette = remember(currentTime, prayerTimes) {
-        prayerSkyPalette(currentTime = currentTime, prayerTimes = prayerTimes)
+    // A new four-second tween every clock second never settled, repainting the
+    // entire reader continuously. Scene lighting only needs minute resolution.
+    val artworkTime = insightArtworkTime(currentTime)
+    val livePrayerSkyPalette = remember(artworkTime, prayerTimes) {
+        prayerSkyPalette(currentTime = artworkTime, prayerTimes = prayerTimes)
     }
     val forecastTarget = remember(prayerTimes, timeOffsets, currentTime) {
         prayerTimes?.let {
@@ -3599,7 +3607,7 @@ internal fun InsightPreviewCard(
             // Keep the editorial payload sharp while gently defocusing the busy
             // artwork behind it when the card becomes a reading surface.
             val expandedArtworkBlur = if (
-                isExpanded && expandedBlurStartFraction == null && !disableExpandedArtworkBlur
+                isExpanded && !fluidFullBleed && expandedBlurStartFraction == null && !disableExpandedArtworkBlur
             ) {
                 expandedArtworkBlurRadius
             } else {
@@ -3638,9 +3646,9 @@ internal fun InsightPreviewCard(
             // The immersive cover supplies its own artwork. Continuously drifting
             // the full-screen cards underneath it keeps both the UI and render
             // threads awake even when the user is simply reading the cover.
-            val animateScene = isFocused && !fluidFullBleed
+            val animateScene = shouldAnimateInsightScene(isFocused, isExpanded, fluidFullBleed)
             val ambientMotion = if (animateScene) {
-                val motion by rememberInfiniteTransition(label = "heroBackgroundMotion")
+                rememberInfiniteTransition(label = "heroBackgroundMotion")
                     .animateFloat(
                         initialValue = -1f,
                         targetValue = 1f,
@@ -3653,9 +3661,8 @@ internal fun InsightPreviewCard(
                         ),
                         label = "heroBackgroundDrift",
                     )
-                motion
             } else {
-                0f
+                rememberUpdatedState(0f)
             }
             val focusedMotionStrength by animateFloatAsState(
                 targetValue = if (isFocused) 1f else 0f,
@@ -3666,7 +3673,7 @@ internal fun InsightPreviewCard(
                 animateScene && (backgroundOverlayBitmap != null || animateWater)
             ) rememberInfiniteTransition(label = "prayerSceneEffects") else null
             val mosqueLightPulse = if (sceneEffectTransition != null && backgroundOverlayBitmap != null) {
-                val pulse by sceneEffectTransition.animateFloat(
+                sceneEffectTransition.animateFloat(
                     initialValue = 0.12f,
                     targetValue = 1f,
                     animationSpec = infiniteRepeatable(
@@ -3675,12 +3682,11 @@ internal fun InsightPreviewCard(
                     ),
                     label = "mosqueLightPulse",
                 )
-                pulse
             } else {
-                1f
+                rememberUpdatedState(1f)
             }
             val waterPhase = if (sceneEffectTransition != null && animateWater) {
-                val phase by sceneEffectTransition.animateFloat(
+                sceneEffectTransition.animateFloat(
                     initialValue = 0f,
                     targetValue = 1f,
                     animationSpec = infiniteRepeatable(
@@ -3689,9 +3695,8 @@ internal fun InsightPreviewCard(
                     ),
                     label = "waterFlow",
                 )
-                phase
             } else {
-                0f
+                rememberUpdatedState(0f)
             }
 
             if (backgroundBitmap != null) {
@@ -3709,7 +3714,7 @@ internal fun InsightPreviewCard(
                             // as the painter-backed tiles so Prayer Now does not feel
                             // static while swiping past it.
                             val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                            val restingMotion = ambientMotion * focusedMotionStrength
+                            val restingMotion = ambientMotion.value * focusedMotionStrength
                             val imageScale = backgroundBaseScale + (restingMotion * 0.006f)
                             val requestedTranslationX =
                                 (backgroundHorizontalBias * size.width) - pageOffset * 18.dp.toPx()
@@ -3735,7 +3740,7 @@ internal fun InsightPreviewCard(
                             .blur(expandedArtworkBlur)
                             .graphicsLayer {
                                 val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                                val restingMotion = ambientMotion * focusedMotionStrength
+                                val restingMotion = ambientMotion.value * focusedMotionStrength
                                 val imageScale = backgroundBaseScale + (restingMotion * 0.006f)
                                 val requestedTranslationX =
                                     (backgroundHorizontalBias * size.width) - pageOffset * 18.dp.toPx()
@@ -3751,7 +3756,7 @@ internal fun InsightPreviewCard(
                                 translationY = boundedArtworkParallax(
                                     restingMotion * 4.dp.toPx(), size.height, imageScale, 1.dp.toPx(),
                                 )
-                                alpha = mosqueLightPulse
+                                alpha = mosqueLightPulse.value
                             },
                     )
                 }
@@ -3771,7 +3776,7 @@ internal fun InsightPreviewCard(
                                 // the pager creates depth without competing with the swipe for
                                 // animated-image decoding or causing a loop-boundary jump.
                                 val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                                val restingMotion = ambientMotion * focusedMotionStrength
+                                val restingMotion = ambientMotion.value * focusedMotionStrength
                                 val imageScale = backgroundBaseScale + (restingMotion * 0.006f)
                                 val requestedTranslationX =
                                     (backgroundHorizontalBias * size.width) - pageOffset * 18.dp.toPx()
@@ -3799,12 +3804,12 @@ internal fun InsightPreviewCard(
                 }
             }
 
-            if (isExpanded && expandedBlurStartFraction != null && !disableExpandedArtworkBlur) {
+            if (isExpanded && !fluidFullBleed && expandedBlurStartFraction != null && !disableExpandedArtworkBlur) {
                 val partialBlurModifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
                         val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                        val restingMotion = ambientMotion * focusedMotionStrength
+                        val restingMotion = ambientMotion.value * focusedMotionStrength
                         val imageScale = backgroundBaseScale + (restingMotion * 0.006f)
                         val requestedTranslationX =
                             (backgroundHorizontalBias * size.width) - pageOffset * 18.dp.toPx()
@@ -3905,7 +3910,7 @@ internal fun InsightPreviewCard(
                     // Match the artwork's crop-space zoom and parallax so the
                     // celestial anchor and skyline never drift apart.
                     val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                    val restingMotion = ambientMotion * focusedMotionStrength
+                    val restingMotion = ambientMotion.value * focusedMotionStrength
                     val imageScale = backgroundBaseScale + restingMotion * .006f
                     val requestedTranslationX = backgroundHorizontalBias * size.width - pageOffset * 18.dp.toPx()
                     val coveredShift = ((size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()).coerceAtLeast(0f)
@@ -3922,13 +3927,13 @@ internal fun InsightPreviewCard(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        val restingLight = ((ambientMotion + 1f) * 0.5f) * focusedMotionStrength
+                        val restingLight = ((ambientMotion.value + 1f) * 0.5f) * focusedMotionStrength
                         alpha = (wallpaperTintAlpha + (restingLight * 0.03f)).coerceIn(0f, 1f)
                     }
                     .background(wallpaperTintBrush),
             )
 
-            if (animateWater && (backgroundBitmap != null || backgroundPainterRes != null)) {
+            if (animateScene && animateWater && (backgroundBitmap != null || backgroundPainterRes != null)) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -3948,9 +3953,9 @@ internal fun InsightPreviewCard(
                             },
                         )
                         .graphicsLayer {
-                            val phase = waterPhase * (Math.PI * 2.0).toFloat()
+                            val phase = waterPhase.value * (Math.PI * 2.0).toFloat()
                             val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                            val restingMotion = ambientMotion * focusedMotionStrength
+                            val restingMotion = ambientMotion.value * focusedMotionStrength
                             val imageScale = backgroundBaseScale + (restingMotion * 0.006f)
                             val requestedTranslationX =
                                 (backgroundHorizontalBias * size.width) - pageOffset * 18.dp.toPx()
@@ -4049,7 +4054,7 @@ internal fun InsightPreviewCard(
                                 // A smaller movement preserves depth without making
                                 // the object appear to float over its background.
                                 val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                                val restingMotion = ambientMotion * focusedMotionStrength
+                                val restingMotion = ambientMotion.value * focusedMotionStrength
                                 val foregroundScale = (1.025f * foregroundBaseScale) +
                                     (restingMotion * 0.002f)
                                 scaleX = foregroundScale
@@ -4073,7 +4078,7 @@ internal fun InsightPreviewCard(
                         .fillMaxSize()
                         .graphicsLayer {
                             val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                            val restingMotion = ambientMotion * focusedMotionStrength
+                            val restingMotion = ambientMotion.value * focusedMotionStrength
                             scaleX = 1.025f + (restingMotion * 0.002f)
                             scaleY = 1.025f + (restingMotion * 0.002f)
                             translationX = (-pageOffset * 6.dp.toPx()) +
@@ -4957,9 +4962,9 @@ private fun QuranReadingExpandedStage(
     }
     val isThisSurahPlaying = playback.isPlaying && playback.surahIndex == surah.number - 1
 
-    // The bismillah breathes with a slow glow instead of a hard shimmer, so
-    // the stage stays calm under the card's own ambient motion.
-    val bismillahGlow by rememberInfiniteTransition(label = "quranStageGlow")
+    // Keep a paused reading static; the decorative glow only runs with playback.
+    val bismillahGlow = if (isThisSurahPlaying) {
+        val glow by rememberInfiniteTransition(label = "quranStageGlow")
         .animateFloat(
             initialValue = 0f,
             targetValue = 1f,
@@ -4969,6 +4974,8 @@ private fun QuranReadingExpandedStage(
             ),
             label = "quranStageGlowPhase",
         )
+        glow
+    } else .35f
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

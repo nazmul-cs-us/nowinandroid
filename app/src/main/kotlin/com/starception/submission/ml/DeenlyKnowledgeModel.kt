@@ -13,8 +13,10 @@ import android.os.SystemClock
 import android.util.Log
 import java.io.File
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
@@ -148,10 +150,14 @@ class DeenlyKnowledgeModel(context: Context) {
                 Log.w(TAG, "Knowledge model is missing or has an unexpected size")
                 return@withContext null
             }
-            if (sha256(modelFile) != task.modelSha256) {
+            val requestContext = currentCoroutineContext()
+            if (!verifiedModels.verify(modelFile, task.modelSha256) { file ->
+                    sha256(file) { requestContext.ensureActive() }
+                }) {
                 Log.w(TAG, "Knowledge model checksum verification failed")
                 return@withContext null
             }
+            requestContext.ensureActive()
             val runner = File(appContext.applicationInfo.nativeLibraryDir, RUNNER_FILE_NAME)
             if (!runner.isFile || !runner.canExecute()) {
                 Log.w(TAG, "Knowledge model runner is unavailable")
@@ -170,6 +176,10 @@ class DeenlyKnowledgeModel(context: Context) {
                     "--single-turn",
                     "--predict",
                     "256",
+                    "--threads",
+                    inferenceThreads.toString(),
+                    "--threads-batch",
+                    inferenceThreads.toString(),
                     "--json-schema",
                     task.outputSchema,
                     "--temp",
@@ -179,35 +189,35 @@ class DeenlyKnowledgeModel(context: Context) {
                     "--simple-io",
                     "--no-conversation",
                 ).start()
-                coroutineScope {
-                    val stdout = async { process.inputStream.bufferedReader().readText() }
-                    val stderr = async { process.errorStream.bufferedReader().readText() }
-                    if (!process.waitFor(INFERENCE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                        Log.w(TAG, "Knowledge model inference timed out")
-                        process.destroyForcibly()
-                        process.waitFor(PROCESS_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                        runCatching { process.inputStream.close() }
-                        runCatching { process.errorStream.close() }
-                        runCatching { stdout.await() }
-                        runCatching { stderr.await() }
-                        return@coroutineScope null
-                    }
-                    val generated = stdout.await()
-                    val errorOutput = stderr.await()
-                    if (process.exitValue() != 0) {
-                        Log.w(TAG, "Knowledge model runner failed: ${errorOutput.take(LOG_PREVIEW_CHARS)}")
-                        null
-                    } else {
-                        parseDecision(generated, task, source.sourceText).also { parsed ->
-                            if (parsed == null) {
-                                Log.w(
-                                    TAG,
-                                    "Rejected model output: ${generated.take(LOG_PREVIEW_CHARS)}",
-                                )
+                try {
+                    coroutineScope {
+                        val stdout = async { runCatching { process.inputStream.bufferedReader().readText() }.getOrDefault("") }
+                        val stderr = async { runCatching { process.errorStream.bufferedReader().readText() }.getOrDefault("") }
+                        try {
+                            if (!awaitInferenceExit(process, INFERENCE_TIMEOUT_SECONDS * 1000L)) {
+                                Log.w(TAG, "Knowledge model inference timed out")
+                                return@coroutineScope null
                             }
+                            val generated = stdout.await()
+                            val errorOutput = stderr.await()
+                            if (process.exitValue() != 0) {
+                                Log.w(TAG, "Knowledge model runner failed: ${errorOutput.take(LOG_PREVIEW_CHARS)}")
+                                null
+                            } else {
+                                parseDecision(generated, task, source.sourceText).also { parsed ->
+                                    if (parsed == null) Log.w(TAG, "Rejected model output: ${generated.take(LOG_PREVIEW_CHARS)}")
+                                }
+                            }
+                        } finally {
+                            // Kill/close before coroutineScope waits for its stream readers.
+                            stopInferenceProcess(process)
                         }
                     }
+                } finally {
+                    stopInferenceProcess(process)
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 Log.w(TAG, "Knowledge model inference failed", error)
                 null
@@ -333,7 +343,6 @@ class DeenlyKnowledgeModel(context: Context) {
 
         private const val RUNNER_FILE_NAME = "libdeenly_completion.so"
         private const val INFERENCE_TIMEOUT_SECONDS = 120L
-        private const val PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 5L
         private const val MAX_SOURCE_CHARS = 1_400
         private const val ANSWER_MAX_SOURCE_CHARS = 600
         private const val MAX_APP_SITUATION_CHARS = 320
@@ -371,6 +380,8 @@ citations, rulings, or claims unsupported by the source."""
         private const val QUESTION_JSON_SCHEMA = """{"type":"object","properties":{"contentType":{"const":"question"},"questionKind":{"enum":["person","place","food","color","action","number","description","teaching","outcome","object","time"]},"question":{"type":"string","minLength":8,"maxLength":180},"answer":{"type":"string","minLength":1,"maxLength":96},"evidence":{"type":"string","minLength":1,"maxLength":420},"options":{"type":"array","minItems":4,"maxItems":4,"items":{"type":"string","minLength":1,"maxLength":96}}},"required":["contentType","questionKind","question","answer","evidence","options"],"additionalProperties":false}"""
         private const val ANSWER_JSON_SCHEMA = """{"type":"object","properties":{"contentType":{"enum":["answer","unanswered"]},"answer":{"type":"string","maxLength":96},"evidence":{"type":"string","maxLength":420}},"required":["contentType","answer","evidence"],"additionalProperties":false}"""
         private val inferenceMutex = Mutex()
+        private val verifiedModels = ModelVerificationCache()
+        private val inferenceThreads = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 3)
         private val prayerSelectionMutex = Mutex()
         private val prayerSelections = linkedMapOf<String, String>()
 
@@ -613,11 +624,12 @@ citations, rulings, or claims unsupported by the source."""
         private fun sha256(bytes: ByteArray): String =
             MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
 
-        private fun sha256(file: File): String {
+        private fun sha256(file: File, checkCancellation: () -> Unit): String {
             val digest = MessageDigest.getInstance("SHA-256")
             file.inputStream().buffered().use { input ->
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                 while (true) {
+                    checkCancellation()
                     val count = input.read(buffer)
                     if (count < 0) break
                     digest.update(buffer, 0, count)

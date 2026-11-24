@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.*
 import org.junit.Rule
@@ -75,5 +77,31 @@ class HomeReflectionSwipeTest {
         }
         compose.onNodeWithTag("homeReflectionSwipeArea").performTouchInput { swipeUp() }
         compose.runOnIdle { assertTrue(scroll.value > 0); assertEquals(0, pageChanges) }
+    }
+
+    @Test fun fastShortFlickRegistersWithoutRequiringALongDrag() {
+        var page by mutableIntStateOf(0)
+        var opened = 0
+        compose.setContent {
+            MaterialTheme { HomeReflectionPrompt(focusedPage = page, scrollPosition = page.toFloat(),
+                onSwipePage = { page = it }, onClick = { opened++ }) }
+        }
+        compose.onNodeWithTag("homeReflectionSwipeArea").performTouchInput {
+            swipe(start = Offset(width * .65f, centerY), end = Offset(width * .57f, centerY), durationMillis = 40)
+        }
+        compose.runOnIdle { assertEquals(1, page); assertEquals(0, opened) }
+    }
+
+    @Test fun slowSmallDragDoesNotAccidentallySwitchPages() {
+        var pageChanges = 0
+        compose.setContent {
+            MaterialTheme { HomeReflectionPrompt(onSwipePage = { pageChanges++ }, onClick = {}) }
+        }
+        compose.onNodeWithTag("homeReflectionSwipeArea").performTouchInput {
+            swipe(start = Offset(width * .65f, centerY), end = Offset(width * .59f, centerY), durationMillis = 1000)
+        }
+        compose.runOnIdle { assertEquals(0, pageChanges) }
+        assertEquals(1, homeReflectionSwipeTarget(0, -12f, 32f, false, -900f, 500f, 6f))
+        assertNull(homeReflectionSwipeTarget(0, -3f, 32f, false, -900f, 500f, 6f))
     }
 }

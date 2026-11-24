@@ -80,9 +80,11 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.animation.core.animateDpAsState
@@ -274,6 +276,13 @@ internal fun HomeReflectionPrompt(
     val context = LocalContext.current.applicationContext
     val direction = LocalLayoutDirection.current
     val swipePage by rememberUpdatedState(onSwipePage)
+    val selectedPage by rememberUpdatedState(focusedPage)
+    var dragDistance by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val dragThreshold = with(density) { 32.dp.toPx() }
+    val flickThreshold = with(density) { 500.dp.toPx() }
+    val minimumFlickDistance = with(density) { 6.dp.toPx() }
+    val dragState = rememberDraggableState { dragDistance += it }
     val ink = if (onDarkCover) Color.White else MaterialTheme.colorScheme.onBackground
     val haptics = LocalHapticFeedback.current
     val arrowRotation by animateFloatAsState(
@@ -281,7 +290,14 @@ internal fun HomeReflectionPrompt(
         label = "homeExploreDividerArrow",
     )
     Column(
-        modifier = modifier.fillMaxWidth().padding(bottom = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(bottom = 16.dp).testTag("homeReflectionSwipeArea")
+            .draggable(state = dragState, orientation = Orientation.Horizontal, enabled = !exploreExpanded,
+                onDragStarted = { dragDistance = 0f },
+                onDragStopped = { velocity ->
+                    homeReflectionSwipeTarget(selectedPage, dragDistance, dragThreshold,
+                        direction == LayoutDirection.Rtl, velocity, flickThreshold, minimumFlickDistance)?.let(swipePage)
+                    dragDistance = 0f
+                }),
         // The arrow is tucked just below the cover's page marks. Give the
         // following reflection the same clear space below the arrow.
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -329,21 +345,7 @@ internal fun HomeReflectionPrompt(
                 animationSpec = tween(320, easing = FastOutSlowInEasing), label = "settledReflectionHeight")
             Modifier.height(fittedHeight)
         } else Modifier
-        Box(Modifier.fillMaxWidth().then(heightModifier).clipToBounds().testTag("homeReflectionSwipeArea")
-            .pointerInput(focusedPage, direction) {
-                var distance = 0f
-                val threshold = 56.dp.toPx()
-                detectHorizontalDragGestures(
-                    onDragStart = { distance = 0f },
-                    onDragCancel = { distance = 0f },
-                    onDragEnd = {
-                        homeReflectionSwipeTarget(focusedPage, distance, threshold, direction == LayoutDirection.Rtl)
-                            ?.let(swipePage)
-                        distance = 0f
-                    },
-                    onHorizontalDrag = { change, delta -> change.consume(); distance += delta },
-                )
-            }) {
+        Box(Modifier.fillMaxWidth().then(heightModifier).clipToBounds()) {
             repeat(5) { page ->
                 key(page) {
                     val offset = homeSwipePageOffset(position, page)
@@ -416,9 +418,15 @@ internal fun homeReflectionMatchesReading(page: Int, surahNumber: Int, target: N
 internal fun homeReflectionHeading(fallback: String, candidate: NowNudgeKnowledgeCandidate?): String =
     candidate?.takeIf { it.modelGenerated }?.nudge?.label?.takeIf(String::isNotBlank) ?: fallback
 
-internal fun homeReflectionSwipeTarget(page: Int, distance: Float, threshold: Float, rtl: Boolean): Int? {
-    if (!distance.isFinite() || abs(distance) < threshold || distance == 0f) return null
-    val step = if ((distance < 0f) != rtl) 1 else -1
+internal fun homeReflectionSwipeTarget(page: Int, distance: Float, threshold: Float, rtl: Boolean,
+    velocity: Float = 0f, velocityThreshold: Float = Float.POSITIVE_INFINITY, minimumFlickDistance: Float = 0f): Int? {
+    if (!distance.isFinite() || distance == 0f) return null
+    val movement = when {
+        abs(distance) >= threshold -> distance
+        velocity.isFinite() && abs(velocity) >= velocityThreshold && abs(distance) >= minimumFlickDistance -> velocity
+        else -> return null
+    }
+    val step = if ((movement < 0f) != rtl) 1 else -1
     return (page.coerceIn(0, 4) + step + 5) % 5
 }
 

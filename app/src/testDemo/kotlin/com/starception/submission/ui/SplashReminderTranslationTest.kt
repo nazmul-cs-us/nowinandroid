@@ -75,8 +75,7 @@ class SplashReminderTranslationTest {
         context.getSharedPreferences("splash_reminders", Context.MODE_PRIVATE).edit().clear().commit()
         val first = loadNextSplashReminder(context)
         val second = loadNextSplashReminder(context)
-        assertEquals("বাংলা অনুবাদ এক", first.text)
-        assertEquals("বাংলা অনুবাদ দুই", second.text)
+        assertEquals(setOf("বাংলা অনুবাদ এক", "বাংলা অনুবাদ দুই"), setOf(first.text, second.text))
         assertNotEquals(first.reference, second.reference)
     }
 }

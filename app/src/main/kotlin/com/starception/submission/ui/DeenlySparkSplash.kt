@@ -15,7 +15,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.component.DeenlySplashScene
 import com.starception.submission.core.designsystem.component.deenlySplashReminder
-import com.starception.submission.core.designsystem.component.nextDeenlySplashReminder
 import com.starception.submission.core.designsystem.component.DeenlySplashReminder
 import com.starception.submission.ml.DeenlyKnowledgeModel
 import com.starception.submission.ml.DeenlyKnowledgeTask
@@ -68,11 +67,26 @@ internal fun loadNextSplashReminder(context: Context): DeenlySplashReminder {
     val model = DeenlyKnowledgeModel.isModelDownloaded(context, DeenlyKnowledgeTask.ANSWER)
     val hadith = File(context.filesDir, "cdn_assets/databases/hadith/sahih_bukhari.db")
         .let { it.isFile && it.length() > 1024 }
-    val previous = preferences.getString("previous_reference", null)
     val language = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
         .getString("quran_translation", "ar") ?: "ar"
-    val reminder = translatedSplashReminder(context, language, previous)
-        ?: nextDeenlySplashReminder(previous, model && language == "en", hadith)
-    preferences.edit().putString("previous_reference", reminder.reference).commit()
-    return reminder
+    var poolLanguage = language
+    var pool = shortQuranReminderPool(context, language)
+    if (pool.isEmpty() && language != "en") {
+        poolLanguage = "en"
+        pool = shortQuranReminderPool(context, "en")
+    }
+    if (pool.isEmpty()) {
+        poolLanguage = "en-fallback"
+        val first = deenlySplashReminder(0, false, false)
+        pool = buildList {
+            var index = 0L
+            do { add(deenlySplashReminder(index++, false, false)) }
+            while (deenlySplashReminder(index, false, false) != first)
+        }
+    }
+    if (model && hadith && poolLanguage.startsWith("en")) {
+        // Keep the existing verified English Hadith option; never translate it with an LLM.
+        pool = pool + deenlySplashReminder(7, true, true)
+    }
+    return SplashReminderShuffleBag(preferences).next(poolLanguage, pool)
 }

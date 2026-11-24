@@ -46,16 +46,25 @@ data class HomeHeaderDetail(val text: String, val kind: HomeHeaderDetailKind)
 /** Use the same quiet Ubuntu family as the brand, with a deliberate title/detail hierarchy. */
 object HomeHeaderTypography {
     val greeting: TextStyle
-        @Composable get() = TextStyle(fontFamily = homeHeaderFontFamily(), fontSize = 23.sp,
-            lineHeight = 29.sp, fontWeight = FontWeight.Medium, letterSpacing = (-.4).sp)
+        @Composable get(): TextStyle {
+            val family = homeHeaderFontFamily()
+            return remember(family) { TextStyle(fontFamily = family, fontSize = 23.sp,
+                lineHeight = 29.sp, fontWeight = FontWeight.Medium, letterSpacing = (-.4).sp) }
+        }
     val detail: TextStyle
-        @Composable get() = TextStyle(fontFamily = homeHeaderFontFamily(), fontSize = 12.5.sp,
-            lineHeight = 18.sp, fontWeight = FontWeight.Normal, letterSpacing = .05.sp)
+        @Composable get(): TextStyle {
+            val family = homeHeaderFontFamily()
+            return remember(family) { TextStyle(fontFamily = family, fontSize = 12.5.sp,
+                lineHeight = 18.sp, fontWeight = FontWeight.Normal, letterSpacing = .05.sp) }
+        }
 }
 
 @Composable
-private fun homeHeaderFontFamily() = FontFamily(Font(Res.font.ubuntu_regular, FontWeight.Normal),
-    Font(Res.font.ubuntu_medium, FontWeight.Medium))
+private fun homeHeaderFontFamily(): FontFamily {
+    val regular = Font(Res.font.ubuntu_regular, FontWeight.Normal)
+    val medium = Font(Res.font.ubuntu_medium, FontWeight.Medium)
+    return remember(regular, medium) { FontFamily(regular, medium) }
+}
 
 /** One fixed-height metadata line; the greeting above it stays stationary. */
 @Composable

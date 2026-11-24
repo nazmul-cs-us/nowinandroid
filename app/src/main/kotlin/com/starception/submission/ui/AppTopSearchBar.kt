@@ -366,9 +366,8 @@ fun AppTopSearchBar(
             whisperService.cancel(reportEmptyResult = false)
         }
         foregroundVoiceLifecycle.addObserver(observer)
-        // Warm the model only when its file is actually present (bundled or
-        // CDN-downloaded); otherwise the mic tap offers the download instead.
-        if (whisperService.isModelAvailable()) whisperService.initialize()
+        // startListening initializes on demand. Merely opening Home must not
+        // keep an unused speech model resident or compete with source models.
         onDispose {
             foregroundVoiceLifecycle.removeObserver(observer)
             whisperService.release()
