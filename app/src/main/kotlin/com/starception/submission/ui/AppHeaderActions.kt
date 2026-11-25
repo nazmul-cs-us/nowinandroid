@@ -46,7 +46,9 @@ internal fun AppHeaderActions(
     onSettingsClick: () -> Unit,
     compact: Boolean = false,
     guideHomeActions: Boolean = false,
+    artworkInk: Color = Color.Unspecified,
 ) {
+    val containerColor = if (artworkInk == Color.Unspecified) Color(0xFF0B0A12) else Color.Transparent
     Box(contentAlignment = Alignment.Center) {
         AppActionSurround(
             onDarkArtwork = onDarkArtwork,
@@ -57,20 +59,24 @@ internal fun AppHeaderActions(
                 onClick = onSearchClick,
                 modifier = Modifier.appGuideAnchor(GuideSection.HOME.takeIf { guideHomeActions }),
                 showSurround = false,
+                containerColor = containerColor,
             ) {
                 HeaderActionIcon(
                     painter = painterResource(R.drawable.ic_home_search_fine),
                     contentDescription = stringResource(R.string.app_top_bar_search_hint),
+                    tint = artworkInk,
                 )
             }
             AppActionButton(
                 onClick = onSettingsClick,
                 modifier = Modifier.appGuideAnchor(GuideSection.SETTINGS.takeIf { guideHomeActions }),
                 showSurround = false,
+                containerColor = containerColor,
             ) {
                 HeaderActionIcon(
                     painter = painterResource(R.drawable.ic_home_settings_fine),
                     contentDescription = stringResource(R.string.app_top_bar_settings_icon_description),
+                    tint = artworkInk,
                 )
             }
         }
@@ -174,8 +180,14 @@ private fun pairedActionPath(width: Float, height: Float, separationFraction: Fl
 }
 
 @Composable
-private fun HeaderActionIcon(painter: Painter, contentDescription: String) {
-    Icon(painter, contentDescription, tint = Color(0xFFF2F2F7), modifier = Modifier.size(18.dp))
+private fun HeaderActionIcon(painter: Painter, contentDescription: String, tint: Color) {
+    val onArtwork = tint != Color.Unspecified
+    Icon(
+        painter = painter,
+        contentDescription = contentDescription,
+        tint = if (onArtwork) tint else Color(0xFFF2F2F7),
+        modifier = Modifier.size(if (onArtwork) 20.dp else 18.dp),
+    )
 }
 
 @Composable
@@ -184,6 +196,7 @@ internal fun AppActionButton(
     modifier: Modifier = Modifier,
     showSurround: Boolean = true,
     onDarkArtwork: Boolean = true,
+    containerColor: Color = Color(0xFF0B0A12),
     content: @Composable () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -201,7 +214,7 @@ internal fun AppActionButton(
                         scaleY = scaleX
                         translationY = depth * .7.dp.toPx()
                     }
-                    .background(Color(0xFF0B0A12), CircleShape),
+                    .background(containerColor, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(

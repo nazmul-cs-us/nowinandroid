@@ -77,7 +77,7 @@ val LocalSearchNavCallbacks = compositionLocalOf { SearchNavCallbacks() }
  * account/profile sheet without threading a lambda through every screen. Defaults to a
  * no-op so previews and isolated callers don't crash.
  */
-val LocalHomeFamilyClick = compositionLocalOf<() -> Unit> { {} }
+internal val LocalProfileDisplayName = compositionLocalOf<String?> { null }
 val LocalProfileClick = compositionLocalOf<() -> Unit> { {} }
 
 /**

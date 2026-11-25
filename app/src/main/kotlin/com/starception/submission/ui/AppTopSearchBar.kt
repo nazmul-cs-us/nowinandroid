@@ -16,9 +16,7 @@
 
 package com.starception.submission.ui
 
-import com.starception.submission.feature.prayertimes.HomeHeaderDetail
 import com.starception.submission.feature.prayertimes.HomeHeaderTypography
-import com.starception.submission.feature.prayertimes.HomeRotatingHeaderText
 
 import androidx.compose.foundation.layout.Column
 import android.Manifest
@@ -79,6 +77,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -123,7 +122,11 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -191,8 +194,7 @@ fun AppTopSearchBar(
     homeImmersiveHeader: Boolean = false,
     homeHeaderActionsVisible: Boolean = true,
     homeHeaderLightText: Boolean = false,
-    homeGreetingText: String = "Assalamu alaikum",
-    homeSupportingTexts: List<HomeHeaderDetail> = emptyList(),
+    homeDateLabel: String = "",
     homeHeaderVisibility: () -> Float = { 1f },
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
@@ -892,55 +894,78 @@ fun AppTopSearchBar(
                 modifier = Modifier.fillMaxWidth()
                     // The wallpaper reaches into the status area, while the actions
                     // sit below it even when an OEM reports no safe-drawing inset.
-                    .padding(start = 24.dp, end = 24.dp, top = topInset.coerceAtLeast(24.dp))
+                    .padding(start = 24.dp, end = 16.dp, top = topInset.coerceAtLeast(24.dp) + 4.dp)
                     .graphicsLayer {
                         val visibility = homeHeaderVisibility()
                         alpha = visibility
                         translationY = -(1f - visibility) * 24.dp.toPx()
                     },
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(Modifier.weight(1f)) {
-                    com.starception.submission.feature.prayertimes.HomeFamilyRibbon(LocalHomeFamilyClick.current)
-                    Column(Modifier.clickable(onClickLabel = "Open profile") { currentOnProfileClick() },
-                        verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        HomeHeaderGreeting(homeGreetingText, greetingColor, homeHeaderLightText)
-                        if (homeSupportingTexts.any { it.text.isNotBlank() }) {
-                            HomeRotatingHeaderText(
-                                texts = homeSupportingTexts,
-                                style = HomeHeaderTypography.detail.copy(
-                                    shadow = Shadow(
-                                        color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .18f else .03f),
-                                        offset = Offset(0f, .5f), blurRadius = 2f,
-                                    ),
-                                ),
-                                color = greetingColor.copy(alpha = .86f),
+                val profileName = LocalProfileDisplayName.current?.trim().orEmpty()
+                val headerShadow = Shadow(
+                    color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .24f else .03f),
+                    offset = Offset(0f, 1f),
+                    blurRadius = 3f,
+                )
+                Column(
+                    modifier = Modifier.weight(1f)
+                        .padding(top = 8.dp)
+                        .clickable(onClickLabel = "Open profile") { currentOnProfileClick() },
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = buildAnnotatedString {
+                                append("Salam")
+                                if (profileName.isNotBlank()) {
+                                    append(", ")
+                                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        append(profileName)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f, fill = false),
+                            style = HomeHeaderTypography.greeting.copy(
                                 fontWeight = FontWeight.Normal,
-                            )
-                        }
+                                letterSpacing = .2.sp,
+                                shadow = headerShadow,
+                            ),
+                            color = greetingColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = greetingColor,
+                        )
+                    }
+                    if (homeDateLabel.isNotBlank()) {
+                        Text(
+                            text = homeDateLabel,
+                            style = HomeHeaderTypography.detail.copy(
+                                letterSpacing = .45.sp,
+                                shadow = headerShadow,
+                            ),
+                            color = greetingColor.copy(alpha = .92f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
-                // Reserve the fixed actions' space while only the greeting fades.
-                Box(Modifier.width(92.dp))
-            }
-        }
-        if (homeImmersiveHeader && homeHeaderActionsVisible && !isSearchViewOpen && showHomeHeader) {
-            Box(
-                Modifier.align(Alignment.TopEnd)
-                    .padding(end = 16.dp, top = topInset.coerceAtLeast(24.dp) + 12.dp)
-                    .graphicsLayer {
-                        val visibility = homeHeaderVisibility()
-                        alpha = visibility
-                        translationY = -(1f - visibility) * 24.dp.toPx()
-                    },
-            ) {
                 AppHeaderActions(
                     onDarkArtwork = homeHeaderLightText,
                     onSearchClick = { searchViewHolder.value?.show() },
                     guideHomeActions = guideHomeActions,
                     onSettingsClick = onSettingsClick,
                     compact = true,
+                    artworkInk = greetingColor,
                 )
             }
         }
