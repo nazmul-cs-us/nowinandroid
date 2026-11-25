@@ -20,7 +20,7 @@ import com.starception.submission.settings.components.GuideSection
 import com.starception.submission.settings.components.appGuideAnchor
 import com.starception.submission.feature.prayertimes.homeNavigationReveal
 import com.starception.submission.feature.prayertimes.homeHeaderLocation
-import com.starception.submission.feature.prayertimes.HomeProfileAvatar
+import com.starception.submission.feature.prayertimes.HomeFamilyRibbon
 import com.starception.submission.feature.prayertimes.HomeHeaderDetail
 import com.starception.submission.feature.prayertimes.HomeHeaderDetailKind
 import com.starception.submission.feature.prayertimes.HomeHeaderTypography
@@ -1150,6 +1150,7 @@ fun PrayerTimesScreen(
                                 onVoiceTap = { searchController?.openVoice() },
                                 onShowProfile = { showProfileSheet = true },
                                 searchController = searchController,
+                                onOpenFamily = onOpenFamilyAccount,
                                 onArtwork = true,
                             )
                         }
@@ -1312,6 +1313,7 @@ private fun PrayerHomeHeader(
     onVoiceTap: (() -> Unit)? = null,
     onShowProfile: () -> Unit = {},
     searchController: SharedSearchController? = null,
+    onOpenFamily: (() -> Unit)? = null,
     onArtwork: Boolean = false,
     lightHeaderInk: Boolean = true,
     greeting: String = "Peace be upon you",
@@ -1320,18 +1322,18 @@ private fun PrayerHomeHeader(
     if (onArtwork) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f).clickable(onClickLabel = "Open profile", onClick = onShowProfile), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 val ink = if (lightHeaderInk) Color.White else Color(0xFF101827)
                 val headerShadow = androidx.compose.ui.graphics.Shadow(
                     color = Color.Black.copy(alpha = if (lightHeaderInk) .18f else .03f),
                     offset = androidx.compose.ui.geometry.Offset(0f, .5f), blurRadius = 2f,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HomeProfileAvatar(ink)
+                HomeFamilyRibbon(onOpenFamily ?: onShowProfile)
+                Column(Modifier.clickable(onClickLabel = "Open profile", onClick = onShowProfile)) {
                     Text(greeting, style = HomeHeaderTypography.greeting.copy(shadow = headerShadow),
                     color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    HomeRotatingHeaderText(supportingTexts, style = HomeHeaderTypography.detail.copy(shadow = headerShadow), color = ink.copy(alpha = .86f))
                 }
-                HomeRotatingHeaderText(supportingTexts, style = HomeHeaderTypography.detail.copy(shadow = headerShadow), color = ink.copy(alpha = .86f))
             }
             AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings, guideHomeActions = true)
         }

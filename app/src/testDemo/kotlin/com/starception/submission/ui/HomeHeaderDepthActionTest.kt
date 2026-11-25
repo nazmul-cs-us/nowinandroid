@@ -45,6 +45,7 @@ class HomeHeaderDepthActionTest {
 
     @OptIn(ExperimentalResourceApi::class)
     @Test fun sculptedHomeActionsKeepSeparateAccessibleTargets() {
+        var familyClicks = 0
         var searchClicks = 0
         var settingsClicks = 0
         val headerDetail = androidx.compose.runtime.mutableStateOf(
@@ -57,10 +58,8 @@ class HomeHeaderDepthActionTest {
                 )))) {
                     Column(Modifier.align(Alignment.TopStart).padding(22.dp).width(240.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            com.starception.submission.feature.prayertimes.HomeProfileAvatar(Color(0xFF101827))
-                            HomeHeaderGreeting("Salam, evening", Color(0xFF101827), false)
-                        }
+                        com.starception.submission.feature.prayertimes.HomeFamilyRibbon { familyClicks++ }
+                        HomeHeaderGreeting("Salam, evening", Color(0xFF101827), false)
                         HomeRotatingHeaderText(
                             listOf(headerDetail.value),
                             HomeHeaderTypography.detail, Color(0xFF101827).copy(alpha = .92f))
@@ -76,6 +75,8 @@ class HomeHeaderDepthActionTest {
             }
         }
         compose.onRoot().captureRoboImage("src/testDemo/screenshots/home_header_depth_actions.png")
+        compose.onNodeWithContentDescription("Family account").assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
+        assertEquals(1, familyClicks)
         compose.onNodeWithContentDescription("Search")
             .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithContentDescription("Settings")

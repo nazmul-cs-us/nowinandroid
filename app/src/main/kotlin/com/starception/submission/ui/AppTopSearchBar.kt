@@ -892,7 +892,7 @@ fun AppTopSearchBar(
                 modifier = Modifier.fillMaxWidth()
                     // The wallpaper reaches into the status area, while the actions
                     // sit below it even when an OEM reports no safe-drawing inset.
-                    .padding(start = 24.dp, end = 24.dp, top = topInset.coerceAtLeast(24.dp) + 12.dp)
+                    .padding(start = 24.dp, end = 24.dp, top = topInset.coerceAtLeast(24.dp))
                     .graphicsLayer {
                         val visibility = homeHeaderVisibility()
                         alpha = visibility
@@ -901,28 +901,24 @@ fun AppTopSearchBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(
-                    modifier = Modifier.weight(1f)
-                        .clickable { currentOnProfileClick() }
-                        .semantics { contentDescription = "Open profile" },
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        com.starception.submission.feature.prayertimes.HomeProfileAvatar(greetingColor)
+                Column(Modifier.weight(1f)) {
+                    com.starception.submission.feature.prayertimes.HomeFamilyRibbon(LocalHomeFamilyClick.current)
+                    Column(Modifier.clickable(onClickLabel = "Open profile") { currentOnProfileClick() },
+                        verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         HomeHeaderGreeting(homeGreetingText, greetingColor, homeHeaderLightText)
-                    }
-                    if (homeSupportingTexts.any { it.text.isNotBlank() }) {
-                        HomeRotatingHeaderText(
-                            texts = homeSupportingTexts,
-                            style = HomeHeaderTypography.detail.copy(
-                                shadow = Shadow(
-                                    color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .18f else .03f),
-                                    offset = Offset(0f, .5f), blurRadius = 2f,
+                        if (homeSupportingTexts.any { it.text.isNotBlank() }) {
+                            HomeRotatingHeaderText(
+                                texts = homeSupportingTexts,
+                                style = HomeHeaderTypography.detail.copy(
+                                    shadow = Shadow(
+                                        color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .18f else .03f),
+                                        offset = Offset(0f, .5f), blurRadius = 2f,
+                                    ),
                                 ),
-                            ),
-                            color = greetingColor.copy(alpha = .86f),
-                            fontWeight = FontWeight.Normal,
-                        )
+                                color = greetingColor.copy(alpha = .86f),
+                                fontWeight = FontWeight.Normal,
+                            )
+                        }
                     }
                 }
                 // Reserve the fixed actions' space while only the greeting fades.

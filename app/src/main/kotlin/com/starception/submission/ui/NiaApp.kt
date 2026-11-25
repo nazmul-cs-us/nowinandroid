@@ -306,6 +306,7 @@ fun NiaApp(
 
             CompositionLocalProvider(
                 com.starception.submission.settings.components.LocalAppGuideEnabled provides (!guideCallActive && !familyOwnsAudio && !showProfileSheet && pendingCountrySwitch == null),
+                LocalHomeFamilyClick provides { appState.navigateToTopLevelDestination(TopLevelDestination.FAMILY) },
                 LocalProfileClick provides { showProfileSheet = true },
                 LocalProfileAvatarUrl provides (authUiState as? AuthUiState.LoggedIn)?.avatarUrl,
             ) {

@@ -7,8 +7,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.CircleShape
@@ -154,9 +160,27 @@ fun HomeRotatingHeaderText(
 }
 
 @Composable
-fun HomeProfileAvatar(tint: Color) {
-    Box(Modifier.size(30.dp).background(tint.copy(alpha = .16f), CircleShape), contentAlignment = Alignment.Center) {
-        Icon(Icons.Outlined.PersonOutline, null, tint = tint, modifier = Modifier.size(20.dp))
+fun HomeFamilyRibbon(onClick: () -> Unit) {
+    Box(Modifier.size(48.dp).clickable(role = Role.Button, onClick = onClick)) {
+        Box(
+            Modifier.size(30.dp, 42.dp).drawBehind {
+                val w = size.width
+                val h = size.height
+                fun outline(inset: Float) = Path().apply {
+                    moveTo(inset, 0f)
+                    lineTo(inset, h - inset)
+                    lineTo(w / 2, h - 7.dp.toPx() - inset)
+                    lineTo(w - inset, h - inset)
+                    lineTo(w - inset, 0f)
+                }
+                drawPath(outline(0f), Brush.horizontalGradient(listOf(Color(0xFF315653), Color(0xFF406861), Color(0xFF2B4A48))))
+                drawPath(outline(3.dp.toPx()), Color(0xFFCCBC94), style = Stroke(width = .75.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(1.5.dp.toPx(), 1.7.dp.toPx()))))
+            },
+        ) {
+            Icon(Icons.Outlined.PersonOutline, "Family account",
+                Modifier.align(Alignment.TopCenter).padding(top = 7.dp).size(21.dp), tint = Color(0xFFFFF2D5))
+        }
     }
 }
 
