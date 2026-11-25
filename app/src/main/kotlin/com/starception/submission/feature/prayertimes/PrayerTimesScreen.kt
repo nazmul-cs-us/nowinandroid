@@ -3200,6 +3200,28 @@ fun PrayerTimesScreen(
                 val homeDateLabel = coverReadingDate.format(
                     java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d, yyyy", java.util.Locale.getDefault()),
                 )
+                val homeWeather = (currentHomeWeather as? CurrentWeatherLoadState.Available)?.weather?.let {
+                    "${it.temperatureCelsius.roundToInt()}°C · ${weatherConditionLabel(it)}"
+                }
+                val homePlace = remember(location, prayerTimes?.location) {
+                    val data = prayerTimes?.location
+                    val place = prayerLocationLabel(data) {
+                        getLocationWithCountryCode(location, data)
+                    }.singleLine
+                    homeHeaderLocation(place, data?.country.orEmpty(), data?.countryCode.orEmpty())
+                }
+                val homeHijriDate = remember(coverReadingDate, java.util.Locale.getDefault()) {
+                    runCatching {
+                        java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy G", java.util.Locale.getDefault())
+                            .format(java.time.chrono.HijrahChronology.INSTANCE.date(coverReadingDate))
+                    }.getOrNull()
+                }
+                val homeSupportingTexts = listOfNotNull(
+                    HomeHeaderDetail(homeDateLabel, HomeHeaderDetailKind.Calendar),
+                    homeHijriDate?.let { HomeHeaderDetail(it, HomeHeaderDetailKind.Calendar) },
+                    homePlace.takeIf { it.isNotBlank() }?.let { HomeHeaderDetail(it, HomeHeaderDetailKind.Location) },
+                    homeWeather?.let { HomeHeaderDetail(it, HomeHeaderDetailKind.Weather) },
+                )
                 val coverReading = remember(coverReadingDate) {
                     com.starception.submission.feature.quran.dailyReading(
                         kotlinx.datetime.LocalDate(
@@ -3281,7 +3303,7 @@ fun PrayerTimesScreen(
                     // motion has cleared the header, including its fluid recess.
                     homeHeaderActionsVisible = !insightTileExpanded && !insightReaderOpen,
                     homeHeaderLightText = homeCoverHeaderUsesLightText(coverPage, prayerArtworkNight),
-                    homeDateLabel = homeDateLabel,
+                    homeSupportingTexts = homeSupportingTexts,
                     homeHeaderVisibility = {
                         if (insightTileExpanded || insightReaderOpen) 0f else
                             (1f - portraitScrollState.value / headerFadeDistancePx).coerceIn(0f, 1f)

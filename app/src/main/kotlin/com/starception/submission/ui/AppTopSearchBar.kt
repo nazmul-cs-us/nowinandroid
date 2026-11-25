@@ -16,7 +16,9 @@
 
 package com.starception.submission.ui
 
+import com.starception.submission.feature.prayertimes.HomeHeaderDetail
 import com.starception.submission.feature.prayertimes.HomeHeaderTypography
+import com.starception.submission.feature.prayertimes.HomeRotatingHeaderText
 
 import androidx.compose.foundation.layout.Column
 import android.Manifest
@@ -123,10 +125,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -194,7 +193,7 @@ fun AppTopSearchBar(
     homeImmersiveHeader: Boolean = false,
     homeHeaderActionsVisible: Boolean = true,
     homeHeaderLightText: Boolean = false,
-    homeDateLabel: String = "",
+    homeSupportingTexts: List<HomeHeaderDetail> = emptyList(),
     homeHeaderVisibility: () -> Float = { 1f },
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
@@ -919,26 +918,28 @@ fun AppTopSearchBar(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
+                        val greetingStyle = HomeHeaderTypography.greeting.copy(
+                            fontWeight = FontWeight.Normal,
+                            letterSpacing = .2.sp,
+                            shadow = headerShadow,
+                        )
                         Text(
-                            text = buildAnnotatedString {
-                                append("Salam")
-                                if (profileName.isNotBlank()) {
-                                    append(", ")
-                                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                        append(profileName)
-                                    }
-                                }
-                            },
-                            modifier = Modifier.weight(1f, fill = false),
-                            style = HomeHeaderTypography.greeting.copy(
-                                fontWeight = FontWeight.Normal,
-                                letterSpacing = .2.sp,
-                                shadow = headerShadow,
-                            ),
+                            text = if (profileName.isBlank()) "Salam" else "Salam,",
+                            modifier = Modifier.alignByBaseline(),
+                            style = greetingStyle,
                             color = greetingColor,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
+                        if (profileName.isNotBlank()) {
+                            Text(
+                                text = profileName,
+                                modifier = Modifier.weight(1f, fill = false).alignByBaseline(),
+                                style = greetingStyle.copy(fontWeight = FontWeight.Bold),
+                                color = greetingColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
                             contentDescription = null,
@@ -946,18 +947,14 @@ fun AppTopSearchBar(
                             tint = greetingColor,
                         )
                     }
-                    if (homeDateLabel.isNotBlank()) {
-                        Text(
-                            text = homeDateLabel,
-                            style = HomeHeaderTypography.detail.copy(
-                                letterSpacing = .45.sp,
-                                shadow = headerShadow,
-                            ),
-                            color = greetingColor.copy(alpha = .92f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    HomeRotatingHeaderText(
+                        texts = homeSupportingTexts,
+                        style = HomeHeaderTypography.detail.copy(
+                            letterSpacing = .45.sp,
+                            shadow = headerShadow,
+                        ),
+                        color = greetingColor.copy(alpha = .92f),
+                    )
                 }
                 AppHeaderActions(
                     onDarkArtwork = homeHeaderLightText,

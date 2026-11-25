@@ -275,10 +275,16 @@ fun NiaApp(
     val authViewModel: AuthViewModel = hiltViewModel()
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val signedInProfile = authUiState as? AuthUiState.LoggedIn
-    val profileDisplayName = signedInProfile?.displayName?.trim()?.takeIf { it.isNotEmpty() }
+    val accountDisplayName = signedInProfile?.displayName?.trim()?.takeIf { it.isNotEmpty() }
         ?: familyAccount?.let { com.starception.submission.family.callDisplayName(it) }
     var showProfileSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val greetingPreferences = remember(context) {
+        context.getSharedPreferences("home_greeting", android.content.Context.MODE_PRIVATE)
+    }
+    var greetingName by remember(greetingPreferences) {
+        mutableStateOf(greetingPreferences.getString("display_name", null))
+    }
     val activity = remember(context) { context.findActivity() }
 
     // Country-change consent: when the app detects a move to a new country it proposes switching
@@ -312,7 +318,7 @@ fun NiaApp(
 
             CompositionLocalProvider(
                 com.starception.submission.settings.components.LocalAppGuideEnabled provides (!guideCallActive && !familyOwnsAudio && !showProfileSheet && pendingCountrySwitch == null),
-                LocalProfileDisplayName provides profileDisplayName,
+                LocalProfileDisplayName provides (greetingName ?: accountDisplayName),
                 LocalProfileClick provides { showProfileSheet = true },
                 LocalProfileAvatarUrl provides signedInProfile?.avatarUrl,
             ) {
@@ -346,6 +352,12 @@ fun NiaApp(
                 ProfileSheet(
                     uiState = authUiState,
                     familyAccount = familyAccount,
+                    greetingName = greetingName,
+                    accountDisplayName = accountDisplayName,
+                    onSaveGreetingName = { name ->
+                        greetingPreferences.edit().putString("display_name", name).apply()
+                        greetingName = name
+                    },
                     onOpenFamily = familyClient?.let { {
                         showProfileSheet = false
                         appState.navigateToTopLevelDestination(TopLevelDestination.FAMILY)
