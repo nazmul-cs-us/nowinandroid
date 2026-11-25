@@ -852,7 +852,7 @@ private fun NiaFloatingBottomBar(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
+                    .padding(start = 12.dp, end = 12.dp, bottom = FloatingNavigationDimensions.bottomGap)
                     .then(glassAppearance.samplingModifier),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -863,7 +863,7 @@ private fun NiaFloatingBottomBar(
                 Modifier
                     .fillMaxSize()
                     .navigationBarsPadding()
-                    .padding(end = 12.dp, bottom = 8.dp),
+                    .padding(end = 12.dp, bottom = FloatingNavigationDimensions.bottomGap),
             )
         }
     }
@@ -883,9 +883,10 @@ private object FloatingNavigationColors {
     val surface = Color(0xFF242428).copy(alpha = .94f)
 }
 
-private object FloatingNavigationDimensions {
+internal object FloatingNavigationDimensions {
     val controlSize = 56.dp
     val controlGap = 8.dp
+    val bottomGap = 8.dp
 }
 
 private enum class VoiceAssistantSurface {

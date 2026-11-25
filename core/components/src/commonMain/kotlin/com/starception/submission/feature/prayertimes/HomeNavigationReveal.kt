@@ -7,11 +7,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 
 /** Give scrolling content a soft edge immediately above the floating navigation. */
 fun Modifier.homeNavigationReveal(background: Color, clearance: Dp): Modifier = drawWithCache {
-    val height = (clearance + 12.dp).toPx().coerceAtMost(size.height)
+    val height = clearance.toPx().coerceAtMost(size.height)
     val top = size.height - height
     val reveal = Brush.verticalGradient(
         0f to background.copy(alpha = 0f),

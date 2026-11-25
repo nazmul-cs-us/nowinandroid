@@ -109,6 +109,13 @@ class HomeScreenBugFixTest {
         assertEquals("Do not retain the long passage's empty space after returning", initialHeight, fittedHeight, .5f)
     }
 
+    @Test fun navigationClearanceUsesMeasuredOverlapWithoutReservingItTwice() {
+        assertEquals(64f, homeNavigationOverlapPx(840f, 776f))
+        assertEquals(0f, homeNavigationOverlapPx(770f, 776f))
+        assertNull(homeNavigationOverlapPx(Float.NaN, 776f))
+        assertNull(homeNavigationOverlapPx(840f, null))
+    }
+
     @Test fun foregroundContentBlendsIntoTheNavigationSurface() {
         val feed = Color(0xFF352C28)
         compose.setContent {

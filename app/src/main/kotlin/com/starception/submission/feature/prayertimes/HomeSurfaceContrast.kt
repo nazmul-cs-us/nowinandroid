@@ -9,6 +9,12 @@ import androidx.compose.ui.graphics.luminance
 private const val ReflectionOpaqueStart = .35f
 private const val ReflectionOpaqueEnd = .68f
 
+/** Use the actual overlap: a viewport that already ends above the pill needs no reservation. */
+internal fun homeNavigationOverlapPx(viewportBottom: Float, navigationTop: Float?): Float? {
+    if (!viewportBottom.isFinite() || navigationTop == null || !navigationTop.isFinite()) return null
+    return (viewportBottom - navigationTop).coerceAtLeast(0f)
+}
+
 /** PullToSyncContainer's tertiary strip is fully opaque at a .15 reveal. */
 internal fun homeBannerUsesLightIcons(reveal: Float, bannerBackground: Color): Boolean? =
     if (reveal >= .15f) bannerBackground.luminance() < .179f else null

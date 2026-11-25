@@ -3079,8 +3079,17 @@ fun PrayerTimesScreen(
                     .asPaddingValues().calculateTopPadding()
                 val navigationBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
                     .asPaddingValues().calculateBottomPadding()
-                val floatingNavigationClearance = if (!outerIsLandscape && !insightTileExpanded)
-                    navigationBarInset + 80.dp else 0.dp
+                val navigationTopInWindowPx by com.starception.submission.ui.InsightImmersiveBus
+                    .navigationTopInWindowPx.collectAsStateWithLifecycle()
+                val viewportBottomPx = homeViewportTopInWindowPx + measuredHomeViewport.height
+                val floatingNavigationClearance = if (!outerIsLandscape && !insightTileExpanded) {
+                    with(LocalDensity.current) {
+                        homeNavigationOverlapPx(viewportBottomPx, navigationTopInWindowPx)?.toDp()
+                            ?: (WindowInsets.navigationBars.getBottom(this).toDp() +
+                                com.starception.submission.ui.FloatingNavigationDimensions.controlSize +
+                                com.starception.submission.ui.FloatingNavigationDimensions.bottomGap)
+                    }
+                } else 0.dp
                 val clearancePx = with(LocalDensity.current) { floatingNavigationClearance.roundToPx() }
                 val homeViewport = IntSize(measuredHomeViewport.width, (measuredHomeViewport.height - clearancePx).coerceAtLeast(0))
                 val homeViewportBottomInWindowPx = homeViewportTopInWindowPx + homeViewport.height
@@ -3836,7 +3845,7 @@ fun PrayerTimesScreen(
                                             .padding(horizontal = feedGutter)
                                             .padding(
                                                 top = feedTopPadding,
-                                                bottom = if (floatingNavigationClearance > 0.dp) floatingNavigationClearance + 12.dp else 0.dp,
+                                                bottom = if (floatingNavigationClearance > 0.dp) floatingNavigationClearance + 8.dp else 0.dp,
                                             ),
                                         verticalArrangement = Arrangement.Top,
                                     ) {
