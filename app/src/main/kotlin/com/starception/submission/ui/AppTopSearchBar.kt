@@ -902,7 +902,12 @@ fun AppTopSearchBar(
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                val profileName = LocalProfileDisplayName.current?.trim().orEmpty()
+                val profileSignedIn = LocalProfileSignedIn.current
+                val greetingLabel = if (profileSignedIn) {
+                    LocalProfileDisplayName.current?.trim().orEmpty()
+                } else {
+                    "Sign In"
+                }
                 val headerShadow = Shadow(
                     color = ComposeColor.Black.copy(alpha = if (homeHeaderLightText) .24f else .03f),
                     offset = Offset(0f, 1f),
@@ -911,7 +916,9 @@ fun AppTopSearchBar(
                 Column(
                     modifier = Modifier.weight(1f)
                         .padding(top = 8.dp)
-                        .clickable(onClickLabel = "Open profile") { currentOnProfileClick() },
+                        .clickable(onClickLabel = if (profileSignedIn) "Open profile" else "Sign in") {
+                            currentOnProfileClick()
+                        },
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Row(
@@ -924,15 +931,15 @@ fun AppTopSearchBar(
                             shadow = headerShadow,
                         )
                         Text(
-                            text = if (profileName.isBlank()) "Salam" else "Salam,",
+                            text = if (greetingLabel.isBlank()) "Salam" else "Salam,",
                             modifier = Modifier.alignByBaseline(),
                             style = greetingStyle,
                             color = greetingColor,
                             maxLines = 1,
                         )
-                        if (profileName.isNotBlank()) {
+                        if (greetingLabel.isNotBlank()) {
                             Text(
-                                text = profileName,
+                                text = greetingLabel,
                                 modifier = Modifier.weight(1f, fill = false).alignByBaseline(),
                                 style = greetingStyle.copy(fontWeight = FontWeight.Bold),
                                 color = greetingColor,
