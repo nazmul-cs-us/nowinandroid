@@ -338,6 +338,11 @@ fun NiaApp(
             if (showProfileSheet) {
                 ProfileSheet(
                     uiState = authUiState,
+                    familyAccount = familyClient?.state?.collectAsStateWithLifecycle()?.value?.takeIf { it.connected || it.reconnecting }?.me,
+                    onOpenFamily = familyClient?.let { {
+                        showProfileSheet = false
+                        appState.navigateToTopLevelDestination(TopLevelDestination.FAMILY)
+                    } },
                     onSignIn = { provider ->
                         activity?.let { authViewModel.signIn(it, provider) }
                         showProfileSheet = false

@@ -6,12 +6,18 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Cloud
@@ -144,5 +150,21 @@ fun HomeRotatingHeaderText(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+    }
+}
+
+@Composable
+fun HomeProfileAvatar(tint: Color) {
+    Box(Modifier.size(30.dp).background(tint.copy(alpha = .16f), CircleShape), contentAlignment = Alignment.Center) {
+        Icon(Icons.Outlined.PersonOutline, null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+fun FamilyProfileEntry(account: String?, onClick: () -> Unit) {
+    androidx.compose.material3.OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text(account?.takeIf { it.isNotBlank() }?.substringBefore('@') ?: "Family account",
+            modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(if (account == null) "Sign in" else "Open chats")
     }
 }

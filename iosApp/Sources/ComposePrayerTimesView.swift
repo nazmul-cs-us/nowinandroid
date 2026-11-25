@@ -68,6 +68,7 @@ struct ComposePrayerTimesTabView: UIViewControllerRepresentable {
                 salahTfliteService: SalahTfliteServiceImpl(),
                 salah3DService: SalahScene3DHost(),
                 startBottomIndex: Int32(tabIndex),
+                familyAccount: { FamilyStore.shared.signedIn ? FamilyStore.shared.me : nil },
                 onSelectBottom: { index in
                     onSelectTab(Int(index.int32Value))
                 }

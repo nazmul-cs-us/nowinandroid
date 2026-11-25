@@ -57,7 +57,10 @@ class HomeHeaderDepthActionTest {
                 )))) {
                     Column(Modifier.align(Alignment.TopStart).padding(22.dp).width(240.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        HomeHeaderGreeting("Assalamu alaikum", Color(0xFF101827), false)
+                        androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            com.starception.submission.feature.prayertimes.HomeProfileAvatar(Color(0xFF101827))
+                            HomeHeaderGreeting("Salam, evening", Color(0xFF101827), false)
+                        }
                         HomeRotatingHeaderText(
                             listOf(headerDetail.value),
                             HomeHeaderTypography.detail, Color(0xFF101827).copy(alpha = .92f))

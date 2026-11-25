@@ -907,11 +907,10 @@ fun AppTopSearchBar(
                         .semantics { contentDescription = "Open profile" },
                     verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    HomeHeaderGreeting(
-                        text = homeGreetingText,
-                        color = greetingColor,
-                        onDarkArtwork = homeHeaderLightText,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.starception.submission.feature.prayertimes.HomeProfileAvatar(greetingColor)
+                        HomeHeaderGreeting(homeGreetingText, greetingColor, homeHeaderLightText)
+                    }
                     if (homeSupportingTexts.any { it.text.isNotBlank() }) {
                         HomeRotatingHeaderText(
                             texts = homeSupportingTexts,

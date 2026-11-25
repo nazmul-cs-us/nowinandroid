@@ -20,6 +20,7 @@ import com.starception.submission.settings.components.GuideSection
 import com.starception.submission.settings.components.appGuideAnchor
 import com.starception.submission.feature.prayertimes.homeNavigationReveal
 import com.starception.submission.feature.prayertimes.homeHeaderLocation
+import com.starception.submission.feature.prayertimes.HomeProfileAvatar
 import com.starception.submission.feature.prayertimes.HomeHeaderDetail
 import com.starception.submission.feature.prayertimes.HomeHeaderDetailKind
 import com.starception.submission.feature.prayertimes.HomeHeaderTypography
@@ -255,6 +256,8 @@ fun PrayerTimesScreen(
     onInsightImmersiveChange: (Boolean) -> Unit = {},
     homeCountryName: String = "",
     homeCountryCode: String = "",
+    onOpenFamilyAccount: (() -> Unit)? = null,
+    familyAccount: () -> String? = { null },
 ) {
     val prayerContentHeights = remember(LocalDensity.current.fontScale) { mutableStateMapOf<String, Dp>() }
     var showAllPrayers by remember { mutableStateOf(initialShowAllPrayers) }
@@ -753,6 +756,8 @@ fun PrayerTimesScreen(
                             }
                             if (showProfileSheet) {
                                 HomeProfileSheet(
+                                    familyAccount = familyAccount(),
+                                    onOpenFamily = onOpenFamilyAccount?.let { open -> { showProfileSheet = false; open() } },
                                     onOpenProfile = {
                                         showProfileSheet = false
                                         onOpenProfile()
@@ -1315,13 +1320,17 @@ private fun PrayerHomeHeader(
     if (onArtwork) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(Modifier.weight(1f).clickable(onClickLabel = "Open profile", onClick = onShowProfile), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 val ink = if (lightHeaderInk) Color.White else Color(0xFF101827)
                 val headerShadow = androidx.compose.ui.graphics.Shadow(
                     color = Color.Black.copy(alpha = if (lightHeaderInk) .18f else .03f),
                     offset = androidx.compose.ui.geometry.Offset(0f, .5f), blurRadius = 2f,
                 )
-                Text(greeting, style = HomeHeaderTypography.greeting.copy(shadow = headerShadow), color = ink, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HomeProfileAvatar(ink)
+                    Text(greeting, style = HomeHeaderTypography.greeting.copy(shadow = headerShadow),
+                    color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 HomeRotatingHeaderText(supportingTexts, style = HomeHeaderTypography.detail.copy(shadow = headerShadow), color = ink.copy(alpha = .86f))
             }
             AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings, guideHomeActions = true)
@@ -1905,6 +1914,8 @@ private fun SuggestionRow(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeProfileSheet(
+    familyAccount: String?,
+    onOpenFamily: (() -> Unit)?,
     onOpenProfile: () -> Unit,
     onSelectSaved: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -1944,6 +1955,10 @@ private fun HomeProfileSheet(
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(20.dp))
+            onOpenFamily?.let {
+                com.starception.submission.feature.prayertimes.FamilyProfileEntry(familyAccount, it)
+                Spacer(Modifier.height(10.dp))
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 androidx.compose.material3.FilledTonalButton(
                     onClick = onSelectSaved,

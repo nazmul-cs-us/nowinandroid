@@ -67,6 +67,8 @@ fun ProfileSheet(
     uiState: AuthUiState,
     onSignIn: (provider: String) -> Unit,
     onSignOut: () -> Unit,
+    familyAccount: String?,
+    onOpenFamily: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -110,6 +112,7 @@ fun ProfileSheet(
                         )
                     }
 
+                    onOpenFamily?.let { com.starception.submission.feature.prayertimes.FamilyProfileEntry(familyAccount, it) }
                     when (uiState) {
                         is AuthUiState.LoggedIn -> {
                             Text(

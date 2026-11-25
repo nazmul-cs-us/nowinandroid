@@ -444,6 +444,7 @@ fun PrayerTimesTabViewController(
     salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService? = null,
     salah3DService: Salah3DSceneService? = null,
     startBottomIndex: Int,
+    familyAccount: () -> String?,
     onSelectBottom: (Int) -> Unit,
 ): UIViewController = createPrayerTimesViewController(
     sherpaService = sherpaService,
@@ -451,6 +452,7 @@ fun PrayerTimesTabViewController(
     salahTfliteService = salahTfliteService,
     salah3DService = salah3DService,
     startBottomIndex = startBottomIndex,
+    familyAccount = familyAccount,
     onSelectBottom = onSelectBottom,
 )
 
@@ -460,6 +462,7 @@ private fun createPrayerTimesViewController(
     salahTfliteService: com.starception.submission.shared.ml.SalahTfliteService?,
     salah3DService: Salah3DSceneService?,
     startBottomIndex: Int,
+    familyAccount: () -> String? = { null },
     onSelectBottom: ((Int) -> Unit)?,
 ): UIViewController = ComposeUIViewController {
     com.starception.submission.shared.audio.QuranReciterLibrary.platform =
@@ -1110,6 +1113,8 @@ private fun createPrayerTimesViewController(
                             notificationPrefs = settingsStore.setAdhanVolumeForPrayer(prayer, volume)
                         },
                         onOpenProfile = actions.onOpenProfile,
+                        familyAccount = familyAccount,
+                        onOpenFamilyAccount = onSelectBottom?.let { select -> { select(7) } },
                         onOpenSearch = actions.onOpenSearch,
                         searchController = actions.searchController,
                         onOpenQuran = actions.onOpenQuran,
