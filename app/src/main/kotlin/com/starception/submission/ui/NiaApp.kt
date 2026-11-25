@@ -257,7 +257,10 @@ fun NiaApp(
             appState.navigateToTopLevelDestination(TopLevelDestination.HOME)
     }
     val familyOwnsAudio by com.starception.submission.family.FamilyAudioSession.state.collectAsStateWithLifecycle()
-    val guideCallActive = familyClient?.state?.collectAsStateWithLifecycle()?.value?.call != null
+    val familyState = familyClient?.state?.collectAsStateWithLifecycle()?.value
+    val familySignedIn = familyState?.let { it.connected || it.reconnecting } == true
+    val familyAccount = familyState?.me?.takeIf { familySignedIn && it.isNotBlank() }
+    val guideCallActive = familyState?.call != null
     LaunchedEffect(familyOwnsAudio) {
         if (familyOwnsAudio && mainViewModel?.globalMedia?.controllerState?.value?.playback?.isPlaying == true) {
             mainViewModel.globalMedia.pause()
@@ -271,6 +274,9 @@ fun NiaApp(
     // LocalProfileClick CompositionLocal without threading a lambda through every screen.
     val authViewModel: AuthViewModel = hiltViewModel()
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val signedInProfile = authUiState as? AuthUiState.LoggedIn
+    val profileDisplayName = signedInProfile?.displayName?.trim()?.takeIf { it.isNotEmpty() }
+        ?: familyAccount?.let { com.starception.submission.family.callDisplayName(it) }
     var showProfileSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
@@ -306,9 +312,9 @@ fun NiaApp(
 
             CompositionLocalProvider(
                 com.starception.submission.settings.components.LocalAppGuideEnabled provides (!guideCallActive && !familyOwnsAudio && !showProfileSheet && pendingCountrySwitch == null),
-                LocalProfileDisplayName provides (authUiState as? AuthUiState.LoggedIn)?.displayName,
+                LocalProfileDisplayName provides profileDisplayName,
                 LocalProfileClick provides { showProfileSheet = true },
-                LocalProfileAvatarUrl provides (authUiState as? AuthUiState.LoggedIn)?.avatarUrl,
+                LocalProfileAvatarUrl provides signedInProfile?.avatarUrl,
             ) {
                 NiaAppContent(
                     appState = appState,
@@ -317,9 +323,9 @@ fun NiaApp(
                     windowAdaptiveInfo = windowAdaptiveInfo,
                     mainViewModel = mainViewModel,
                     deepLinkCourseId = deepLinkCourseId,
-                    familyUnreadCount = familyClient?.state?.collectAsStateWithLifecycle()?.value?.unreadCount ?: 0,
-                    familyChatOpen = familyClient?.state?.collectAsStateWithLifecycle()?.value?.chatPeer != null,
-                    familySignedIn = familyClient?.state?.collectAsStateWithLifecycle()?.value?.let { it.connected || it.reconnecting } == true,
+                    familyUnreadCount = familyState?.unreadCount ?: 0,
+                    familyChatOpen = familyState?.chatPeer != null,
+                    familySignedIn = familySignedIn,
                 )
             }
 
@@ -339,7 +345,7 @@ fun NiaApp(
             if (showProfileSheet) {
                 ProfileSheet(
                     uiState = authUiState,
-                    familyAccount = familyClient?.state?.collectAsStateWithLifecycle()?.value?.takeIf { it.connected || it.reconnecting }?.me,
+                    familyAccount = familyAccount,
                     onOpenFamily = familyClient?.let { {
                         showProfileSheet = false
                         appState.navigateToTopLevelDestination(TopLevelDestination.FAMILY)
