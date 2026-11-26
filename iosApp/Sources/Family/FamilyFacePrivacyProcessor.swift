@@ -24,8 +24,10 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
     private var previousFace: CGRect?
     private var previousTimestampNs: Int64 = 0
     private var previousRevision = -1
-    private var lastMaskedTimestampNs: Int64 = 0
-    private var lastMaskedRevision = -1
+    private var lastOutputTimestampNs: Int64 = 0
+    private var lastOutputRevision = -1
+    private var lastOutputFaceMasked = false
+    private var recoveryDetectionNs: Int64?
 
     init(downstream: RTCVideoCapturerDelegate,
          detectFaces: @escaping FaceDetector = FamilyFacePrivacyProcessor.localFaces,
@@ -66,8 +68,9 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
                 gate.lock(); defer { gate.unlock() }
                 if !closed && enabled && token == revision {
                     downstream.capturer(capturer, didCapture: protected.frame)
-                    lastMaskedTimestampNs = frame.timeStampNs
-                    lastMaskedRevision = protected.faceMasked ? token : -1
+                    lastOutputTimestampNs = frame.timeStampNs
+                    lastOutputRevision = token
+                    lastOutputFaceMasked = protected.faceMasked
                 }
             }
         }
@@ -86,17 +89,26 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
         let rotated = CIImage(cvPixelBuffer: input.pixelBuffer).oriented(orientation)
         let image = rotated.transformed(by: CGAffineTransform(translationX: -rotated.extent.minX, y: -rotated.extent.minY))
         let extent = image.extent
-        let faces = ((try? detectFaces(image)) ?? []).filter {
+        let detectedFaces = ((try? detectFaces(image)) ?? []).filter {
             !$0.isNull && !$0.isInfinite && $0.minX.isFinite && $0.minY.isFinite && $0.width.isFinite
                 && $0.height.isFinite && !$0.isEmpty
         }.map {
             $0.insetBy(dx: -$0.width / 3, dy: -$0.height / 3)
         }.filter { $0.intersects(extent) && !$0.intersection(extent).isEmpty }
         // Leave the last protected picture visible through a brief detection miss.
-        let sinceMaskedNs = frame.timeStampNs - lastMaskedTimestampNs
-        if faces.isEmpty, lastMaskedRevision == revision, (1...200_000_000).contains(sinceMaskedNs) {
+        let sameStream = lastOutputRevision == revision
+        let sinceOutputNs = frame.timeStampNs - lastOutputTimestampNs
+        if detectedFaces.isEmpty, sameStream, lastOutputFaceMasked, (1...200_000_000).contains(sinceOutputNs) {
             return nil
         }
+
+        // Hold full-frame blur until two consecutive frames have a face.
+        let recovering = sameStream && !lastOutputFaceMasked && !detectedFaces.isEmpty
+        let recoveryConfirmed = recovering && recoveryDetectionNs.map {
+            (1...350_000_000).contains(frame.timeStampNs - $0)
+        } == true
+        let faces = recovering && !recoveryConfirmed ? [] : detectedFaces
+        recoveryDetectionNs = recovering && !recoveryConfirmed ? frame.timeStampNs : nil
         let currentFace = faces.count == 1 ? faces.first : nil
         let elapsedNs = frame.timeStampNs - previousTimestampNs
         let regions: [CGRect]

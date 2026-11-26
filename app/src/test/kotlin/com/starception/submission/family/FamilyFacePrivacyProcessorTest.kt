@@ -92,6 +92,15 @@ class FamilyFacePrivacyProcessorTest {
             submitAndAwaitDetection(350_000_001)
             assertEquals(350_000_001L, receiver.timestamps.poll(5, TimeUnit.SECONDS))
             assertTrue(receiver.pixels.all { (it.toInt() and 255) in 110..145 })
+
+            faceVisible.set(true)
+            submitAndAwaitDetection(400_000_001)
+            assertEquals(400_000_001L, receiver.timestamps.poll(5, TimeUnit.SECONDS))
+            assertTrue(receiver.pixels.all { (it.toInt() and 255) in 110..145 })
+
+            submitAndAwaitDetection(450_000_001)
+            assertEquals(450_000_001L, receiver.timestamps.poll(5, TimeUnit.SECONDS))
+            assertEquals(0, receiver.pixels.first().toInt())
         } finally { processor.close() }
     }
 

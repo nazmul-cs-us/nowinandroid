@@ -35,8 +35,10 @@ internal class FamilyFacePrivacyProcessor(
     private var previousFace: PrivacyRegion? = null
     private var previousTimestampNs = 0L
     private var previousRevision = -1
-    private var lastMaskedTimestampNs = 0L
-    private var lastMaskedRevision = -1
+    private var lastOutputTimestampNs = 0L
+    private var lastOutputRevision = -1
+    private var lastOutputFaceMasked = false
+    private var recoveryDetectionNs: Long? = null
 
     fun setEnabled(value: Boolean) = synchronized(gate) {
         if (enabled != value) { revision++; enabled = value }
@@ -75,7 +77,7 @@ internal class FamilyFacePrivacyProcessor(
             val nv21 = ByteArray(y.size + 2 * u.size)
             y.copyInto(nv21)
             for (i in u.indices) { nv21[y.size + 2 * i] = v[i]; nv21[y.size + 2 * i + 1] = u[i] }
-            val faces = runCatching {
+            val detectedFaces = runCatching {
                 detectFaces?.invoke(nv21, width, height) ?: findFaces(nv21, width, height)
             }.getOrDefault(emptyList())
                 .filter { region ->
@@ -84,8 +86,17 @@ internal class FamilyFacePrivacyProcessor(
                 }
             // Keep the last protected picture through a brief detection miss. Never apply
             // an old face region to the new frame. Sustained misses use full-frame blur.
-            val sinceMaskedNs = frame.timestampNs - lastMaskedTimestampNs
-            if (faces.isEmpty() && lastMaskedRevision == token && sinceMaskedNs in 1L..200_000_000L) return
+            val sameStream = lastOutputRevision == token
+            val sinceOutputNs = frame.timestampNs - lastOutputTimestampNs
+            if (detectedFaces.isEmpty() && sameStream && lastOutputFaceMasked && sinceOutputNs in 1L..200_000_000L) return
+
+            // Hold full-frame blur until two consecutive frames have a face.
+            val recovering = sameStream && !lastOutputFaceMasked && detectedFaces.isNotEmpty()
+            val recoveryConfirmed = recovering && recoveryDetectionNs?.let {
+                (frame.timestampNs - it) in 1L..350_000_000L
+            } == true
+            val faces = if (recovering && !recoveryConfirmed) emptyList() else detectedFaces
+            recoveryDetectionNs = if (recovering && !recoveryConfirmed) frame.timestampNs else null
 
             output = allocate(width, height)
             val currentFace = faces.singleOrNull()
@@ -116,8 +127,9 @@ internal class FamilyFacePrivacyProcessor(
             synchronized(gate) {
                 if (!closed && enabled && token == revision) {
                     downstream.onFrameCaptured(VideoFrame(output, 0, frame.timestampNs))
-                    lastMaskedTimestampNs = frame.timestampNs
-                    lastMaskedRevision = if (oval) token else -1
+                    lastOutputTimestampNs = frame.timestampNs
+                    lastOutputRevision = token
+                    lastOutputFaceMasked = oval
                 }
             }
         } catch (_: Exception) {
