@@ -10,7 +10,7 @@ final class FamilyFacePrivacyProcessorTests: XCTestCase {
         func capturer(_ capturer: RTCVideoCapturer, didCapture frame: RTCVideoFrame) { receive(frame) }
     }
     private enum DetectionError: Error { case unavailable }
-    private func checkerboard(rotation: RTCVideoRotation = ._0) throws -> RTCVideoFrame {
+    private func checkerboard(rotation: RTCVideoRotation = ._0, timestampNs: Int64 = 123) throws -> RTCVideoFrame {
         var pixel: CVPixelBuffer?
         let attributes = [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary
         XCTAssertEqual(CVPixelBufferCreate(nil, 64, 48, kCVPixelFormatType_32BGRA, attributes, &pixel), kCVReturnSuccess)
@@ -24,7 +24,7 @@ final class FamilyFacePrivacyProcessorTests: XCTestCase {
             bytes[i] = value; bytes[i + 1] = value; bytes[i + 2] = value; bytes[i + 3] = 255
         } }
         CVPixelBufferUnlockBaseAddress(buffer, [])
-        return RTCVideoFrame(buffer: RTCCVPixelBuffer(pixelBuffer: buffer), rotation: rotation, timeStampNs: 123)
+        return RTCVideoFrame(buffer: RTCCVPixelBuffer(pixelBuffer: buffer), rotation: rotation, timeStampNs: timestampNs)
     }
     private func values(_ frame: RTCVideoFrame) throws -> [UInt8] {
         let pixel = try XCTUnwrap(frame.buffer as? RTCCVPixelBuffer).pixelBuffer
@@ -37,7 +37,7 @@ final class FamilyFacePrivacyProcessorTests: XCTestCase {
         }
     }
     private func protectedResult(detector: @escaping FamilyFacePrivacyProcessor.FaceDetector,
-                                 rotation: RTCVideoRotation = ._0) throws -> RTCVideoFrame {
+                                 rotation: RTCVideoRotation = ._0, timestampNs: Int64 = 123) throws -> RTCVideoFrame {
         let delivered = expectation(description: "Protected frame")
         var result: RTCVideoFrame?
         let receiver = Receiver { result = $0; delivered.fulfill() }
@@ -45,7 +45,7 @@ final class FamilyFacePrivacyProcessorTests: XCTestCase {
             context: CIContext(options: [.useSoftwareRenderer: true]))
         defer { processor.close() }
         let capture = RTCVideoCapturer(delegate: processor)
-        processor.capturer(capture, didCapture: try checkerboard(rotation: rotation))
+        processor.capturer(capture, didCapture: try checkerboard(rotation: rotation, timestampNs: timestampNs))
         wait(for: [delivered], timeout: 10)
         return try XCTUnwrap(result)
     }
@@ -63,14 +63,29 @@ final class FamilyFacePrivacyProcessorTests: XCTestCase {
         let frame = try protectedResult(detector: { _ in [CGRect(x: -100, y: -100, width: 1, height: 1)] })
         XCTAssertTrue(try values(frame).allSatisfy { $0 > 40 && $0 < 215 })
     }
-    func testOvalFaceBlurPreservesBackgroundAndCorners() throws {
+    func testFaceMaskPreservesBackgroundAndTapersAtJaw() throws {
         let frame = try protectedResult(detector: { _ in [CGRect(x: 20, y: 14, width: 24, height: 20)] })
         let pixels = try values(frame)
         XCTAssertEqual(pixels[0], 0)
         XCTAssertEqual(pixels[1], 255)
         XCTAssertEqual(pixels[8 * 64 + 13], 255)
+        XCTAssertGreaterThan(pixels[14 * 64 + 48], 60)
+        XCTAssertEqual(pixels[33 * 64 + 48], 255)
         XCTAssertTrue(pixels[24 * 64 + 32] > 40 && pixels[24 * 64 + 32] < 215)
     }
+    func testDotsMoveOnIdenticalFramesAndLoop() throws {
+        let detector: FamilyFacePrivacyProcessor.FaceDetector = { _ in
+            [CGRect(x: 20, y: 14, width: 24, height: 20)]
+        }
+        let start = try values(protectedResult(detector: detector, timestampNs: 0))
+        let quarter = try values(protectedResult(detector: detector, timestampNs: 700_000_000))
+        let loop = try values(protectedResult(detector: detector, timestampNs: 2_800_000_000))
+
+        XCTAssertNotEqual(start, quarter)
+        XCTAssertEqual(start, loop)
+        XCTAssertEqual(start[0], quarter[0])
+    }
+
     func testAllCameraRotationsProduceUprightFrames() throws {
         for rotation: RTCVideoRotation in [._0, ._90, ._180, ._270] {
             let frame = try protectedResult(detector: { _ in [] }, rotation: rotation)

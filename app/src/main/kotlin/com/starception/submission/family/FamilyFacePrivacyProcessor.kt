@@ -31,6 +31,10 @@ internal class FamilyFacePrivacyProcessor(
             .setMinFaceSize(0.1f).build())
     }
     private var detectorCreated = false
+    // Accessed only on the worker. Each mask is based on the current frame's detection.
+    private var previousFace: PrivacyRegion? = null
+    private var previousTimestampNs = 0L
+    private var previousRevision = -1
 
     fun setEnabled(value: Boolean) = synchronized(gate) {
         if (enabled != value) { revision++; enabled = value }
@@ -77,11 +81,23 @@ internal class FamilyFacePrivacyProcessor(
                     val visible = region.clamped(width, height)
                     visible.right > visible.left && visible.bottom > visible.top
                 }
-            val regions = faces.ifEmpty { listOf(PrivacyRegion(0, 0, width, height)) }
+            val currentFace = faces.singleOrNull()
+            val elapsedNs = frame.timestampNs - previousTimestampNs
+            val stabilized = currentFace?.let { face ->
+                previousFace?.takeIf { previousRevision == token && elapsedNs in 1L..150_000_000L }
+                    ?.let(face::stabilizedFrom) ?: face
+            }
+            previousFace = currentFace
+            previousTimestampNs = frame.timestampNs
+            previousRevision = token
+            val regions = stabilized?.let { listOf(it) }
+                ?: faces.ifEmpty { listOf(PrivacyRegion(0, 0, width, height)) }
             val oval = faces.isNotEmpty()
             for (bounds in regions) {
                 val radius = (minOf(bounds.right - bounds.left, bounds.bottom - bounds.top) / 5).coerceAtLeast(12)
-                FamilyPrivacyBlur.apply(y, width, height, bounds, radius, oval = oval, dots = oval)
+                FamilyPrivacyBlur.apply(
+                    y, width, height, bounds, radius, oval = oval, dots = oval, timestampNs = frame.timestampNs,
+                )
                 val chroma = PrivacyRegion(Math.floorDiv(bounds.left, 2), Math.floorDiv(bounds.top, 2),
                     Math.floorDiv(bounds.right + 1, 2), Math.floorDiv(bounds.bottom + 1, 2))
                 FamilyPrivacyBlur.apply(u, chromaWidth, (height + 1) / 2, chroma, (radius / 2).coerceAtLeast(1), oval = oval)

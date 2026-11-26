@@ -1,12 +1,34 @@
 package com.starception.submission.family
 
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlin.math.sin
+
 internal data class PrivacyRegion(val left: Int, val top: Int, val right: Int, val bottom: Int) {
     fun clamped(width: Int, height: Int) = PrivacyRegion(left.coerceIn(0, width), top.coerceIn(0, height),
         right.coerceIn(0, width), bottom.coerceIn(0, height))
+
+    fun stabilizedFrom(previous: PrivacyRegion): PrivacyRegion {
+        val width = right - left
+        val height = bottom - top
+        val horizontalLimit = width * .025f
+        val verticalLimit = height * .025f
+        val shiftX = (((previous.left + previous.right) - (left + right)) * .25f)
+            .coerceIn(-horizontalLimit, horizontalLimit).roundToInt()
+        val shiftY = (((previous.top + previous.bottom) - (top + bottom)) * .25f)
+            .coerceIn(-verticalLimit, verticalLimit).roundToInt()
+        // Expand the shifted mask to preserve coverage around the current face.
+        return PrivacyRegion(
+            left + shiftX - abs(shiftX), top + shiftY - abs(shiftY),
+            right + shiftX + abs(shiftX), bottom + shiftY + abs(shiftY),
+        )
+    }
 }
 
 /** Three separable box passes approximate a strong Gaussian blur, including the chroma planes. */
 internal object FamilyPrivacyBlur {
+    private const val DOT_CYCLE_NS = 2_800_000_000L
     fun apply(
         plane: ByteArray,
         width: Int,
@@ -15,6 +37,7 @@ internal object FamilyPrivacyBlur {
         radius: Int,
         oval: Boolean = false,
         dots: Boolean = false,
+        timestampNs: Long = 0,
     ) {
         val b = region.clamped(width, height)
         val w = b.right - b.left
@@ -60,25 +83,53 @@ internal object FamilyPrivacyBlur {
         val radiusX = (region.right - region.left) / 2f
         val radiusY = (region.bottom - region.top) / 2f
         val spacing = (minOf(radiusX, radiusY) / 9f).coerceIn(5f, 14f)
+        // Move the repeating grid by one cell per cycle so the loop joins seamlessly.
+        val phase = Math.floorMod(timestampNs, DOT_CYCLE_NS).toFloat() / DOT_CYCLE_NS
+        val shift = spacing * (1f - phase)
+        val pulse = .055f * sin((2 * PI * phase).toFloat())
+        val faceX = FloatArray(w) { x -> (b.left + x + .5f - centerX) / radiusX }
+        val faceXSquared = FloatArray(w) { x -> faceX[x] * faceX[x] }
+        val dotCenterXSquared = FloatArray(if (dots) w else 0)
+        val dotOffsetXSquared = FloatArray(if (dots) w else 0)
+        if (dots) {
+            for (x in 0 until w) {
+                val localX = b.left + x + .5f - region.left
+                val dotX = (localX + shift) % spacing - spacing / 2f
+                val dotCenterX = faceX[x] - dotX / radiusX
+                val horizontalScale = 1f - .42f * abs(dotCenterX).coerceAtMost(1f)
+                dotCenterXSquared[x] = dotCenterX * dotCenterX
+                val offset = dotX / horizontalScale
+                dotOffsetXSquared[x] = offset * offset
+            }
+        }
         for (y in 0 until h) {
             val localY = b.top + y + .5f - region.top
             val dy = (b.top + y + .5f - centerY) / radiusY
-            val dotY = localY % spacing - spacing / 2f
-            val dotRadius = spacing * (.17f + .12f * (1f - dy * dy).coerceIn(0f, 1f))
+            // A broader forehead and cheeks taper into a narrower jaw.
+            val jawTaper = 1f - .36f * ((dy - .20f) / .80f).coerceIn(0f, 1f)
+            val horizontalWeight = 1f / (jawTaper * jawTaper)
+            val verticalDistance = dy * dy * dy * dy
+            val dotY = (localY + shift) % spacing - spacing / 2f
+            val dotCenterY = dy - dotY / radiusY
+            val dotCenterYSquared = dotCenterY * dotCenterY
+            val verticalScale = 1f - .42f * abs(dotCenterY).coerceAtMost(1f)
+            val dotOffsetY = dotY / verticalScale
+            val dotOffsetYSquared = dotOffsetY * dotOffsetY
+            val rowIndex = (b.top + y) * width + b.left
             for (x in 0 until w) {
-                val dx = (b.left + x + .5f - centerX) / radiusX
-                val distanceSquared = dx * dx + dy * dy
+                val maskDistance = faceXSquared[x] * horizontalWeight + verticalDistance
                 // Keep full blur across the face. Feather only the padded outer edge.
-                val coverage = if (oval) ((1f - distanceSquared) / .24f).coerceIn(0f, 1f) else 1f
+                val coverage = if (oval) ((1f - maskDistance) / .24f).coerceIn(0f, 1f) else 1f
                 if (coverage == 0f) continue
-                val index = (b.top + y) * width + b.left + x
+                val index = rowIndex + x
                 val original = plane[index].toInt() and 255
                 var blurred = pixels[y * w + x].toFloat()
                 if (dots) {
-                    val localX = b.left + x + .5f - region.left
-                    val dotX = localX % spacing - spacing / 2f
-                    val dot = ((dotRadius * dotRadius - dotX * dotX - dotY * dotY) / dotRadius)
-                        .coerceIn(0f, 1f)
+                    // Sample perspective at the dot center so every dot has a coherent outline.
+                    val distanceFromCenter = (dotCenterXSquared[x] + dotCenterYSquared).coerceAtMost(1f)
+                    val dotRadius = spacing * (.34f - .13f * distanceFromCenter + pulse)
+                    val ellipseDistance = (dotOffsetXSquared[x] + dotOffsetYSquared) / (dotRadius * dotRadius)
+                    val dot = ((1f - ellipseDistance) * 2.6f).coerceIn(0f, 1f)
                     blurred += (235f - blurred).coerceAtLeast(0f) * .36f * dot
                 }
                 plane[index] = (original + (blurred - original) * coverage).toInt().toByte()
