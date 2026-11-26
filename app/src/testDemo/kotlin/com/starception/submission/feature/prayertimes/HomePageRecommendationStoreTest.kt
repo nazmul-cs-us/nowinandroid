@@ -15,6 +15,24 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class HomePageRecommendationStoreTest {
+    @Test fun additionalReadingsRestoreForTheSameTileDayAndContext() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = context.getSharedPreferences("more_home_readings_test", Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+        val store = HomePageRecommendationStore(prefs)
+        val day = "2026-11-24"
+        val reading = candidate(2, "Fresh")
+        store.saveAdditional(day, 2, listOf(reading, reading), "Isha")
+
+        val restored = HomePageGenerationState()
+        store.restore(day, restored, "Isha")
+        assertEquals(listOf(reading.sourceId), restored.additionalRecommendations[2]?.map { it.sourceId })
+        assertNull(restored.additionalRecommendations[0])
+        val stale = HomePageGenerationState()
+        store.restore(day, stale, "Fajr")
+        assertNull(stale.additionalRecommendations[2])
+    }
+
     @Test fun recommendationsForDifferentTilesAndKindsRestoreIndependently() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = context.getSharedPreferences("typed_home_recommendations_test", Context.MODE_PRIVATE)

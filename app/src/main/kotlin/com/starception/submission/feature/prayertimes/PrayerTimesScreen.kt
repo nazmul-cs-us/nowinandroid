@@ -187,6 +187,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -3132,11 +3133,36 @@ fun PrayerTimesScreen(
                 val homeScrollEngaged by remember(portraitScrollState, homeScrollThreshold) {
                     derivedStateOf { portraitScrollState.value > homeScrollThreshold }
                 }
+                var recommendationBottom by remember(coverPage) { mutableFloatStateOf(Float.NaN) }
+                var loadingMoreRecommendations by remember(coverPage, homePageGeneration) { mutableStateOf(false) }
+                val recommendationScrollStep = with(LocalDensity.current) { 48.dp.roundToPx() }
+                val latestRecommendationViewportTop by rememberUpdatedState(homeViewportTopInWindowPx)
+                val latestRecommendationViewportBottom by rememberUpdatedState(homeViewportBottomInWindowPx)
+
+                suspend fun loadHomeRecommendation(
+                    page: Int,
+                    kind: KnowledgeSourceKind,
+                    variation: Int,
+                    readingSurah: Int? = null,
+                    excludedSources: Set<String> = emptySet(),
+                ): NowNudgeKnowledgeCandidate? = nowNudgeKnowledgeProvider.load(
+                    date = LocalDate.parse(nudgeDay),
+                    variation = variation,
+                    query = homeRecommendationQuery(page, kind),
+                    appSituation = listOfNotNull(
+                        latestExpandedAppSituation,
+                        "Home tile: ${homeFeedPage(page).eyebrow}. ${homeFeedPage(page).prompt}",
+                    ).joinToString(" "),
+                    rankingContext = latestExpandedKnowledgeContext,
+                    requiredSurahNumber = readingSurah,
+                    sourceKind = kind,
+                    excludedSourceIds = excludedSources,
+                )
+
                 LaunchedEffect(coverPage, homeScrollEngaged, homeModelAvailable, homePageGeneration) {
                     if (!homeModelAvailable || !homeScrollEngaged) return@LaunchedEffect
                     val page = coverPage.coerceIn(0, 4)
                     val recommendationKinds = homeRecommendationKinds(page)
-                    val date = LocalDate.parse(nudgeDay)
                     val readingSurah = com.starception.submission.feature.quran.dailyReading(
                         kotlinx.datetime.LocalDate.parse(nudgeDay),
                     ).number
@@ -3165,17 +3191,9 @@ fun PrayerTimesScreen(
                         for (kind in ready) {
                             val slot = homeRecommendationSlot(page, kind)
                             try {
-                                val candidate = nowNudgeKnowledgeProvider.load(
-                                    date = date,
-                                    variation = 128 + page * 16,
-                                    query = homeRecommendationQuery(page, kind),
-                                    appSituation = listOfNotNull(
-                                        latestExpandedAppSituation,
-                                        "Home tile: ${homeFeedPage(page).eyebrow}. ${homeFeedPage(page).prompt}",
-                                    ).joinToString(" "),
-                                    rankingContext = latestExpandedKnowledgeContext,
-                                    requiredSurahNumber = readingSurah.takeIf { page == 2 && kind == KnowledgeSourceKind.SURAH },
-                                    sourceKind = kind,
+                                val candidate = loadHomeRecommendation(
+                                    page, kind, 128 + page * 16,
+                                    readingSurah = readingSurah.takeIf { page == 2 && kind == KnowledgeSourceKind.SURAH },
                                 )
                                 if (candidate != null) {
                                     generatedHomePages[slot] = candidate
@@ -3191,6 +3209,49 @@ fun PrayerTimesScreen(
                             if (homePageGeneration.attempted[slot] != true) {
                                 homePageGeneration.retryAfter[slot] = android.os.SystemClock.elapsedRealtime() + 30_000L
                             }
+                        }
+                    }
+                }
+                LaunchedEffect(coverPage, homeScrollEngaged, homeModelAvailable, homePageGeneration, insightTileExpanded) {
+                    if (!homeModelAvailable || !homeScrollEngaged || insightTileExpanded) return@LaunchedEffect
+                    val page = coverPage.coerceIn(0, 4)
+                    val kinds = homeRecommendationKinds(page)
+                    val firstSlots = kinds.map { homeRecommendationSlot(page, it) }
+                    val attempted = homePageGeneration.attemptedAdditionalSources.getOrPut(page) { mutableSetOf() }
+                    attempted += homePageGeneration.additionalRecommendations[page].orEmpty().map { it.sourceId }
+                    var nextScroll = 0
+                    var variation = 256 + page * 32 + attempted.size
+                    while (true) {
+                        val scroll = snapshotFlow {
+                            portraitScrollState.value.takeIf {
+                                it >= nextScroll &&
+                                    recommendationBottom.isFinite() &&
+                                    recommendationBottom >= latestRecommendationViewportTop &&
+                                    recommendationBottom <= latestRecommendationViewportBottom &&
+                                    firstSlots.any { slot -> generatedHomePages[slot] != null } &&
+                                    firstSlots.none(homePageGeneration::needsGeneration)
+                            }
+                        }.first { it != null } ?: break
+                        nextScroll = scroll + recommendationScrollStep
+                        loadingMoreRecommendations = true
+                        try {
+                            for (kind in kinds) {
+                                val excluded = attempted + firstSlots.mapNotNull { generatedHomePages[it]?.sourceId }
+                                val candidate = loadHomeRecommendation(page, kind, variation++, excludedSources = excluded)
+                                    ?: continue
+                                attempted += candidate.sourceId
+                                if (candidate.modelGenerated) {
+                                    val updated = homePageGeneration.additionalRecommendations[page].orEmpty() + candidate
+                                    homePageGeneration.additionalRecommendations[page] = updated
+                                    homeRecommendationStore.saveAdditional(nudgeDay, page, updated, suggestionContextKey)
+                                }
+                            }
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            android.util.Log.w("HomeReflection", "Could not prepare more readings for page $page", error)
+                        } finally {
+                            loadingMoreRecommendations = false
                         }
                     }
                 }
@@ -4133,11 +4194,16 @@ fun PrayerTimesScreen(
                                             HomeReadingRecommendations(
                                                 page = coverPage,
                                                 candidates = generatedHomePages,
+                                                additionalRecommendations = homePageGeneration.additionalRecommendations[coverPage].orEmpty(),
                                                 readingSurahNumber = coverReading.number,
-                                                preparing = homeScrollEngaged && homeModelAvailable &&
+                                                translationLanguage = homeTranslationLanguage,
+                                                preparing = loadingMoreRecommendations || (homeScrollEngaged && homeModelAvailable &&
                                                     homeRecommendationKinds(coverPage).any { kind ->
                                                         homePageGeneration.needsGeneration(homeRecommendationSlot(coverPage, kind))
-                                                    },
+                                                    }),
+                                                modifier = Modifier.onGloballyPositioned {
+                                                    recommendationBottom = it.positionInWindow().y + it.size.height
+                                                },
                                                 onOpen = openExpandedAiCandidate,
                                             )
                                             Spacer(Modifier.height(28.dp))

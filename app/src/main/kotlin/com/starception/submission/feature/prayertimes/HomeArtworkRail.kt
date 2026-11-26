@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
@@ -52,11 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.FormatQuote
-import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
@@ -73,15 +68,19 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.R
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.core.images.resources.Res
+import com.starception.submission.core.images.resources.lora_regular
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.abs
 import androidx.compose.runtime.produceState
@@ -154,72 +153,102 @@ internal fun homeRecommendationQuery(page: Int, kind: KnowledgeSourceKind): Stri
 internal fun HomeReadingRecommendations(
     page: Int,
     candidates: Map<Int, NowNudgeKnowledgeCandidate>,
+    additionalRecommendations: List<NowNudgeKnowledgeCandidate>,
     readingSurahNumber: Int,
+    translationLanguage: String,
     preparing: Boolean,
+    modifier: Modifier = Modifier,
     onOpen: (NowNudgeKnowledgeCandidate) -> Unit,
 ) {
     val recommendations = KnowledgeSourceKind.entries.mapNotNull { kind ->
         candidates[homeRecommendationSlot(page, kind)]
             ?.takeIf { kind != KnowledgeSourceKind.SURAH || homeReflectionMatchesReading(page, readingSurahNumber, it.target) }
-    }
+    } + additionalRecommendations
     if (recommendations.isEmpty() && !preparing) return
+    val context = LocalContext.current.applicationContext
     val ink = MaterialTheme.colorScheme.onBackground
-    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-        Text("Suggested reading", style = HomeTypography.section, color = ink)
+    val sourceInk = ink.copy(alpha = .72f)
+    val headlineFont = Font(Res.font.lora_regular)
+    val headlineStyle = remember(headlineFont) {
+        HomeTypography.reflection.copy(
+            fontFamily = FontFamily(headlineFont),
+            fontSize = 16.sp,
+            lineHeight = 22.sp,
+            letterSpacing = 0.sp,
+        )
+    }
+    Column(modifier.fillMaxWidth().padding(top = 12.dp)) {
+        HorizontalDivider(color = ink.copy(alpha = .16f))
+        Text(
+            "Further reading",
+            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+            style = HomeTypography.eyebrow,
+            color = sourceInk,
+        )
         if (preparing && recommendations.isEmpty()) {
             Text(
                 "Preparing recommendations…",
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(vertical = 8.dp),
                 style = HomeTypography.caption,
-                color = ink.copy(alpha = .72f),
+                color = sourceInk,
             )
         }
-        recommendations.forEachIndexed { index, candidate ->
-            if (index > 0) {
-                HorizontalDivider(Modifier.padding(start = 44.dp), color = ink.copy(alpha = .13f))
-            }
-            val (icon, title, source) = when (val target = candidate.target) {
-                is NowNudgeKnowledgeTarget.QuranAyah -> Triple(
-                    Icons.AutoMirrored.Outlined.MenuBook,
+        for (candidate in recommendations) {
+            val (title, source) = when (val target = candidate.target) {
+                is NowNudgeKnowledgeTarget.QuranAyah -> (
                     QuranData.surahs.firstOrNull { it.number == target.surahNumber }
-                        ?.let { "Surah ${it.nameEnglish}" } ?: "Surah ${target.surahNumber}",
-                    "Quran ${target.surahNumber}:${target.ayahNumber}",
-                )
-                is NowNudgeKnowledgeTarget.Hadith -> Triple(
-                    Icons.Outlined.FormatQuote,
+                        ?.let { "Surah ${it.nameEnglish}" } ?: "Surah ${target.surahNumber}"
+                    ) to "Quran ${target.surahNumber}:${target.ayahNumber}"
+                is NowNudgeKnowledgeTarget.Hadith -> (
                     candidate.topic.takeIf { it.isNotBlank() && it != target.collectionName }
-                        ?: "Hadith ${target.hadithNumber}",
-                    candidate.nudge.sourceLabel ?: target.collectionName,
-                )
-                is NowNudgeKnowledgeTarget.FortressDua -> Triple(
-                    Icons.Outlined.Spa,
-                    target.dua.chapterTitle.ifBlank { "Dua" },
-                    "Fortress of the Muslim · Dua ${target.dua.position}",
-                )
+                        ?: "Hadith ${target.hadithNumber}"
+                    ) to (candidate.nudge.sourceLabel ?: target.collectionName)
+                is NowNudgeKnowledgeTarget.FortressDua ->
+                    target.dua.chapterTitle.ifBlank { "Dua" } to "Fortress of the Muslim · Dua ${target.dua.position}"
             }
-            Row(
+            val translation by key(candidate.target, translationLanguage) {
+                produceState<String?>(null) {
+                    if (translationLanguage != "en") {
+                        value = withContext(Dispatchers.IO) {
+                            readHomePassageTranslation(context, candidate.target, translationLanguage)
+                        }
+                    }
+                }
+            }
+            val gist = candidate.nudge.label.takeIf {
+                translationLanguage != "en" && candidate.modelGenerated &&
+                    it.isNotBlank() && !it.equals(title, ignoreCase = true)
+            }
+            val excerpt = translation?.let(::homeEvidencePreview) ?: gist
+                ?: candidate.nudge.supportingText?.let(::homeEvidencePreview)
+            val citation = when {
+                translationLanguage == "en" -> source
+                translation != null -> homeTranslationReference(candidate.target, source, translationLanguage)
+                !excerpt.isNullOrBlank() -> "$source · English"
+                else -> source
+            }
+            Column(
                 modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(candidate) }
-                    .heightIn(min = 56.dp).padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .heightIn(min = 48.dp).padding(vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Box(
-                    Modifier.size(32.dp).background(ink.copy(alpha = .09f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(17.dp), tint = ink.copy(alpha = .86f))
+                Text(title, style = headlineStyle, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (!excerpt.isNullOrBlank()) {
+                    Text(
+                        excerpt, style = HomeTypography.body, color = ink.copy(alpha = .84f),
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(title, style = HomeTypography.cardTitle, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(source, style = HomeTypography.caption, color = ink.copy(alpha = .72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = ink.copy(alpha = .62f),
-                )
+                Text(citation, style = HomeTypography.caption, color = sourceInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+        }
+        if (preparing && recommendations.isNotEmpty()) {
+            Text(
+                "Preparing more readings…",
+                modifier = Modifier.padding(vertical = 8.dp),
+                style = HomeTypography.caption,
+                color = sourceInk,
+            )
         }
     }
 }
@@ -227,6 +256,8 @@ internal fun HomeReadingRecommendations(
 /** Retain one model turn per page/day across Home navigation within this process. */
 internal class HomePageGenerationState {
     val generated = mutableStateMapOf<Int, NowNudgeKnowledgeCandidate>()
+    val additionalRecommendations = mutableStateMapOf<Int, List<NowNudgeKnowledgeCandidate>>()
+    val attemptedAdditionalSources = mutableMapOf<Int, MutableSet<String>>()
     val attempted = mutableStateMapOf<Int, Boolean>()
     val attempts = mutableStateMapOf<Int, Int>()
     val retryAfter = mutableStateMapOf<Int, Long>()
@@ -451,10 +482,12 @@ internal fun HomeReflectionPrompt(
                     val generatedCandidate = generatedInsights[page]?.takeIf {
                         homeReflectionMatchesReading(page, readingSurahNumber, it.target)
                     }
-                    val localized by produceState<HomePassageTranslation?>(null, generatedCandidate?.target, translationLanguage) {
-                        if (generatedCandidate != null && translationLanguage != "en") {
-                            value = withContext(Dispatchers.IO) {
-                                HomePassageTranslation(readHomePassageTranslation(context, generatedCandidate.target, translationLanguage))
+                    val localized by key(generatedCandidate?.target, translationLanguage) {
+                        produceState<String?>(null) {
+                            if (generatedCandidate != null && translationLanguage != "en") {
+                                value = withContext(Dispatchers.IO) {
+                                    readHomePassageTranslation(context, generatedCandidate.target, translationLanguage)
+                                }
                             }
                         }
                     }
@@ -481,15 +514,20 @@ internal fun HomeReflectionPrompt(
                             overflow = TextOverflow.Ellipsis,
                         )
                         generatedCandidate?.nudge?.supportingText?.takeIf(String::isNotBlank)?.let { sourceText ->
-                            val selectedText = if (translationLanguage == "en") sourceText else localized?.text
-                            val preview = selectedText?.let(::homeEvidencePreview) ?: if (localized == null) {
-                                if (translationLanguage == "bn") "অনুবাদ লোড হচ্ছে…" else "Loading selected translation…"
-                            } else homeTranslationUnavailable(translationLanguage)
-                            Text(preview, style = HomeTypography.body,
-                                color = ink.copy(alpha = .88f))
+                            val fallbackToEnglish = translationLanguage != "en" && localized == null
+                            val preview = homeEvidencePreview(localized ?: sourceText)
+                            Text(
+                                preview, style = HomeTypography.body, color = ink.copy(alpha = .88f),
+                                maxLines = 3, overflow = TextOverflow.Ellipsis,
+                            )
                             generatedCandidate.nudge.sourceLabel?.let { reference ->
-                                Text(homeTranslationReference(generatedCandidate.target, reference, translationLanguage), style = HomeTypography.caption,
-                                    color = ink.copy(alpha = .76f))
+                                val citation = homeTranslationReference(
+                                    generatedCandidate.target, reference, if (fallbackToEnglish) "en" else translationLanguage,
+                                )
+                                Text(
+                                    if (fallbackToEnglish) "$citation · English" else citation,
+                                    style = HomeTypography.caption, color = ink.copy(alpha = .76f),
+                                )
                             }
                         }
                     }

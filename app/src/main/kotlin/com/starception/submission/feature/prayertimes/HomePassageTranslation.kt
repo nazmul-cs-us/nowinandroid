@@ -21,8 +21,6 @@ internal fun rememberHomeTranslationLanguage(context: Context): String {
     return language
 }
 
-internal data class HomePassageTranslation(val text: String?)
-
 /** Localize the displayed source by its canonical target, not by translating model output. */
 internal fun readHomePassageTranslation(context: Context, target: NowNudgeKnowledgeTarget, language: String): String? =
     when (target) {
@@ -50,7 +48,7 @@ private fun localHadithPassage(context: Context, target: NowNudgeKnowledgeTarget
             when (language) {
                 "ar" -> query("SELECT text_arabic FROM hadiths WHERE id = ? LIMIT 1")
                 else -> query("SELECT bengali_text FROM hadith_details WHERE hadith_id = ? LIMIT 1")
-                    ?.takeIf { it.hasBengaliSourceText() }
+                    ?.takeIf { text -> text.any { it in '\u0980'..'\u09ff' } }
                     ?: query("SELECT text_plain FROM hadiths WHERE id = ? LIMIT 1")?.takeIf { it.hasBengaliSourceText() }
             }
         }
@@ -58,10 +56,6 @@ private fun localHadithPassage(context: Context, target: NowNudgeKnowledgeTarget
 }
 
 private fun String.hasBengaliSourceText() = any { it in '\u0980'..'\u09ff' } && none { it in 'A'..'Z' || it in 'a'..'z' }
-
-internal fun homeTranslationUnavailable(language: String): String = if (language == "bn")
-    "এই অংশের বাংলা অনুবাদ ডাউনলোড করা নেই। অনুবাদ দেখতে অংশটি খুলুন।"
-    else "The selected translation is not downloaded for this passage. Open the passage to view translations."
 
 internal fun homeTranslationReference(target: NowNudgeKnowledgeTarget, reference: String, language: String): String {
     if (language != "bn" || target !is NowNudgeKnowledgeTarget.QuranAyah) return reference

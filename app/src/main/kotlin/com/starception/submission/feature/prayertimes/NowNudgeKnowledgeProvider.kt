@@ -179,6 +179,7 @@ internal class NowNudgeKnowledgeProvider(
         task: DeenlyKnowledgeTask = DeenlyKnowledgeTask.KNOWLEDGE,
         requiredSurahNumber: Int? = null,
         sourceKind: KnowledgeSourceKind? = null,
+        excludedSourceIds: Set<String> = emptySet(),
         onProgress: suspend (InsightSearchProgress) -> Unit = {},
     ): NowNudgeKnowledgeCandidate? {
         val sources = withContext(Dispatchers.IO) {
@@ -191,6 +192,7 @@ internal class NowNudgeKnowledgeProvider(
                     if (sourceKind == null) addAll(sourceLoader.search(searchQuery, QUERY_SEARCH_LIMIT))
                     else {
                         val matches = sourceLoader.searchForKind(searchQuery, QUERY_SEARCH_LIMIT, sourceKind)
+                            .filterNot { it.id in excludedSourceIds }
                         addAll(if (matches.isEmpty() && sourceKind == KnowledgeSourceKind.DUA) {
                             sourceLoader.searchForKind("Allah", QUERY_SEARCH_LIMIT, sourceKind)
                         } else matches)
@@ -221,7 +223,7 @@ internal class NowNudgeKnowledgeProvider(
                         determinate = true,
                     ))
                 }
-            }.filter { sourceKind == null || sourceKind.matches(it.target) }
+            }.filter { it.id !in excludedSourceIds && (sourceKind == null || sourceKind.matches(it.target)) }
                 .distinctBy(GroundedKnowledgeSource::id)
         }
         fun rank(context: NowNudgeKnowledgeRankingContext): List<RankedKnowledgeSource> {

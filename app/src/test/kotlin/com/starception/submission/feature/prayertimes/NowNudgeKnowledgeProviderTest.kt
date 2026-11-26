@@ -60,6 +60,33 @@ class NowNudgeKnowledgeProviderTest {
     }
 
     @Test
+    fun moreHomeReadingsExcludeSourcesAlreadyShownBeforeCallingTheModel() = runBlocking {
+        val next = source.copy(
+            id = "quran-1-5",
+            reference = "Quran 1:5",
+            target = NowNudgeKnowledgeTarget.QuranAyah(1, 5),
+        )
+        val provider = NowNudgeKnowledgeProvider(
+            sourceLoader = object : GroundedKnowledgeSourceLoader {
+                override suspend fun load(date: LocalDate, variation: Int): GroundedKnowledgeSource =
+                    error("The unseen search result should avoid a daily corpus scan")
+
+                override suspend fun search(query: String, limit: Int) = listOf(source, next)
+            },
+            decisionGenerator = KnowledgeDecisionGenerator { _, envelope ->
+                assertEquals(next.reference, envelope.reference)
+                DeenlyKnowledgeDecision.Knowledge("Worship and seeking help")
+            },
+        )
+
+        val candidate = provider.load(
+            date, query = "Quran", sourceKind = KnowledgeSourceKind.SURAH, excludedSourceIds = setOf(source.id),
+        )
+        assertEquals(next.target, candidate?.target)
+        assertTrue(candidate?.modelGenerated == true)
+    }
+
+    @Test
     fun progressTracksActualReadsBeforePreparingTheGroundedSuggestion() = runBlocking {
         var reads = 0
         val updates = mutableListOf<com.starception.submission.core.model.deenly.InsightSearchProgress>()

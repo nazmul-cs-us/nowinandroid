@@ -24,11 +24,27 @@ internal class HomePageRecommendationStore(private val preferences: SharedPrefer
             if (stored.first == day && stored.second == contextKey && stored.third.modelGenerated)
                 state.attempted[page] = true
         }
+        for (page in 0..4) {
+            if (state.additionalRecommendations[page] != null) continue
+            val fields = runCatching { unpackInsightFields(preferences.getString("more_$page", "").orEmpty()) }
+                .getOrNull() ?: continue
+            if (fields.getOrNull(0) != day || fields.getOrNull(1) != contextKey) continue
+            val readings = fields.drop(2).mapNotNull {
+                runCatching { PreparedInsightReadings.decodeAiCandidate(it) }.getOrNull()?.takeIf { it.modelGenerated }
+            }.distinctBy(NowNudgeKnowledgeCandidate::sourceId)
+            if (readings.isNotEmpty()) state.additionalRecommendations[page] = readings
+        }
     }
 
     fun save(day: String, page: Int, candidate: NowNudgeKnowledgeCandidate, contextKey: String = "default") {
         require(page in 0 until 5 + 5 * KnowledgeSourceKind.entries.size)
         val value = packInsightFields(listOf(day, contextKey, PreparedInsightReadings.encodeAiCandidate(candidate)))
         preferences.edit().putString("page_$page", value).apply()
+    }
+
+    fun saveAdditional(day: String, page: Int, readings: List<NowNudgeKnowledgeCandidate>, contextKey: String) {
+        require(page in 0..4)
+        val value = packInsightFields(listOf(day, contextKey) + readings.map(PreparedInsightReadings::encodeAiCandidate))
+        preferences.edit().putString("more_$page", value).apply()
     }
 }
