@@ -893,13 +893,13 @@ fun AppTopSearchBar(
                 modifier = Modifier.fillMaxWidth()
                     // The wallpaper reaches into the status area, while the actions
                     // sit below it even when an OEM reports no safe-drawing inset.
-                    .padding(start = 24.dp, end = 16.dp, top = topInset.coerceAtLeast(24.dp) + 4.dp)
+                    .padding(start = 24.dp, end = 16.dp, top = topInset.coerceAtLeast(24.dp) + 12.dp)
                     .graphicsLayer {
                         val visibility = homeHeaderVisibility()
                         alpha = visibility
                         translationY = -(1f - visibility) * 24.dp.toPx()
                     },
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val profileSignedIn = LocalProfileSignedIn.current
@@ -915,7 +915,6 @@ fun AppTopSearchBar(
                 )
                 Column(
                     modifier = Modifier.weight(1f)
-                        .padding(top = 8.dp)
                         .clickable(onClickLabel = if (profileSignedIn) "Open profile" else "Sign in") {
                             currentOnProfileClick()
                         },
