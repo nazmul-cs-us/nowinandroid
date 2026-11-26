@@ -24,6 +24,8 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
     private var previousFace: CGRect?
     private var previousTimestampNs: Int64 = 0
     private var previousRevision = -1
+    private var lastMaskedTimestampNs: Int64 = 0
+    private var lastMaskedRevision = -1
 
     init(downstream: RTCVideoCapturerDelegate,
          detectFaces: @escaping FaceDetector = FamilyFacePrivacyProcessor.localFaces,
@@ -63,13 +65,15 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
                 guard let protected = protectedFrame(frame, revision: token) else { return }
                 gate.lock(); defer { gate.unlock() }
                 if !closed && enabled && token == revision {
-                    downstream.capturer(capturer, didCapture: protected)
+                    downstream.capturer(capturer, didCapture: protected.frame)
+                    lastMaskedTimestampNs = frame.timeStampNs
+                    lastMaskedRevision = protected.faceMasked ? token : -1
                 }
             }
         }
     }
 
-    private func protectedFrame(_ frame: RTCVideoFrame, revision: Int) -> RTCVideoFrame? {
+    private func protectedFrame(_ frame: RTCVideoFrame, revision: Int) -> (frame: RTCVideoFrame, faceMasked: Bool)? {
         // The native camera emits CVPixelBuffers. Unsupported formats are dropped, never passed raw.
         guard let input = frame.buffer as? RTCCVPixelBuffer else { return nil }
         let orientation: CGImagePropertyOrientation
@@ -88,6 +92,11 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
         }.map {
             $0.insetBy(dx: -$0.width / 3, dy: -$0.height / 3)
         }.filter { $0.intersects(extent) && !$0.intersection(extent).isEmpty }
+        // Leave the last protected picture visible through a brief detection miss.
+        let sinceMaskedNs = frame.timeStampNs - lastMaskedTimestampNs
+        if faces.isEmpty, lastMaskedRevision == revision, (1...200_000_000).contains(sinceMaskedNs) {
+            return nil
+        }
         let currentFace = faces.count == 1 ? faces.first : nil
         let elapsedNs = frame.timeStampNs - previousTimestampNs
         let regions: [CGRect]
@@ -150,7 +159,8 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
         }
         guard let output = outputBuffer(width: Int(extent.width), height: Int(extent.height)) else { return nil }
         context.render(result, to: output, bounds: extent, colorSpace: CGColorSpaceCreateDeviceRGB())
-        return RTCVideoFrame(buffer: RTCCVPixelBuffer(pixelBuffer: output), rotation: ._0, timeStampNs: frame.timeStampNs)
+        let protected = RTCVideoFrame(buffer: RTCCVPixelBuffer(pixelBuffer: output), rotation: ._0, timeStampNs: frame.timeStampNs)
+        return (protected, !faces.isEmpty)
     }
 
     private static let faceShapeMask = CIColorKernel(source: """

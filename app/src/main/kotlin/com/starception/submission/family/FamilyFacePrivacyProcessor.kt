@@ -35,6 +35,8 @@ internal class FamilyFacePrivacyProcessor(
     private var previousFace: PrivacyRegion? = null
     private var previousTimestampNs = 0L
     private var previousRevision = -1
+    private var lastMaskedTimestampNs = 0L
+    private var lastMaskedRevision = -1
 
     fun setEnabled(value: Boolean) = synchronized(gate) {
         if (enabled != value) { revision++; enabled = value }
@@ -66,7 +68,6 @@ internal class FamilyFacePrivacyProcessor(
             val rotated = frame.rotation == 90 || frame.rotation == 270
             val width = if (rotated) input.height else input.width
             val height = if (rotated) input.width else input.height
-            output = allocate(width, height)
             val y = upright(input.dataY, input.strideY, input.width, input.height, frame.rotation)
             val u = upright(input.dataU, input.strideU, (input.width + 1) / 2, (input.height + 1) / 2, frame.rotation)
             val v = upright(input.dataV, input.strideV, (input.width + 1) / 2, (input.height + 1) / 2, frame.rotation)
@@ -81,6 +82,12 @@ internal class FamilyFacePrivacyProcessor(
                     val visible = region.clamped(width, height)
                     visible.right > visible.left && visible.bottom > visible.top
                 }
+            // Keep the last protected picture through a brief detection miss. Never apply
+            // an old face region to the new frame. Sustained misses use full-frame blur.
+            val sinceMaskedNs = frame.timestampNs - lastMaskedTimestampNs
+            if (faces.isEmpty() && lastMaskedRevision == token && sinceMaskedNs in 1L..200_000_000L) return
+
+            output = allocate(width, height)
             val currentFace = faces.singleOrNull()
             val elapsedNs = frame.timestampNs - previousTimestampNs
             val stabilized = currentFace?.let { face ->
@@ -107,7 +114,11 @@ internal class FamilyFacePrivacyProcessor(
             write(u, output.dataU, output.strideU, chromaWidth, (height + 1) / 2)
             write(v, output.dataV, output.strideV, chromaWidth, (height + 1) / 2)
             synchronized(gate) {
-                if (!closed && enabled && token == revision) downstream.onFrameCaptured(VideoFrame(output, 0, frame.timestampNs))
+                if (!closed && enabled && token == revision) {
+                    downstream.onFrameCaptured(VideoFrame(output, 0, frame.timestampNs))
+                    lastMaskedTimestampNs = frame.timestampNs
+                    lastMaskedRevision = if (oval) token else -1
+                }
             }
         } catch (_: Exception) {
             // Conversion/rendering failure: drop the frame. Never emit the raw input as recovery.

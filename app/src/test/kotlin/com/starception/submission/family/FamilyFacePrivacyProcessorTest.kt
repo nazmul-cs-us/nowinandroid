@@ -7,11 +7,14 @@ import org.webrtc.JavaI420Buffer
 import org.webrtc.VideoFrame
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.TimeUnit
 
 class FamilyFacePrivacyProcessorTest {
     private class Receiver : CapturerObserver {
         val delivered = CountDownLatch(1)
+        val timestamps = LinkedBlockingQueue<Long>()
         var pixels = byteArrayOf()
         var rotation = -1
         var width = 0
@@ -24,6 +27,7 @@ class FamilyFacePrivacyProcessorTest {
                 width = buffer.width; height = buffer.height; rotation = frame.rotation
                 pixels = ByteArray(width * height) { i -> buffer.dataY.get(i / width * buffer.strideY + i % width) }
             } finally { buffer.release() }
+            timestamps.add(frame.timestampNs)
             delivered.countDown()
         }
         fun await() { assertTrue("Expected a protected frame", delivered.await(5, TimeUnit.SECONDS)) }
@@ -35,10 +39,10 @@ class FamilyFacePrivacyProcessorTest {
         return JavaI420Buffer.wrap(width, height, ByteBuffer.allocateDirect(width * height), width,
             ByteBuffer.allocateDirect(cw * ch), cw, ByteBuffer.allocateDirect(cw * ch), cw, null)
     }
-    private fun frame(rotation: Int = 0): VideoFrame {
+    private fun frame(rotation: Int = 0, timestampNs: Long = 123L): VideoFrame {
         val buffer = allocate(32, 24)
         for (i in 0 until 32 * 24) buffer.dataY.put(i, if ((i + i / 32) % 2 == 0) 0 else 255.toByte())
-        return VideoFrame(buffer, rotation, 123L)
+        return VideoFrame(buffer, rotation, timestampNs)
     }
     private fun submit(processor: FamilyFacePrivacyProcessor, frame: VideoFrame = frame()) {
         try { processor.onFrameCaptured(frame) } finally { frame.release() }
@@ -49,6 +53,44 @@ class FamilyFacePrivacyProcessorTest {
         val processor = FamilyFacePrivacyProcessor(receiver, { _, _, _ -> emptyList() }, ::allocate)
         try {
             submit(processor); receiver.await()
+            assertTrue(receiver.pixels.all { (it.toInt() and 255) in 110..145 })
+        } finally { processor.close() }
+    }
+
+    @Test fun briefDetectionLossHoldsTheProtectedFrameBeforeFullFrameFallback() {
+        val receiver = Receiver()
+        val detected = LinkedBlockingQueue<Unit>()
+        val faceVisible = AtomicBoolean(true)
+        val processor = FamilyFacePrivacyProcessor(receiver, { _, _, _ ->
+            val faces = if (faceVisible.get()) listOf(PrivacyRegion(8, 4, 24, 20)) else emptyList()
+            detected.add(Unit)
+            faces
+        }, ::allocate)
+        fun submitAndAwaitDetection(timestampNs: Long) {
+            repeat(100) {
+                submit(processor, frame(timestampNs = timestampNs))
+                if (detected.poll(20, TimeUnit.MILLISECONDS) != null) return
+            }
+            fail("Expected a frame to reach face detection")
+        }
+
+        try {
+            submitAndAwaitDetection(1)
+            assertEquals(1L, receiver.timestamps.poll(5, TimeUnit.SECONDS))
+            assertEquals(0, receiver.pixels.first().toInt())
+
+            faceVisible.set(false)
+            submitAndAwaitDetection(50_000_001)
+            assertNull(receiver.timestamps.poll(150, TimeUnit.MILLISECONDS))
+
+            faceVisible.set(true)
+            submitAndAwaitDetection(100_000_001)
+            assertEquals(100_000_001L, receiver.timestamps.poll(5, TimeUnit.SECONDS))
+            assertEquals(0, receiver.pixels.first().toInt())
+
+            faceVisible.set(false)
+            submitAndAwaitDetection(350_000_001)
+            assertEquals(350_000_001L, receiver.timestamps.poll(5, TimeUnit.SECONDS))
             assertTrue(receiver.pixels.all { (it.toInt() and 255) in 110..145 })
         } finally { processor.close() }
     }
