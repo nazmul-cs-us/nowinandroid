@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
@@ -50,9 +52,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.FormatQuote
+import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
@@ -71,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.starception.submission.R
+import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import org.jetbrains.compose.resources.DrawableResource
@@ -150,30 +158,67 @@ internal fun HomeReadingRecommendations(
     preparing: Boolean,
     onOpen: (NowNudgeKnowledgeCandidate) -> Unit,
 ) {
-    val cards = KnowledgeSourceKind.entries.mapNotNull { kind ->
+    val recommendations = KnowledgeSourceKind.entries.mapNotNull { kind ->
         candidates[homeRecommendationSlot(page, kind)]
             ?.takeIf { kind != KnowledgeSourceKind.SURAH || homeReflectionMatchesReading(page, readingSurahNumber, it.target) }
-            ?.let { kind to it }
     }
-    if (cards.isEmpty() && !preparing) return
-    val colors = MaterialTheme.colorScheme
-    Column(Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Recommended for this tile", style = HomeTypography.section, color = colors.onBackground)
-        if (preparing) {
-            Text("Preparing recommendations…", style = HomeTypography.caption, color = colors.onSurfaceVariant)
+    if (recommendations.isEmpty() && !preparing) return
+    val ink = MaterialTheme.colorScheme.onBackground
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Text("Suggested reading", style = HomeTypography.section, color = ink)
+        if (preparing && recommendations.isEmpty()) {
+            Text(
+                "Preparing recommendations…",
+                modifier = Modifier.padding(top = 8.dp),
+                style = HomeTypography.caption,
+                color = ink.copy(alpha = .72f),
+            )
         }
-        for ((kind, candidate) in cards) {
-            val shape = RoundedCornerShape(16.dp)
-            Column(
-                Modifier.fillMaxWidth().clip(shape).background(colors.surfaceContainerHigh)
-                    .clickable { onOpen(candidate) }.padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+        recommendations.forEachIndexed { index, candidate ->
+            if (index > 0) {
+                HorizontalDivider(Modifier.padding(start = 44.dp), color = ink.copy(alpha = .13f))
+            }
+            val (icon, title, source) = when (val target = candidate.target) {
+                is NowNudgeKnowledgeTarget.QuranAyah -> Triple(
+                    Icons.AutoMirrored.Outlined.MenuBook,
+                    QuranData.surahs.firstOrNull { it.number == target.surahNumber }
+                        ?.let { "Surah ${it.nameEnglish}" } ?: "Surah ${target.surahNumber}",
+                    "Quran ${target.surahNumber}:${target.ayahNumber}",
+                )
+                is NowNudgeKnowledgeTarget.Hadith -> Triple(
+                    Icons.Outlined.FormatQuote,
+                    candidate.topic.takeIf { it.isNotBlank() && it != target.collectionName }
+                        ?: "Hadith ${target.hadithNumber}",
+                    candidate.nudge.sourceLabel ?: target.collectionName,
+                )
+                is NowNudgeKnowledgeTarget.FortressDua -> Triple(
+                    Icons.Outlined.Spa,
+                    target.dua.chapterTitle.ifBlank { "Dua" },
+                    "Fortress of the Muslim · Dua ${target.dua.position}",
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(candidate) }
+                    .heightIn(min = 56.dp).padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(kind.label, style = HomeTypography.caption, color = colors.onSurfaceVariant)
-                Text(candidate.nudge.label, style = HomeTypography.body, color = colors.onSurface)
-                candidate.nudge.sourceLabel?.let {
-                    Text(it, style = HomeTypography.caption, color = colors.onSurfaceVariant)
+                Box(
+                    Modifier.size(32.dp).background(ink.copy(alpha = .09f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(17.dp), tint = ink.copy(alpha = .86f))
                 }
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = HomeTypography.cardTitle, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(source, style = HomeTypography.caption, color = ink.copy(alpha = .72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = ink.copy(alpha = .62f),
+                )
             }
         }
     }
