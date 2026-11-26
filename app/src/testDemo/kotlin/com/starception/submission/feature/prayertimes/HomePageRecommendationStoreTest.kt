@@ -15,6 +15,26 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class HomePageRecommendationStoreTest {
+    @Test fun recommendationsForDifferentTilesAndKindsRestoreIndependently() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = context.getSharedPreferences("typed_home_recommendations_test", Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+        val store = HomePageRecommendationStore(prefs)
+        val day = "2026-11-24"
+        val prayerSurah = homeRecommendationSlot(0, KnowledgeSourceKind.SURAH)
+        val prayerHadith = homeRecommendationSlot(0, KnowledgeSourceKind.HADITH)
+        val readingSurah = homeRecommendationSlot(2, KnowledgeSourceKind.SURAH)
+        store.save(day, prayerSurah, candidate(0, "Prayer surah"))
+        store.save(day, prayerHadith, candidate(1, "Prayer hadith"))
+        store.save(day, readingSurah, candidate(2, "Reading surah"))
+
+        val restored = HomePageGenerationState()
+        store.restore(day, restored)
+        assertEquals("Prayer surah 0", restored.generated[prayerSurah]?.nudge?.supportingText)
+        assertEquals("Prayer hadith 1", restored.generated[prayerHadith]?.nudge?.supportingText)
+        assertEquals("Reading surah 2", restored.generated[readingSurah]?.nudge?.supportingText)
+    }
+
     @Test fun fallbackOrWrongContextNeverPreventsANewModelAttempt() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = context.getSharedPreferences("home_model_freshness_test", Context.MODE_PRIVATE)

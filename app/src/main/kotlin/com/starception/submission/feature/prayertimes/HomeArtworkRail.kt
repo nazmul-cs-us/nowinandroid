@@ -125,13 +125,66 @@ internal fun homeFeedKnowledgeQuery(page: Int): String = when (page) {
     else -> "guidance faith today"
 }
 
+internal fun homeRecommendationSlot(page: Int, kind: KnowledgeSourceKind): Int =
+    5 + page * KnowledgeSourceKind.entries.size + kind.ordinal
+
+internal fun homeRecommendationKinds(page: Int): List<KnowledgeSourceKind> = when (page) {
+    0, 1 -> listOf(KnowledgeSourceKind.HADITH, KnowledgeSourceKind.SURAH, KnowledgeSourceKind.DUA)
+    3 -> listOf(KnowledgeSourceKind.DUA, KnowledgeSourceKind.SURAH, KnowledgeSourceKind.HADITH)
+    else -> KnowledgeSourceKind.entries
+}
+
+internal fun homeRecommendationQuery(page: Int, kind: KnowledgeSourceKind): String =
+    if (kind != KnowledgeSourceKind.DUA) homeFeedKnowledgeQuery(page) else when (page) {
+        0, 1 -> "prayer"
+        2 -> "recitation knowledge"
+        3 -> "mosque prayer"
+        else -> "guidance mercy"
+    }
+
+@Composable
+internal fun HomeReadingRecommendations(
+    page: Int,
+    candidates: Map<Int, NowNudgeKnowledgeCandidate>,
+    readingSurahNumber: Int,
+    preparing: Boolean,
+    onOpen: (NowNudgeKnowledgeCandidate) -> Unit,
+) {
+    val cards = KnowledgeSourceKind.entries.mapNotNull { kind ->
+        candidates[homeRecommendationSlot(page, kind)]
+            ?.takeIf { kind != KnowledgeSourceKind.SURAH || homeReflectionMatchesReading(page, readingSurahNumber, it.target) }
+            ?.let { kind to it }
+    }
+    if (cards.isEmpty() && !preparing) return
+    val colors = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Recommended for this tile", style = HomeTypography.section, color = colors.onBackground)
+        if (preparing) {
+            Text("Preparing recommendations…", style = HomeTypography.caption, color = colors.onSurfaceVariant)
+        }
+        for ((kind, candidate) in cards) {
+            val shape = RoundedCornerShape(16.dp)
+            Column(
+                Modifier.fillMaxWidth().clip(shape).background(colors.surfaceContainerHigh)
+                    .clickable { onOpen(candidate) }.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(kind.label, style = HomeTypography.caption, color = colors.onSurfaceVariant)
+                Text(candidate.nudge.label, style = HomeTypography.body, color = colors.onSurface)
+                candidate.nudge.sourceLabel?.let {
+                    Text(it, style = HomeTypography.caption, color = colors.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
 /** Retain one model turn per page/day across Home navigation within this process. */
 internal class HomePageGenerationState {
     val generated = mutableStateMapOf<Int, NowNudgeKnowledgeCandidate>()
     val attempted = mutableStateMapOf<Int, Boolean>()
     val attempts = mutableStateMapOf<Int, Int>()
     val retryAfter = mutableStateMapOf<Int, Long>()
-    var generatingPage by mutableIntStateOf(-1)
 
     fun needsGeneration(page: Int): Boolean = attempted[page] != true && (attempts[page] ?: 0) < 2
 }

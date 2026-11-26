@@ -56,6 +56,18 @@ internal sealed interface NowNudgeKnowledgeTarget {
     data class FortressDua(val dua: Dua) : NowNudgeKnowledgeTarget
 }
 
+internal enum class KnowledgeSourceKind(val label: String) {
+    SURAH("Surah"),
+    HADITH("Hadith"),
+    DUA("Dua");
+
+    fun matches(target: NowNudgeKnowledgeTarget): Boolean = when (this) {
+        SURAH -> target is NowNudgeKnowledgeTarget.QuranAyah
+        HADITH -> target is NowNudgeKnowledgeTarget.Hadith
+        DUA -> target is NowNudgeKnowledgeTarget.FortressDua
+    }
+}
+
 internal data class GroundedKnowledgeSource(
     val id: String,
     val collection: String,
@@ -134,6 +146,9 @@ internal fun interface GroundedKnowledgeSourceLoader {
     suspend fun quranSurah(surahNumber: Int): GroundedKnowledgeSource? = null
 
     suspend fun search(query: String, limit: Int): List<GroundedKnowledgeSource> = emptyList()
+
+    suspend fun searchForKind(query: String, limit: Int, kind: KnowledgeSourceKind): List<GroundedKnowledgeSource> =
+        search(query, limit).filter { kind.matches(it.target) }
 }
 
 internal fun interface KnowledgeDecisionGenerator {
@@ -163,6 +178,7 @@ internal class NowNudgeKnowledgeProvider(
         rankingContext: NowNudgeKnowledgeRankingContext = NowNudgeKnowledgeRankingContext(),
         task: DeenlyKnowledgeTask = DeenlyKnowledgeTask.KNOWLEDGE,
         requiredSurahNumber: Int? = null,
+        sourceKind: KnowledgeSourceKind? = null,
         onProgress: suspend (InsightSearchProgress) -> Unit = {},
     ): NowNudgeKnowledgeCandidate? {
         val sources = withContext(Dispatchers.IO) {
@@ -172,14 +188,21 @@ internal class NowNudgeKnowledgeProvider(
                 }
             } else buildList {
                 query?.takeIf(String::isNotBlank)?.let { searchQuery ->
-                    addAll(sourceLoader.search(searchQuery, QUERY_SEARCH_LIMIT))
+                    if (sourceKind == null) addAll(sourceLoader.search(searchQuery, QUERY_SEARCH_LIMIT))
+                    else {
+                        val matches = sourceLoader.searchForKind(searchQuery, QUERY_SEARCH_LIMIT, sourceKind)
+                        addAll(if (matches.isEmpty() && sourceKind == KnowledgeSourceKind.DUA) {
+                            sourceLoader.searchForKind("Allah", QUERY_SEARCH_LIMIT, sourceKind)
+                        } else matches)
+                    }
                 }
                 val poolSize = if (query.isNullOrBlank()) {
                     KNOWLEDGE_CANDIDATE_POOL_SIZE
                 } else {
                     QUERY_CANDIDATE_POOL_SIZE
                 }
-                repeat(poolSize) { offset ->
+                val needsDailySources = sourceKind == null || (isEmpty() && sourceKind != KnowledgeSourceKind.DUA)
+                repeat(if (needsDailySources) poolSize else 0) { offset ->
                     onProgress(InsightSearchProgress(
                         title = "Finding your next reading",
                         detail = "Reading downloaded Quran and Hadith passages…",
@@ -198,9 +221,16 @@ internal class NowNudgeKnowledgeProvider(
                         determinate = true,
                     ))
                 }
-            }.distinctBy(GroundedKnowledgeSource::id)
+            }.filter { sourceKind == null || sourceKind.matches(it.target) }
+                .distinctBy(GroundedKnowledgeSource::id)
         }
-        val rankedSources = rankSources(date, sources, rankingContext, query)
+        fun rank(context: NowNudgeKnowledgeRankingContext): List<RankedKnowledgeSource> {
+            val matches = rankSources(date, sources, context, query)
+            return if (matches.isEmpty() && (sourceKind != null || requiredSurahNumber != null)) {
+                rankSources(date, sources, context)
+            } else matches
+        }
+        val rankedSources = rank(rankingContext)
         val rankedSource = rankedSources.firstOrNull()
             // Dismissals are honored until the current candidate window is
             // exhausted. At that point prefer a fresh ranking over returning
@@ -208,12 +238,7 @@ internal class NowNudgeKnowledgeProvider(
             ?: rankingContext.dismissedNudgeIds
                 .takeIf(Set<String>::isNotEmpty)
                 ?.let {
-                    rankSources(
-                        date = date,
-                        sources = sources,
-                        context = rankingContext.copy(dismissedNudgeIds = emptySet()),
-                        query = query,
-                    ).firstOrNull()
+                    rank(rankingContext.copy(dismissedNudgeIds = emptySet())).firstOrNull()
                 }
             ?: return null
         val source = rankedSource.source
@@ -1211,7 +1236,13 @@ private class AndroidGroundedKnowledgeSourceLoader(
         )
     }
 
-    override suspend fun search(query: String, limit: Int): List<GroundedKnowledgeSource> {
+    override suspend fun search(query: String, limit: Int): List<GroundedKnowledgeSource> =
+        search(query, limit, null)
+
+    override suspend fun searchForKind(query: String, limit: Int, kind: KnowledgeSourceKind): List<GroundedKnowledgeSource> =
+        search(query, limit, kind)
+
+    private suspend fun search(query: String, limit: Int, kind: KnowledgeSourceKind?): List<GroundedKnowledgeSource> {
         val tokens = query
             .lowercase()
             .split(Regex("[^a-z0-9]+"))
@@ -1246,7 +1277,7 @@ private class AndroidGroundedKnowledgeSourceLoader(
         }.distinct()
 
         for (plan in plans) {
-            val results = searchCorpora(plan, limit)
+            val results = searchCorpora(plan, limit, kind)
             // The strict plan can crowd out the real answer: "prophet favourite
             // food" matches food-etiquette narrations on all three tokens while
             // "Rasulullah loved halwa and honey" never says "food". Merge the
@@ -1257,10 +1288,10 @@ private class AndroidGroundedKnowledgeSourceLoader(
                 val merged = if (plan.size == 3) {
                     val strictIds = results.map(GroundedKnowledgeSource::id).toSet()
                     val pairA = runCatching {
-                        searchCorpora(listOf(slots[0], slots[1]), limit)
+                        searchCorpora(listOf(slots[0], slots[1]), limit, kind)
                     }.getOrDefault(emptyList())
                     val pairB = runCatching {
-                        searchCorpora(listOf(slots[1], slots[2]), limit)
+                        searchCorpora(listOf(slots[1], slots[2]), limit, kind)
                     }.getOrDefault(emptyList())
                     val pairOnly = (pairA + pairB)
                         .distinctBy(GroundedKnowledgeSource::id)
@@ -1284,6 +1315,7 @@ private class AndroidGroundedKnowledgeSourceLoader(
     private suspend fun searchCorpora(
         slots: List<SearchSlot>,
         limit: Int,
+        kind: KnowledgeSourceKind?,
     ): List<GroundedKnowledgeSource> {
         val results = mutableListOf<GroundedKnowledgeSource>()
         val slot = { index: Int -> slots.getOrElse(index) { SearchSlot("") } }
@@ -1313,7 +1345,7 @@ private class AndroidGroundedKnowledgeSourceLoader(
         }
 
         // Fortress of the Muslim invocations (primary tokens only).
-        runCatching {
+        if (kind == null || kind == KnowledgeSourceKind.DUA) runCatching {
             duaRepository.searchDuasMultiToken(
                 slots.map { it.primary.removeSurrounding("%") },
                 DUA_SEARCH_LIMIT,
@@ -1332,7 +1364,7 @@ private class AndroidGroundedKnowledgeSourceLoader(
         }.getOrDefault(emptyList()).let(results::addAll)
 
         // Quran translation ayahs.
-        runCatching {
+        if (kind == null || kind == KnowledgeSourceKind.SURAH) runCatching {
             quranRepository.searchAyahsMultiTokenAny(
                 p0 = slot(0).primary,
                 a0 = slot(0).firstAlternative,
@@ -1366,7 +1398,7 @@ private class AndroidGroundedKnowledgeSourceLoader(
         // Every downloaded Hadith collection, ranked by FTS5 bm25 when the
         // index exists, with the LIKE multi-token fallback for databases
         // that lack the FTS index (e.g. Shama'il).
-        HADITH_COLLECTIONS.forEach { collection ->
+        if (kind == null || kind == KnowledgeSourceKind.HADITH) HADITH_COLLECTIONS.forEach { collection ->
             if (!HadithDatabase.isDatabaseAvailable(appContext, collection.databaseFile)) {
                 return@forEach
             }

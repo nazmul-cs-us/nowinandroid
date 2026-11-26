@@ -12,7 +12,7 @@ internal class HomePageRecommendationStore(private val preferences: SharedPrefer
     )
 
     fun restore(day: String, state: HomePageGenerationState, contextKey: String = "default") {
-        (0..4).forEach { page ->
+        (0 until 5 + 5 * KnowledgeSourceKind.entries.size).forEach { page ->
             val stored = runCatching {
                 val fields = unpackInsightFields(preferences.getString("page_$page", null) ?: return@runCatching null)
                 if (fields.size !in 2..3) return@runCatching null
@@ -27,7 +27,7 @@ internal class HomePageRecommendationStore(private val preferences: SharedPrefer
     }
 
     fun save(day: String, page: Int, candidate: NowNudgeKnowledgeCandidate, contextKey: String = "default") {
-        require(page in 0..4)
+        require(page in 0 until 5 + 5 * KnowledgeSourceKind.entries.size)
         val value = packInsightFields(listOf(day, contextKey, PreparedInsightReadings.encodeAiCandidate(candidate)))
         preferences.edit().putString("page_$page", value).apply()
     }

@@ -3108,7 +3108,6 @@ fun PrayerTimesScreen(
                     }
                 }
                 val generatedHomePages = homePageGeneration.generated
-                val homeGenerationScope = rememberCoroutineScope()
                 val homeModelAvailable = remember(nudgeDay, aiModelDownloadTick) {
                     com.starception.submission.ml.DeenlyKnowledgeModel(screenContext)
                         .isKnowledgeModelAvailable()
@@ -3133,62 +3132,65 @@ fun PrayerTimesScreen(
                 val homeScrollEngaged by remember(portraitScrollState, homeScrollThreshold) {
                     derivedStateOf { portraitScrollState.value > homeScrollThreshold }
                 }
-                LaunchedEffect(coverPage, homeScrollEngaged, homePageGeneration.generatingPage, homeModelAvailable, expandedAiCandidate, suggestionContextKey) {
+                LaunchedEffect(coverPage, homeScrollEngaged, homeModelAvailable, homePageGeneration) {
+                    if (!homeModelAvailable || !homeScrollEngaged) return@LaunchedEffect
                     val page = coverPage.coerceIn(0, 4)
+                    val recommendationKinds = homeRecommendationKinds(page)
+                    val date = LocalDate.parse(nudgeDay)
                     val readingSurah = com.starception.submission.feature.quran.dailyReading(
                         kotlinx.datetime.LocalDate.parse(nudgeDay),
                     ).number
-                    if (generatedHomePages[page]?.let {
+                    val readingSlot = homeRecommendationSlot(page, KnowledgeSourceKind.SURAH)
+                    if (generatedHomePages[readingSlot]?.let {
                             !homeReflectionMatchesReading(page, readingSurah, it.target)
                         } == true) {
-                        generatedHomePages.remove(page)
-                        homePageGeneration.attempted.remove(page)
+                        generatedHomePages.remove(readingSlot)
+                        homePageGeneration.attempted.remove(readingSlot)
                     }
-                    if (!homeModelAvailable || (!homeScrollEngaged && page == 0) ||
-                        homePageGeneration.generatingPage != -1 || !homePageGeneration.needsGeneration(page)
-                    ) return@LaunchedEffect
-                    val retryDelay = (homePageGeneration.retryAfter[page] ?: 0L) - android.os.SystemClock.elapsedRealtime()
-                    if (retryDelay > 0L) delay(retryDelay)
-                    // Only the settled page may claim a turn. Fast swipes cancel
-                    // this delay; one active job and a per-day cache prevent
-                    // scroll frames from repeatedly invoking the on-device model.
+                    // Fast swipes cancel this delay. Generate each kind serially on the active tile.
                     delay(500)
-                    val preparedCandidate = expandedAiCandidate
-                    if (page == 4 && preparedCandidate?.modelGenerated == true) {
-                        generatedHomePages[page] = preparedCandidate
-                        homePageGeneration.attempted[page] = true
-                        homeRecommendationStore.save(nudgeDay, page, preparedCandidate, suggestionContextKey)
-                        return@LaunchedEffect
-                    }
-                    homePageGeneration.attempts[page] = (homePageGeneration.attempts[page] ?: 0) + 1
-                    homePageGeneration.generatingPage = page
-                    homeGenerationScope.launch {
-                        try {
-                            val candidate = nowNudgeKnowledgeProvider.load(
-                                date = LocalDate.parse(nudgeDay),
-                                variation = 128 + page * 16,
-                                query = homeFeedKnowledgeQuery(page),
-                                appSituation = latestExpandedAppSituation,
-                                rankingContext = latestExpandedKnowledgeContext,
-                                task = com.starception.submission.ml.DeenlyKnowledgeTask.KNOWLEDGE,
-                                requiredSurahNumber = readingSurah.takeIf { page == 2 },
-                            )
-                            if (candidate != null) {
-                                generatedHomePages[page] = candidate
-                                homePageGeneration.attempted[page] = candidate.modelGenerated
-                                homeRecommendationStore.save(nudgeDay, page, candidate, suggestionContextKey)
+                    while (true) {
+                        val pending = recommendationKinds.filter { kind ->
+                            homePageGeneration.needsGeneration(homeRecommendationSlot(page, kind))
+                        }
+                        if (pending.isEmpty()) break
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        val ready = pending.filter { kind ->
+                            (homePageGeneration.retryAfter[homeRecommendationSlot(page, kind)] ?: 0L) <= now
+                        }
+                        if (ready.isEmpty()) {
+                            delay(pending.minOf { homePageGeneration.retryAfter.getValue(homeRecommendationSlot(page, it)) } - now)
+                            continue
+                        }
+                        for (kind in ready) {
+                            val slot = homeRecommendationSlot(page, kind)
+                            try {
+                                val candidate = nowNudgeKnowledgeProvider.load(
+                                    date = date,
+                                    variation = 128 + page * 16,
+                                    query = homeRecommendationQuery(page, kind),
+                                    appSituation = listOfNotNull(
+                                        latestExpandedAppSituation,
+                                        "Home tile: ${homeFeedPage(page).eyebrow}. ${homeFeedPage(page).prompt}",
+                                    ).joinToString(" "),
+                                    rankingContext = latestExpandedKnowledgeContext,
+                                    requiredSurahNumber = readingSurah.takeIf { page == 2 && kind == KnowledgeSourceKind.SURAH },
+                                    sourceKind = kind,
+                                )
+                                if (candidate != null) {
+                                    generatedHomePages[slot] = candidate
+                                    homePageGeneration.attempted[slot] = candidate.modelGenerated
+                                    homeRecommendationStore.save(nudgeDay, slot, candidate, suggestionContextKey)
+                                }
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                android.util.Log.w("HomeReflection", "Could not prepare ${kind.label} for page $page", error)
                             }
-                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                            // Navigation can dispose Home mid-turn. An unfinished
-                            // turn must not block this page for the rest of the day.
-                            homePageGeneration.attempted.remove(page)
-                            throw cancelled
-                        } catch (error: Exception) {
-                            android.util.Log.w("HomeReflection", "Could not prepare page $page", error)
-                        } finally {
-                            if (homePageGeneration.attempted[page] != true)
-                                homePageGeneration.retryAfter[page] = android.os.SystemClock.elapsedRealtime() + 30_000L
-                            homePageGeneration.generatingPage = -1
+                            homePageGeneration.attempts[slot] = (homePageGeneration.attempts[slot] ?: 0) + 1
+                            if (homePageGeneration.attempted[slot] != true) {
+                                homePageGeneration.retryAfter[slot] = android.os.SystemClock.elapsedRealtime() + 30_000L
+                            }
                         }
                     }
                 }
@@ -4073,13 +4075,19 @@ fun PrayerTimesScreen(
                                         }
 
                                         if (!insightTileExpanded) {
+                                            val reflectionInsights = (0..4).mapNotNull { page ->
+                                                val preferred = homeRecommendationKinds(page).first()
+                                                val recommendation = generatedHomePages[homeRecommendationSlot(page, preferred)]
+                                                    ?: generatedHomePages[page]
+                                                recommendation?.let { page to it }
+                                            }.toMap()
                                              HomeReflectionPrompt(
                                                  focusedPage = coverPage,
                                                  scrollPosition = coverScrollPosition.floatValue,
                                                 onDarkCover = !darkHome,
                                                 exploreExpanded = exploreExpanded,
                                                 onExploreToggle = { exploreExpanded = !exploreExpanded },
-                                                generatedInsights = generatedHomePages,
+                                                generatedInsights = reflectionInsights,
                                                 readingSurahNumber = coverReading.number,
                                                 modifier = Modifier.onSizeChanged { homeReflectionHeightPx = it.height },
                                                 translationLanguage = homeTranslationLanguage,
@@ -4116,12 +4124,22 @@ fun PrayerTimesScreen(
                                                     }
                                                 },
                                             ) {
-                                                val generated = generatedHomePages[coverPage]?.takeIf {
+                                                val generated = reflectionInsights[coverPage]?.takeIf {
                                                     homeReflectionMatchesReading(coverPage, coverReading.number, it.target)
                                                 }
                                                 if (generated != null) openExpandedAiCandidate(generated)
                                                 else feedPageRequest = coverPage to ((feedPageRequest?.second ?: 0) + 1)
                                             }
+                                            HomeReadingRecommendations(
+                                                page = coverPage,
+                                                candidates = generatedHomePages,
+                                                readingSurahNumber = coverReading.number,
+                                                preparing = homeScrollEngaged && homeModelAvailable &&
+                                                    homeRecommendationKinds(coverPage).any { kind ->
+                                                        homePageGeneration.needsGeneration(homeRecommendationSlot(coverPage, kind))
+                                                    },
+                                                onOpen = openExpandedAiCandidate,
+                                            )
                                             Spacer(Modifier.height(28.dp))
                                         }
 
