@@ -73,7 +73,7 @@ final class FamilyFacePrivacyProcessorTests: XCTestCase {
         XCTAssertEqual(pixels[33 * 64 + 46], 255)
         XCTAssertTrue(pixels[24 * 64 + 32] > 40 && pixels[24 * 64 + 32] < 215)
     }
-    func testDotsMoveOnIdenticalFramesAndLoop() throws {
+    func testDotsPulseOnIdenticalFramesAndLoop() throws {
         let detector: FamilyFacePrivacyProcessor.FaceDetector = { _ in
             [CGRect(x: 20, y: 14, width: 24, height: 20)]
         }

@@ -1,9 +1,7 @@
 package com.starception.submission.family
 
-import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 internal data class PrivacyRegion(val left: Int, val top: Int, val right: Int, val bottom: Int) {
     fun clamped(width: Int, height: Int) = PrivacyRegion(left.coerceIn(0, width), top.coerceIn(0, height),
@@ -29,6 +27,11 @@ internal data class PrivacyRegion(val left: Int, val top: Int, val right: Int, v
 /** Three separable box passes approximate a strong Gaussian blur, including the chroma planes. */
 internal object FamilyPrivacyBlur {
     private const val DOT_CYCLE_NS = 1_800_000_000L
+    // Mint #63E69B in limited-range BT.601, as used by the I420 camera path.
+    private const val DOT_Y = 173
+    private const val DOT_U = 115
+    private const val DOT_V = 76
+    private const val CHROMA_ALPHA_MAX = 252
     fun apply(
         plane: ByteArray,
         width: Int,
@@ -38,6 +41,7 @@ internal object FamilyPrivacyBlur {
         oval: Boolean = false,
         dots: Boolean = false,
         timestampNs: Long = 0,
+        dotChromaAlpha: ByteArray? = null,
     ) {
         val b = region.clamped(width, height)
         val w = b.right - b.left
@@ -78,27 +82,36 @@ internal object FamilyPrivacyBlur {
             }
             return
         }
+        val chromaWidth = (width + 1) / 2
         val centerX = (region.left + region.right) / 2f
         val centerY = (region.top + region.bottom) / 2f
         val radiusX = (region.right - region.left) / 2f
         val radiusY = (region.bottom - region.top) / 2f
         val spacing = (minOf(radiusX, radiusY) / 9f).coerceIn(5f, 14f)
-        // Move the repeating grid by one cell per cycle so the loop joins seamlessly.
         val phase = Math.floorMod(timestampNs, DOT_CYCLE_NS).toFloat() / DOT_CYCLE_NS
-        val shift = spacing * (1f - phase)
         val faceX = FloatArray(w) { x -> (b.left + x + .5f - centerX) / radiusX }
         val faceXSquared = FloatArray(w) { x -> faceX[x] * faceX[x] }
         val dotCenterXSquared = FloatArray(if (dots) w else 0)
         val dotOffsetXSquared = FloatArray(if (dots) w else 0)
+        val dotSpark = FloatArray(if (dots) w else 0)
+        val dotVerticalWeight = FloatArray(if (dots) w else 0)
         if (dots) {
             for (x in 0 until w) {
                 val localX = b.left + x + .5f - region.left
-                val dotX = (localX + shift) % spacing - spacing / 2f
+                val dotX = localX % spacing - spacing / 2f
                 val dotCenterX = faceX[x] - dotX / radiusX
                 val horizontalScale = 1f - .42f * abs(dotCenterX).coerceAtMost(1f)
                 dotCenterXSquared[x] = dotCenterX * dotCenterX
                 val offset = dotX / horizontalScale
                 dotOffsetXSquared[x] = offset * offset
+                // Stagger the eased pulse across columns, like a moving voice waveform.
+                val columnPhase = (phase + 2.18f - dotCenterX * .55f) % 1f
+                val rise = (columnPhase / .28f).coerceIn(0f, 1f)
+                val fall = ((.72f - columnPhase) / .44f).coerceIn(0f, 1f)
+                val spark = rise * rise * (3f - 2f * rise) * fall * fall * (3f - 2f * fall)
+                dotSpark[x] = spark
+                val stretch = 1f + .55f * spark
+                dotVerticalWeight[x] = 1f / (stretch * stretch)
             }
         }
         for (y in 0 until h) {
@@ -109,11 +122,9 @@ internal object FamilyPrivacyBlur {
             val horizontalWeight = 1f / (jawTaper * jawTaper)
             val ySquared = dy * dy
             val verticalDistance = if (dy < 0f) ySquared else ySquared * ySquared
-            val dotY = (localY + shift) % spacing - spacing / 2f
+            val dotY = localY % spacing - spacing / 2f
             val dotCenterY = dy - dotY / radiusY
             val dotCenterYSquared = dotCenterY * dotCenterY
-            // A crest travels from the forehead to the jaw through the drifting grid.
-            val wave = sin((2 * PI * (phase - dotCenterY * .55f)).toFloat())
             val verticalScale = 1f - .42f * abs(dotCenterY).coerceAtMost(1f)
             val dotOffsetY = dotY / verticalScale
             val dotOffsetYSquared = dotOffsetY * dotOffsetY
@@ -129,13 +140,33 @@ internal object FamilyPrivacyBlur {
                 if (dots) {
                     // Sample perspective at the dot center so every dot has a coherent outline.
                     val distanceFromCenter = (dotCenterXSquared[x] + dotCenterYSquared).coerceAtMost(1f)
-                    val dotRadius = spacing * (.34f - .13f * distanceFromCenter + .10f * wave)
-                    val ellipseDistance = (dotOffsetXSquared[x] + dotOffsetYSquared) / (dotRadius * dotRadius)
+                    val spark = dotSpark[x]
+                    val dotRadius = spacing * (.29f - .11f * distanceFromCenter + .055f * spark)
+                    val ellipseDistance = (dotOffsetXSquared[x] + dotOffsetYSquared * dotVerticalWeight[x]) / (dotRadius * dotRadius)
                     val dot = ((1f - ellipseDistance) * 2.6f).coerceIn(0f, 1f)
-                    blurred += (235f - blurred).coerceAtLeast(0f) * (.36f + .12f * wave) * dot
+                    val opacity = (.28f + .18f * spark) * dot
+                    blurred += (DOT_Y - blurred) * opacity
+                    if (dotChromaAlpha != null && opacity > 0f) {
+                        // Each I420 chroma sample covers four luma pixels. Average their opacity.
+                        val chromaIndex = (b.top + y) / 2 * chromaWidth + (b.left + x) / 2
+                        val previous = dotChromaAlpha[chromaIndex].toInt() and 255
+                        val contribution = (opacity * coverage * (CHROMA_ALPHA_MAX / 4)).roundToInt()
+                        dotChromaAlpha[chromaIndex] = (previous + contribution).coerceAtMost(CHROMA_ALPHA_MAX).toByte()
+                    }
                 }
                 plane[index] = (original + (blurred - original) * coverage).toInt().toByte()
             }
+        }
+    }
+
+    fun tintDotChroma(u: ByteArray, v: ByteArray, alpha: ByteArray) {
+        for (index in alpha.indices) {
+            val weight = alpha[index].toInt() and 255
+            if (weight == 0) continue
+            val cb = u[index].toInt() and 255
+            val cr = v[index].toInt() and 255
+            u[index] = (cb + (DOT_U - cb) * weight / CHROMA_ALPHA_MAX).toByte()
+            v[index] = (cr + (DOT_V - cr) * weight / CHROMA_ALPHA_MAX).toByte()
         }
     }
 }

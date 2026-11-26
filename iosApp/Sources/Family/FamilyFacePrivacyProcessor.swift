@@ -147,14 +147,13 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
                 let dots = Self.faceDotMask?.apply(extent: visible, arguments: [
                     faceCenter,
                     faceRadii,
-                    // One cell of drift per cycle keeps the grid seamless.
-                    CIVector(x: region.minX + spacing * phase, y: region.minY - spacing * phase),
+                    CIVector(x: region.minX, y: region.minY),
                     spacing,
                     phase,
                 ])
                 let textured: CIImage
                 if let dots {
-                    let highlight = CIImage(color: CIColor(red: 0.96, green: 0.98, blue: 1, alpha: 0.48))
+                    let highlight = CIImage(color: CIColor(red: 99.0 / 255, green: 230.0 / 255, blue: 155.0 / 255, alpha: 0.48))
                         .cropped(to: visible).composited(over: blurred)
                     textured = highlight.applyingFilter("CIBlendWithMask", parameters: [
                         kCIInputBackgroundImageKey: blurred, kCIInputMaskImageKey: dots,
@@ -194,11 +193,14 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
             vec2 pixel = destCoord();
             vec2 offset = mod(pixel - gridOrigin, spacing) - spacing * 0.5;
             vec2 position = (pixel - offset - faceCenter) / faceRadii;
-            float wave = sin(6.2831853 * (phase + position.y * 0.55));
-            float radius = spacing * (0.34 - 0.13 * min(dot(position, position), 1.0) + 0.10 * wave);
-            vec2 scale = 1.0 - 0.42 * min(abs(position), vec2(1.0));
+            float columnPhase = mod(phase + 2.18 - position.x * 0.55, 1.0);
+            float rise = clamp(columnPhase / 0.28, 0.0, 1.0);
+            float fall = clamp((0.72 - columnPhase) / 0.44, 0.0, 1.0);
+            float spark = rise * rise * (3.0 - 2.0 * rise) * fall * fall * (3.0 - 2.0 * fall);
+            float radius = spacing * (0.29 - 0.11 * min(dot(position, position), 1.0) + 0.055 * spark);
+            vec2 scale = (1.0 - 0.42 * min(abs(position), vec2(1.0))) * vec2(1.0, 1.0 + 0.55 * spark);
             vec2 ellipse = offset / (radius * scale);
-            float mask = clamp((1.0 - dot(ellipse, ellipse)) * 2.6, 0.0, 1.0) * (0.75 + 0.25 * wave);
+            float mask = clamp((1.0 - dot(ellipse, ellipse)) * 2.6, 0.0, 1.0) * (0.28 + 0.18 * spark) / 0.48;
             return vec4(mask, mask, mask, 1.0);
         }
         """)

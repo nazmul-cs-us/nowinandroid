@@ -111,16 +111,19 @@ internal class FamilyFacePrivacyProcessor(
             val regions = stabilized?.let { listOf(it) }
                 ?: faces.ifEmpty { listOf(PrivacyRegion(0, 0, width, height)) }
             val oval = faces.isNotEmpty()
+            val dotChromaAlpha = if (oval) ByteArray(u.size) else null
             for (bounds in regions) {
                 val radius = (minOf(bounds.right - bounds.left, bounds.bottom - bounds.top) / 5).coerceAtLeast(12)
                 FamilyPrivacyBlur.apply(
                     y, width, height, bounds, radius, oval = oval, dots = oval, timestampNs = frame.timestampNs,
+                    dotChromaAlpha = dotChromaAlpha,
                 )
                 val chroma = PrivacyRegion(Math.floorDiv(bounds.left, 2), Math.floorDiv(bounds.top, 2),
                     Math.floorDiv(bounds.right + 1, 2), Math.floorDiv(bounds.bottom + 1, 2))
                 FamilyPrivacyBlur.apply(u, chromaWidth, (height + 1) / 2, chroma, (radius / 2).coerceAtLeast(1), oval = oval)
                 FamilyPrivacyBlur.apply(v, chromaWidth, (height + 1) / 2, chroma, (radius / 2).coerceAtLeast(1), oval = oval)
             }
+            if (dotChromaAlpha != null) FamilyPrivacyBlur.tintDotChroma(u, v, dotChromaAlpha)
             write(y, output.dataY, output.strideY, width, height)
             write(u, output.dataU, output.strideU, chromaWidth, (height + 1) / 2)
             write(v, output.dataV, output.strideV, chromaWidth, (height + 1) / 2)

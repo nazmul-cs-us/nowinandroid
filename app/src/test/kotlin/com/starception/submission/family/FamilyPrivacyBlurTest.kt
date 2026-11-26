@@ -34,10 +34,10 @@ class FamilyPrivacyBlurTest {
         assertEquals(original[55 * width + 55], plane[55 * width + 55])
         val center = (24 until 40).flatMap { y -> (24 until 40).map { x -> plane[y * width + x].toInt() and 255 } }
         assertTrue(center.all { it in 110..180 })
-        assertTrue(center.max() - center.min() > 15)
+        assertTrue(center.max() - center.min() > 10)
     }
 
-    @Test fun dotPatternMovesOnIdenticalFramesAndLoops() {
+    @Test fun dotPatternPulsesOnIdenticalFramesAndLoops() {
         val width = 64
         val face = PrivacyRegion(8, 8, 56, 56)
         fun render(timestampNs: Long, dots: Boolean = true): ByteArray {
@@ -54,6 +54,25 @@ class FamilyPrivacyBlurTest {
         assertEquals(start[8 * width + 8], quarter[8 * width + 8])
     }
 
+    @Test fun voiceSpikePulseTravelsAcrossDotColumns() {
+        val width = 90
+        fun render(timestampNs: Long): ByteArray {
+            val plane = ByteArray(width * width) { 100 }
+            FamilyPrivacyBlur.apply(
+                plane, width, width, PrivacyRegion(0, 0, width, width), 12,
+                oval = true, dots = true, timestampNs = timestampNs,
+            )
+            return plane
+        }
+
+        val start = render(0)
+        val halfCycle = render(900_000_000)
+        val left = 42 * width + 22
+        val right = 42 * width + 67
+        assertTrue((start[left].toInt() and 255) > (start[right].toInt() and 255))
+        assertTrue((halfCycle[left].toInt() and 255) < (halfCycle[right].toInt() and 255))
+    }
+
     @Test fun dotsShrinkAndNarrowTowardTheSideOfTheFace() {
         val width = 90
         val plane = ByteArray(width * width) { 100 }
@@ -62,6 +81,25 @@ class FamilyPrivacyBlurTest {
 
         assertTrue(luminance(43, 42) > luminance(73, 42))
         assertTrue(luminance(72, 43) > luminance(73, 42))
+    }
+
+    @Test fun mintTintUsesTheDotCoverageAndLeavesBackgroundChromaAlone() {
+        val size = 64
+        val luma = ByteArray(size * size) { 100 }
+        val chromaSize = size / 2 * (size / 2)
+        val alpha = ByteArray(chromaSize)
+        val u = ByteArray(chromaSize) { 128.toByte() }
+        val v = u.copyOf()
+        FamilyPrivacyBlur.apply(
+            luma, size, size, PrivacyRegion(8, 8, 56, 56), 12,
+            oval = true, dots = true, dotChromaAlpha = alpha,
+        )
+        FamilyPrivacyBlur.tintDotChroma(u, v, alpha)
+
+        assertEquals(128, u.first().toInt() and 255)
+        assertEquals(128, v.first().toInt() and 255)
+        assertTrue((u.indices).any { (u[it].toInt() and 255) in 115..127 })
+        assertTrue((v.indices).any { (v[it].toInt() and 255) in 76..127 })
     }
 
     @Test fun faceMaskTapersAtTheJaw() {
