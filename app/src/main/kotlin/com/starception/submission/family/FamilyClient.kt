@@ -38,7 +38,7 @@ data class FamilyUiState(
     val webPairing: FamilyWebPairing? = null,
     val callError: String? = null, val pushRegistrationError: String? = null,
     val members: List<FamilyMember> = emptyList(), val call: FamilyCall? = null,
-    val error: String? = null, val muted: Boolean = false, val camera: Boolean = true,
+    val error: String? = null, val muted: Boolean = false, val camera: Boolean = true, val faceBlur: Boolean = true,
     val speaker: Boolean = false, val mediaConnected: Boolean = false,
     val connectionRoute: String = "unknown",
     val connectedAtElapsed: Long? = null,
@@ -327,7 +327,7 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
             runCatching { old.disconnect() }
         }
         connection = null
-        ringingJob?.cancel(); mediaInstance?.close(); rtcCallId = null; queuedSignals.clear(); terminal.clear(); callReducer.clear()
+        ringingJob?.cancel(); mediaInstance?.faceBlur(true); mediaInstance?.close(); rtcCallId = null; queuedSignals.clear(); terminal.clear(); callReducer.clear()
         mutable.value = FamilyUiState()
     }
     private fun lost(token: Int) {
@@ -554,6 +554,11 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
     }
     fun mute() { val mute = !mutable.value.muted; media.mute(mute); mutable.value = mutable.value.copy(muted = mute) }
     fun toggleCamera() { val enabled = !mutable.value.camera; media.camera(enabled); mutable.value = mutable.value.copy(camera = enabled) }
+    fun toggleFaceBlur() {
+        val enabled = !mutable.value.faceBlur
+        media.faceBlur(enabled)
+        mutable.value = mutable.value.copy(faceBlur = enabled)
+    }
     fun switchCamera() { media.switchCamera() }
     fun speaker() { val enabled = !mutable.value.speaker; media.speaker(enabled); mutable.value = mutable.value.copy(speaker = enabled) }
 
@@ -667,7 +672,8 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         android.util.Log.i("FamilyCalls", "Call update: stage=${call.stage}; version=${call.version}; selected=${call.selected}; remainingMs=${call.expires - System.currentTimeMillis()}; serverReason=$reason")
         if (callReducer.stage == "ended" || (call.stage == "active" && !call.selected)) { finish(call.id, "terminal-expired-or-other-device"); return }
         if (call.stage == "ringing" && call.expires <= System.currentTimeMillis()) { finish(call.id, "terminal-expired-or-other-device"); return }
-        mutable.value = mutable.value.copy(call = call, speaker = if (call.stage == "active") call.kind == "video" else mutable.value.speaker)
+        if (current == null) mediaInstance?.faceBlur(true)
+        mutable.value = mutable.value.copy(faceBlur = if (current == null) true else mutable.value.faceBlur, call = call, speaker = if (call.stage == "active") call.kind == "video" else mutable.value.speaker)
         // Acceptance, rather than ICE connectivity, ends Telecom's ringing/dialling
         // state. Waiting for media here can leave audio focus locked by the system.
         if (call.stage == "active") FamilyTelecom.accepted(call.id)
@@ -712,8 +718,8 @@ class FamilyClient @Inject constructor(@ApplicationContext private val context: 
         terminal.add(id); while (terminal.size > 256) terminal.remove(terminal.first())
         if (mutable.value.call?.id == id) {
             android.util.Log.i("FamilyCalls", "Ending local call presentation: $reason")
-            mutable.value = mutable.value.copy(call = null, muted = false, camera = true, speaker = false, mediaConnected = false, connectionRoute = "unknown", connectedAtElapsed = null, callError = null)
-            ringingJob?.cancel(); mediaInstance?.close(); rtcCallId = null; queuedSignals.clear()
+            mutable.value = mutable.value.copy(call = null, muted = false, camera = true, faceBlur = true, speaker = false, mediaConnected = false, connectionRoute = "unknown", connectedAtElapsed = null, callError = null)
+            ringingJob?.cancel(); mediaInstance?.faceBlur(true); mediaInstance?.close(); rtcCallId = null; queuedSignals.clear()
         }
     }
     private suspend fun endWithError(message: String) {

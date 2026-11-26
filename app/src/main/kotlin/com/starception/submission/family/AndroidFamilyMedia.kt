@@ -47,6 +47,8 @@ class AndroidFamilyMedia(
     private var audioSource: AudioSource? = null
     private var cameraSource: VideoSource? = null
     private var capturer: CameraVideoCapturer? = null
+    private var privacyProcessor: FamilyFacePrivacyProcessor? = null
+    private var faceBlurEnabled = true
     private var texture: SurfaceTextureHelper? = null
     private var remoteDescription = false
     private val candidates = mutableListOf<IceCandidate>()
@@ -168,12 +170,17 @@ class AndroidFamilyMedia(
         capturer = enumerator.createCapturer(name, null) ?: error("Camera unavailable")
         prepareCameraTrack()
         texture = SurfaceTextureHelper.create("FamilyCamera", egl.eglBaseContext)
-        capturer!!.initialize(texture, context, cameraSource!!.capturerObserver)
+        capturer!!.initialize(texture, context, privacyProcessor!!)
         capturer!!.startCapture(640, 480, 24)
     }
     /** A disabled outgoing video track can negotiate without opening the camera. */
     private fun prepareCameraTrack() {
-        if (cameraSource == null) cameraSource = factory.createVideoSource(false)
+        if (cameraSource == null) {
+            cameraSource = factory.createVideoSource(false)
+            privacyProcessor = FamilyFacePrivacyProcessor(cameraSource!!.capturerObserver).also {
+                it.setEnabled(faceBlurEnabled)
+            }
+        }
         if (localVideo.value == null) localVideo.value = factory.createVideoTrack("family-video", cameraSource)
     }
     suspend fun receive(payload: JSONObject) {
@@ -227,6 +234,10 @@ class AndroidFamilyMedia(
         if (enabled && capturer == null) preview()
         localVideo.value?.setEnabled(enabled)
     }
+    fun faceBlur(enabled: Boolean) {
+        faceBlurEnabled = enabled
+        privacyProcessor?.setEnabled(enabled)
+    }
     fun switchCamera() { capturer?.switchCamera(null) }
     @Suppress("DEPRECATION") fun speaker(enabled: Boolean) { audio.isSpeakerphoneOn = enabled }
     fun close(preservePreview: Boolean = false) {
@@ -234,6 +245,7 @@ class AndroidFamilyMedia(
         routeJob?.cancel(); routeJob = null; routeChanged("unknown")
         if (!preservePreview) {
             runCatching { capturer?.stopCapture() }; capturer?.dispose(); capturer = null
+            privacyProcessor?.close(); privacyProcessor = null
             texture?.dispose(); texture = null
             localVideo.value?.dispose(); localVideo.value = null
             cameraSource?.dispose(); cameraSource = null

@@ -27,6 +27,7 @@ import com.starception.submission.feature.prayertimes.HomeHeaderTypography
 import com.starception.submission.feature.prayertimes.HomeRotatingHeaderText
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -499,15 +500,7 @@ fun PrayerTimesScreen(
                 val layoutHeight = maxHeight + syncState.heldContentInsetTop
                 // Requiring room in both axes keeps wide, short phones out of tablet sizing.
                 val isTablet = maxWidth >= 600.dp && layoutHeight >= 600.dp
-                val isTabletPortrait = isTablet && maxWidth <= maxHeight
-                    // The phone and tablet share one design language: identical
-                // cards at identical aspect ratios. Portrait tablets therefore
-                // reuse the single-pane layout and simply show more of the
-                // carousel; only landscape tablets split into two panes.
-                val useTwoPaneLayout = isTablet && !isTabletPortrait
-                // Match Android: the floating bottom pill in portrait, the side
-                // rail only in landscape two-pane layouts.
-                val useSideNavigation = useTwoPaneLayout
+                val useSideNavigation = isTablet && maxWidth > maxHeight
                 val sideNavigationVisible = useSideNavigation && LocalShowBottomNavigation.current
                 // iOS has taller status/navigation safe areas than Android. Reserving
                 // their measured space keeps the location card above the floating bar.
@@ -534,49 +527,17 @@ fun PrayerTimesScreen(
                             syncState.transientContentOffsetY
                         ).coerceAtLeast(180.dp)
                 }
-                // Measured two-pane sizing: both panes share the height below
-                // the search header (~150dp of status bar, header, paddings).
-                val paneContentHeight = layoutHeight - 150.dp
-                // The hero pane is 5/11 of the row; keep the card's 288/250
-                // aspect instead of stretching it to an arbitrary height.
-                val dashboardStartInset = if (sideNavigationVisible) 80.dp else 24.dp
-                val heroPaneWidth = (maxWidth - dashboardStartInset - 24.dp - 20.dp) * (5f / 11f)
-                val landscapeInsightHeight = if (isTablet) {
-                    minOf(
-                        // Pane minus the "Insights" title row (44), location
-                        // card (58), and their gap (12).
-                        paneContentHeight - 114.dp,
-                        heroPaneWidth * (288f / 250f),
-                    ).coerceAtLeast(320.dp)
-                } else {
-                    (layoutHeight - 182.dp).coerceIn(220.dp, 400.dp)
-                }
-                // Landscape schedule: three rows of two cards split the pane
-                // minus the schedule header (44) and 8dp row gaps evenly.
-                val tabletCardHeight = (
-                    (paneContentHeight - 44.dp - (8.dp * 3)) / 3
-                    ).coerceIn(96.dp, 190.dp)
-                // Portrait tablet single-pane: the schedule always shows all
-                // six prayers, and its three rows absorb the height left after
-                // the header (58), hero block (~454), schedule header (44),
-                // location card (58), and paddings, so nothing pools below.
-                // Budget: safe areas + header (58) + insights title (44) +
-                // hero (400) + gaps + schedule header (52) + location (58) +
-                // bottom-bar clearance (112) ≈ 810dp; rows share the rest.
-                val portraitCardHeight = (
-                    (layoutHeight - 810.dp) / 3
-                    ).coerceIn(96.dp, 132.dp)
                 // Tablets use their pane's viewport. Portrait phones supply a
                 // separate maximum after measuring their header and navigation.
                 val insightViewportHeight = (maxHeight - 96.dp).coerceAtLeast(220.dp)
-                // The Android home for portrait phones: a fixed full-screen
+                // The current Home design for phones, iPad and Designed-for-iPad Mac windows: a fixed full-screen
                 // artwork backdrop behind the feed, the swipeable cover copy
                 // as the first feed item, then the reflection prompt, the
                 // explore rail, and the prayer dashboard. The insight reader
                 // takes over the top slot when a cover page opens it.
-                val isPhoneHome = !isTablet && maxWidth < maxHeight
+                val usesArtworkHome = useArtworkHomeLayout(maxWidth.value, layoutHeight.value)
                 val isPagerRevealed = insightExpansionExtent > 0.001f
-                val showPhoneHomeCover = isPhoneHome && !isPagerRevealed && !isInsightImmersive
+                val showHomeCover = usesArtworkHome && !isPagerRevealed && !isInsightImmersive
                 val homeIsDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
                 val homeSafeTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
                 val homePortraitScroll = rememberScrollState()
@@ -584,7 +545,7 @@ fun PrayerTimesScreen(
                 val backdropTopInWindow = remember { mutableFloatStateOf(0f) }
                 val feedTopInWindow = remember { mutableFloatStateOf(Float.NaN) }
                 val feedViewportHeight = remember { mutableIntStateOf(0) }
-                if (isPhoneHome) {
+                if (usesArtworkHome) {
                     val artworkIcons = homeStatusBarUsesLightIcons(
                         homeCoverHeaderUsesLightText(coverPage, coverNightArtwork),
                         with(LocalDensity.current) { homePortraitScroll.value.toDp().value },
@@ -601,10 +562,10 @@ fun PrayerTimesScreen(
                 // The feed starts under the overlay header; the reader slot
                 // opens at the very top of the safe area.
                 val homeTopGap by animateDpAsState(
-                    targetValue = if (showPhoneHomeCover) {
+                    targetValue = if (showHomeCover) {
                         homeSafeTop + 4.dp
                     } else {
-                        if (isPhoneHome && isPagerRevealed) 0.dp else 8.dp
+                        if (usesArtworkHome && isPagerRevealed) 0.dp else 8.dp
                     },
                     animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
                     label = "homeCoverTopGap",
@@ -619,7 +580,7 @@ fun PrayerTimesScreen(
                     coverPage = page
                     // Reveal the insight reader for this page; the pager
                     // refines its own extent after measuring.
-                    insightExpansionExtent = if (isPhoneHome) 1f else preferredInsightExpansionExtent(
+                    insightExpansionExtent = if (usesArtworkHome) 1f else preferredInsightExpansionExtent(
                         page,
                         portraitInsightHeight,
                         insightViewportHeight,
@@ -637,7 +598,7 @@ fun PrayerTimesScreen(
                      initialPage: Int? = initialExpandedInsight,
                  ) {
                       InsightPager(
-                          immersiveHome = isPhoneHome,
+                          immersiveHome = usesArtworkHome,
                           useHomeArtwork = true,
                          expandRequest = expandRequest,
                          initialExpandedPage = initialPage,
@@ -677,13 +638,13 @@ fun PrayerTimesScreen(
                         .fillMaxSize()
                         .align(Alignment.TopCenter)
                         .onGloballyPositioned { backdropTopInWindow.floatValue = it.positionInWindow().y }
-                        .background(if (isPhoneHome) homeFeed.background else Color.Transparent),
+                        .background(if (usesArtworkHome) homeFeed.background else Color.Transparent),
                 ) {
                     // The fixed full-screen artwork backdrop of the Android
                     // home: edge-to-edge under the status bar, fixed behind
                     // the scrolling feed, fading to the app surface once the
                     // cover scrolls out of view.
-                    if (isPhoneHome) {
+                    if (usesArtworkHome) {
                         HomeCoverArtworkBackdrop(
                             position = coverScrollPosition,
                             useNightArtwork = coverNightArtwork,
@@ -721,29 +682,27 @@ fun PrayerTimesScreen(
                     }
                     val bottomNavigationClearance =
                         if (LocalShowBottomNavigation.current && !useSideNavigation && !isInsightImmersive) 72.dp else 0.dp
-                    val revealAtNavigation = isPhoneHome && bottomNavigationClearance > 0.dp
+                    val revealAtNavigation = usesArtworkHome && bottomNavigationClearance > 0.dp
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
                             .fillMaxHeight()
-                            .then(
-                                if (useTwoPaneLayout) Modifier else syncState.directPullModifier,
-                            )
-                            .then(if (isPhoneHome && isPagerRevealed) Modifier else Modifier.safeDrawingPadding())
+                            .then(syncState.directPullModifier)
+                            .then(if (usesArtworkHome && isPagerRevealed) Modifier else Modifier.safeDrawingPadding())
                             .padding(bottom = if (revealAtNavigation) 0.dp else bottomNavigationClearance)
                             .clipToBounds()
                             .padding(
                                 // Phone feed shading paints before its own
                                 // gutters, like Android. Tablet/rail layouts
                                 // retain their existing outer content margins.
-                                start = if (sideNavigationVisible) 80.dp else if (isPhoneHome) 0.dp else 24.dp,
-                                end = if (isPhoneHome) 0.dp else 24.dp,
+                                start = if (sideNavigationVisible) 80.dp else if (usesArtworkHome) 0.dp else 24.dp,
+                                end = if (usesArtworkHome) 0.dp else 24.dp,
                             )
-                            .padding(top = if (isPhoneHome) homeTopGap else 8.dp),
+                            .padding(top = if (usesArtworkHome) homeTopGap else 8.dp),
                     ) {
                         if (!isInsightImmersive) {
-                            if (!showPhoneHomeCover) {
+                            if (!showHomeCover) {
                                 PrayerHomeHeader(
                                     onOpenSettings = onOpenSettings,
                                     onOpenProfile = onOpenProfile,
@@ -773,129 +732,12 @@ fun PrayerTimesScreen(
                                     onDismiss = { showProfileSheet = false },
                                 )
                             }
-                            if (!showPhoneHomeCover) {
+                            if (!showHomeCover) {
                                 Spacer(Modifier.height(10.dp))
                             }
                         }
 
-                        if (useTwoPaneLayout) {
-                            Row(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.spacedBy(20.dp),
-                            ) {
-                                LazyColumn(
-                                    modifier = Modifier.weight(
-                                        if (isInsightImmersive) 1f else if (isTablet) 5f else 1f,
-                                    ),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                                    contentPadding = PaddingValues(bottom = 84.dp),
-                                ) {
-                                    item {
-                                        renderInsightPager(
-                                            landscapeInsightHeight,
-                                            true,
-                                            if (isTablet) {
-                                                if (isInsightImmersive) 720.dp else heroPaneWidth
-                                            } else {
-                                                null
-                                            },
-                                        )
-                                    }
-                                    if (!isInsightImmersive) {
-                                        item {
-                                            LocationWeatherRow(
-                                                placeName = placeName,
-                                                temperatureCelsius = day.temperatureCelsius,
-                                                conditionLabel = day.conditionLabel,
-                                                isLocating = isLocating,
-                                                compact = false,
-                                                onRefresh = onRefresh,
-                                            )
-                                        }
-                                    }
-                                }
-                                if (!isInsightImmersive) {
-                                    LazyColumn(
-                                        modifier = Modifier.weight(if (isTablet) 6f else 1f),
-                                        contentPadding = PaddingValues(bottom = 84.dp),
-                                    ) {
-                                        item {
-                                            PrayerScheduleSection(
-                                                day = day,
-                                                offsets = offsets,
-                                                showAllPrayers = true,
-                                                onToggleExpanded = { showAllPrayers = !showAllPrayers },
-                                                onAdjustPrayer = onAdjustPrayer,
-                                                onTogglePrayerAdhan = onTogglePrayerAdhan,
-                                                onAdhanVolumeChange = onAdhanVolumeChange,
-                                                onOpenAdhanVolume = { name, volume ->
-                                                    activeAdhanVolume = name to volume
-                                                },
-                                                isTuning = isTuningSchedule,
-                                                onToggleTuning = { isTuningSchedule = !isTuningSchedule },
-                                                notifications = notifications,
-                                                onTogglePrayerNotification = onTogglePrayerNotification,
-                                                showExpandControl = false,
-                                                compact = !isTablet,
-                                                cardMinHeight = if (isTablet) tabletCardHeight else null,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        } else if (isTabletPortrait) {
-                            // Portrait tablets never need to scroll: every fixed block
-                            // takes its natural height and the hero absorbs whatever
-                            // the window measurement leaves over, so nothing can
-                            // overlap the floating bar or pool at the bottom.
-                            Column(Modifier.fillMaxSize()) {
-                                Box(Modifier.weight(1f).fillMaxWidth()) {
-                                    BoxWithConstraints(Modifier.fillMaxSize()) {
-                                        // The pager draws its own 34dp title row plus
-                                        // an 8dp gap above the artwork.
-                                        val heroTile = portraitInsightHeight.coerceAtMost(
-                                            (maxHeight - 42.dp).coerceAtLeast(220.dp),
-                                        )
-                                        renderInsightPager(heroTile, false, 420.dp)
-                                    }
-                                }
-                                if (!isInsightImmersive) {
-                                    Spacer(Modifier.height(10.dp))
-                                    PrayerScheduleSection(
-                                        day = day,
-                                        offsets = offsets,
-                                        showAllPrayers = true,
-                                        onToggleExpanded = { showAllPrayers = !showAllPrayers },
-                                        onAdjustPrayer = onAdjustPrayer,
-                                        onTogglePrayerAdhan = onTogglePrayerAdhan,
-                                        onAdhanVolumeChange = onAdhanVolumeChange,
-                                        onOpenAdhanVolume = { name, volume ->
-                                            activeAdhanVolume = name to volume
-                                        },
-                                        isTuning = isTuningSchedule,
-                                        onToggleTuning = { isTuningSchedule = !isTuningSchedule },
-                                        notifications = notifications,
-                                        onTogglePrayerNotification = onTogglePrayerNotification,
-                                        showExpandControl = false,
-                                        compact = false,
-                                        cardMinHeight = 104.dp,
-                                    )
-                                    Spacer(Modifier.height(10.dp))
-                                    LocationWeatherRow(
-                                        placeName = placeName,
-                                        temperatureCelsius = day.temperatureCelsius,
-                                        conditionLabel = day.conditionLabel,
-                                        isLocating = isLocating,
-                                        compact = false,
-                                        onRefresh = onRefresh,
-                                    )
-                                    // Navigation is reserved outside the content viewport.
-                                    Spacer(Modifier.height(8.dp))
-                                }
-                            }
-                        } else {
-                            // Keep the phone viewport fixed while the insight
-                            // borrows room from progressively reduced home content.
+                            // Readers share the measured viewport at every window size.
                             BoxWithConstraints(Modifier.fillMaxSize()
                                 .onGloballyPositioned { feedTopInWindow.floatValue = it.positionInWindow().y }
                                 .onSizeChanged { feedViewportHeight.intValue = it.height }) {
@@ -914,7 +756,7 @@ fun PrayerTimesScreen(
                                 // allowed to fill the viewport, including the pager's
                                 // 34dp heading and 8dp gap. Keep the compact budget
                                 // separate so normal Home still fits its prayer rows.
-                                val phoneMaximumInsight = (maxHeight - if (isPhoneHome) 0.dp else 42.dp).coerceAtLeast(140.dp)
+                                val phoneMaximumInsight = (maxHeight - if (usesArtworkHome) 0.dp else 42.dp).coerceAtLeast(140.dp)
                                 val phoneRestingInsight = minOf(
                                     portraitInsightHeight,
                                     maxHeight - minimumSchedule - 100.dp,
@@ -932,16 +774,18 @@ fun PrayerTimesScreen(
                                       sectionGap * 3 - 4.dp).coerceAtLeast(0.dp)
                                   // Captured for the scrolling column below: its content
                                   // lambda leaves the BoxWithConstraints receiver scope.
-                                  val phoneViewportWidth = if (isPhoneHome) maxWidth - 48.dp else maxWidth
+                                  val phoneViewportWidth = if (usesArtworkHome) maxWidth - 48.dp else maxWidth
                                   Column(
                                       modifier = Modifier.fillMaxSize()
+                                          .testTag("home-artwork-feed")
                                           .then(if (revealAtNavigation) Modifier.homeNavigationReveal(homeFeed.background, bottomNavigationClearance) else Modifier)
                                           .verticalScroll(homePortraitScroll)
                                           .padding(
-                                              start = if (isPhoneHome) 24.dp else 0.dp,
-                                              end = if (isPhoneHome) 24.dp else 0.dp,
+                                              start = if (usesArtworkHome) 24.dp else 0.dp,
+                                              end = if (usesArtworkHome) 24.dp else 0.dp,
                                               bottom = if (revealAtNavigation) bottomNavigationClearance + 12.dp else 0.dp,
                                           ),
+                                      horizontalAlignment = Alignment.CenterHorizontally,
                                       verticalArrangement = Arrangement.spacedBy(sectionGap),
                                   ) {
                                       // The insight reader slot, Android home order: it
@@ -952,7 +796,7 @@ fun PrayerTimesScreen(
                                       // Landscape phones keep the carousel in flow — the
                                       // cover is a portrait composition.
                                       AnimatedVisibility(
-                                          visible = isPagerRevealed || !isPhoneHome,
+                                          visible = isPagerRevealed || !usesArtworkHome,
                                           enter = expandVertically(
                                               animationSpec = tween(
                                                   durationMillis = 420,
@@ -970,10 +814,10 @@ fun PrayerTimesScreen(
                                           },
                                       ) {
                                           Box(Modifier.align(Alignment.CenterHorizontally)
-                                              .requiredWidth(if (isPhoneHome) phoneViewportWidth + 48.dp else phoneViewportWidth)) {
+                                              .requiredWidth(if (usesArtworkHome) phoneViewportWidth + 48.dp else phoneViewportWidth)) {
                                               renderInsightPager(
                                                   phoneRestingInsight,
-                                                  isPhoneHome,
+                                                  usesArtworkHome,
                                                   null,
                                                   phoneMaximumInsight,
                                                   coverExpandRequest,
@@ -991,6 +835,7 @@ fun PrayerTimesScreen(
                                               .align(Alignment.CenterHorizontally)
                                               .requiredWidth(phoneViewportWidth + 48.dp)
                                               .height(phoneCoverSlotHeight)
+                                              .testTag("home-artwork-cover")
                                               .onSizeChanged {
                                                   homeCoverHeightPx.intValue = it.height
                                               }
@@ -1014,6 +859,7 @@ fun PrayerTimesScreen(
                                       }
                                       if (!isPagerRevealed) {
                                           HomeReflectionPrompt(
+                                              modifier = Modifier.widthIn(max = 1100.dp),
                                               focusedPage = coverPage,
                                               scrollPosition = coverScrollPosition.floatValue,
                                               generatedInsights = homeReflectionEvidence,
@@ -1046,8 +892,8 @@ fun PrayerTimesScreen(
                                             prayerContentHeights.values.maxOrNull()?.value ?: 0f,
                                         )
                                         PrayerScheduleSection(
-                                            onDarkFeed = isPhoneHome,
-                                            modifier = Modifier.fillMaxWidth(),
+                                            onDarkFeed = usesArtworkHome,
+                                            modifier = Modifier.widthIn(max = 1100.dp).fillMaxWidth(),
                                             day = day,
                                             offsets = offsets,
                                             showAllPrayers = showAllPrayers,
@@ -1079,7 +925,7 @@ fun PrayerTimesScreen(
                                         // Keep location in normal flow directly below
                                         // the reduced schedule while resizing.
                                         AnimatedVisibility(
-                                            modifier = Modifier.onSizeChanged {
+                                            modifier = Modifier.widthIn(max = 1100.dp).onSizeChanged {
                                                 phoneLocationHeight = with(phoneDensity) { it.height.toDp() }
                                             },
                                             visible = !collapseLocation,
@@ -1109,19 +955,18 @@ fun PrayerTimesScreen(
                                     }
                                 }
                             }
-                        }
                     }
 
                     // The header overlays the cover artwork, Android-home
                     // style: status-bar padded, fixed above the backdrop, and
                     // it fades away as the feed scrolls or a reader opens.
-                    if (isPhoneHome) {
+                    if (usesArtworkHome) {
                         val headerFadeDistancePx = with(LocalDensity.current) { 96.dp.toPx() }
                         val headerVisibility = if (isPagerRevealed) 0f else
                             (1f - homePortraitScroll.value / headerFadeDistancePx)
                                 .coerceIn(0f, 1f)
                         AnimatedVisibility(
-                            visible = showPhoneHomeCover,
+                            visible = showHomeCover,
                             enter = fadeIn(tween(durationMillis = 320, easing = FastOutSlowInEasing)),
                             exit = fadeOut(tween(durationMillis = 220, easing = FastOutSlowInEasing)),
                             modifier = Modifier

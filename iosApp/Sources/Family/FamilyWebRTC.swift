@@ -18,6 +18,8 @@ import Shared
     }()
     private var peer: RTCPeerConnection?
     private var microphone: RTCAudioTrack?
+    private var privacyProcessor: FamilyFacePrivacyProcessor?
+    private var faceBlurEnabled = true
     private var capturer: RTCCameraVideoCapturer?
     private var cameraDevice: AVCaptureDevice?
     private var cameraStarted = false
@@ -99,7 +101,10 @@ import Shared
     }
     private func makeCamera() {
         let source = Self.factory.videoSource()
-        capturer = RTCCameraVideoCapturer(delegate: source)
+        let privacy = FamilyFacePrivacyProcessor(downstream: source)
+        privacy.setEnabled(faceBlurEnabled)
+        privacyProcessor = privacy
+        capturer = RTCCameraVideoCapturer(delegate: privacy)
         localVideo = Self.factory.videoTrack(with: source, trackId: "family-video")
     }
     /// Local video only: no peer connection, microphone or audio activation.
@@ -179,6 +184,10 @@ import Shared
         }
         cameraStarted = true
     }
+    func faceBlur(_ enabled: Bool) {
+        faceBlurEnabled = enabled
+        privacyProcessor?.setEnabled(enabled)
+    }
     func switchCamera() {
         let front = cameraDevice?.position != .front
         Task { do { try await startCamera(front: front) } catch { onFailure?("Could not switch camera.") } }
@@ -194,7 +203,10 @@ import Shared
     func close(preservePreview: Bool = false) {
         epoch += 1
         stopRouteStats()
-        if !preservePreview { capturer?.stopCapture(); capturer = nil; cameraDevice = nil; cameraStarted = false; localVideo = nil }
+        if !preservePreview {
+            privacyProcessor?.close(); privacyProcessor = nil
+            capturer?.stopCapture(); capturer = nil; cameraDevice = nil; cameraStarted = false; localVideo = nil
+        }
         peer?.close(); peer = nil; microphone = nil; remoteVideo = nil
         pendingCandidates.removeAll(); hasRemoteDescription = false
         if ownsAudio {

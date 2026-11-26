@@ -7,6 +7,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -246,7 +247,7 @@ internal fun ImmersiveHomeCover(
             val pageOffset = pagerState.currentPage - absolutePage + pagerState.currentPageOffsetFraction
             Box(Modifier.fillMaxSize().clickable { onOpen(page) }) {
                 Column(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    Modifier.align(Alignment.BottomCenter).widthIn(max = 720.dp).fillMaxWidth()
                         // Counter the pager's full-width travel. Copy drifts
                         // only a few pixels and fades before the next arrives.
                         .graphicsLayer {

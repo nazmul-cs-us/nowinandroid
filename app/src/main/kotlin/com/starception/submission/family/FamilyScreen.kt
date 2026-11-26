@@ -551,7 +551,7 @@ internal fun ContactAvatar(jid: String, size: Int, ring: Boolean = false, online
 
 internal data class FamilyCallActions(
     val answer: () -> Unit = {}, val hangup: () -> Unit = {}, val mute: () -> Unit = {},
-    val speaker: () -> Unit = {}, val camera: () -> Unit = {}, val flip: () -> Unit = {},
+    val speaker: () -> Unit = {}, val camera: () -> Unit = {}, val flip: () -> Unit = {}, val faceBlur: () -> Unit = {},
 )
 
 /** Handles an already-resumed screen as well as every subsequent resume/stop. */
@@ -607,7 +607,7 @@ fun FamilyCallOverlay(client: FamilyClient) {
         }
         FamilyCallContent(state, elapsed, FamilyCallActions(
             answer = { permission(call.kind == "video") { client.acceptCall() } }, hangup = { client.hangup() },
-            mute = { client.mute() }, speaker = { client.speaker() }, camera = { client.toggleCamera(); client.previewCamera() }, flip = { client.switchCamera() }),
+            mute = { client.mute() }, speaker = { client.speaker() }, camera = { client.toggleCamera(); client.previewCamera() }, flip = { client.switchCamera() }, faceBlur = { client.toggleFaceBlur() }),
             remoteReady = remote != null, localReady = local != null,
             remoteVideo = { VideoSurface(client.media, false, Modifier.fillMaxSize(), onGlassFrame = { remoteGlassFrame = it }) },
             localVideo = { VideoSurface(client.media, true, Modifier.fillMaxSize(), fitPreview = true, onGlassFrame = { localGlassFrame = it }) },

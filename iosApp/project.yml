@@ -405,3 +405,29 @@ targets:
         CODE_SIGN_STYLE: Automatic
         "CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]": "NO"
         "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": "NO"
+
+  FamilyVideoPrivacyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+      - path: Sources/Family/FamilyFacePrivacyProcessor.swift
+    dependencies:
+      - package: FamilyWebRTC
+        product: WebRTC
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission.FamilyVideoPrivacyTests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        "CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]": "NO"
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": "NO"
+
+schemes:
+  FamilyVideoPrivacyTests:
+    build:
+      targets:
+        FamilyVideoPrivacyTests: all
+    test:
+      targets:
+        - FamilyVideoPrivacyTests

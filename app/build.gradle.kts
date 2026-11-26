@@ -141,6 +141,8 @@ dependencies {
     implementation(libs.smack.android.extensions)
     implementation(libs.smack.tcp)
     implementation(libs.smack.xmlparser)
+    // Bundled face model: privacy processing must work on the first call offline.
+    implementation(libs.family.face.detection)
     implementation(libs.family.webrtc)
     implementation(projects.feature.interests)
     implementation(projects.feature.foryou)

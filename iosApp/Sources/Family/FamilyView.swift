@@ -779,6 +779,7 @@ private struct FamilyCallView: View {
                         if let message = store.callMessage {
                             Text(message).font(.system(size: 12)).foregroundStyle(colors.error).multilineTextAlignment(.center).padding(.bottom, 12)
                         }
+                        if call.kind == "video" && !incoming { faceBlurControl.padding(.bottom, 8) }
                         if call.stage == "ringing" && call.kind == "video" && call.caller == store.me {
                             FamilyCallControl(symbol: "arrow.triangle.2.circlepath.camera", title: "Flip", onVideo: preview) { store.switchCamera() }
                                 .disabled(!preview).padding(.bottom, 24)
@@ -946,6 +947,7 @@ private struct FamilyCallView: View {
                         Spacer(minLength: 0)
                         videoButton("speaker.wave.2", title: "Speaker", selected: store.speakerEnabled) { store.speaker() }
                     }.padding(.trailing, 60)
+                    faceBlurControl
                     if let message = store.callMessage { Text(message).font(.system(size: 11)).foregroundStyle(colors.error) }
                 }.padding(12).background(colors.panel.opacity(0.65)).background(.ultraThinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 26)).shadow(color: .black.opacity(0.1), radius: 8, y: 4).padding(.top, 28)
@@ -962,6 +964,18 @@ private struct FamilyCallView: View {
                 if height > 0 { videoControlsHeight = height }
             }
     }
+    private var faceBlurControl: some View {
+        Button { store.toggleFaceBlur() } label: {
+            Label(store.faceBlurEnabled ? "Face blur on" : "Face blur off", systemImage: "person.crop.circle.badge.checkmark")
+                .font(.system(size: 12, weight: .medium)).padding(.horizontal, 14).padding(.vertical, 8)
+                .foregroundStyle(colors.ink)
+                .background(store.faceBlurEnabled ? colors.header : colors.field, in: Capsule())
+        }
+        .accessibilityIdentifier("family-face-blur")
+        .accessibilityAddTraits(store.faceBlurEnabled ? .isSelected : [])
+        .accessibilityHint("Changes whether your face is blurred in the video you send")
+    }
+
     private var selfPreview: some View {
         ZStack(alignment: .bottomLeading) {
             colors.field

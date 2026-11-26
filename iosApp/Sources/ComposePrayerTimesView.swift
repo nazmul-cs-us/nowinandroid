@@ -820,6 +820,14 @@ struct NativePrayerTabsView: View {
     }
 
     private var activeOwner: Int { selectedTab == 5 ? (morePath.last ?? 5) : selectedTab }
+    private var contentIgnoredEdges: Edge.Set {
+        // iPad places native tabs at the top. Keep that inset while ordinary tab
+        // content is visible; immersive destinations still own the whole window.
+        if UIDevice.current.userInterfaceIdiom == .pad && !insightImmersive && destinationChrome[activeOwner] != true {
+            return .bottom
+        }
+        return .all
+    }
     private var preferClassicTabs: Bool {
         #if DEBUG
         return ProcessInfo.processInfo.arguments.contains("--classic-tabs")
@@ -835,7 +843,7 @@ struct NativePrayerTabsView: View {
             }
             else { classicTabs }
         }
-        .ignoresSafeArea(.container, edges: .all)
+        .ignoresSafeArea(.container, edges: contentIgnoredEdges)
         .tint(Color.accentColor)
         .overlay(alignment: .bottomTrailing) {
             if selectedTab != 7 && !insightImmersive && destinationChrome[activeOwner] != true {
@@ -926,7 +934,7 @@ struct NativePrayerTabsView: View {
 
     @ViewBuilder private func tabContent(_ index: Int) -> some View {
         let content = ComposePrayerTimesTabView(tabIndex: index, onSelectTab: selectContentTab)
-            .ignoresSafeArea(.container, edges: .all)
+            .ignoresSafeArea(.container, edges: contentIgnoredEdges)
             .toolbarBackground(.hidden, for: .tabBar)
             .toolbar((insightImmersive || destinationChrome[activeOwner] == true) ? .hidden : .visible, for: .tabBar)
         if #available(iOS 26.0, *) { content.scrollEdgeEffectHidden(true, for: .all) }

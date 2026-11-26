@@ -49,6 +49,20 @@ class FamilyOutgoingVideoUiTest {
         call = FamilyCall("outgoing-video", "omar@xmpp.starception.com", "amina.khan@xmpp.starception.com",
             "video", "ringing", 1, Long.MAX_VALUE, true))
 
+    @Test fun faceBlurDefaultsOnAndCanBeToggledBeforeAndDuringTheCall() {
+        val ui = mutableStateOf(state())
+        compose.setContent { NiaTheme {
+            FamilyCallContent(ui.value, localReady = true, remoteReady = true,
+                actions = FamilyCallActions(faceBlur = { ui.value = ui.value.copy(faceBlur = !ui.value.faceBlur) }))
+        } }
+        compose.onNodeWithTag("familyFaceBlur").assertIsSelected().performClick()
+        compose.onNodeWithText("Face blur off").assertIsDisplayed()
+        compose.runOnIdle { ui.value = ui.value.copy(call = ui.value.call?.copy(stage = "active")) }
+        compose.onNodeWithText("Face blur off").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("familyFaceBlur").assertIsSelected()
+        compose.onNodeWithText("Face blur on").assertIsDisplayed()
+    }
+
     @Test fun outgoingPreviewUsesTheRoundedCardAndShelfBeforeTheCallIsAnswered() {
         val events = mutableListOf<String>()
         compose.setContent { NiaTheme(darkTheme = false) {

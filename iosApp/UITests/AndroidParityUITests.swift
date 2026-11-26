@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 @MainActor
 final class AndroidParityUITests: XCTestCase {
@@ -40,6 +41,40 @@ final class AndroidParityUITests: XCTestCase {
         image.name = "Home wide window"
         image.lifetime = .keepAlways
         add(image)
+    }
+
+    func testIPadUsesCurrentArtworkHomeInBothOrientations() throws {
+        continueAfterFailure = false
+        defer { XCUIDevice.shared.orientation = .portrait }
+        for orientation: UIDeviceOrientation in [.landscapeLeft, .portrait] {
+            XCUIDevice.shared.orientation = orientation
+            let app = XCUIApplication()
+            app.launchArguments = []
+            app.launch()
+            let skip = app.buttons["Skip for now"]
+            if skip.waitForExistence(timeout: 5) { skip.tap() }
+            XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 30), app.debugDescription)
+            for _ in 0..<8 {
+                let dismiss = app.buttons["appGuideTipDismiss"]
+                if !dismiss.waitForExistence(timeout: 1) { break }
+                dismiss.tap()
+            }
+            let window = app.windows.firstMatch.frame
+            guard min(window.width, window.height) >= 600 else {
+                throw XCTSkip("Run this Home design check on an iPad.")
+            }
+            let cover = app.descendants(matching: .any)["home-artwork-cover"].firstMatch
+            XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertFalse(app.staticTexts["Insights"].exists, "The old tablet dashboard must not be used.")
+            XCTAssertLessThanOrEqual(cover.frame.maxY, window.maxY)
+            let image = XCTAttachment(screenshot: app.screenshot())
+            image.name = orientation == .portrait ? "Current iPad Home portrait" : "Current iPad Home landscape"
+            image.lifetime = .keepAlways
+            add(image)
+            cover.swipeLeft()
+            XCTAssertTrue(app.staticTexts["TODAY'S SALAH"].waitForExistence(timeout: 10), app.debugDescription)
+            app.terminate()
+        }
     }
 
     func testFamilyIsReachableFromTheNativeTabBar() throws {

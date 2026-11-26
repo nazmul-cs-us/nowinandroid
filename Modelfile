@@ -1,0 +1,2 @@
+FROM qwen3.5:35b-a3b-int4
+PARAMETER num_ctx 4096

@@ -62,6 +62,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     @Published private(set) var pushRegistrationMessage: String?
     @Published private(set) var muted = false
     @Published private(set) var cameraEnabled = true
+    @Published private(set) var faceBlurEnabled = true
     @Published private(set) var speakerEnabled = false
     @Published private(set) var mediaConnected = false
     @Published private(set) var connectionRoute = "unknown"
@@ -239,6 +240,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         stream = nil; socket?.removeDelegate(self); socket?.disconnectAfterSending()
         reconnecting = false
         password = nil; registering = false; accountJustCreated = false; pendingCredential = nil; connected = false; serviceReady = false; busy = false; me = ""; members = []; connectedAt = nil
+        faceBlurEnabled = true; media.faceBlur(true)
         media.close(); mediaCall = nil; call = nil; terminal.removeAll(); queuedSignals.removeAll(); callReducer.clear()
         ringingTask?.cancel(); heartbeat?.cancel(); heartbeat = nil
         rejectPending()
@@ -250,6 +252,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         pendingCredential = nil
         callMessage = nil
         connectedAt = nil
+        faceBlurEnabled = true; media.faceBlur(true)
         password = nil; connected = false; serviceReady = false; busy = false; media.close(); mediaCall = nil
         call = nil; queuedSignals.removeAll(); ringingTask?.cancel(); heartbeat?.cancel()
         rejectPending(); message = text
@@ -432,6 +435,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
     }
     func mute() { muted.toggle(); media.mute(muted) }
     func camera() { cameraEnabled.toggle(); media.camera(cameraEnabled) }
+    func toggleFaceBlur() { faceBlurEnabled.toggle(); media.faceBlur(faceBlurEnabled) }
     func switchCamera() { media.switchCamera() }
     func speaker() { speakerEnabled.toggle(); media.speaker(speakerEnabled) }
     func backgrounded() {
@@ -598,7 +602,10 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         logger.info("Call update: stage=\(next.stage, privacy: .public); version=\(next.version); selected=\(next.selected); remainingMs=\(next.expires - now); serverReason=\(reason, privacy: .public)")
         if callReducer.stage == "ended" || (next.stage == "active" && !next.selected) { finish(next.id, reason: "terminal-expired-or-other-device"); return }
         if next.stage == "ringing" && next.expires <= now { finish(next.id, reason: "terminal-expired-or-other-device"); return }
-        if call?.id != next.id { callMessage = nil }
+        if call?.id != next.id {
+            callMessage = nil
+            faceBlurEnabled = true; media.faceBlur(true)
+        }
         call = next
         FamilySystemCalls.shared.update(next, me: me)
         if next.stage == "active" && mediaCall != next.id { speakerEnabled = next.kind == "video" }
@@ -631,6 +638,7 @@ private enum FamilyError: Error { case disconnected, rejected(String), invalidRe
         logger.info("Ending local call presentation: \(reason, privacy: .public)")
         FamilySystemCalls.shared.end(id)
         call = nil; ringingTask?.cancel(); media.close(); mediaCall = nil; queuedSignals.removeAll()
+        faceBlurEnabled = true; media.faceBlur(true)
         muted = false; cameraEnabled = true; speakerEnabled = false; mediaConnected = false; connectedAt = nil; callMessage = nil
     }
     private func failCall(_ text: String) async {

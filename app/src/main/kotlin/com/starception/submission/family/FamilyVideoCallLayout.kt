@@ -169,6 +169,15 @@ internal fun FamilyVideoCallLayout(
                     }
                 }
             }
+            if (!incoming) {
+                FilterChip(
+                    selected = state.faceBlur,
+                    onClick = actions.faceBlur,
+                    label = { Text(if (state.faceBlur) "Face blur on" else "Face blur off") },
+                    leadingIcon = { Icon(Icons.Outlined.BlurOn, null, Modifier.size(18.dp)) },
+                    modifier = Modifier.align(Alignment.CenterHorizontally).testTag("familyFaceBlur"),
+                )
+            }
             // Outgoing calls already show the local camera as the main preview.
             // Incoming calls show avatars only until the user accepts.
             if (incoming) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {

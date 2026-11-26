@@ -220,6 +220,7 @@ internal fun HomeArtworkRail(
 
 @Composable
 internal fun HomeReflectionPrompt(
+    modifier: Modifier = Modifier,
     focusedPage: Int = 0,
     scrollPosition: Float = focusedPage.toFloat(),
     onDarkCover: Boolean = false,
@@ -236,7 +237,7 @@ internal fun HomeReflectionPrompt(
         label = "homeExploreDividerArrow",
     )
     Column(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(bottom = 16.dp),
         // The arrow is tucked just below the cover's page marks. Give the
         // following reflection the same clear space below the arrow.
         verticalArrangement = Arrangement.spacedBy(2.dp),
