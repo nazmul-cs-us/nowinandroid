@@ -24,6 +24,19 @@ class FamilyPrivacyBlurTest {
         assertTrue(changed > 100)
     }
 
+    @Test fun dottedFaceMaskLeavesCornersClearAndObscuresFaceDetail() {
+        val width = 64
+        val plane = ByteArray(width * width) { if ((it + it / width) % 2 == 0) 0 else 255.toByte() }
+        val original = plane.copyOf()
+        FamilyPrivacyBlur.apply(plane, width, width, PrivacyRegion(8, 8, 56, 56), 12, oval = true, dots = true)
+
+        assertEquals(original[8 * width + 8], plane[8 * width + 8])
+        assertEquals(original[55 * width + 55], plane[55 * width + 55])
+        val center = (24 until 40).flatMap { y -> (24 until 40).map { x -> plane[y * width + x].toInt() and 255 } }
+        assertTrue(center.all { it in 110..180 })
+        assertTrue(center.max() - center.min() > 15)
+    }
+
     @Test fun outOfFrameFacesAreClampedAndConstantChromaIsPreserved() {
         val plane = ByteArray(16 * 12) { 128.toByte() }
         val original = plane.copyOf()

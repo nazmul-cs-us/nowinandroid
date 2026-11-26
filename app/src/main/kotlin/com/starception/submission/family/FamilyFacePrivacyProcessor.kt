@@ -70,19 +70,22 @@ internal class FamilyFacePrivacyProcessor(
             val nv21 = ByteArray(y.size + 2 * u.size)
             y.copyInto(nv21)
             for (i in u.indices) { nv21[y.size + 2 * i] = v[i]; nv21[y.size + 2 * i + 1] = u[i] }
-            val regions = runCatching {
+            val faces = runCatching {
                 detectFaces?.invoke(nv21, width, height) ?: findFaces(nv21, width, height)
             }.getOrDefault(emptyList())
-                .map { it.clamped(width, height) }
-                .filter { it.right > it.left && it.bottom > it.top }
-                .ifEmpty { listOf(PrivacyRegion(0, 0, width, height)) }
-            for (region in regions) {
-                val bounds = region.clamped(width, height)
+                .filter { region ->
+                    val visible = region.clamped(width, height)
+                    visible.right > visible.left && visible.bottom > visible.top
+                }
+            val regions = faces.ifEmpty { listOf(PrivacyRegion(0, 0, width, height)) }
+            val oval = faces.isNotEmpty()
+            for (bounds in regions) {
                 val radius = (minOf(bounds.right - bounds.left, bounds.bottom - bounds.top) / 5).coerceAtLeast(12)
-                FamilyPrivacyBlur.apply(y, width, height, bounds, radius)
-                val chroma = PrivacyRegion(bounds.left / 2, bounds.top / 2, (bounds.right + 1) / 2, (bounds.bottom + 1) / 2)
-                FamilyPrivacyBlur.apply(u, chromaWidth, (height + 1) / 2, chroma, (radius / 2).coerceAtLeast(1))
-                FamilyPrivacyBlur.apply(v, chromaWidth, (height + 1) / 2, chroma, (radius / 2).coerceAtLeast(1))
+                FamilyPrivacyBlur.apply(y, width, height, bounds, radius, oval = oval, dots = oval)
+                val chroma = PrivacyRegion(Math.floorDiv(bounds.left, 2), Math.floorDiv(bounds.top, 2),
+                    Math.floorDiv(bounds.right + 1, 2), Math.floorDiv(bounds.bottom + 1, 2))
+                FamilyPrivacyBlur.apply(u, chromaWidth, (height + 1) / 2, chroma, (radius / 2).coerceAtLeast(1), oval = oval)
+                FamilyPrivacyBlur.apply(v, chromaWidth, (height + 1) / 2, chroma, (radius / 2).coerceAtLeast(1), oval = oval)
             }
             write(y, output.dataY, output.strideY, width, height)
             write(u, output.dataU, output.strideU, chromaWidth, (height + 1) / 2)

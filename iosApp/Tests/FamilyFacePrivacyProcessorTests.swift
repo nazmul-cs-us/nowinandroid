@@ -63,11 +63,12 @@ final class FamilyFacePrivacyProcessorTests: XCTestCase {
         let frame = try protectedResult(detector: { _ in [CGRect(x: -100, y: -100, width: 1, height: 1)] })
         XCTAssertTrue(try values(frame).allSatisfy { $0 > 40 && $0 < 215 })
     }
-    func testFaceBlurPreservesBackgroundOutsideExpandedRegion() throws {
+    func testOvalFaceBlurPreservesBackgroundAndCorners() throws {
         let frame = try protectedResult(detector: { _ in [CGRect(x: 20, y: 14, width: 24, height: 20)] })
         let pixels = try values(frame)
         XCTAssertEqual(pixels[0], 0)
         XCTAssertEqual(pixels[1], 255)
+        XCTAssertEqual(pixels[8 * 64 + 13], 255)
         XCTAssertTrue(pixels[24 * 64 + 32] > 40 && pixels[24 * 64 + 32] < 215)
     }
     func testAllCameraRotationsProduceUprightFrames() throws {
