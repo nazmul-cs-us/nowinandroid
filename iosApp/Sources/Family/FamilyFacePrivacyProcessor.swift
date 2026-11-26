@@ -104,9 +104,8 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
         previousFace = currentFace
         previousTimestampNs = frame.timeStampNs
         previousRevision = revision
-        let cycleNs: Int64 = 2_800_000_000
+        let cycleNs: Int64 = 1_800_000_000
         let phase = CGFloat(frame.timeStampNs % cycleNs) / CGFloat(cycleNs)
-        let pulse = 0.055 * sin(2 * CGFloat.pi * phase)
         var result = image
         for region in regions {
             let radius = max(12, min(region.width, region.height) / 5)
@@ -130,11 +129,11 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
                     // One cell of drift per cycle keeps the grid seamless.
                     CIVector(x: region.minX + spacing * phase, y: region.minY - spacing * phase),
                     spacing,
-                    pulse,
+                    phase,
                 ])
                 let textured: CIImage
                 if let dots {
-                    let highlight = CIImage(color: CIColor(red: 0.96, green: 0.98, blue: 1, alpha: 0.36))
+                    let highlight = CIImage(color: CIColor(red: 0.96, green: 0.98, blue: 1, alpha: 0.48))
                         .cropped(to: visible).composited(over: blurred)
                     textured = highlight.applyingFilter("CIBlendWithMask", parameters: [
                         kCIInputBackgroundImageKey: blurred, kCIInputMaskImageKey: dots,
@@ -158,24 +157,26 @@ final class FamilyFacePrivacyProcessor: NSObject, RTCVideoCapturerDelegate {
         kernel vec4 faceShapeMask(vec2 faceCenter, vec2 faceRadii) {
             vec2 position = (destCoord() - faceCenter) / faceRadii;
             float y = -position.y;
-            float jawTaper = 1.0 - 0.36 * clamp((y - 0.20) / 0.80, 0.0, 1.0);
+            float jawTaper = 1.0 - 0.52 * clamp((y - 0.20) / 0.80, 0.0, 1.0);
             float x = position.x / jawTaper;
             float ySquared = y * y;
-            float mask = clamp((1.0 - x * x - ySquared * ySquared) / 0.24, 0.0, 1.0);
+            float verticalDistance = y < 0.0 ? ySquared : ySquared * ySquared;
+            float mask = clamp((1.0 - x * x - verticalDistance) / 0.18, 0.0, 1.0);
             return vec4(mask, mask, mask, 1.0);
         }
         """)
 
     // Use each grid cell's center to give its dot one size and one elliptical outline.
     private static let faceDotMask = CIColorKernel(source: """
-        kernel vec4 faceDotMask(vec2 faceCenter, vec2 faceRadii, vec2 gridOrigin, float spacing, float pulse) {
+        kernel vec4 faceDotMask(vec2 faceCenter, vec2 faceRadii, vec2 gridOrigin, float spacing, float phase) {
             vec2 pixel = destCoord();
             vec2 offset = mod(pixel - gridOrigin, spacing) - spacing * 0.5;
             vec2 position = (pixel - offset - faceCenter) / faceRadii;
-            float radius = spacing * (0.34 - 0.13 * min(dot(position, position), 1.0) + pulse);
+            float wave = sin(6.2831853 * (phase + position.y * 0.55));
+            float radius = spacing * (0.34 - 0.13 * min(dot(position, position), 1.0) + 0.10 * wave);
             vec2 scale = 1.0 - 0.42 * min(abs(position), vec2(1.0));
             vec2 ellipse = offset / (radius * scale);
-            float mask = clamp((1.0 - dot(ellipse, ellipse)) * 2.6, 0.0, 1.0);
+            float mask = clamp((1.0 - dot(ellipse, ellipse)) * 2.6, 0.0, 1.0) * (0.75 + 0.25 * wave);
             return vec4(mask, mask, mask, 1.0);
         }
         """)

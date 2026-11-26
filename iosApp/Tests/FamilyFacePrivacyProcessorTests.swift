@@ -69,8 +69,8 @@ final class FamilyFacePrivacyProcessorTests: XCTestCase {
         XCTAssertEqual(pixels[0], 0)
         XCTAssertEqual(pixels[1], 255)
         XCTAssertEqual(pixels[8 * 64 + 13], 255)
-        XCTAssertGreaterThan(pixels[14 * 64 + 48], 60)
-        XCTAssertEqual(pixels[33 * 64 + 48], 255)
+        XCTAssertGreaterThan(pixels[14 * 64 + 46], 60)
+        XCTAssertEqual(pixels[33 * 64 + 46], 255)
         XCTAssertTrue(pixels[24 * 64 + 32] > 40 && pixels[24 * 64 + 32] < 215)
     }
     func testDotsMoveOnIdenticalFramesAndLoop() throws {
@@ -78,8 +78,8 @@ final class FamilyFacePrivacyProcessorTests: XCTestCase {
             [CGRect(x: 20, y: 14, width: 24, height: 20)]
         }
         let start = try values(protectedResult(detector: detector, timestampNs: 0))
-        let quarter = try values(protectedResult(detector: detector, timestampNs: 700_000_000))
-        let loop = try values(protectedResult(detector: detector, timestampNs: 2_800_000_000))
+        let quarter = try values(protectedResult(detector: detector, timestampNs: 450_000_000))
+        let loop = try values(protectedResult(detector: detector, timestampNs: 1_800_000_000))
 
         XCTAssertNotEqual(start, quarter)
         XCTAssertEqual(start, loop)

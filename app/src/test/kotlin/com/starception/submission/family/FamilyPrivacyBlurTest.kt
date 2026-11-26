@@ -47,10 +47,10 @@ class FamilyPrivacyBlurTest {
         }
 
         val start = render(0)
-        val quarter = render(700_000_000)
+        val quarter = render(450_000_000)
         assertTrue(!start.contentEquals(quarter))
-        assertArrayEquals(start, render(2_800_000_000))
-        assertArrayEquals(render(0, dots = false), render(700_000_000, dots = false))
+        assertArrayEquals(start, render(1_800_000_000))
+        assertArrayEquals(render(0, dots = false), render(450_000_000, dots = false))
         assertEquals(start[8 * width + 8], quarter[8 * width + 8])
     }
 
@@ -69,8 +69,8 @@ class FamilyPrivacyBlurTest {
         val plane = ByteArray(width * width) { if (it % 2 == 0) 0 else 255.toByte() }
         FamilyPrivacyBlur.apply(plane, width, width, PrivacyRegion(0, 0, width, width), 12, oval = true)
 
-        assertTrue((plane[20 * width + 90].toInt() and 255) > 100)
-        assertEquals(0, plane[79 * width + 90].toInt())
+        assertTrue((plane[20 * width + 86].toInt() and 255) > 60)
+        assertEquals(0, plane[79 * width + 86].toInt())
     }
 
     @Test fun smoothingFollowsMovementWithoutShrinkingCurrentCoverage() {

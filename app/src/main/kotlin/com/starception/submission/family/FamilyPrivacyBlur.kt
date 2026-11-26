@@ -28,7 +28,7 @@ internal data class PrivacyRegion(val left: Int, val top: Int, val right: Int, v
 
 /** Three separable box passes approximate a strong Gaussian blur, including the chroma planes. */
 internal object FamilyPrivacyBlur {
-    private const val DOT_CYCLE_NS = 2_800_000_000L
+    private const val DOT_CYCLE_NS = 1_800_000_000L
     fun apply(
         plane: ByteArray,
         width: Int,
@@ -86,7 +86,6 @@ internal object FamilyPrivacyBlur {
         // Move the repeating grid by one cell per cycle so the loop joins seamlessly.
         val phase = Math.floorMod(timestampNs, DOT_CYCLE_NS).toFloat() / DOT_CYCLE_NS
         val shift = spacing * (1f - phase)
-        val pulse = .055f * sin((2 * PI * phase).toFloat())
         val faceX = FloatArray(w) { x -> (b.left + x + .5f - centerX) / radiusX }
         val faceXSquared = FloatArray(w) { x -> faceX[x] * faceX[x] }
         val dotCenterXSquared = FloatArray(if (dots) w else 0)
@@ -106,12 +105,15 @@ internal object FamilyPrivacyBlur {
             val localY = b.top + y + .5f - region.top
             val dy = (b.top + y + .5f - centerY) / radiusY
             // A broader forehead and cheeks taper into a narrower jaw.
-            val jawTaper = 1f - .36f * ((dy - .20f) / .80f).coerceIn(0f, 1f)
+            val jawTaper = 1f - .52f * ((dy - .20f) / .80f).coerceIn(0f, 1f)
             val horizontalWeight = 1f / (jawTaper * jawTaper)
-            val verticalDistance = dy * dy * dy * dy
+            val ySquared = dy * dy
+            val verticalDistance = if (dy < 0f) ySquared else ySquared * ySquared
             val dotY = (localY + shift) % spacing - spacing / 2f
             val dotCenterY = dy - dotY / radiusY
             val dotCenterYSquared = dotCenterY * dotCenterY
+            // A crest travels from the forehead to the jaw through the drifting grid.
+            val wave = sin((2 * PI * (phase - dotCenterY * .55f)).toFloat())
             val verticalScale = 1f - .42f * abs(dotCenterY).coerceAtMost(1f)
             val dotOffsetY = dotY / verticalScale
             val dotOffsetYSquared = dotOffsetY * dotOffsetY
@@ -119,7 +121,7 @@ internal object FamilyPrivacyBlur {
             for (x in 0 until w) {
                 val maskDistance = faceXSquared[x] * horizontalWeight + verticalDistance
                 // Keep full blur across the face. Feather only the padded outer edge.
-                val coverage = if (oval) ((1f - maskDistance) / .24f).coerceIn(0f, 1f) else 1f
+                val coverage = if (oval) ((1f - maskDistance) / .18f).coerceIn(0f, 1f) else 1f
                 if (coverage == 0f) continue
                 val index = rowIndex + x
                 val original = plane[index].toInt() and 255
@@ -127,10 +129,10 @@ internal object FamilyPrivacyBlur {
                 if (dots) {
                     // Sample perspective at the dot center so every dot has a coherent outline.
                     val distanceFromCenter = (dotCenterXSquared[x] + dotCenterYSquared).coerceAtMost(1f)
-                    val dotRadius = spacing * (.34f - .13f * distanceFromCenter + pulse)
+                    val dotRadius = spacing * (.34f - .13f * distanceFromCenter + .10f * wave)
                     val ellipseDistance = (dotOffsetXSquared[x] + dotOffsetYSquared) / (dotRadius * dotRadius)
                     val dot = ((1f - ellipseDistance) * 2.6f).coerceIn(0f, 1f)
-                    blurred += (235f - blurred).coerceAtLeast(0f) * .36f * dot
+                    blurred += (235f - blurred).coerceAtLeast(0f) * (.36f + .12f * wave) * dot
                 }
                 plane[index] = (original + (blurred - original) * coverage).toInt().toByte()
             }
