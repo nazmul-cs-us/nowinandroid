@@ -234,7 +234,7 @@ object NowNudgeBus {
             searchEnglishHadithCollections(terms, HADITH_SEARCH_LIMIT_PER_COLLECTION)
         }.getOrDefault(emptyList())
         return hits.map { hit ->
-            val reference = "${hit.collectionName} ${hit.hadithId}"
+            val reference = com.starception.submission.core.model.data.HadithSourceIdentity.reference(hit.collectionName, hit.hadithId)
             AnswerCandidate(
                 candidateId = "${hit.databaseFile}-${hit.hadithId}",
                 searchable = "${hit.collectionName} $reference ${hit.text}",

@@ -207,15 +207,17 @@ fun extractSurahNumber(title: String, url: String, type: String): Int? {
 
 /**
  * Extract hadith database and number from URL
- * Example URL: "hadith://sahih_bukhari/1" -> Pair("sahih_bukhari.db", 1)
+ * Only explicitly local links are accepted. Legacy/external hadith numbers
+ * cannot be interpreted as local row IDs without a verified crosswalk.
  */
 fun extractHadithInfo(url: String): Pair<String, Int>? {
     return try {
-        val regex = Regex("hadith://([^/]+)/(\\d+)")
+        val regex = Regex("^hadith-local://([a-z0-9_]+)/(\\d+)$")
         val match = regex.find(url)
         if (match != null) {
             val dbName = match.groupValues[1]
             val hadithNumber = match.groupValues[2].toInt()
+            if (hadithNumber <= 0 || com.starception.submission.core.model.data.HadithCollections.byDatabaseFile("$dbName.db") == null) return null
             Pair("$dbName.db", hadithNumber)
         } else {
             null

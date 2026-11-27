@@ -89,7 +89,7 @@ fun modulesForCourse(courseId: String): List<SharedCourseModule> = when (courseI
                 lessons = (start..end).map { hadithNumber ->
                     SharedLesson(
                         id = "hadith_$hadithNumber",
-                        title = "Hadith #$hadithNumber",
+                        title = "Local record $hadithNumber",
                         subtitle = "Sahih Al-Bukhari",
                         duration = "3 min",
                         hadithNumber = hadithNumber,

@@ -3163,7 +3163,7 @@ private fun BukhariHadithTile(hadith: SharedHadith, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
-            ReaderTag("HADITH ${hadith.id}")
+            ReaderTag("LOCAL RECORD ${hadith.id}")
             if (hadith.arabic.isNotBlank()) {
                 Text(
                     hadith.arabic,
@@ -3284,7 +3284,7 @@ internal fun BukhariHadithDetailScreen(
                 }
             }
             val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
-            var translatedText by remember { mutableStateOf<String?>(null) }
+            var translatedText by remember(currentHadith.id, translationLanguage, translationProvider) { mutableStateOf<String?>(null) }
             var isTranslating by remember { mutableStateOf(false) }
             LaunchedEffect(currentHadith.id, translationLanguage, translationProvider) {
                 if (translationLanguage == "en") {
@@ -3406,7 +3406,7 @@ internal fun BukhariHadithDetailScreen(
                                     readingSettingsAction,
                                 ),
                                 contentColor = MaterialTheme.colorScheme.onSurface,
-                                toolbarTitle = "Sahih al-Bukhari · Hadith ${currentHadith.id}",
+                                toolbarTitle = "Sahih al-Bukhari · Local record ${currentHadith.id}",
                             )
                         }
                     },
@@ -3457,7 +3457,7 @@ internal fun BukhariHadithDetailScreen(
                     horizontalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
+                        "Local record ${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -3519,7 +3519,7 @@ private fun HadithDetailPage(
                 Text(collectionTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ReaderTag("HADITH ${hadith.id}")
+                    ReaderTag("LOCAL RECORD ${hadith.id}")
                     if (bookTag != null) {
                         ReaderTag(bookTag, selected = false)
                     }
@@ -3775,7 +3775,7 @@ internal fun ShamayelHadithDetailScreen(
                 }
             }
             val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
-            var translatedText by remember { mutableStateOf<String?>(null) }
+            var translatedText by remember(currentHadith.id, translationLanguage, translationProvider) { mutableStateOf<String?>(null) }
             var isTranslating by remember { mutableStateOf(false) }
             LaunchedEffect(currentHadith.id, translationLanguage, translationProvider) {
                 if (translationLanguage == "en") {
@@ -3902,7 +3902,7 @@ internal fun ShamayelHadithDetailScreen(
                                     readingSettingsAction,
                                 ),
                                 contentColor = MaterialTheme.colorScheme.onSurface,
-                                toolbarTitle = "Shama'il At-Tirmidhi · Hadith ${currentHadith.id}",
+                                toolbarTitle = "Shama'il At-Tirmidhi · Local record ${currentHadith.id}",
                             )
                         }
                     },
@@ -3953,7 +3953,7 @@ internal fun ShamayelHadithDetailScreen(
                     horizontalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        "Hadith #${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
+                        "Local record ${currentHadith.id} · ${pagerState.currentPage + 1} of ${hadiths.size}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -4485,7 +4485,7 @@ private fun BukhariBook.savedNewsResource() = SharedNewsResource(
     content = buildString {
         if (nameArabic.isNotBlank()) append("**Arabic:** $nameArabic\n\n")
         append("**Collection:** Sahih al-Bukhari\n\n")
-        append("$hadithCount narrations · Hadith $firstHadithId–$lastHadithId")
+        append("$hadithCount narrations · Local records $firstHadithId–$lastHadithId")
     },
     url = "hadith-book://sahih_bukhari/$id",
     headerImageUrl = "drawable://topic_sahih_bukhari",
@@ -6826,7 +6826,7 @@ private fun HadithCollectionTile(hadith: SharedHadith, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
-            ReaderTag("HADITH ${hadith.id}")
+            ReaderTag("LOCAL RECORD ${hadith.id}")
             if (hadith.arabic.isNotBlank()) {
                 Text(
                     hadith.arabic,
@@ -6941,7 +6941,7 @@ internal fun HadithCollectionHadithScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             contentPadding = PaddingValues(bottom = 28.dp),
                         ) {
-                            item { ReaderTag("HADITH ${hadith.id}") }
+                            item { ReaderTag("LOCAL RECORD ${hadith.id}") }
                             if (hadith.arabic.isNotBlank()) {
                                 item {
                                     Surface(

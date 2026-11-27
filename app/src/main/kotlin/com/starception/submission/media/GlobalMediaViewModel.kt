@@ -367,7 +367,7 @@ class GlobalMediaViewModel(
     private fun onHadithPlaybackStopped() {
         if (activeSource is MediaSource.Hadith) {
             val recitation = ChapterRecitationState
-            if (recitation.isActive && recitation.title.startsWith("Hadith #")) {
+            if (recitation.isActive && recitation.hadithRecordId != null) {
                 updateChapterRecitationState(
                     recitation.isPlaying,
                     recitation.title,
@@ -402,8 +402,8 @@ class GlobalMediaViewModel(
             return
         }
 
-        if (title.startsWith("Hadith #")) {
-            val hadithNumber = title.substringAfter('#').toIntOrNull() ?: 0
+        if (ChapterRecitationState.hadithRecordId != null) {
+            val hadithNumber = ChapterRecitationState.hadithRecordId ?: return
             val collectionName = subtitle.ifBlank { "Hadith" }
             activeSource = MediaSource.Hadith(hadithNumber, collectionName)
             _controllerState.update { current ->
@@ -765,9 +765,9 @@ class GlobalMediaViewModel(
         // a process-wide snapshot, so we can restore the mini-bar without a bound connection.
         val recite = com.starception.submission.services.ChapterRecitationState
         if (recite.isActive) {
-            if (recite.title.startsWith("Hadith #")) {
+            if (recite.hadithRecordId != null) {
                 onHadithPlaybackStarted(
-                    hadithNumber = recite.title.substringAfter('#').toIntOrNull() ?: 0,
+                    hadithNumber = recite.hadithRecordId ?: return,
                     collectionName = recite.subtitle.ifBlank { "Hadith" },
                     title = recite.title,
                 )

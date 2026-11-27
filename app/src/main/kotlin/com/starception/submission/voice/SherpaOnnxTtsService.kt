@@ -77,6 +77,14 @@ class SherpaOnnxTtsService(
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val speechRequests = SpeechRequestGate()
+
+    private fun beginSpeechRequest(): Long = speechRequests.begin {
+        stopAudioTrack()
+        stopRequested = false
+        playbackPaused = false
+        isSpeakingNow = true
+    }
 
     init {
         // Load persisted cache from disk on service creation
@@ -152,14 +160,17 @@ class SherpaOnnxTtsService(
     // Pre-generated audio cache (key: text hash, value: samples + sample rate)
     // Cache is persisted to disk for survival across app restarts
     private data class CachedAudio(val samples: FloatArray, val sampleRate: Int)
-    private val audioCache = mutableMapOf<Int, CachedAudio>()
+    private val audioCache = java.util.concurrent.ConcurrentHashMap<String, CachedAudio>()
 
     // Track which texts are currently being generated to avoid duplicates
-    private val generatingHashes = mutableSetOf<Int>()
+    private val generatingHashes = mutableSetOf<String>()
+
+    private fun cacheIdentity(text: String, speakerId: Int = DEFAULT_SPEAKER_ID, speed: Float = DEFAULT_SPEED): String =
+        ttsCacheIdentity(text, "${currentVoice.name}|${currentVoice.modelFile}|${currentVoice.tokensFile}", speakerId, speed)
 
     // Persistent cache directory
     private val cacheDir: File by lazy {
-        File(context.cacheDir, if (initialVoice.languageCode == "en") "tts_audio_cache" else "tts_audio_cache_${initialVoice.languageCode}").also {
+        File(context.cacheDir, "tts_audio_cache_source_v2_${initialVoice.languageCode}").also {
             it.mkdirs()
             Log.d(TAG, "📂 TTS cache directory: ${it.absolutePath}")
         }
@@ -421,29 +432,45 @@ class SherpaOnnxTtsService(
         onPlaybackStart: (() -> Unit)? = null,
     ): Boolean {
         if (com.starception.submission.family.FamilyAudioSession.isActive) return false
+        val request = beginSpeechRequest()
+        return synthesizeAndSpeak(text, speed, speakerId, onComplete, onPlaybackStart, request)
+    }
+
+    private suspend fun synthesizeAndSpeak(
+        text: String,
+        speed: Float,
+        speakerId: Int,
+        onComplete: (() -> Unit)?,
+        onPlaybackStart: (() -> Unit)?,
+        request: Long,
+    ): Boolean {
+        if (!speechRequests.isCurrent(request)) return false
         val speechText = normalizeTtsSpeechText(currentVoice, text)
-        _isPreparingAudio.value = true
-        stopRequested = false
-        playbackPaused = false
+        speechRequests.withCurrent(request) { _isPreparingAudio.value = true }
         if (!isInitialized) {
             val initialized = initialize()
             if (!initialized) {
                 Log.e(TAG, "TTS not initialized")
-                _isPreparingAudio.value = false
-                onComplete?.invoke()
+                speechRequests.withCurrent(request) {
+                    _isPreparingAudio.value = false
+                    isSpeakingNow = false
+                    onComplete?.invoke()
+                }
                 return false
             }
         }
 
         acquirePlaybackWakeLock()
         return try {
-            isSpeakingNow = true
-            speakInternal(speechText, speed, speakerId, onComplete, onPlaybackStart)
+            speechRequests.withCurrent(request) { isSpeakingNow = true }
+            speakInternal(speechText, speed, speakerId, onComplete, onPlaybackStart, request)
         } finally {
             // Covers every exit (success, failure, cancellation); during normal
             // playback the flag already cleared when audio started.
-            _isPreparingAudio.value = false
-            isSpeakingNow = false
+            speechRequests.withCurrent(request) {
+                _isPreparingAudio.value = false
+                isSpeakingNow = false
+            }
             releasePlaybackWakeLock()
         }
     }
@@ -454,6 +481,7 @@ class SherpaOnnxTtsService(
         speakerId: Int,
         onComplete: (() -> Unit)?,
         onPlaybackStart: (() -> Unit)?,
+        request: Long,
     ): Boolean {
         return suspendCancellableCoroutine { continuation ->
             scope.launch {
@@ -461,7 +489,7 @@ class SherpaOnnxTtsService(
                     val sentences = splitIntoSentences(text)
                         .filter { it.isNotBlank() }
                     if (sentences.isEmpty()) {
-                        onComplete?.invoke()
+                        speechRequests.withCurrent(request) { onComplete?.invoke() }
                         if (continuation.isActive) continuation.resume(true)
                         return@launch
                     }
@@ -479,14 +507,14 @@ class SherpaOnnxTtsService(
                         val generatedParts = ArrayList<FloatArray>(sentences.size)
                         var sampleRate = tts?.sampleRate() ?: 22050
                         for ((index, sentence) in sentences.withIndex()) {
-                            if (stopRequested) break
+                            if (!speechRequests.isCurrent(request) || !continuation.isActive) break
                             val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
                             if (audio != null && audio.samples.isNotEmpty()) {
                                 generatedParts += audio.samples
                                 sampleRate = audio.sampleRate
                             }
                         }
-                        if (generatedParts.size != sentences.size || stopRequested) {
+                        if (generatedParts.size != sentences.size || !speechRequests.isCurrent(request) || !continuation.isActive) {
                             null
                         } else {
                             CachedAudio(concatenateSamples(generatedParts), sampleRate)
@@ -495,7 +523,7 @@ class SherpaOnnxTtsService(
 
                     if (preparedAudio == null) {
                         Log.w(TAG, "No audio samples generated")
-                        onComplete?.invoke()
+                        speechRequests.withCurrent(request) { onComplete?.invoke() }
                         if (continuation.isActive) continuation.resume(false)
                         return@launch
                     }
@@ -504,21 +532,20 @@ class SherpaOnnxTtsService(
                         TAG,
                         "Complete clip ready: ${preparedAudio.samples.size} samples; starting gap-free playback",
                     )
-                    onPlaybackStart?.invoke()
-                    playAudioSamples(preparedAudio.samples, preparedAudio.sampleRate)
+                    val played = playAudioSamples(preparedAudio.samples, preparedAudio.sampleRate, request, onPlaybackStart)
                     Log.d(TAG, "Finished playing complete ${sentences.size}-sentence clip")
 
-                    onComplete?.invoke()
-                    if (continuation.isActive) continuation.resume(true)
+                    speechRequests.withCurrent(request) { onComplete?.invoke() }
+                    if (continuation.isActive) continuation.resume(played)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error generating/playing speech", e)
-                    onComplete?.invoke()
+                    speechRequests.withCurrent(request) { onComplete?.invoke() }
                     if (continuation.isActive) continuation.resume(false)
                 }
             }
 
             continuation.invokeOnCancellation {
-                stopSpeaking()
+                speechRequests.withCurrent(request) { stopSpeaking() }
             }
         }
     }
@@ -601,21 +628,18 @@ class SherpaOnnxTtsService(
     /**
      * Play generated audio samples from a GeneratedAudio object.
      */
-    private suspend fun playAudio(audio: GeneratedAudio) {
-        playAudioSamples(audio.samples, audio.sampleRate)
-    }
-
     /**
      * Play audio samples continuously without gaps.
      * Uses a single AudioTrack for smooth playback.
      */
-    private suspend fun playAudioSamples(samples: FloatArray, sampleRate: Int) {
+    private suspend fun playAudioSamples(samples: FloatArray, sampleRate: Int, request: Long, onPlaybackStart: (() -> Unit)? = null): Boolean {
+        if (!speechRequests.isCurrent(request)) return false
         var coordinatedTrack: AudioTrack? = null
         // Audio is about to start — the "Preparing audio" banner can go away.
-        _isPreparingAudio.value = false
+        speechRequests.withCurrent(request) { _isPreparingAudio.value = false }
         try {
             // Stop any existing playback
-            stopAudioTrack()
+            if (speechRequests.withCurrent(request) { stopAudioTrack(); true } != true) return false
 
             // Convert float samples to 16-bit PCM
             val pcmData = ShortArray(samples.size)
@@ -632,7 +656,7 @@ class SherpaOnnxTtsService(
                 AudioFormat.ENCODING_PCM_16BIT,
             )
 
-            audioTrack = AudioTrack.Builder()
+            val createdTrack = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -650,9 +674,13 @@ class SherpaOnnxTtsService(
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .build()
 
-            audioTrack?.write(pcmData, 0, pcmData.size)
-            val track = audioTrack ?: return
+            createdTrack.write(pcmData, 0, pcmData.size)
+            val track = createdTrack
             coordinatedTrack = track
+            if (speechRequests.withCurrent(request) { audioTrack = track; true } != true) {
+                track.release()
+                return false
+            }
             val started = withContext(Dispatchers.Main.immediate) {
                 val coordinator = com.starception.submission.media.TravelDuaInterruption.controller
                 coordinator.register(track, com.starception.submission.services.ChapterRecitationState) {
@@ -667,11 +695,15 @@ class SherpaOnnxTtsService(
                 suspendCancellableCoroutine<Boolean> { continuation ->
                     val start: () -> Unit = {
                         if (continuation.isActive) {
-                            val valid = audioTrack === track && !stopRequested
-                            val started = valid && runCatching {
-                                if (!playbackPaused) track.play()
-                                true
-                            }.getOrDefault(false)
+                            val started = speechRequests.withCurrent(request) {
+                                audioTrack === track && runCatching {
+                                    onPlaybackStart?.invoke()
+                                    if (!speechRequests.isCurrent(request)) false else {
+                                        if (!playbackPaused) track.play()
+                                        true
+                                    }
+                                }.getOrDefault(false)
+                            } == true
                             continuation.resume(started)
                         }
                     }
@@ -687,15 +719,15 @@ class SherpaOnnxTtsService(
                 }
             }
             if (!started) {
-                if (audioTrack === track) stopAudioTrack()
-                return
+                speechRequests.withCurrent(request) { if (audioTrack === track) stopAudioTrack() }
+                return false
             }
 
             // Wait in short intervals so stop/skip interrupts promptly. Paused time does
             // not consume the clip duration; resuming continues the same AudioTrack.
             var remainingMs = (samples.size * 1000L) / sampleRate + 100L
             var lastTick = android.os.SystemClock.elapsedRealtime()
-            while (!stopRequested && remainingMs > 0L) {
+            while (speechRequests.isCurrent(request) && remainingMs > 0L) {
                 Thread.sleep(100)
                 val now = android.os.SystemClock.elapsedRealtime()
                 if (!playbackPaused) {
@@ -704,17 +736,19 @@ class SherpaOnnxTtsService(
                 lastTick = now
             }
 
-            stopAudioTrack()
+            speechRequests.withCurrent(request) { stopAudioTrack() }
 
             // Minimal delay - mic now works immediately after TTS
             // Removed 200ms delay that was causing user's "yes" to be missed
             Thread.sleep(20)
+            return speechRequests.isCurrent(request)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            stopAudioTrack()
+            speechRequests.withCurrent(request) { stopAudioTrack() }
             throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "Error playing audio", e)
-            stopAudioTrack()
+            speechRequests.withCurrent(request) { stopAudioTrack() }
+            return false
         } finally {
             coordinatedTrack?.let { track ->
                 withContext(kotlinx.coroutines.NonCancellable + Dispatchers.Main.immediate) {
@@ -728,6 +762,7 @@ class SherpaOnnxTtsService(
      * Stop current speech playback.
      */
     fun stopSpeaking() {
+        speechRequests.begin {
         audioTrack?.let { track ->
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 com.starception.submission.media.TravelDuaInterruption.controller.unregister(track)
@@ -738,6 +773,7 @@ class SherpaOnnxTtsService(
         playbackPaused = false
         isSpeakingNow = false
         stopAudioTrack()
+        }
     }
 
     /** Pause the active clip without completing/cancelling its playlist request. */
@@ -830,7 +866,7 @@ class SherpaOnnxTtsService(
         speed: Float = DEFAULT_SPEED,
     ) {
         val speechText = normalizeTtsSpeechText(currentVoice, text)
-        val textHash = speechText.hashCode()
+        val textHash = cacheIdentity(speechText, speakerId, speed)
 
         // Skip if already cached
         if (audioCache.containsKey(textHash)) {
@@ -946,7 +982,7 @@ class SherpaOnnxTtsService(
             .map { normalizeTtsSpeechText(currentVoice, it) }
             .filter { it.isNotBlank() }
             .distinct()
-            .filterNot { audioCache.containsKey(it.hashCode()) }
+            .filterNot { audioCache.containsKey(cacheIdentity(it)) }
 
         onProgress(0, pending.size)
         Log.i(TAG, "🎬 Preparing ${pending.size} voice lines up front")
@@ -966,7 +1002,7 @@ class SherpaOnnxTtsService(
                     }
                 }
                 if (generatedParts.size == sentences.size) {
-                    audioCache[text.hashCode()] = CachedAudio(concatenateSamples(generatedParts), sampleRate)
+                    audioCache[cacheIdentity(text)] = CachedAudio(concatenateSamples(generatedParts), sampleRate)
                 } else {
                     Log.w(TAG, "Prepared line produced no audio, will retry on demand: \"${text.take(40)}\"")
                 }
@@ -985,7 +1021,7 @@ class SherpaOnnxTtsService(
         texts
             .map { normalizeTtsSpeechText(currentVoice, it) }
             .distinct()
-            .forEach { audioCache.remove(it.hashCode()) }
+            .forEach { audioCache.remove(cacheIdentity(it)) }
         Log.i(TAG, "🧹 Released prepared voice lines (${audioCache.size} entries remain)")
     }
 
@@ -993,7 +1029,7 @@ class SherpaOnnxTtsService(
      * Check if audio for given text is pre-generated and cached (memory or disk).
      */
     fun isCached(text: String): Boolean {
-        val hash = normalizeTtsSpeechText(currentVoice, text).hashCode()
+        val hash = cacheIdentity(normalizeTtsSpeechText(currentVoice, text))
 
         // First check memory cache
         if (audioCache.containsKey(hash)) {
@@ -1026,7 +1062,7 @@ class SherpaOnnxTtsService(
             val parts = file.nameWithoutExtension.split("_")
             if (parts.size != 2) return false
 
-            val hash = parts[0].toIntOrNull() ?: return false
+            val hash = parts[0].takeIf(::isTtsCacheIdentity) ?: return false
             val sampleRate = parts[1].toIntOrNull() ?: return false
 
             if (audioCache.containsKey(hash)) return true // Already loaded
@@ -1098,14 +1134,46 @@ class SherpaOnnxTtsService(
         retainCache: Boolean = false,
     ): Boolean {
         if (com.starception.submission.family.FamilyAudioSession.isActive) return false
-        stopRequested = false
-        playbackPaused = false
+        return speakCachedForRequest(text, speakerId, speed, onComplete, onPlaybackStart, retainCache, beginSpeechRequest())
+    }
+
+    /** Accepted narration belongs to the audio engine, not the originating reader composition. */
+    fun speakOwned(text: String, speakerId: Int, onComplete: () -> Unit, onFailure: () -> Unit) {
+        if (com.starception.submission.family.FamilyAudioSession.isActive) {
+            onFailure()
+            return
+        }
+        val request = beginSpeechRequest()
+        scope.launch(Dispatchers.Main.immediate) {
+            try {
+                val success = speakCachedForRequest(text, speakerId, DEFAULT_SPEED, onComplete, null, false, request)
+                if (!success) speechRequests.withCurrent(request, onFailure)
+            } catch (error: Exception) {
+                Log.e(TAG, "Owned narration failed", error)
+                speechRequests.withCurrent(request) {
+                    stopSpeaking()
+                    onFailure()
+                }
+            }
+        }
+    }
+
+    private suspend fun speakCachedForRequest(
+        text: String,
+        speakerId: Int,
+        speed: Float,
+        onComplete: (() -> Unit)?,
+        onPlaybackStart: (() -> Unit)?,
+        retainCache: Boolean,
+        request: Long,
+    ): Boolean {
+        if (!speechRequests.isCurrent(request)) return false
         val speechText = normalizeTtsSpeechText(currentVoice, text)
-        val textHash = speechText.hashCode()
+        val textHash = cacheIdentity(speechText, speakerId, speed)
         // Show "Preparing audio" while the cache is checked/loaded; cleared when
         // playback starts (playAudioSamples) or by speak()'s finally on the
         // generate path.
-        _isPreparingAudio.value = true
+        speechRequests.withCurrent(request) { _isPreparingAudio.value = true }
 
         // Check memory cache first
         var cached = audioCache[textHash]
@@ -1132,7 +1200,7 @@ class SherpaOnnxTtsService(
         if (cached == null && synchronized(generatingHashes) { textHash in generatingHashes }) {
             Log.i(TAG, "⏳ Waiting for in-flight complete clip (hash=$textHash)")
             while (
-                !stopRequested &&
+                speechRequests.isCurrent(request) &&
                 synchronized(generatingHashes) { textHash in generatingHashes }
             ) {
                 kotlinx.coroutines.delay(50)
@@ -1143,9 +1211,7 @@ class SherpaOnnxTtsService(
             }
         }
 
-        if (stopRequested) {
-            _isPreparingAudio.value = false
-            onComplete?.invoke()
+        if (!speechRequests.isCurrent(request)) {
             return false
         }
 
@@ -1157,37 +1223,37 @@ class SherpaOnnxTtsService(
             try {
                 acquirePlaybackWakeLock()
                 isSpeakingNow = true
-                onPlaybackStart?.invoke()
                 // playAudioSamples blocks (Thread.sleep) for the whole clip. The
                 // caller invokes this from Dispatchers.Main, so run the playback
                 // on IO — otherwise the main thread sleeps and the app ANRs.
                 withContext(Dispatchers.IO) {
-                    playAudioSamples(cached.samples, cached.sampleRate)
+                    playAudioSamples(cached.samples, cached.sampleRate, request, onPlaybackStart)
                 }
             } finally {
-                isSpeakingNow = false
+                speechRequests.withCurrent(request) { isSpeakingNow = false }
                 releasePlaybackWakeLock()
             }
             if (!retainCache) audioCache.remove(textHash) // Remove from memory after playing
-            onComplete?.invoke()
-            return true
+            speechRequests.withCurrent(request) { onComplete?.invoke() }
+            return speechRequests.isCurrent(request)
         }
 
         // Not cached, generate and play normally
         Log.d(TAG, "Cache miss (hash=$textHash), generating normally")
-        return speak(
+        return synthesizeAndSpeak(
             text = speechText,
             speed = speed,
             speakerId = speakerId,
             onComplete = onComplete,
             onPlaybackStart = onPlaybackStart,
+            request = request,
         )
     }
 
     /**
      * Delete a specific cache file from disk.
      */
-    private fun deleteDiskCache(textHash: Int) {
+    private fun deleteDiskCache(textHash: String) {
         try {
             val files = cacheDir.listFiles { file ->
                 file.name.startsWith("${textHash}_") && file.extension == "pcm"
@@ -1234,7 +1300,7 @@ class SherpaOnnxTtsService(
                         val parts = file.nameWithoutExtension.split("_")
                         if (parts.size != 2) continue
 
-                        val hash = parts[0].toIntOrNull() ?: continue
+                        val hash = parts[0].takeIf(::isTtsCacheIdentity) ?: continue
                         val sampleRate = parts[1].toIntOrNull() ?: continue
 
                         // Skip if already in memory
@@ -1269,7 +1335,7 @@ class SherpaOnnxTtsService(
     /**
      * Save cached audio to disk for persistence.
      */
-    private fun saveToDisk(textHash: Int, audio: CachedAudio) {
+    private fun saveToDisk(textHash: String, audio: CachedAudio) {
         scope.launch {
             try {
                 // Filename format: {hash}_{sampleRate}.pcm
@@ -1280,7 +1346,15 @@ class SherpaOnnxTtsService(
                     .order(java.nio.ByteOrder.LITTLE_ENDIAN)
                 buffer.asFloatBuffer().put(audio.samples)
 
-                file.writeBytes(buffer.array())
+                val atomic = android.util.AtomicFile(file)
+                val output = atomic.startWrite()
+                try {
+                    output.write(buffer.array())
+                    atomic.finishWrite(output)
+                } catch (error: Exception) {
+                    atomic.failWrite(output)
+                    throw error
+                }
                 Log.d(TAG, "💾 Saved audio to disk: ${file.name} (${audio.samples.size} samples)")
 
                 // Cleanup old files if we have too many
@@ -1302,7 +1376,7 @@ class SherpaOnnxTtsService(
             if (files.size > MAX_CACHE_FILES) {
                 val toDelete = files.take(files.size - MAX_CACHE_FILES)
                 toDelete.forEach { file ->
-                    val hash = file.nameWithoutExtension.split("_").firstOrNull()?.toIntOrNull()
+                    val hash = file.nameWithoutExtension.split("_").firstOrNull()?.takeIf(::isTtsCacheIdentity)
                     if (hash != null) {
                         audioCache.remove(hash) // Also remove from memory
                     }
@@ -1318,7 +1392,7 @@ class SherpaOnnxTtsService(
     /**
      * Get list of cached hadith hashes (for debugging).
      */
-    fun getCachedHashes(): Set<Int> = audioCache.keys.toSet()
+    fun getCachedHashes(): Set<String> = audioCache.keys.toSet()
 
     /**
      * Extract a single file from assets to internal storage.

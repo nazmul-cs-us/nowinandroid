@@ -197,7 +197,7 @@ object NarrationNowPlaying {
             NarrationQueue.Collection.SHAMAYEL -> "Ash-Shama'il al-Muhammadiyah"
         }
         publish(
-            title = "$collection · Hadith ${state.hadithId}",
+            title = "$collection · Local record ${state.hadithId}",
             albumTitle = if (state.queueSize > 1) {
                 "Hadith ${state.index + 1} of ${state.queueSize}"
             } else {

@@ -104,8 +104,8 @@ internal object PreparedPrayerReadings {
                 val fields = com.starception.submission.core.model.deenly.unpackInsightFields(value)
                 PrayerHadithRecommendation(PrayerHadithCandidate(fields[0], fields[1], fields[2].toInt(), fields[3]), fields[4].toBooleanStrict())
             },
-            read = { store.getString("prepared_prayer_readings_v2") },
-            write = { store.putString("prepared_prayer_readings_v2", it) },
+            read = { store.getString("prepared_prayer_readings_local_record_v3") },
+            write = { store.putString("prepared_prayer_readings_local_record_v3", it) },
         )
     }
 }

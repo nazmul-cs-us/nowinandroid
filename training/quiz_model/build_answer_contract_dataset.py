@@ -365,7 +365,7 @@ def passage_corpus(
             passages.append(
                 {
                     "collection": slug,
-                    "reference": f"{display_name} {hadith_id}",
+                    "reference": f"{display_name} · Local record {hadith_id}",
                     "topic": " ".join(str(display_name).split()),
                     "text": text,
                 }
@@ -525,7 +525,7 @@ def preference_passages(hadith_paths: list[Path]) -> dict[tuple[str, int], dict]
                     )
                 passages[(name, hadith_id)] = {
                     "collection": slug,
-                    "reference": f"{display_name} {hadith_id}",
+                    "reference": f"{display_name} · Local record {hadith_id}",
                     "topic": display_name,
                     "text": row[0],
                 }

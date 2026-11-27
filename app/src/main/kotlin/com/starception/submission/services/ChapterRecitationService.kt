@@ -87,6 +87,7 @@ class ChapterRecitationService : Service() {
 
     private var currentSource: String? = null
     private var currentTitle: String = ""
+    private var currentHadithRecordId: Int? = null
     private var currentSubtitle: String = ""
     private var isContinuousHandoff = false
 
@@ -139,6 +140,7 @@ class ChapterRecitationService : Service() {
         const val ACTION_PREVIOUS = "com.starception.submission.CHAPTER_PREVIOUS"
         const val EXTRA_SOURCE = "source"
         const val EXTRA_TITLE = "title"
+        const val EXTRA_HADITH_RECORD_ID = "hadith_record_id"
         const val EXTRA_SUBTITLE = "subtitle"
         const val EXTRA_CONTINUOUS_HANDOFF = "continuous_handoff"
         const val EXTRA_DATABASE_FILE = "database_file"
@@ -158,6 +160,7 @@ class ChapterRecitationService : Service() {
             title: String,
             subtitle: String,
             continuousHandoff: Boolean = false,
+            hadithRecordId: Int? = null,
         ) {
             // A Play-all sequence can advance while the app is backgrounded. Reuse the
             // already-running service directly because Android 12+ rejects another
@@ -168,6 +171,7 @@ class ChapterRecitationService : Service() {
                     title,
                     subtitle,
                     continuousHandoff,
+                    hadithRecordId,
                 )
             ) {
                 return
@@ -179,6 +183,7 @@ class ChapterRecitationService : Service() {
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_SUBTITLE, subtitle)
                 putExtra(EXTRA_CONTINUOUS_HANDOFF, continuousHandoff)
+                hadithRecordId?.let { putExtra(EXTRA_HADITH_RECORD_ID, it) }
             }
             try {
                 androidx.core.content.ContextCompat.startForegroundService(context, intent)
@@ -192,11 +197,12 @@ class ChapterRecitationService : Service() {
          * Sherpa or Android TTS). The external renderer remains responsible for audio;
          * this service owns the foreground lifetime and MediaSession notification.
          */
-        fun showExternalPlayback(context: Context, title: String, subtitle: String) {
-            if (ChapterRecitationState.requestExternalPlayback(title, subtitle)) return
+        fun showExternalPlayback(context: Context, title: String, subtitle: String, hadithRecordId: Int? = null) {
+            if (ChapterRecitationState.requestExternalPlayback(title, subtitle, hadithRecordId)) return
 
             val intent = Intent(context, ChapterRecitationService::class.java).apply {
                 action = ACTION_SHOW_EXTERNAL_PLAYBACK
+                hadithRecordId?.let { putExtra(EXTRA_HADITH_RECORD_ID, it) }
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_SUBTITLE, subtitle)
             }
@@ -307,13 +313,13 @@ class ChapterRecitationService : Service() {
             } else null
         }
         ChapterRecitationState.onSourcePlaybackRequested =
-            { source, title, subtitle, continuousHandoff ->
+            { source, title, subtitle, continuousHandoff, recordId ->
                 handler.post {
-                    startPlayback(source, title, subtitle, continuousHandoff)
+                    startPlayback(source, title, subtitle, continuousHandoff, recordId)
                 }
             }
-        ChapterRecitationState.onExternalPlaybackRequested = { title, subtitle ->
-            handler.post { startExternalPlayback(title, subtitle) }
+        ChapterRecitationState.onExternalPlaybackRequested = { title, subtitle, recordId ->
+            handler.post { startExternalPlayback(title, subtitle, recordId) }
         }
         ChapterRecitationState.onStopRequested = {
             handler.post { stopPlaybackAndSelf() }
@@ -372,6 +378,7 @@ class ChapterRecitationService : Service() {
                         source = source,
                         title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
                         subtitle = intent.getStringExtra(EXTRA_SUBTITLE).orEmpty(),
+                        hadithRecordId = intent.getIntExtra(EXTRA_HADITH_RECORD_ID, 0).takeIf { it > 0 },
                         continuousHandoff = intent.getBooleanExtra(
                             EXTRA_CONTINUOUS_HANDOFF,
                             false,
@@ -383,6 +390,7 @@ class ChapterRecitationService : Service() {
             ACTION_SHOW_EXTERNAL_PLAYBACK -> startExternalPlayback(
                 title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
                 subtitle = intent.getStringExtra(EXTRA_SUBTITLE).orEmpty(),
+                hadithRecordId = intent.getIntExtra(EXTRA_HADITH_RECORD_ID, 0).takeIf { it > 0 },
             )
             ACTION_PLAY_HADITH_BOOK -> startHadithBookPlaylist(
                 databaseFile = intent.getStringExtra(EXTRA_DATABASE_FILE).orEmpty(),
@@ -408,9 +416,10 @@ class ChapterRecitationService : Service() {
         title: String,
         subtitle: String,
         continuousHandoff: Boolean,
+        hadithRecordId: Int? = null,
     ) {
         if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(this) {
-                startPlayback(source, title, subtitle, continuousHandoff)
+                startPlayback(source, title, subtitle, continuousHandoff, hadithRecordId)
             }
         ) {
             startForegroundNotification()
@@ -432,6 +441,8 @@ class ChapterRecitationService : Service() {
             return
         }
         currentSource = source
+        currentHadithRecordId = hadithRecordId
+        ChapterRecitationState.setHadithIdentity(hadithRecordId)
         currentTitle = title
         currentSubtitle = subtitle
         isContinuousHandoff = continuousHandoff
@@ -469,7 +480,7 @@ class ChapterRecitationService : Service() {
             // Route natural completion to the active content type. Hadith details
             // advance their own numbered sequence; Fortress playback keeps its
             // existing chapter/dua playlist behavior.
-            if (currentTitle.startsWith("Hadith #")) {
+            if (currentHadithRecordId != null) {
                 val completion = ChapterRecitationState.onHadithCompletion
                 if (completion != null && isContinuousHandoff) {
                     // A Play-all sequence may spend a short time loading the next
@@ -501,7 +512,7 @@ class ChapterRecitationService : Service() {
             Log.e(TAG, "MediaPlayer error what=$what extra=$extra")
             val completion = ChapterRecitationState.onHadithCompletion
             if (
-                currentTitle.startsWith("Hadith #") &&
+                currentHadithRecordId != null &&
                 completion != null &&
                 isContinuousHandoff
             ) {
@@ -528,7 +539,7 @@ class ChapterRecitationService : Service() {
             Log.e(TAG, "setDataSource failed for $source", e)
             ChapterRecitationState.publish(false, currentTitle, currentSubtitle)
             stopForeground(STOP_FOREGROUND_REMOVE)
-            if (currentTitle.startsWith("Hadith #")) {
+            if (currentHadithRecordId != null) {
                 ChapterRecitationState.onHadithCompletion?.invoke()
             }
         }
@@ -587,7 +598,9 @@ class ChapterRecitationService : Service() {
         if (previous != null && com.starception.submission.feature.quran.SurahTafsirPlayback.owner.state.value?.entry !== previous) previous.player.stop()
     }
 
-    private fun startExternalPlayback(title: String, subtitle: String) {
+    private fun startExternalPlayback(title: String, subtitle: String, hadithRecordId: Int? = null) {
+        currentHadithRecordId = hadithRecordId
+        ChapterRecitationState.setHadithIdentity(hadithRecordId)
         detachTafsirPlayback()
         mediaPlayer?.let {
             runCatching { it.stop() }
@@ -682,10 +695,10 @@ class ChapterRecitationService : Service() {
             rangeStart = rangeStart,
             rangeEnd = rangeEnd,
         )
-        currentTitle = "Hadith #$bookPlaylistCurrent"
+        currentTitle = "Local record $bookPlaylistCurrent"
         currentSubtitle = collectionName
         isContinuousHandoff = true
-        startExternalPlayback(currentTitle, currentSubtitle)
+        startExternalPlayback(currentTitle, currentSubtitle, bookPlaylistCurrent)
         ChapterRecitationState.publishBookTrack(bookPlaylistCurrent, true)
 
         val voice = runCatching { TtsVoice.valueOf(voiceName) }
@@ -753,11 +766,11 @@ class ChapterRecitationService : Service() {
                     while (bookPlaylistPaused && generation == bookPlaylistGeneration) delay(100)
                     if (generation != bookPlaylistGeneration || requestedBookTrack != null) continue
 
-                    currentTitle = "Hadith #$number"
+                    currentTitle = "Local record $number"
                     currentSubtitle = collectionName
                     currentSource = null
                     isContinuousHandoff = true
-                    startExternalPlayback(currentTitle, currentSubtitle)
+                    startExternalPlayback(currentTitle, currentSubtitle, number)
                     ChapterRecitationState.publishBookTrack(number, true)
                     Log.i(
                         TAG,
@@ -859,7 +872,7 @@ class ChapterRecitationService : Service() {
                 generation == bookPlaylistGeneration &&
                 requestedBookTrack == null
             ) {
-                startExternalPlayback("Hadith #$number", collectionName)
+                startExternalPlayback("Local record $number", collectionName, number)
                 val recordingCompleted = playBookRecording(audioFile.absolutePath)
                 if (recordingCompleted) return true
             }
@@ -1140,7 +1153,7 @@ class ChapterRecitationService : Service() {
 
     /** Route car/Bluetooth previous/next controls into an active Bukhari book playlist. */
     private fun skipHadith(next: Boolean) {
-        if (!currentTitle.startsWith("Hadith #")) return
+        if (currentHadithRecordId == null) return
         if (ChapterRecitationState.isBookPlaylistActive) {
             val currentIndex = bookPlaylistOrder.indexOf(bookPlaylistCurrent)
                 .coerceAtLeast(0)
@@ -1454,10 +1467,10 @@ object ChapterRecitationState {
     var onBookTrackChanged: ((hadithNumber: Int, isPlaying: Boolean, isActive: Boolean, collectionName: String) -> Unit)? = null
 
     @Volatile
-    internal var onSourcePlaybackRequested: ((String, String, String, Boolean) -> Unit)? = null
+    internal var onSourcePlaybackRequested: ((String, String, String, Boolean, Int?) -> Unit)? = null
 
     @Volatile
-    internal var onExternalPlaybackRequested: ((String, String) -> Unit)? = null
+    internal var onExternalPlaybackRequested: ((String, String, Int?) -> Unit)? = null
 
     @Volatile
     internal var onStopRequested: (() -> Unit)? = null
@@ -1469,6 +1482,13 @@ object ChapterRecitationState {
 
     @Volatile var title: String = ""
         private set
+
+    @Volatile var hadithRecordId: Int? = null
+        private set
+
+    internal fun setHadithIdentity(recordId: Int?) {
+        hadithRecordId = recordId?.takeIf { it > 0 }
+    }
 
     @Volatile var subtitle: String = ""
         private set
@@ -1519,6 +1539,7 @@ object ChapterRecitationState {
         isPlaying = false
         onStateChanged?.invoke(false, title, subtitle)
         onGlobalStateChanged?.invoke(false, title, subtitle)
+        hadithRecordId = null
     }
 
     internal fun setBookPlaylist(
@@ -1557,15 +1578,16 @@ object ChapterRecitationState {
         title: String,
         subtitle: String,
         continuousHandoff: Boolean,
+        hadithRecordId: Int? = null,
     ): Boolean {
         val callback = onSourcePlaybackRequested ?: return false
-        callback(source, title, subtitle, continuousHandoff)
+        callback(source, title, subtitle, continuousHandoff, hadithRecordId)
         return true
     }
 
-    internal fun requestExternalPlayback(title: String, subtitle: String): Boolean {
+    internal fun requestExternalPlayback(title: String, subtitle: String, hadithRecordId: Int? = null): Boolean {
         val callback = onExternalPlaybackRequested ?: return false
-        callback(title, subtitle)
+        callback(title, subtitle, hadithRecordId)
         return true
     }
 

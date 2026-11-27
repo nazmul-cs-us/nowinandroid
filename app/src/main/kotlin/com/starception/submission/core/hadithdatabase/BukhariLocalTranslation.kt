@@ -1,165 +1,28 @@
-/*
- * Copyright 2026 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package com.starception.submission.core.hadithdatabase
 
 import android.content.Context
 import com.starception.submission.download.AssetRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
 
 /**
- * Data class for local Bukhari hadith translation
- */
-data class BukhariTranslation(
-    val hadithNumber: Int,
-    val volumeNumber: Int,
-    val bookNumber: Int,
-    val bookName: String,
-    val narrator: String,
-    val englishText: String,
-)
-
-/**
- * Repository for loading local Bukhari English translations from JSON asset
+ * Compatibility facade for existing playback callers. English must come from
+ * the SAME database row as the reader. The old Volume/Book/Number JSON is not a
+ * crosswalk: its Number field restarts and must never be keyed by a local ID.
  */
 class BukhariLocalTranslationRepository private constructor(
     private val context: Context,
-    private val assetRepository: AssetRepository? = null,
+    private val assetRepository: AssetRepository?,
 ) {
+    suspend fun loadTranslations(): Boolean =
+        HadithDatabase.isDatabaseAvailable(context, "sahih_bukhari.db")
 
-    private var translationsMap: Map<Int, BukhariTranslation>? = null
-    private var isLoaded = false
-
-    /**
-     * Load translations from JSON asset file
-     */
-    suspend fun loadTranslations(): Boolean {
-        if (isLoaded) return true
-
-        return withContext(Dispatchers.IO) {
-            try {
-                val repository = assetRepository ?: com.starception.submission.download.readingAssetRepository(context)
-                val inputStream = repository?.openAsset("json/sahih_bukhari.json")
-                    ?: context.assets.open("sahih_bukhari.json")
-                val jsonString = inputStream.bufferedReader().use { it.readText() }
-                val jsonArray = JSONArray(jsonString)
-                val map = mutableMapOf<Int, BukhariTranslation>()
-
-                for (volIndex in 0 until jsonArray.length()) {
-                    val volume = jsonArray.getJSONObject(volIndex)
-                    val volumeName = volume.getString("name")
-                    val volumeNumber = extractVolumeNumber(volumeName)
-                    val books = volume.getJSONArray("books")
-
-                    for (bookIndex in 0 until books.length()) {
-                        val book = books.getJSONObject(bookIndex)
-                        val bookName = book.getString("name")
-                        val bookNumber = extractBookNumber(bookName)
-                        val hadiths = book.getJSONArray("hadiths")
-
-                        for (hadithIndex in 0 until hadiths.length()) {
-                            val hadith = hadiths.getJSONObject(hadithIndex)
-                            val info = hadith.getString("info")
-                            val narrator = hadith.optString("by", "")
-                            val text = hadith.getString("text")
-
-                            val hadithNumber = extractHadithNumber(info)
-                            if (hadithNumber > 0) {
-                                map[hadithNumber] = BukhariTranslation(
-                                    hadithNumber = hadithNumber,
-                                    volumeNumber = volumeNumber,
-                                    bookNumber = bookNumber,
-                                    bookName = bookName,
-                                    narrator = narrator,
-                                    englishText = text.trim(),
-                                )
-                            }
-                        }
-                    }
-                }
-
-                translationsMap = map
-                isLoaded = true
-                android.util.Log.d(TAG, "✅ Loaded ${map.size} Bukhari English translations")
-                true
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "❌ Error loading Bukhari translations", e)
-                false
-            }
-        }
-    }
-
-    /**
-     * Get English translation for a hadith number
-     */
-    fun getTranslation(hadithNumber: Int): BukhariTranslation? {
-        return translationsMap?.get(hadithNumber)
-    }
-
-    /**
-     * Get formatted English text with narrator
-     */
-    fun getEnglishText(hadithNumber: Int): String? {
-        val translation = getTranslation(hadithNumber) ?: return null
-        return if (translation.narrator.isNotEmpty()) {
-            "${translation.narrator}\n\n${translation.englishText}"
-        } else {
-            translation.englishText
-        }
-    }
-
-    /**
-     * Check if translations are loaded
-     */
-    fun isLoaded(): Boolean = isLoaded
-
-    /**
-     * Get total count of loaded translations
-     */
-    fun getCount(): Int = translationsMap?.size ?: 0
-
-    private fun extractVolumeNumber(volumeName: String): Int {
-        val regex = Regex("""Volume\s*(\d+)""", RegexOption.IGNORE_CASE)
-        return regex.find(volumeName)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-    }
-
-    private fun extractBookNumber(bookName: String): Int {
-        val regex = Regex("""^(\d+)\.""")
-        return regex.find(bookName)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-    }
-
-    private fun extractHadithNumber(info: String): Int {
-        val regex = Regex("""Number\s*(\d+)""", RegexOption.IGNORE_CASE)
-        return regex.find(info)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    suspend fun getEnglishText(hadithNumber: Int): String? {
+        val hadith = HadithRepository(context, assetRepository)
+            .getHadith("sahih_bukhari.db", hadithNumber) ?: return null
+        return (hadith.englishText ?: hadith.textPlain)?.takeIf(String::isNotBlank)
     }
 
     companion object {
-        private const val TAG = "BukhariLocalTranslation"
-
-        @Volatile
-        private var dbInstance: BukhariLocalTranslationRepository? = null
-
-        fun getInstance(context: Context, assetRepository: AssetRepository? = null): BukhariLocalTranslationRepository {
-            return dbInstance ?: synchronized(this) {
-                dbInstance ?: BukhariLocalTranslationRepository(context.applicationContext, assetRepository).also {
-                    dbInstance = it
-                }
-            }
-        }
+        fun getInstance(context: Context, assetRepository: AssetRepository? = null) =
+            BukhariLocalTranslationRepository(context.applicationContext, assetRepository)
     }
 }

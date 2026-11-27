@@ -2256,8 +2256,8 @@ private object PreparedKnowledgeReadings {
                 }
                 DeenlyKnowledgeCard(fields[0], fields[1], fields[2], target)
             },
-            read = { store.getString("prepared_knowledge_readings_v1") },
-            write = { store.putString("prepared_knowledge_readings_v1", it) },
+            read = { store.getString("prepared_knowledge_readings_local_record_v2") },
+            write = { store.putString("prepared_knowledge_readings_local_record_v2", it) },
         )
     }
 }
@@ -2350,7 +2350,7 @@ internal suspend fun generateInsightKnowledgeCard(
                 ?.let { hadith ->
                     sources += DeenlyInsightSource(
                         collection = "Sahih al-Bukhari",
-                        reference = "Hadith ${hadith.id} · ${book.nameEnglish}",
+                        reference = "Local record ${hadith.id} · ${book.nameEnglish}",
                         topic = "A teaching from ${book.nameEnglish}",
                         text = hadith.english,
                         target = DeenlyKnowledgeTarget.BukhariHadith(hadith.id),
@@ -2370,7 +2370,7 @@ internal suspend fun generateInsightKnowledgeCard(
                 ?.let { hadith ->
                     sources += DeenlyInsightSource(
                         collection = "Shama'il At-Tirmidhi",
-                        reference = "Hadith ${hadith.id} · ${book.nameEnglish}",
+                        reference = "Local record ${hadith.id} · ${book.nameEnglish}",
                         topic = "Learn about ${book.nameEnglish}",
                         text = hadith.english,
                         target = DeenlyKnowledgeTarget.ShamayelBook(book.id),

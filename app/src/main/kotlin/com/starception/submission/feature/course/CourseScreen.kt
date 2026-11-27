@@ -336,7 +336,7 @@ fun CourseScreen(
                         "daily_bukhari" -> {
                             val hadithNumber = currentProgress + 1
                             val lessonId = "hadith_$hadithNumber"
-                            val lessonTitle = "Hadith #$hadithNumber"
+                            val lessonTitle = "Local record $hadithNumber"
                             CourseProgressTracker.setPendingCompletion(context, course.id, lessonId, lessonTitle)
                             onHadithClick("sahih_bukhari.db", hadithNumber)
                         }
@@ -3576,7 +3576,7 @@ private suspend fun preGenerateHadithTts(context: Context, startHadithNumber: In
                 ?: run {
                     // Fallback to database if not in JSON
                     val hadith = hadithRepository.getHadith("sahih_bukhari.db", hadithNumber)
-                    hadith?.textPlain ?: hadith?.elaboration
+                    hadith?.englishText ?: hadith?.textPlain
                 }
                 ?: continue
 

@@ -35,8 +35,10 @@ internal fun readHomePassageTranslation(context: Context, target: NowNudgeKnowle
 
 private fun localHadithPassage(context: Context, target: NowNudgeKnowledgeTarget.Hadith, language: String): String? {
     if (!target.databaseFile.matches(Regex("[a-z0-9_]+\\.db")) || language !in setOf("ar", "bn")) return null
-    val file = listOf(File(context.filesDir, "cdn_assets/databases/hadith/${target.databaseFile}"),
-        context.getDatabasePath("hadith_${target.databaseFile}"))
+    // The candidate/reader came from Room's installed collection. A newer CDN
+    // file may use another edition; never translate an old row from that file.
+    val file = listOf(context.getDatabasePath("hadith_${target.databaseFile}"),
+        File(context.filesDir, "cdn_assets/databases/hadith/${target.databaseFile}"))
         .firstOrNull { it.isFile && it.length() > 1024 } ?: return null
     return runCatching {
         SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { database ->

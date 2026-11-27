@@ -243,7 +243,7 @@ private fun HomeReadingRecommendation(
             ) to "Quran ${target.surahNumber}:${target.ayahNumber}"
         is NowNudgeKnowledgeTarget.Hadith -> (
             candidate.topic.takeIf { it.isNotBlank() && it != target.collectionName }
-                ?: "Hadith ${target.hadithNumber}"
+                ?: "Local record ${target.hadithNumber}"
             ) to (candidate.nudge.sourceLabel ?: target.collectionName)
         is NowNudgeKnowledgeTarget.FortressDua ->
             target.dua.chapterTitle.ifBlank { "Dua" } to "Fortress of the Muslim · Dua ${target.dua.position}"

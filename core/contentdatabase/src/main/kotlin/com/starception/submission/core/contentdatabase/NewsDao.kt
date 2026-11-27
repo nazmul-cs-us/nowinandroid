@@ -278,6 +278,26 @@ interface NewsDao {
     @Query("DELETE FROM news_topics")
     suspend fun deleteAllNewsTopics()
 
+    @Query("SELECT id FROM news_resources WHERE is_system != 1 OR is_user_created != 0")
+    suspend fun getNonGeneratedNewsIds(): List<Int>
+
+    @Query("DELETE FROM news_topics WHERE news_id IN (SELECT id FROM news_resources WHERE is_system = 1 AND is_user_created = 0)")
+    suspend fun deleteGeneratedNewsTopics()
+
+    @Query("DELETE FROM news_resources WHERE is_system = 1 AND is_user_created = 0")
+    suspend fun deleteGeneratedNewsResources()
+
+    @Transaction
+    suspend fun replaceGeneratedNews(resources: List<NewsResourceEntity>, topics: List<NewsTopicCrossRef>) {
+        val protectedIds = getNonGeneratedNewsIds().toSet()
+        val generated = resources.filterNot { it.id in protectedIds }
+        val generatedIds = generated.mapTo(mutableSetOf()) { it.id }
+        deleteGeneratedNewsTopics()
+        deleteGeneratedNewsResources()
+        insertNewsResources(generated)
+        insertNewsTopicCrossRefs(topics.filter { it.newsId in generatedIds })
+    }
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNewsResources(newsResources: List<NewsResourceEntity>)
 

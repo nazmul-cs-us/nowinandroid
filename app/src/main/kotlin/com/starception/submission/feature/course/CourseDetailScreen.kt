@@ -2919,7 +2919,7 @@ private fun generateDailyBukhariModules(): List<CourseModule> {
                 val hadithNumber = startHadith + lessonIndex
                 Lesson(
                     id = "hadith_$hadithNumber",
-                    title = "Hadith #$hadithNumber",
+                    title = "Local record $hadithNumber",
                     subtitle = "Sahih Al-Bukhari",
                     duration = "3 min",
                     type = LessonType.READING,

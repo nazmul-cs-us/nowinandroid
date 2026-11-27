@@ -11,7 +11,7 @@ Sources (all under app/src/main/assets):
   - databases/quran.db                     -> Surahs        (topic 7,  ids 2001+)
   - databases/quranic_duas.db              -> Quranic Duas  (topic 11, ids 101+)
   - databases/fortress_of_the_muslim_v2.db -> Fortress duas (topics 21-37, ids 1001+)
-  - sahih_bukhari.json                     -> Bukhari       (topic 8,  ids 3001+)
+  - databases/hadith/sahih_bukhari.db       -> Bukhari       (topic 8, local record ids 1000001+)
 
 Run whenever any source is updated, then regenerate the manifest and upload to R2:
   python3 scripts/generate_news_db.py
@@ -34,7 +34,7 @@ DB_DIR = os.path.join(ASSETS_DIR, 'databases')
 QURAN_DB = os.path.join(DB_DIR, 'quran.db')
 FORTRESS_V2_DB = os.path.join(DB_DIR, 'fortress_of_the_muslim_v2.db')
 QURANIC_DUAS_DB = os.path.join(DB_DIR, 'quranic_duas.db')
-BUKHARI_JSON = os.path.join(ASSETS_DIR, 'sahih_bukhari.json')
+BUKHARI_DB = os.path.join(DB_DIR, 'hadith', 'sahih_bukhari.db')
 NEWS_DB = os.path.join(DB_DIR, 'news.db')
 
 # Header images (match Kotlin generator)
@@ -336,37 +336,28 @@ def generate_fortress_duas(conn):
 
 
 def generate_bukhari(conn):
-    """Sahih Bukhari hadiths from sahih_bukhari.json (topic 8, ids 3001+)."""
-    print('Generating Sahih Bukhari hadiths from JSON...')
-    if not os.path.exists(BUKHARI_JSON):
-        print('  sahih_bukhari.json not found, skipping...')
+    """Keep feed text and local navigation ID bound to the same database row."""
+    print('Generating Sahih Bukhari hadiths from source database...')
+    if not os.path.exists(BUKHARI_DB):
+        print('  sahih_bukhari.db not found, skipping (no legacy-number fallback)...')
         return 0
-    with open(BUKHARI_JSON, 'r', encoding='utf-8') as fh:
-        data = json.load(fh)
     c = conn.cursor()
     now = now_ts()
-    news_id = 3001
     count = 0
-    num_re = re.compile(r'Number\s*(\d+)', re.IGNORECASE)
-    for volume in data:
-        for book in volume.get('books', []):
-            book_name = book.get('name', '')
-            for hadith in book.get('hadiths', []):
-                info = hadith.get('info', '')
-                narrator = hadith.get('by', '') or ''
-                text = (hadith.get('text', '') or '').strip()
-                m = num_re.search(info)
-                if not m:
-                    continue
-                hadith_number = int(m.group(1))
-                title = f'Hadith {hadith_number} - {book_name}'
-                content = f'{narrator}\n\n{text}' if narrator else text
-                url = f'hadith://sahih_bukhari/{hadith_number}'
-                insert_news(c, news_id, title, content, url, IMG_MADINAH,
-                            'Hadith 📖', 'Sahih Bukhari', now)
-                link_topic(c, news_id, TOPIC_SAHIH_BUKHARI)
-                news_id += 1
-                count += 1
+    source = sqlite3.connect(f'file:{BUKHARI_DB}?mode=ro', uri=True)
+    try:
+        for record_id, content in source.execute('SELECT id, text_plain FROM hadiths ORDER BY id'):
+            if not content or not content.strip():
+                continue
+            news_id = 1_000_000 + record_id
+            title = f'Sahih al-Bukhari · Local record {record_id}'
+            url = f'hadith-local://sahih_bukhari/{record_id}'
+            insert_news(c, news_id, title, content, url, IMG_MADINAH,
+                        'Hadith 📖', 'Sahih Bukhari', now)
+            link_topic(c, news_id, TOPIC_SAHIH_BUKHARI)
+            count += 1
+    finally:
+        source.close()
     conn.commit()
     print(f'  Generated {count} Bukhari hadiths')
     return count

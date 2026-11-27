@@ -311,7 +311,7 @@ private suspend fun DailyReminder.bookmarkId(context: Context): String? = when (
         val fallback = "hadith-$databaseName-${destination.hadithNumber}"
         runCatching {
             NewsDatabase.getInstance(context).newsDao()
-                .getNewsIdByExactUrl("hadith://$databaseName/${destination.hadithNumber}")
+                .getNewsIdByExactUrl("hadith-local://$databaseName/${destination.hadithNumber}")
                 ?.toString()
         }.getOrNull() ?: fallback
     }

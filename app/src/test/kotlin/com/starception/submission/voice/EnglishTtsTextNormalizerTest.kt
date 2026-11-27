@@ -68,7 +68,7 @@ class EnglishTtsTextNormalizerTest {
     @Test
     fun bukhariIntroSpellsSingleDigitHadithNumber() {
         assertEquals(
-            "Hadith number one from Sahih Al-Bukhari.",
+            "Local record one from Sahih Al-Bukhari.",
             EnglishTtsTextNormalizer.bukhariIntro(1),
         )
     }
@@ -76,8 +76,14 @@ class EnglishTtsTextNormalizerTest {
     @Test
     fun bukhariIntroSpellsMultiDigitHadithNumber() {
         assertEquals(
-            "Hadith number seven thousand five hundred sixty three from Sahih Al-Bukhari.",
+            "Local record seven thousand five hundred sixty three from Sahih Al-Bukhari.",
             EnglishTtsTextNormalizer.bukhariIntro(7_563),
         )
+    }
+
+    @Test
+    fun otherCollectionsAreNotIntroducedAsBukhari() {
+        assertEquals("Local record six hundred fifteen from Sahih Muslim.",
+            EnglishTtsTextNormalizer.hadithIntro(615, "Sahih Muslim"))
     }
 }

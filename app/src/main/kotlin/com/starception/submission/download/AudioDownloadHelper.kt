@@ -234,6 +234,9 @@ class AudioDownloadHelper @Inject constructor(
      * Returns null if the file isn't available locally (needs download).
      */
     fun resolveHadithAudioFile(hadithNumber: Int): File? {
+        // File existence is not proof that recording N narrates local record N.
+        // Refuse both CDN and SD-card copies until a content-bound mapping exists.
+        if (com.starception.submission.core.model.data.HadithSourceIdentity.verifiedBukhariRecording(hadithNumber) == null) return null
         // 1. Check CDN download location
         for (cdnKey in bukhariAudioCdnKeyCandidates(hadithNumber)) {
             val cdnFile = downloadManager.getAssetFile(cdnKey)
@@ -326,6 +329,9 @@ class AudioDownloadHelper @Inject constructor(
      * Returns the download result.
      */
     suspend fun downloadAudio(cdnKey: String): AssetDownloadManager.DownloadState {
+        if (cdnKey.startsWith("audio/bukhari/", ignoreCase = true)) {
+            return AssetDownloadManager.DownloadState.Failed("Hadith recording identity is not verified; use source-text narration")
+        }
         val manifest = downloadManager.loadManifest()
             ?: return AssetDownloadManager.DownloadState.Failed("Manifest not available")
 

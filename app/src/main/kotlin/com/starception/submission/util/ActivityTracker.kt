@@ -1168,7 +1168,7 @@ object ActivityTracker {
             val hadithText = localTranslationRepository.getEnglishText(nextHadithNumber)
                 ?: HadithRepository.getInstance(ctx)
                     .getHadith("sahih_bukhari.db", nextHadithNumber)
-                    ?.let { it.textPlain ?: it.elaboration }
+                    ?.let { it.englishText ?: it.textPlain }
 
             Log.i("ActivityTracker", "📚 Next hadith: #$nextHadithNumber, useBengaliAudio=$useBengaliAudio")
             return Triple(nextHadithNumber, hadithText, useBengaliAudio)
@@ -1221,7 +1221,7 @@ object ActivityTracker {
                     val hadith = hadithRepository.getHadith("sahih_bukhari.db", nextHadithNumber)
 
                     if (hadith != null) {
-                        val textToSpeak = hadith.textPlain ?: hadith.elaboration ?: "Hadith number $nextHadithNumber"
+                        val textToSpeak = hadith.englishText ?: hadith.textPlain ?: return@launch
                         Log.i("ActivityTracker", "📚 Playing hadith #$nextHadithNumber: ${textToSpeak.take(100)}...")
 
                         speakHadith(ctx, nextHadithNumber, textToSpeak)
@@ -1303,7 +1303,7 @@ object ActivityTracker {
                         ctx,
                         "daily_bukhari",
                         "hadith_$hadithNumber",
-                        "Hadith #$hadithNumber",
+                        "Local record $hadithNumber",
                         isManualTriggerMode,
                     )
                 }
@@ -1377,7 +1377,7 @@ object ActivityTracker {
                             ctx,
                             "daily_bukhari",
                             "hadith_$hadithNumber",
-                            "Hadith #$hadithNumber",
+                            "Local record $hadithNumber",
                             isManualTriggerMode,
                         )
                     },
@@ -1457,7 +1457,7 @@ object ActivityTracker {
                             ctx,
                             "daily_bukhari",
                             "hadith_$hadithNum",
-                            "Hadith #$hadithNum",
+                            "Local record $hadithNum",
                             isManualTriggerMode,
                         )
                     }

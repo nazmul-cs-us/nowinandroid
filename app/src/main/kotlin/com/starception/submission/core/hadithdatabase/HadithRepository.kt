@@ -131,9 +131,9 @@ class HadithRepository(
      * @param reference The hadith reference from fortress_of_the_muslim
      */
     suspend fun getHadithFromReference(reference: HadithReference): Hadith? {
-        val databaseFile = reference.databaseFile ?: return null
-        val hadithNumber = reference.hadithNumber ?: return null
-        return getHadith(databaseFile, hadithNumber)
+        // Fortress references use publisher numbering, not our local row IDs.
+        // Do not open a different narration merely because its integer matches.
+        return null
     }
 
     /**

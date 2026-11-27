@@ -672,7 +672,7 @@ class DrivingAudioService : Service() {
                 Log.w(TAG, "⚠️ Hadith #$hadithNumber not in BukhariLocalTranslation, falling back to database")
                 val hadithRepository = com.starception.submission.core.hadithdatabase.HadithRepository.getInstance(this)
                 val hadith = hadithRepository.getHadith("sahih_bukhari.db", hadithNumber)
-                hadith?.textPlain ?: hadith?.elaboration
+                hadith?.englishText ?: hadith?.textPlain
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching hadith #$hadithNumber: ${e.message}")
@@ -744,6 +744,10 @@ class DrivingAudioService : Service() {
      * Play hadith audio from SD card (Bengali)
      */
     fun playHadithAudio(hadithNumber: Int) {
+        if (com.starception.submission.core.model.data.HadithSourceIdentity.verifiedBukhariRecording(hadithNumber) == null) {
+            playExactEnglishHadithFallback(hadithNumber)
+            return
+        }
         try {
             Log.i(TAG, "📚 Playing hadith audio #$hadithNumber")
 
@@ -793,7 +797,7 @@ class DrivingAudioService : Service() {
                 prepare()
             }
 
-            updateState(PlaybackState.PLAYING_HADITH_AUDIO, "Hadith #$hadithNumber", "Sahih Al-Bukhari")
+            updateState(PlaybackState.PLAYING_HADITH_AUDIO, "Local record $hadithNumber", "Sahih Al-Bukhari")
             updateNotification()
 
             mediaPlayer?.start()
@@ -827,7 +831,7 @@ class DrivingAudioService : Service() {
         mediaPlayer?.release()
         mediaPlayer = null
 
-        updateState(PlaybackState.PLAYING_HADITH_TTS, "Hadith #$hadithNumber", "Sahih Al-Bukhari")
+        updateState(PlaybackState.PLAYING_HADITH_TTS, "Local record $hadithNumber", "Sahih Al-Bukhari")
         updateNotification()
 
         // Check for Sherpa-ONNX TTS preference from Settings
@@ -981,7 +985,7 @@ class DrivingAudioService : Service() {
         voiceCompletionManager.promptForCompletion(
             courseId = courseId,
             lessonId = lessonId,
-            lessonTitle = "Hadith #$hadithNumber",
+            lessonTitle = "Local record $hadithNumber",
             onComplete = {
                 Log.i(TAG, "✅ Lesson marked complete via voice")
                 // Actually mark the lesson as completed in the progress tracker
@@ -998,7 +1002,7 @@ class DrivingAudioService : Service() {
             },
             onInconclusive = { reason ->
                 Log.w(TAG, "⚠️ Voice completion inconclusive for $lessonId: $reason")
-                queuePendingCompletion(courseId, lessonId, "Hadith #$hadithNumber", reason)
+                queuePendingCompletion(courseId, lessonId, "Local record $hadithNumber", reason)
                 markHadithPlayed(hadithNumber)
                 startQuranPlaybackIfEnrolled(hadithNumber)
             },

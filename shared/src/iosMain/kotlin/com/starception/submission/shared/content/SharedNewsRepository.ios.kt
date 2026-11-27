@@ -55,7 +55,7 @@ import sqlite3.sqlite3_step
 
 actual fun createSharedNewsRepository(): SharedNewsRepository = IosSharedNewsRepository()
 
-private class IosSharedNewsRepository : SharedNewsRepository {
+internal class IosSharedNewsRepository(private val sourcePath: String? = null) : SharedNewsRepository {
     private val databasePathMutex = Mutex()
     private var cachedDatabasePath: String? = null
 
@@ -70,7 +70,7 @@ private class IosSharedNewsRepository : SharedNewsRepository {
             path = databasePath(),
             sql = """
                 $NEWS_SELECT
-                FROM news_resources n
+                FROM $SAFE_NEWS_ROWS
                 WHERE EXISTS (
                     SELECT 1 FROM news_topics filtered
                     WHERE filtered.news_id = n.id
@@ -91,7 +91,7 @@ private class IosSharedNewsRepository : SharedNewsRepository {
                 path = databasePath(),
                 sql = """
                     $NEWS_SELECT
-                    FROM news_resources n
+                    FROM $SAFE_NEWS_ROWS
                     WHERE n.id IN (${placeholders(orderedIds.size)})
                     ORDER BY n.id ASC
                 """.trimIndent(),
@@ -111,7 +111,7 @@ private class IosSharedNewsRepository : SharedNewsRepository {
                 path = databasePath(),
                 sql = """
                     $NEWS_SELECT
-                    FROM news_resources n
+                    FROM $SAFE_NEWS_ROWS
                     WHERE n.id = ?
                     LIMIT 1
                 """.trimIndent(),
@@ -128,7 +128,7 @@ private class IosSharedNewsRepository : SharedNewsRepository {
                 path = databasePath(),
                 sql = """
                     $NEWS_SELECT
-                    FROM news_resources n
+                    FROM $SAFE_NEWS_ROWS
                     WHERE n.title LIKE ? ESCAPE '\' OR n.content LIKE ? ESCAPE '\'
                     ORDER BY n.id ASC
                     LIMIT ?
@@ -149,7 +149,7 @@ private class IosSharedNewsRepository : SharedNewsRepository {
             path = databasePath(),
             sql = """
                 $NEWS_SELECT
-                FROM news_resources n
+                FROM $SAFE_NEWS_ROWS
                 WHERE (n.title LIKE ? ESCAPE '\' OR n.content LIKE ? ESCAPE '\')
                   AND n.type LIKE ?
                 ORDER BY n.id ASC
@@ -174,7 +174,7 @@ private class IosSharedNewsRepository : SharedNewsRepository {
             path = databasePath(),
             sql = """
                 $NEWS_SELECT
-                FROM news_resources n
+                FROM $SAFE_NEWS_ROWS
                 WHERE ($matchSql)
                   AND n.type LIKE ?
                 ORDER BY CASE WHEN n.title LIKE ? ESCAPE '\' THEN 0 ELSE 1 END, n.id ASC
@@ -188,7 +188,7 @@ private class IosSharedNewsRepository : SharedNewsRepository {
     private suspend fun databasePath(): String {
         databasePathMutex.lock()
         return try {
-            cachedDatabasePath ?: resolveDatabaseAsset(
+            cachedDatabasePath ?: sourcePath ?: resolveDatabaseAsset(
                 bundledPath = NSBundle.mainBundle.pathForResource("news", ofType = "db"),
                 remotePath = "databases/news.db",
                 cacheName = "news.db",
@@ -206,6 +206,12 @@ private const val NEWS_SELECT = """
             FROM news_topics all_topics
             WHERE all_topics.news_id = n.id) AS topic_ids
 """
+
+// Read-only containment also covers legacy bundled/downloaded databases. Filter
+// before LIMIT/OFFSET so unsafe rows cannot starve the feed, search, or bookmarks.
+private const val SAFE_NEWS_ROWS = """(SELECT * FROM news_resources
+    WHERE NOT (is_system = 1 AND is_user_created = 0
+        AND COALESCE(url, '') LIKE 'hadith://%')) n"""
 
 private fun placeholders(count: Int): String = List(count) { "?" }.joinToString(",")
 

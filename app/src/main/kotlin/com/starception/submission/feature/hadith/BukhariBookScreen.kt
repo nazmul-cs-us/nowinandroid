@@ -614,7 +614,7 @@ private fun HadithBookHadithCard(
             NiaTopicTag(
                 followed = false,
                 onClick = onClick,
-                text = { Text("HADITH ${hadith.id}") },
+                text = { Text("LOCAL RECORD ${hadith.id}") },
             )
             hadith.textPlain?.takeIf(String::isNotBlank)?.let { english ->
                 Text(

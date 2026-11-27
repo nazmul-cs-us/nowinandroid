@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.model.deenly.PrayerHadithCandidate
 import com.starception.submission.core.translation.TranslationService
@@ -108,12 +107,9 @@ internal suspend fun loadHomeHadithTranslation(
     val local = when (language) {
         "ar", "" -> hadith?.textArabic
         "bn" -> hadith?.bengaliText ?: hadith?.textPlain?.takeIf { it.any { char -> char in '\u0980'..'\u09FF' } }
-        "en" -> hadith?.englishText ?: if (source.databaseFile.contains("bukhari")) {
-            BukhariLocalTranslationRepository.getInstance(context).let { repo ->
-                repo.loadTranslations()
-                repo.getEnglishText(source.hadithNumber)
-            }
-        } else null
+        "en" -> hadith?.englishText ?: hadith?.textPlain?.takeIf { text ->
+            text.any { it in 'a'..'z' || it in 'A'..'Z' } && text.none { it in '\u0980'..'\u09ff' }
+        }
         else -> null
     }?.takeIf(String::isNotBlank)
     if (local != null) return HomeReadingText(local, if (language == "ar" || language.isEmpty()) "Arabic source" else "Local translation")

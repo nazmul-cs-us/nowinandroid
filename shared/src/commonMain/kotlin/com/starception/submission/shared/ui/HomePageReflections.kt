@@ -30,7 +30,7 @@ internal object HomePageReflections {
             readings.clear(); loadingReadings.clear(); readingAttempts.clear()
         }
         if (page !in 0..4 || loadingReadings[page] == true) return
-        val storageKey = "home_further_readings_$page"
+        val storageKey = "home_further_readings_local_record_v2_$page"
         if (readings[page] == null) runCatching {
             Json.decodeFromString<StoredReadings>(store.getString(storageKey).orEmpty())
         }.getOrNull()?.takeIf { it.day == day.toString() }?.let { readings[page] = it.cards }
@@ -62,7 +62,7 @@ internal object HomePageReflections {
         if (page !in 0..4) return
         val key = "$day:$page"
         val saved = runCatching {
-            Json.decodeFromString<Stored>(store.getString("home_reflection_$page").orEmpty())
+            Json.decodeFromString<Stored>(store.getString("home_reflection_local_record_v2_$page").orEmpty())
         }.getOrNull()
         if (evidence[page] == null && saved != null) evidence[page] = saved.evidence
         saved?.card?.let { if (cards[page] == null) cards[page] = it }
@@ -77,7 +77,7 @@ internal object HomePageReflections {
                     (card.target as? DeenlyKnowledgeTarget.Surah)?.number)
                 evidence[page] = result
                 cards[page] = card
-                store.putString("home_reflection_$page", Json.encodeToString(Stored(day.toString(), result, card)))
+                store.putString("home_reflection_local_record_v2_$page", Json.encodeToString(Stored(day.toString(), result, card)))
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { attempts -= key }
         }

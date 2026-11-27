@@ -44,7 +44,7 @@ internal object PreparedInsightReadings {
     private var aiCache: InsightReadAhead<NowNudgeKnowledgeCandidate>? = null
 
     private fun <T : Any> cache(context: Context, name: String, encode: (T) -> List<String>, decode: (List<String>) -> T): InsightReadAhead<T> {
-        val prefs = context.applicationContext.getSharedPreferences("prepared_insight_readings_v1", Context.MODE_PRIVATE)
+        val prefs = context.applicationContext.getSharedPreferences("prepared_insight_readings_local_record_v2", Context.MODE_PRIVATE)
         return InsightReadAhead(scope, { packInsightFields(encode(it)) }, { decode(unpackInsightFields(it)) },
             { prefs.getString(name, null) }, { prefs.edit().putString(name, it).apply() })
     }
@@ -75,10 +75,13 @@ internal object PreparedInsightReadings {
                         transliteration.orEmpty(), translation.orEmpty(), this.context.orEmpty(), instruction.orEmpty(), note.orEmpty(),
                         postContext.orEmpty(), description.orEmpty(), audioUrl.orEmpty())
                 }
-            } + listOf("model-generated-v1", item.modelGenerated.toString())
+            } + listOf("model-generated-v1", item.modelGenerated.toString(), com.starception.submission.core.model.data.HadithSourceIdentity.CACHE_REVISION)
     }
 
     private fun decodeAiFields(fields: List<String>): NowNudgeKnowledgeCandidate {
+        require(fields.lastOrNull() == com.starception.submission.core.model.data.HadithSourceIdentity.CACHE_REVISION) {
+            "Unverified legacy insight cache must be regenerated"
+        }
         val target = when (fields[11]) {
             "quran" -> NowNudgeKnowledgeTarget.QuranAyah(fields[12].toInt(), fields[13].toInt())
             "hadith" -> NowNudgeKnowledgeTarget.Hadith(fields[12], fields[13], fields[14].toInt())
@@ -89,6 +92,6 @@ internal object PreparedInsightReadings {
         return NowNudgeKnowledgeCandidate(DeenlyNudge(fields[0], DeenlyNudgeAction.valueOf(fields[1]), fields[2],
             fields[3].ifEmpty { null }, fields[4], fields[5].ifEmpty { null }, fields[6].ifEmpty { null }),
             target, fields[7], fields[8], fields[9], fields[10].toFloat(),
-            modelGenerated = fields.getOrNull(fields.lastIndex - 1) == "model-generated-v1" && fields.last() == "true")
+            modelGenerated = fields.getOrNull(fields.lastIndex - 2) == "model-generated-v1" && fields.getOrNull(fields.lastIndex - 1) == "true")
     }
 }

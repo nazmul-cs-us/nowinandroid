@@ -11,7 +11,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.starception.submission.core.duadatabase.Dua
 import com.starception.submission.core.duadatabase.DuaRepository
-import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithCollectionMetadata
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithEntity
@@ -706,7 +705,7 @@ private fun GroundedKnowledgeSource.sourceUrl(): String = when (val destination 
     is NowNudgeKnowledgeTarget.QuranAyah ->
         "https://quran.com/${destination.surahNumber}/${destination.ayahNumber}"
     is NowNudgeKnowledgeTarget.Hadith ->
-        "hadith://${destination.databaseFile.removeSuffix(".db")}/${destination.hadithNumber}"
+        "hadith-local://${destination.databaseFile.removeSuffix(".db")}/${destination.hadithNumber}"
     is NowNudgeKnowledgeTarget.FortressDua -> "deenly://dua/${destination.dua.id}"
 }
 
@@ -1226,9 +1225,6 @@ private class AndroidGroundedKnowledgeSourceLoader(
     private val hadithRepository by lazy {
         HadithRepository(appContext, assetRepository)
     }
-    private val bukhariTranslations by lazy {
-        BukhariLocalTranslationRepository.getInstance(appContext, assetRepository)
-    }
 
     override suspend fun load(date: LocalDate, variation: Int): GroundedKnowledgeSource? {
         val selectionDate = date.plusDays(variation.coerceAtLeast(0).toLong())
@@ -1595,12 +1591,8 @@ private class AndroidGroundedKnowledgeSourceLoader(
             hadithRepository.getHadith(collection.databaseFile, hadithId)
         }.getOrNull() ?: return null
 
-        // The legacy Bukhari translation JSON numbers hadiths per volume ("Volume 5,
-        // Book 58, Number 242"), which collides across books and does not match the
-        // database's sunnah-style ids at all — requiring it silently dropped every
-        // Bukhari hit above id 895. The database's own text_plain is the curated
-        // English translation, so map sources straight from it like every other
-        // collection.
+        // Bind the quote to its database record. Neither these row IDs nor the
+        // legacy JSON Volume/Book/Number are verified external citation numbers.
         val sourceText = when (collection.databaseFile) {
             SHAMAYEL_DATABASE -> hadith.englishText
             else -> hadith.englishText ?: hadith.textPlain
@@ -1614,7 +1606,7 @@ private class AndroidGroundedKnowledgeSourceLoader(
             SHAMAYEL_DATABASE -> ShamayelBooks.findByHadithId(hadithId)?.nameEnglish
             else -> displayName
         }?.takeIf(String::isNotBlank) ?: displayName
-        val reference = "$displayName $hadithId"
+        val reference = com.starception.submission.core.model.data.HadithSourceIdentity.reference(displayName, hadithId)
         return GroundedKnowledgeSource(
             id = "${collection.databaseFile.removeSuffix(".db")}-$hadithId",
             collection = collection.modelCollection,

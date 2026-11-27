@@ -487,74 +487,43 @@ object NewsDbGenerator {
                 Log.d(TAG, "Generated $fortressCount Fortress duas")
             }
 
-            // Generate Bukhari Hadiths from JSON
+            // Text and navigation identity MUST come from the same database row.
+            // Legacy JSON Volume/Book/Number is not a database ID crosswalk.
             var bukhariCount = 0
             try {
-                // Use the same persistent locations as the download manager. In particular, an
-                // extracted copy can remain valid after the asset is removed from a newer APK.
-                val resolvedJsonFile = RESOLVED_ASSET_ROOTS
-                    .asSequence()
-                    .map { root -> File(context.filesDir, "$root/json/sahih_bukhari.json") }
-                    .firstOrNull { it.isFile && it.length() > 0L }
-                val jsonString = if (resolvedJsonFile != null) {
-                    Log.d(
-                        TAG,
-                        "Using resolved sahih_bukhari.json " +
-                            "(${resolvedJsonFile.length()} bytes)",
-                    )
-                    resolvedJsonFile.readText()
-                } else {
-                    context.assets.open("sahih_bukhari.json").bufferedReader().use { it.readText() }
-                }
-                val jsonArray = org.json.JSONArray(jsonString)
-                var newsId = 3001
-
-                for (volIndex in 0 until jsonArray.length()) {
-                    val volume = jsonArray.getJSONObject(volIndex)
-                    val books = volume.getJSONArray("books")
-
-                    for (bookIndex in 0 until books.length()) {
-                        val book = books.getJSONObject(bookIndex)
-                        val bookName = book.getString("name")
-                        val hadiths = book.getJSONArray("hadiths")
-
-                        for (hadithIndex in 0 until hadiths.length()) {
-                            val hadith = hadiths.getJSONObject(hadithIndex)
-                            val info = hadith.getString("info")
-                            val narrator = hadith.optString("by", "")
-                            val text = hadith.getString("text").trim()
-
-                            // Extract hadith number
-                            val numberMatch = Regex("""Number\s*(\d+)""", RegexOption.IGNORE_CASE).find(info)
-                            val hadithNumber = numberMatch?.groupValues?.get(1)?.toIntOrNull() ?: continue
-
-                            val title = "Hadith $hadithNumber - $bookName"
-                            val content = if (narrator.isNotEmpty()) {
-                                "$narrator\n\n$text"
-                            } else {
-                                text
+                val installed = context.getDatabasePath("hadith_sahih_bukhari.db")
+                val path = installed.takeIf { it.isFile && it.length() > 0L }?.absolutePath
+                    ?: getAssetDbPath(context, "sahih_bukhari.db")
+                if (path != null) {
+                    SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READONLY).use { database ->
+                        database.rawQuery("SELECT id, text_plain FROM hadiths ORDER BY id", null).use { cursor ->
+                            while (cursor.moveToNext()) {
+                                val recordId = cursor.getInt(0)
+                                val content = cursor.getString(1)?.takeIf(String::isNotBlank) ?: continue
+                                // New namespace: never retarget a legacy feed bookmark to
+                                // a different narration merely because its list index matches.
+                                val newsId = 1_000_000 + recordId
+                                val title = com.starception.submission.core.model.data.HadithSourceIdentity.reference("Sahih al-Bukhari", recordId)
+                                val url = "hadith-local://sahih_bukhari/$recordId"
+                                newsResources.add(
+                                    NewsResourceEntity(
+                                        id = newsId,
+                                        title = title,
+                                        content = content,
+                                        url = url,
+                                        headerImageUrl = "drawable://masjid_al_nawabi",
+                                        publishDate = now,
+                                        type = "Hadith 📖",
+                                        isSystem = 1,
+                                        isUserCreated = 0,
+                                        source = "Sahih Bukhari",
+                                        createdAt = now,
+                                        updatedAt = now,
+                                    ),
+                                )
+                                crossRefs.add(NewsTopicCrossRef(newsId, TOPIC_SAHIH_BUKHARI))
+                                bukhariCount++
                             }
-                            val url = "hadith://sahih_bukhari/$hadithNumber"
-
-                            newsResources.add(
-                                NewsResourceEntity(
-                                    id = newsId,
-                                    title = title,
-                                    content = content,
-                                    url = url,
-                                    headerImageUrl = "drawable://masjid_al_nawabi",
-                                    publishDate = now,
-                                    type = "Hadith 📖",
-                                    isSystem = 1,
-                                    isUserCreated = 0,
-                                    source = "Sahih Bukhari",
-                                    createdAt = now,
-                                    updatedAt = now,
-                                ),
-                            )
-                            crossRefs.add(NewsTopicCrossRef(newsId, TOPIC_SAHIH_BUKHARI))
-                            newsId++
-                            bukhariCount++
                         }
                     }
                 }
@@ -589,14 +558,13 @@ object NewsDbGenerator {
                         cursor.use {
                             while (it.moveToNext()) {
                                 val hadithId = it.getInt(0)
-                                val numberInBook = it.getInt(1)
                                 val chapterId = it.getInt(2)
                                 val chapterEnglish = it.getString(3).orEmpty()
                                 val chapterBengali = it.getString(4).orEmpty()
                                 val englishText = it.getString(5).orEmpty()
                                 val bengaliText = it.getString(6).orEmpty()
                                 val chapterTitle = chapterEnglish.ifBlank { chapterBengali }
-                                val title = "Hadith $numberInBook · Chapter $chapterId: $chapterTitle"
+                                val title = "Local record $hadithId · Chapter $chapterId: $chapterTitle"
                                 val content = buildString {
                                     append(englishText)
                                     if (englishText.isNotBlank() && bengaliText.isNotBlank()) {
@@ -610,7 +578,7 @@ object NewsDbGenerator {
                                         id = 11000 + hadithId,
                                         title = title,
                                         content = content,
-                                        url = "hadith://shamayele_tirmidhi_complete/$hadithId",
+                                        url = "hadith-local://shamayele_tirmidhi_complete/$hadithId",
                                         headerImageUrl = "drawable://masjid_al_nawabi",
                                         publishDate = now,
                                         type = "Hadith 📖",
@@ -641,11 +609,8 @@ object NewsDbGenerator {
 
             // Clear and insert only after all sources generated cleanly, so a failed
             // generation never leaves news.db emptier than it started.
-            dao.deleteAllNewsTopics()
-            dao.deleteAllNewsResources()
-            Log.d(TAG, "Cleared existing news data")
-            dao.insertNewsResources(newsResources)
-            dao.insertNewsTopicCrossRefs(crossRefs)
+            dao.replaceGeneratedNews(newsResources, crossRefs)
+            Log.d(TAG, "Replaced generated news; preserved user content and topic associations")
 
             val duration = System.currentTimeMillis() - startTime
             Log.d(TAG, "News.db regeneration completed in ${duration}ms")

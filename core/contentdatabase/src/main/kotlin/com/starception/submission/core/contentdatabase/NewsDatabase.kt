@@ -89,6 +89,16 @@ abstract class NewsDatabase : RoomDatabase() {
 
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
+                            // Old feed assets used ambiguous JSON numbers as local links.
+                            // Quarantine only derived system rows before any reader sees them.
+                            // Keep their IDs, so old bookmarks cannot point at new narrations.
+                            db.execSQL("""
+                                UPDATE news_resources
+                                SET title = 'Unavailable · source identity requires verification',
+                                    content = NULL, url = NULL
+                                WHERE is_system = 1 AND is_user_created = 0
+                                  AND url LIKE 'hadith://%'
+                            """.trimIndent())
                             Log.d(TAG, "News database opened")
                         }
                     })

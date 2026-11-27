@@ -64,7 +64,7 @@ class ChapterRecitationStateTest {
 
         var received: PlaybackRequest? = null
         ChapterRecitationState.onSourcePlaybackRequested =
-            { source, title, subtitle, continuousHandoff ->
+            { source, title, subtitle, continuousHandoff, _ ->
                 received = PlaybackRequest(source, title, subtitle, continuousHandoff)
             }
 
@@ -90,7 +90,7 @@ class ChapterRecitationStateTest {
     @Test
     fun singlePlaybackRequestDoesNotUseContinuousHandoff() {
         var continuousHandoff: Boolean? = null
-        ChapterRecitationState.onSourcePlaybackRequested = { _, _, _, isContinuous ->
+        ChapterRecitationState.onSourcePlaybackRequested = { _, _, _, isContinuous, _ ->
             continuousHandoff = isContinuous
         }
 
@@ -115,5 +115,23 @@ class ChapterRecitationStateTest {
                 subtitle = "Sahih Bukhari",
             ),
         )
+    }
+
+    @Test
+    fun hadithIdentityDoesNotDependOnDisplayTitle() {
+        ChapterRecitationState.setHadithIdentity(615)
+        ChapterRecitationState.publish(true, "A localized title without a number", "Sahih al-Bukhari")
+        assertEquals(615, ChapterRecitationState.hadithRecordId)
+        ChapterRecitationState.setHadithIdentity(null)
+        ChapterRecitationState.publish(true, "Hadith #615", "A Fortress chapter title")
+        assertEquals(null, ChapterRecitationState.hadithRecordId)
+    }
+
+    @Test
+    fun serviceRequestCarriesIdentitySeparatelyFromMetadata() {
+        var identity: Int? = null
+        ChapterRecitationState.onExternalPlaybackRequested = { _, _, recordId -> identity = recordId }
+        assertTrue(ChapterRecitationState.requestExternalPlayback("Local record 615", "Sahih al-Bukhari", 615))
+        assertEquals(615, identity)
     }
 }

@@ -1319,7 +1319,7 @@ private fun renderSuggestions(
     val ftsNews = searchResults.newsResources
         .filterNot { news ->
             cappedBukhariHadiths.isNotEmpty() &&
-                news.url.startsWith("hadith://sahih_bukhari/")
+                news.url.startsWith("hadith-local://sahih_bukhari/")
         }
         .take(8)
 
@@ -1933,7 +1933,7 @@ private fun addBukhariHadithItem(
     }
     view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
         text = buildString {
-            append("Hadith #${hadith.id}")
+            append("Local record ${hadith.id}")
             book?.let { append(" · ${it.nameEnglish}") }
         }
         setTextColor(titleColor)

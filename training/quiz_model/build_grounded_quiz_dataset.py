@@ -271,7 +271,7 @@ def shamayel_questions(path: Path) -> Iterable[dict]:
             """
         ):
             chapter_title = compact(chapter_title)
-            reference = f"Shama'il At-Tirmidhi {hadith_id}"
+            reference = f"Shama'il At-Tirmidhi · Local record {hadith_id}"
             yield question(
                 question_id=f"shamayel-{hadith_id}-chapter",
                 prompt=(
@@ -335,7 +335,7 @@ def collection_hadith_questions(paths: list[Path]) -> Iterable[dict]:
                 ORDER BY id
                 """
             ):
-                reference = f"{display_name} {hadith_id}"
+                reference = f"{display_name} · Local record {hadith_id}"
                 source_arabic = text_arabic if compact(text_arabic or "") else None
                 yield question(
                     question_id=f"{slug}-{hadith_id}-collection",

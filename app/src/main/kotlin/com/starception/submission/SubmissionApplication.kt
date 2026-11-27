@@ -364,11 +364,11 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                 // (GlobalMediaViewModel) and the news-card play/pause icons (ChapterAudioController).
                 com.starception.submission.services.ChapterRecitationState.onStateChanged =
                     { playing, title, subtitle ->
-                        if (title.startsWith("Hadith #")) {
-                            val hadithNumber = title.substringAfter('#').toIntOrNull() ?: 0
+                        val recordId = com.starception.submission.services.ChapterRecitationState.hadithRecordId
+                        if (recordId != null) {
                             com.starception.submission.media.GlobalMediaViewModel
                                 .onHadithPlaybackChanged
-                                ?.invoke(playing, hadithNumber, subtitle, title)
+                                ?.invoke(playing, recordId, subtitle, title)
                         } else if (!subtitle.startsWith("Tafsir")) {
                             com.starception.submission.core.ui.ChapterAudioController
                                 .updateExternalState(playing, title)

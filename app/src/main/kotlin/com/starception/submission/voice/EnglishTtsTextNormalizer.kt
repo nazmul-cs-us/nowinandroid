@@ -78,7 +78,7 @@ object EnglishTtsTextNormalizer {
                 collectionName.contains("shamay", ignoreCase = true) -> "Shamail At-Tirmidhi"
             else -> collectionName
         }
-        return "Hadith number ${integerToEnglishWords(hadithNumber)} from $spokenCollectionName."
+        return "Local record ${integerToEnglishWords(hadithNumber)} from $spokenCollectionName."
     }
 
     fun bukhariIntro(hadithNumber: Int): String =

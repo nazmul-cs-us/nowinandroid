@@ -275,6 +275,7 @@ fun HadithDetailScreen(
     }
 
     val context = LocalContext.current
+    var screenActive by remember { mutableStateOf(true) }
     val repository = remember { HadithRepository.getInstance(context) }
     val translationService = remember { TranslationService.getInstance(context) }
     val bukhariTranslationRepo = remember { BukhariLocalTranslationRepository.getInstance(context) }
@@ -305,7 +306,7 @@ fun HadithDetailScreen(
 
     LaunchedEffect(databaseFile, hadithNumber) {
         val fallbackId = "hadith-${databaseFile.removeSuffix(".db")}-$hadithNumber"
-        val hadithUrl = "hadith://${databaseFile.removeSuffix(".db")}/$hadithNumber"
+        val hadithUrl = "hadith-local://${databaseFile.removeSuffix(".db")}/$hadithNumber"
         val resolvedId = kotlinx.coroutines.withContext(Dispatchers.IO) {
             runCatching {
                 NewsDatabase.getInstance(context).newsDao()
@@ -339,7 +340,7 @@ fun HadithDetailScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    var hadith by remember { mutableStateOf<Hadith?>(null) }
+    var hadith by remember(databaseFile, hadithNumber) { mutableStateOf<Hadith?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var showDownloadPrompt by remember { mutableStateOf(false) }
@@ -362,9 +363,9 @@ fun HadithDetailScreen(
     val hadithCache = remember(databaseFile) { androidx.compose.runtime.mutableStateMapOf<Int, Hadith>() }
 
     // Translation state
-    var translatedArabic by remember { mutableStateOf<String?>(null) }
-    var translatedText by remember { mutableStateOf<String?>(null) }
-    var translatedElaboration by remember { mutableStateOf<String?>(null) }
+    var translatedArabic by remember(databaseFile, hadithNumber) { mutableStateOf<String?>(null) }
+    var translatedText by remember(databaseFile, hadithNumber) { mutableStateOf<String?>(null) }
+    var translatedElaboration by remember(databaseFile, hadithNumber) { mutableStateOf<String?>(null) }
     var isTranslating by remember { mutableStateOf(false) }
     var selectedLanguage by remember { mutableStateOf(translationService.getSelectedLanguage()) }
     var selectedProvider by remember { mutableStateOf(translationService.getSelectedProvider()) }
@@ -426,7 +427,7 @@ fun HadithDetailScreen(
             return@LaunchedEffect
         }
         suppressStopNotification = false
-        val title = "Hadith #$hadithNumber"
+        val title = "Local record $hadithNumber"
         GlobalMediaViewModel.onHadithPlaybackChanged?.invoke(isPlaying, hadithNumber, collectionName, title)
 
         if (isPlaying) {
@@ -472,6 +473,7 @@ fun HadithDetailScreen(
     // Cleanup on dispose
     androidx.compose.runtime.DisposableEffect(Unit) {
         onDispose {
+            screenActive = false
             mediaPlayer?.release()
             mediaPlayer = null
             textToSpeech?.stop()
@@ -587,7 +589,7 @@ fun HadithDetailScreen(
             if (isBukhari) {
                 // Load local Bukhari English translations
                 bukhariTranslationRepo.loadTranslations()
-                val localEnglish = bukhariTranslationRepo.getEnglishText(hadithNumber)
+                val localEnglish = currentHadith.englishText ?: currentHadith.textPlain
 
                 if (localEnglish != null) {
                     if (selectedLanguage == "en") {
@@ -871,7 +873,7 @@ fun HadithDetailScreen(
                 }
                 // Show shimmer only on first load (no hadith yet). During swipe/mini-bar
                 // navigation, keep the previous hadith visible while the new one loads.
-                isLoading && hadith == null -> {
+                isLoading -> {
                     HadithShimmerLoading(onBackClick = wrappedOnBackClick, isLandscape = isLandscape)
                 }
                 error != null && showDownloadPrompt -> {
@@ -931,8 +933,9 @@ fun HadithDetailScreen(
                             com.starception.submission.services.ChapterRecitationService
                                 .showExternalPlayback(
                                     context = context,
-                                    title = "Hadith #$hadithNumber",
+                                    title = "Local record $hadithNumber",
                                     subtitle = collectionName,
+                                    hadithRecordId = hadithNumber,
                                 )
                         } else if (isTtsBackedPlayback) {
                             com.starception.submission.services.ChapterRecitationService.stop(context)
@@ -941,14 +944,15 @@ fun HadithDetailScreen(
                     }
                     val playExactEnglishBukhariWithSherpa:
                         (onPlaybackCompleted: () -> Unit) -> Unit = { onPlaybackCompleted ->
+                            val request = HadithPlaybackRequest(databaseFile, hadithNumber, playbackGeneration)
+                            val englishText = hadith?.englishText ?: hadith?.textPlain ?: ""
+                            val isCurrentRequest = { screenActive && request.isCurrent(databaseFile, hadithNumber, playbackGeneration) }
                             // Availability checks the filesystem; run them off the Main thread
                             // inside a click-launched coroutine so the tap stays responsive.
-                            CoroutineScope(Dispatchers.Main).launch {
-                                val englishText = bukhariTranslationRepo.getEnglishText(hadithNumber)
-                                    ?: hadith?.textPlain
-                                    ?: hadith?.elaboration
-                                    ?: ""
-                                if (!withContext(Dispatchers.IO) { isTtsVoiceModelAvailable(context, selectedVoice) }) {
+                            bookmarkScope.launch {
+                                val available = withContext(Dispatchers.IO) { isTtsVoiceModelAvailable(context, selectedVoice) }
+                                if (!isCurrentRequest()) return@launch
+                                if (!available) {
                                     android.util.Log.i(
                                         "HadithDetailScreen",
                                         "${selectedVoice.displayName} model missing for English Bukhari fallback",
@@ -968,11 +972,13 @@ fun HadithDetailScreen(
                                     )
                                     playWithSherpaOnnxTts(
                                         sherpaOnnxTts = sherpaOnnxTts,
+                                        collectionName = collectionName,
                                         text = englishText,
-                                        hadithNumber = hadithNumber,
+                                        hadithNumber = request.recordId,
+                                        isCurrentRequest = isCurrentRequest,
                                         selectedVoice = selectedVoice,
                                         speakerId = selectedSpeakerId,
-                                        onPlayingChanged = updateTtsPlaybackState,
+                                        onPlayingChanged = { if (isCurrentRequest()) updateTtsPlaybackState(it) },
                                         onPlaybackCompleted = onPlaybackCompleted,
                                     )
                                 }
@@ -1008,21 +1014,24 @@ fun HadithDetailScreen(
                             val playBengaliRecordingWithIntro: (source: String) -> Unit =
                                 playRecording@{ source ->
                                     val recordingHadithNumber = hadithNumber
-                                    CoroutineScope(Dispatchers.Main).launch {
+                                    bookmarkScope.launch {
                                         // Availability checks the filesystem; do it off the
                                         // Main thread before announcing playback state.
                                         if (!withContext(Dispatchers.IO) { isTtsVoiceModelAvailable(context, selectedVoice) }) {
+                                            if (playbackGeneration != playbackId) return@launch
                                             showTtsModelDownload = true
                                             isPlaying = false
                                             return@launch
                                         }
+                                        if (playbackGeneration != playbackId || hadithNumber != recordingHadithNumber) return@launch
                                         isPlaying = true
                                         isTtsBackedPlayback = true
                                         com.starception.submission.services.ChapterRecitationService
                                             .showExternalPlayback(
                                                 context = context,
-                                                title = "Hadith #$recordingHadithNumber",
+                                                title = "Local record $recordingHadithNumber",
                                                 subtitle = "Sahih Bukhari",
+                                                hadithRecordId = recordingHadithNumber,
                                             )
                                         sherpaOnnxTts.setVoice(selectedVoice)
                                         val introCompleted = sherpaOnnxTts.speakCachedOrGenerate(
@@ -1040,8 +1049,9 @@ fun HadithDetailScreen(
                                                 com.starception.submission.services.ChapterRecitationService.play(
                                                     context = context,
                                                     source = source,
-                                                    title = "Hadith #$recordingHadithNumber",
+                                                    title = "Local record $recordingHadithNumber",
                                                     subtitle = "Sahih Bukhari",
+                                                    hadithRecordId = recordingHadithNumber,
                                                 )
                                                 android.util.Log.i(
                                                     "HadithDetailScreen",
@@ -1069,7 +1079,9 @@ fun HadithDetailScreen(
                             // Bengali first uses its matching recording. If that exact
                             // track is unavailable, Bukhari always falls back to the
                             // exact English entry in the user's selected Sherpa voice.
-                            if (selectedLanguage == "bn" && isBukhari) {
+                            if (selectedLanguage == "bn" && isBukhari &&
+                                com.starception.submission.core.model.data.HadithSourceIdentity.verifiedBukhariRecording(hadithNumber) != null
+                            ) {
                                 // Resolve audio: check cdn_assets first, then SD card
                                 val audioFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
 
@@ -1160,10 +1172,14 @@ fun HadithDetailScreen(
                                 // Use Sherpa-ONNX TTS (user-selected voice) for English
                                 // For non-English languages, fall back to Android TTS
                                 val textToSpeak = translatedText ?: hadith!!.textPlain ?: ""
+                                val request = HadithPlaybackRequest(databaseFile, hadithNumber, playbackId)
+                                val isCurrentRequest = { screenActive && request.isCurrent(databaseFile, hadithNumber, playbackGeneration) }
                                 if (selectedLanguage == "en") {
                                     // Availability checks the filesystem; do it off the Main thread.
-                                    CoroutineScope(Dispatchers.Main).launch {
-                                        if (!withContext(Dispatchers.IO) { isTtsVoiceModelAvailable(context, selectedVoice) }) {
+                                    bookmarkScope.launch {
+                                        val available = withContext(Dispatchers.IO) { isTtsVoiceModelAvailable(context, selectedVoice) }
+                                        if (!isCurrentRequest()) return@launch
+                                        if (!available) {
                                             // Selected voice model not downloaded — show the
                                             // asset download page instead of failing silently.
                                             android.util.Log.i("HadithDetailScreen", "🔊 ${selectedVoice.displayName} model missing — showing download page")
@@ -1172,11 +1188,13 @@ fun HadithDetailScreen(
                                             android.util.Log.i("HadithDetailScreen", "🔊 Using Sherpa-ONNX TTS with ${selectedVoice.displayName}, speaker $selectedSpeakerId")
                                             playWithSherpaOnnxTts(
                                                 sherpaOnnxTts = sherpaOnnxTts,
+                                                collectionName = collectionName,
                                                 text = textToSpeak,
-                                                hadithNumber = hadithNumber,
+                                                hadithNumber = request.recordId,
+                                                isCurrentRequest = isCurrentRequest,
                                                 selectedVoice = selectedVoice,
                                                 speakerId = selectedSpeakerId,
-                                                onPlayingChanged = updateTtsPlaybackState,
+                                                onPlayingChanged = { if (isCurrentRequest()) updateTtsPlaybackState(it) },
                                                 onPlaybackCompleted = completeCurrentPlayback,
                                             )
                                         }
@@ -1186,14 +1204,16 @@ fun HadithDetailScreen(
                                     android.util.Log.i("HadithDetailScreen", "🔊 Using Android TTS for $selectedLanguage")
                                     playWithTts(
                                         context = context,
+                                        collectionName = collectionName,
                                         text = textToSpeak,
                                         language = selectedLanguage,
+                                        isCurrentRequest = isCurrentRequest,
                                         tts = textToSpeech,
                                         onTtsCreated = {
                                             textToSpeech = it
                                             isTtsInitialized = true
                                         },
-                                        onPlayingChanged = updateTtsPlaybackState,
+                                        onPlayingChanged = { if (isCurrentRequest()) updateTtsPlaybackState(it) },
                                         onPlaybackCompleted = completeCurrentPlayback,
                                     )
                                 }
@@ -1763,7 +1783,7 @@ private fun HadithContent(
                                                     enabled = true,
                                                     text = {
                                                         Text(
-                                                            text = "Hadith #${hadithNumber.toLocalizedDigits(selectedLanguage)}"
+                                                            text = "Local record ${hadithNumber.toLocalizedDigits(selectedLanguage)}"
                                                                 .uppercase(Locale.getDefault()),
                                                         )
                                                     },
@@ -2157,9 +2177,10 @@ private suspend fun playHadithRecordingAndAwait(
     com.starception.submission.services.ChapterRecitationService.play(
         context = context,
         source = source,
-        title = "Hadith #$hadithNumber",
+        title = "Local record $hadithNumber",
         subtitle = "Sahih Bukhari",
         continuousHandoff = true,
+        hadithRecordId = hadithNumber,
     )
 }
 
@@ -2245,18 +2266,21 @@ private suspend fun speakWithAndroidTtsAndAwait(
 
 private fun playWithTts(
     context: android.content.Context,
+    collectionName: String,
     text: String,
     language: String,
+    isCurrentRequest: () -> Boolean,
     tts: TextToSpeech?,
     onTtsCreated: (TextToSpeech) -> Unit,
     onPlayingChanged: (Boolean) -> Unit,
     onPlaybackCompleted: () -> Unit,
 ) {
+    if (!isCurrentRequest()) return
     if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(
             tts ?: onPlayingChanged,
             group = com.starception.submission.services.ChapterRecitationState,
         ) {
-            playWithTts(context, text, language, tts, onTtsCreated, onPlayingChanged, onPlaybackCompleted)
+            playWithTts(context, collectionName, text, language, isCurrentRequest, tts, onTtsCreated, onPlayingChanged, onPlaybackCompleted)
         }
     ) return
     val locale = when (language) {
@@ -2274,19 +2298,9 @@ private fun playWithTts(
         else -> java.util.Locale.US
     }
 
-    // Get intro for hadith
-    val intro = when (language) {
-        "bn" -> "সহীহ আল-বুখারী থেকে।"
-        "ar" -> "من صحيح البخاري."
-        "es" -> "De Sahih Al-Bujari."
-        "fr" -> "De Sahih Al-Boukhari."
-        "id" -> "Dari Sahih Al-Bukhari."
-        "ru" -> "Из Сахих аль-Бухари."
-        "tr" -> "Sahih-i Buhari'den."
-        "ur" -> "صحیح البخاری سے۔"
-        "zh" -> "来自《布哈里圣训》。"
-        else -> "From Sahih Al-Bukhari."
-    }
+    // This reader serves every collection; never introduce Muslim/Tirmidhi/etc.
+    // as Bukhari merely because the original player was written for Bukhari.
+    val intro = "$collectionName."
 
     val fullText = if (language == "en") {
         EnglishTtsTextNormalizer.normalize("$intro $text")
@@ -2315,12 +2329,16 @@ private fun playWithTts(
         ttsHolder = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 ttsHolder?.let { createdTts ->
+                    if (!isCurrentRequest()) {
+                        createdTts.shutdown()
+                        return@let
+                    }
                     onTtsCreated(createdTts)
                     if (com.starception.submission.media.TravelDuaInterruption.controller.deferIfInterrupted(
                             createdTts,
                             group = com.starception.submission.services.ChapterRecitationState,
                         ) {
-                            playWithTts(context, text, language, createdTts, onTtsCreated,
+                            playWithTts(context, collectionName, text, language, isCurrentRequest, createdTts, onTtsCreated,
                                 onPlayingChanged, onPlaybackCompleted)
                         }
                     ) return@let
@@ -2353,15 +2371,17 @@ private fun playWithTts(
  */
 private fun playWithSherpaOnnxTts(
     sherpaOnnxTts: SherpaOnnxTtsService,
+    collectionName: String,
     text: String,
     hadithNumber: Int,
+    isCurrentRequest: () -> Boolean,
     selectedVoice: TtsVoice,
     speakerId: Int,
     onPlayingChanged: (Boolean) -> Unit,
     onPlaybackCompleted: () -> Unit,
 ) {
     // IMPORTANT: Use same intro format as DrivingAudioService for cache compatibility
-    val introText = EnglishTtsTextNormalizer.bukhariIntro(hadithNumber)
+    val introText = EnglishTtsTextNormalizer.hadithIntro(hadithNumber, collectionName)
     val fullText = "$introText $text"
 
     // Set the voice from user settings
@@ -2371,29 +2391,11 @@ private fun playWithSherpaOnnxTts(
     val isCached = sherpaOnnxTts.isCached(fullText)
     android.util.Log.i("HadithDetailScreen", "🔊 Playing hadith #$hadithNumber - cached: $isCached")
 
-    // Launch coroutine for TTS playback
-    CoroutineScope(Dispatchers.Main).launch {
-        try {
-            onPlayingChanged(true)
-
-            // Use speakCachedOrGenerate to leverage pre-generated cache
-            val success = sherpaOnnxTts.speakCachedOrGenerate(
-                text = fullText,
-                speakerId = speakerId,
-                onComplete = {
-                    onPlaybackCompleted()
-                },
-            )
-
-            if (!success) {
-                android.util.Log.e("HadithDetailScreen", "Sherpa-ONNX TTS failed to speak")
-                onPlayingChanged(false)
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("HadithDetailScreen", "Error playing with Sherpa-ONNX TTS", e)
-            onPlayingChanged(false)
-        }
-    }
+    if (!isCurrentRequest()) return
+    onPlayingChanged(true)
+    // Pending availability checks are lifecycle-owned; accepted playback is not.
+    // The engine reserves a monotonic identity before launching its owned worker.
+    sherpaOnnxTts.speakOwned(fullText, speakerId, onPlaybackCompleted) { onPlayingChanged(false) }
 }
 
 @Composable

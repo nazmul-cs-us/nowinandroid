@@ -59,7 +59,8 @@ object NewsDatabaseModule {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val count = db.newsDao().getNewsResourceCount()
-                if (count == 0) {
+                val hasVerifiedLocalFeed = db.newsDao().getNewsIdByExactUrl("hadith-local://sahih_bukhari/1") != null
+                if (count == 0 || !hasVerifiedLocalFeed) {
                     Log.i(TAG, "News database is empty, auto-regenerating from sources...")
                     val result = NewsDatabase.regenerateFromSources(context)
                     if (result.success) {

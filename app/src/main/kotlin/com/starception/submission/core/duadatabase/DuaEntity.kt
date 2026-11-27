@@ -343,5 +343,7 @@ fun HadithReferenceEntity.toHadithReference() = HadithReference(
     collectionName = collectionName,
     hadithNumber = hadithNumber,
     referenceStr = referenceStr,
-    databaseFile = databaseFile,
+    // No verified publisher-number -> local-record crosswalk exists. Retain the
+    // external citation, but do not expose it as an internal navigation target.
+    databaseFile = null,
 )

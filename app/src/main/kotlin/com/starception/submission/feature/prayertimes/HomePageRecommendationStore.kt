@@ -8,7 +8,7 @@ import com.starception.submission.core.model.deenly.unpackInsightFields
 /** Last grounded recommendation for each Home cover page, retained across app launches. */
 internal class HomePageRecommendationStore(private val preferences: SharedPreferences) {
     constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences("home_page_recommendations_v1", Context.MODE_PRIVATE),
+        context.applicationContext.getSharedPreferences("home_page_recommendations_local_record_v2", Context.MODE_PRIVATE),
     )
 
     fun restore(day: String, state: HomePageGenerationState, contextKey: String = "default") {

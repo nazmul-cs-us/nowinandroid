@@ -24,7 +24,7 @@ data class PrayerHadithCandidate(
     val text: String,
 ) {
     val sourceId: String get() = "$databaseFile#$hadithNumber"
-    val reference: String get() = "$collection · $hadithNumber"
+    val reference: String get() = com.starception.submission.core.model.data.HadithSourceIdentity.reference(collection, hadithNumber)
 }
 
 object PrayerHadithSelection {

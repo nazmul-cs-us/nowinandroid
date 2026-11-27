@@ -107,4 +107,14 @@ class PrayerHadithRecommendationRepositoryTest {
         assertEquals(original, reading.text)
         assertTrue(reading.notice.contains("unavailable"))
     }
+
+    @Test
+    fun englishHomeTranslationComesFromTheSameDatabaseRow() = runBlocking {
+        val english = "Narrated Malik bin Huwairith: Two men came to the Prophet with the intention of a journey."
+        installCollection(english)
+        val reading = loadHomeHadithTranslation(context,
+            com.starception.submission.core.model.deenly.PrayerHadithCandidate(databaseFile, "Bukhari", 1, "Stale source text"), "en")
+        assertEquals(english, reading.text)
+        assertEquals("Local translation", reading.notice)
+    }
 }
