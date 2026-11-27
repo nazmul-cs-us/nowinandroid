@@ -1,5 +1,18 @@
 package com.starception.submission.shared.ui
 
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.semantics.clearAndSetSemantics
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -76,7 +89,10 @@ import kotlin.math.abs
 import kotlin.math.floor
 
 @kotlinx.serialization.Serializable
-internal data class HomeReflectionEvidence(val sourceText: String, val reference: String)
+internal data class HomeReflectionEvidence(
+    val sourceText: String, val reference: String,
+    val title: String? = null, val surahNumber: Int? = null,
+)
 
 /** The feed and its transition render the same scene and carry the same page identity. */
 internal data class HomeArtworkCard(
@@ -228,8 +244,19 @@ internal fun HomeReflectionPrompt(
     onExploreToggle: () -> Unit = {},
     exploreContent: @Composable () -> Unit = {},
     generatedInsights: Map<Int, HomeReflectionEvidence> = emptyMap(),
+    onSwipePage: (Int) -> Unit = {},
+    readingSurahNumber: Int = 0,
     onClick: () -> Unit,
 ) {
+    val direction = LocalLayoutDirection.current
+    val swipePage by rememberUpdatedState(onSwipePage)
+    val selectedPage by rememberUpdatedState(focusedPage)
+    var dragDistance by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val dragThreshold = with(density) { 32.dp.toPx() }
+    val flickThreshold = with(density) { 500.dp.toPx() }
+    val minimumFlickDistance = with(density) { 6.dp.toPx() }
+    val dragState = rememberDraggableState { dragDistance += it }
     val ink = if (onDarkCover) Color.White else MaterialTheme.colorScheme.onBackground
     val haptics = LocalHapticFeedback.current
     val arrowRotation by animateFloatAsState(
@@ -237,7 +264,14 @@ internal fun HomeReflectionPrompt(
         label = "homeExploreDividerArrow",
     )
     Column(
-        modifier = modifier.fillMaxWidth().padding(bottom = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(bottom = 16.dp).testTag("homeReflectionSwipeArea")
+            .draggable(state = dragState, orientation = Orientation.Horizontal, enabled = !exploreExpanded,
+                onDragStarted = { dragDistance = 0f },
+                onDragStopped = { velocity ->
+                    homeReflectionSwipeTarget(selectedPage, dragDistance, dragThreshold,
+                        direction == LayoutDirection.Rtl, velocity, flickThreshold, minimumFlickDistance)?.let(swipePage)
+                    dragDistance = 0f
+                }),
         // The arrow is tucked just below the cover's page marks. Give the
         // following reflection the same clear space below the arrow.
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -269,35 +303,45 @@ internal fun HomeReflectionPrompt(
                 }
             }
         }
-        // Mirror the cover headline's swipe-driven fade and small drift. Both
-        // text areas change at the same point, with no separate timed animation.
+        // Retain all scenes/translations, but reserve space only for the settled page.
+        // Freeze the selected measurement during a gesture, then fit it smoothly afterward.
         val position = ((scrollPosition % 5f) + 5f) % 5f
-        val current = floor(position).toInt()
-        val visiblePages = if (position - current < .001f) {
-            listOf(current)
-        } else {
-            listOf(current, (current + 1) % 5)
+        val heights = remember { mutableStateMapOf<Int, Int>() }
+        var layoutPage by remember { mutableIntStateOf(focusedPage) }
+        LaunchedEffect(position, focusedPage) {
+            if (abs(homeSwipePageOffset(position, focusedPage)) < .001f) layoutPage = focusedPage
         }
-        Box(Modifier.fillMaxWidth().clipToBounds()) {
-            visiblePages.forEach { page ->
+        val activeHeight = heights[layoutPage]
+        val heightModifier = if (activeHeight != null) {
+            val fittedHeight by animateDpAsState(with(LocalDensity.current) { activeHeight.toDp() },
+                animationSpec = tween(320, easing = FastOutSlowInEasing), label = "settledReflectionHeight")
+            Modifier.height(fittedHeight)
+        } else Modifier
+        Box(Modifier.fillMaxWidth().then(heightModifier).clipToBounds()) {
+            repeat(5) { page ->
                 key(page) {
                     val offset = homeSwipePageOffset(position, page)
                     val feed = homeFeedPage(page)
-                    val generatedCandidate = generatedInsights[page]
+                    val generatedCandidate = generatedInsights[page]?.takeIf {
+                        page != 2 || it.surahNumber == readingSurahNumber
+                    }
                     Column(
                         Modifier.fillMaxWidth()
+                            .wrapContentHeight(align = Alignment.Top, unbounded = true)
+                            .onSizeChanged { if (heights[page] != it.height) heights[page] = it.height }
                             .graphicsLayer {
                                 translationX = -offset * 16.dp.toPx()
                                 translationY = abs(offset) * 8.dp.toPx()
                                 alpha = homeCoverCopyOpacity(offset)
                             }
-                            .clickable(onClick = onClick),
+                            .then(if (page == focusedPage) Modifier.clickable(onClick = onClick)
+                                else Modifier.clearAndSetSemantics { }),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(feed.eyebrow, style = HomeTypography.eyebrow,
                             color = ink.copy(alpha = .72f))
                         Text(
-                            feed.prompt,
+                            generatedCandidate?.title?.takeIf(String::isNotBlank) ?: feed.prompt,
                             style = HomeTypography.reflection,
                             color = ink,
                             maxLines = 2,
@@ -306,11 +350,11 @@ internal fun HomeReflectionPrompt(
                         generatedCandidate?.sourceText?.takeIf(String::isNotBlank)?.let { sourceText ->
                             val preview = remember(sourceText) { homeEvidencePreview(sourceText) }
                             Text(preview, style = HomeTypography.body,
-                                color = ink.copy(alpha = .82f), maxLines = 1,
+                                color = ink.copy(alpha = .88f), maxLines = 3,
                                 overflow = TextOverflow.Ellipsis)
                             generatedCandidate.reference?.let { reference ->
                                 Text(reference, style = HomeTypography.caption,
-                                    color = ink.copy(alpha = .68f), maxLines = 1,
+                                    color = ink.copy(alpha = .76f), maxLines = 2,
                                     overflow = TextOverflow.Ellipsis)
                             }
                         }
@@ -334,6 +378,24 @@ internal fun homeEvidencePreview(sourceText: String): String =
             prefix.substringBeforeLast(' ', missingDelimiterValue = prefix).trimEnd() + "…"
         } else quotedTeaching
     }
+
+internal fun homeReflectionSwipeTarget(page: Int, distance: Float, threshold: Float, rtl: Boolean,
+    velocity: Float = 0f, velocityThreshold: Float = Float.POSITIVE_INFINITY, minimumFlickDistance: Float = 0f): Int? {
+    if (!distance.isFinite() || distance == 0f) return null
+    val movement = when {
+        abs(distance) >= threshold -> distance
+        velocity.isFinite() && abs(velocity) >= velocityThreshold && abs(distance) >= minimumFlickDistance -> velocity
+        else -> return null
+    }
+    val step = if ((movement < 0f) != rtl) 1 else -1
+    return (page.coerceIn(0, 4) + step + 5) % 5
+}
+
+/** Give measured reflection/citation text its space before assigning the decorative cover height. */
+internal fun homeRestingCoverHeight(viewport: Float, preferred: Float, reflection: Float, spacing: Float): Float {
+    if (viewport <= 0f) return preferred
+    return minOf(preferred, (viewport - reflection - spacing).coerceAtLeast(minOf(240f, preferred)))
+}
 
 @Composable
 private fun HomeSectionDivider(ink: Color) {

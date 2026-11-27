@@ -23,20 +23,21 @@ final class AndroidParityUITests: XCTestCase {
 
     func testHomeUsesTheAvailableWideWindow() throws {
         continueAfterFailure = false
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
         let app = XCUIApplication()
+        app.launchArguments = []
         app.launch()
-        let profile = app.buttons["Open local profile"]
-        let settings = app.buttons["Prayer settings"]
-        XCTAssertTrue(profile.waitForExistence(timeout: 30), app.debugDescription)
-        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        let cover = app.descendants(matching: .any)["home-artwork-cover"].firstMatch
+        XCTAssertTrue(cover.waitForExistence(timeout: 30), app.debugDescription)
         let window = app.windows.firstMatch.frame
         guard window.width >= 1300 else {
             throw XCTSkip("Run on a landscape iPad or Mac window at least 1300 points wide.")
         }
-        // Allow the side-navigation gutter and ordinary safe-area/panel padding.
-        // A centered 1200-point dashboard fails this on a wide window.
-        XCTAssertGreaterThan(settings.frame.maxX - profile.frame.minX, window.width - 180,
-                             "Home should expand with its window instead of staying in a centered column.")
+        // Artwork uses the window; the text and prayer grid have readable widths.
+        XCTAssertGreaterThan(cover.frame.width, window.width - 48)
+        XCTAssertGreaterThanOrEqual(cover.frame.minX, window.minX)
+        XCTAssertLessThanOrEqual(cover.frame.maxX, window.maxX)
         let image = XCTAttachment(screenshot: app.screenshot())
         image.name = "Home wide window"
         image.lifetime = .keepAlways
@@ -75,6 +76,46 @@ final class AndroidParityUITests: XCTestCase {
             XCTAssertTrue(app.staticTexts["TODAY'S SALAH"].waitForExistence(timeout: 10), app.debugDescription)
             app.terminate()
         }
+    }
+
+    func testHomeFitsTheWindowAndScrollsToItsLocationRow() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = []
+        app.launch()
+        let skip = app.buttons["Skip for now"]
+        if skip.waitForExistence(timeout: 5) { skip.tap() }
+        XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 30), app.debugDescription)
+        for _ in 0..<8 {
+            let dismiss = app.buttons["appGuideTipDismiss"]
+            if !dismiss.waitForExistence(timeout: 1) { break }
+            dismiss.tap()
+        }
+        let window = app.windows.firstMatch.frame
+        let schedule = app.descendants(matching: .any)["home-prayer-schedule"].firstMatch
+        XCTAssertTrue(schedule.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertGreaterThanOrEqual(schedule.frame.minX, window.minX)
+        XCTAssertLessThanOrEqual(schedule.frame.maxX, window.maxX)
+        for name in ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"] {
+            let card = app.descendants(matching: .any)["home-prayer-" + name].firstMatch
+            if card.exists {
+                XCTAssertGreaterThanOrEqual(card.frame.minX, window.minX)
+                XCTAssertLessThanOrEqual(card.frame.maxX, window.maxX)
+                XCTAssertLessThanOrEqual(card.frame.width, 550)
+            }
+        }
+        let location = app.descendants(matching: .any)["home-location-weather"].firstMatch
+        XCTAssertTrue(location.exists, app.debugDescription)
+        for _ in 0..<6 {
+            if location.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(location.isHittable, "The bottom of Home must remain reachable by scrolling.")
+        XCTAssertLessThanOrEqual(location.frame.maxY, window.maxY)
+        let image = XCTAttachment(screenshot: app.screenshot())
+        image.name = "Responsive Android-parity Home"
+        image.lifetime = .keepAlways
+        add(image)
     }
 
     func testFamilyIsReachableFromTheNativeTabBar() throws {

@@ -2267,12 +2267,15 @@ internal suspend fun generateInsightKnowledgeCard(
     appSituation: String?,
     fortressInvocations: Map<Int, List<com.starception.submission.shared.content.FortressInvocation>>,
     variation: Int = 0,
+    sourceKind: HomeReadingKind? = null,
+    readingSurah: Int? = null,
 ): DeenlyKnowledgeCard? {
     val seed = date.toEpochDays().toInt() + variation
     val sources = mutableListOf<DeenlyInsightSource>()
     val quranStore = SharedContentStore()
     val quranLanguage = QuranTranslationLanguage.fromCode(quranStore.quranTranslationLanguage())
-    val surah = QuranData.surahs[((seed % QuranData.surahs.size) + QuranData.surahs.size) % QuranData.surahs.size]
+    val surah = QuranData.surahs.firstOrNull { it.number == readingSurah }
+        ?: QuranData.surahs[((seed % QuranData.surahs.size) + QuranData.surahs.size) % QuranData.surahs.size]
     runCatching {
         createQuranVerseRepository()
             .getVersesBySurah(surah.number, quranLanguage)
@@ -2289,7 +2292,15 @@ internal suspend fun generateInsightKnowledgeCard(
         )
     }
 
-    fortressInvocations
+    val availableInvocations = if (fortressInvocations.isNotEmpty() || sourceKind != HomeReadingKind.Dua) fortressInvocations else {
+        runCatching {
+            val repository = com.starception.submission.shared.content.createSharedFortressRepository()
+            val chapters = repository.getChapters()
+            val chapter = chapters.getOrNull(seed.mod(chapters.size.coerceAtLeast(1)))
+            chapter?.let { mapOf(it.id to repository.getChapterInvocations(it.id)) }.orEmpty()
+        }.getOrDefault(emptyMap())
+    }
+    availableInvocations
         .entries
         .sortedBy { it.key }
         .flatMap { it.value }
@@ -2367,8 +2378,9 @@ internal suspend fun generateInsightKnowledgeCard(
                 }
         }
 
-    if (sources.isEmpty()) return null
-    val source = sources[expandedKnowledgeSourceIndex(date, sources.size)]
+    val eligible = if (sourceKind == null) sources else sources.filter { homeReadingKind(it.target) == sourceKind }
+    if (eligible.isEmpty()) return null
+    val source = eligible[if (sourceKind == null) expandedKnowledgeSourceIndex(date, eligible.size) else seed.mod(eligible.size)]
     println("[DeenlyKnowledge] selected ${source.collection}: ${source.reference}")
     val generatedTitle = DeenlyKnowledgeRuntime.generateKnowledgeTitle(
         collection = source.collection,

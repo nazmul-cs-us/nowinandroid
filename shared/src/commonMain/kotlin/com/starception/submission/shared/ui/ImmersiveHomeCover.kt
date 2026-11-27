@@ -7,7 +7,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,6 +14,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -54,9 +55,9 @@ internal fun homeCoverArtwork(page: Int, useNightArtwork: Boolean): DrawableReso
 
 internal data class HomeCoverCopy(val eyebrow: String, val title: String, val detail: String)
 
-/** The cover copy fades out before the next page's copy comes into focus. */
+/** Complementary crossfade weights keep text visible throughout the swipe. */
 internal fun homeCoverCopyOpacity(pageOffset: Float): Float {
-    val visible = (1f - abs(pageOffset) * 2f).coerceIn(0f, 1f)
+    val visible = (1f - abs(pageOffset)).coerceIn(0f, 1f)
     return visible * visible * (3f - 2f * visible)
 }
 
@@ -66,11 +67,19 @@ internal fun homeSwipePageOffset(position: Float, page: Int): Float {
     return if (distance > 2.5f) distance - 5f else distance
 }
 
-internal fun homeGreetingForHour(hour: Int): String = when (hour) {
-    in 5..11 -> "Salam, morning"
-    in 12..17 -> "Salam, afternoon"
+internal fun homeGreetingForHour(hour: Int, isDaylight: Boolean? = null): String = when {
+    isDaylight == false -> "Salam, evening"
+    hour in 5..11 -> "Salam, morning"
+    hour in 12..17 -> "Salam, afternoon"
     else -> "Salam, evening"
 }
+
+internal fun homeHeaderArtworkScrim(): Brush = Brush.verticalGradient(
+    0f to Color(0xFF101927).copy(alpha = .70f),
+    .55f to Color(0xFF101927).copy(alpha = .60f),
+    .86f to Color(0xFF101927).copy(alpha = .18f),
+    1f to Color.Transparent,
+)
 
 /** The poster previews the destination opened by its tap, not a generic mood. */
 internal fun homeCoverCopy(
@@ -150,9 +159,6 @@ internal fun HomeCoverArtworkBackdrop(
     isExpanded: Boolean,
     scrollOffsetPx: Int = 0,
     coverHeightPx: Int = 0,
-    epochSeconds: Double = 0.0,
-    latitude: Double = 0.0,
-    longitude: Double = 0.0,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier) {
@@ -166,14 +172,9 @@ internal fun HomeCoverArtworkBackdrop(
         else -> 0f
     }
     HomeCoverArtworkImages(lowerPage, swipeProgress, useNightArtwork)
-    if (!isExpanded && epochSeconds > 0) {
-        val visible = if (lowerPage == 0) 1f - swipeProgress else if (lowerPage == 4) swipeProgress else 0f
-        if (visible > 0f) com.starception.submission.feature.prayertimes.celestial.PrayerHomeCoverCelestialLayer(
-            epochSeconds = epochSeconds, latitude = latitude, longitude = longitude,
-            isNight = useNightArtwork, playing = false, modifier = Modifier.graphicsLayer { alpha = visible })
-    }
-    // The top and middle stay unfiltered. Header text supplies its own shadow;
-    // only the lower copy fades into the feed.
+    // Keep bright skies from erasing the greeting, weather and system icons.
+    // Shade only the header region; the photograph's focal area remains untouched.
+    if (!isExpanded) Box(Modifier.fillMaxWidth().height(224.dp).background(homeHeaderArtworkScrim()))
     Box(Modifier.fillMaxSize().background(
         homeCoverScrim(prayerVisibility, feedBackground, isExpanded)
     ))

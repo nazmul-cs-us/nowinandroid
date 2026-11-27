@@ -20,7 +20,6 @@ import com.starception.submission.settings.components.GuideSection
 import com.starception.submission.settings.components.appGuideAnchor
 import com.starception.submission.feature.prayertimes.homeNavigationReveal
 import com.starception.submission.feature.prayertimes.homeHeaderLocation
-import com.starception.submission.feature.prayertimes.HomeFamilyRibbon
 import com.starception.submission.feature.prayertimes.HomeHeaderDetail
 import com.starception.submission.feature.prayertimes.HomeHeaderDetailKind
 import com.starception.submission.feature.prayertimes.HomeHeaderTypography
@@ -97,6 +96,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -290,6 +290,7 @@ fun PrayerTimesScreen(
     // The immersive home cover, ported from the Android home page. Tapping a
     // cover page reveals the matching insight tile in the pager below it.
     var coverPage by remember { mutableStateOf(initialExpandedInsight ?: 0) }
+    var homeReflectionHeight by remember { mutableStateOf(148.dp) }
     val homeReflectionEvidence = HomePageReflections.evidence
     val reflectionModelRevision by com.starception.submission.shared.ml.DeenlyKnowledgeRuntime.downloadCompleted.collectAsState()
     LaunchedEffect(today, coverPage, reflectionModelRevision) {
@@ -498,6 +499,7 @@ fun PrayerTimesScreen(
                 // responsive sizing so cards do not shrink and reflow while the strip
                 // opens; the LazyColumn remains responsible for the smaller viewport.
                 val layoutHeight = maxHeight + syncState.heldContentInsetTop
+                val windowLayout = homeWindowLayout(maxWidth.value, LocalDensity.current.fontScale)
                 // Requiring room in both axes keeps wide, short phones out of tablet sizing.
                 val isTablet = maxWidth >= 600.dp && layoutHeight >= 600.dp
                 val useSideNavigation = isTablet && maxWidth > maxHeight
@@ -541,6 +543,13 @@ fun PrayerTimesScreen(
                 val homeIsDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
                 val homeSafeTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
                 val homePortraitScroll = rememberScrollState()
+                LaunchedEffect(coverPage, today) {
+                    androidx.compose.runtime.snapshotFlow { homePortraitScroll.value to homePortraitScroll.maxValue }
+                        .collect { (offset, maximum) ->
+                            if (offset > 0) HomePageReflections.prepareReadings(today, coverPage,
+                                more = maximum > 0 && maximum - offset < 360)
+                        }
+                }
                 val homeCoverHeightPx = remember { mutableIntStateOf(0) }
                 val backdropTopInWindow = remember { mutableFloatStateOf(0f) }
                 val feedTopInWindow = remember { mutableFloatStateOf(Float.NaN) }
@@ -555,10 +564,10 @@ fun PrayerTimesScreen(
                         lightIcons = homeBannerUsesLightIcons(syncState.wobbleIntensity, MaterialTheme.colorScheme.tertiaryContainer) ?: artworkIcons)
                 }
                 val coverScrollPosition = remember { mutableFloatStateOf(coverPage.toFloat()) }
-                val coverEpochSeconds = remember {
-                    kotlin.time.Clock.System.now().epochSeconds.toDouble()
-                }
-                val phoneCoverSlotHeight = (maxHeight * .55f).coerceIn(450.dp, 620.dp)
+                val preferredCoverHeight = (maxHeight * .69f).coerceIn(320.dp, 640.dp)
+                val phoneCoverSlotHeight = homeRestingCoverHeight(
+                    maxHeight.value, preferredCoverHeight.value, homeReflectionHeight.value, 24f,
+                ).dp
                 // The feed starts under the overlay header; the reader slot
                 // opens at the very top of the safe area.
                 val homeTopGap by animateDpAsState(
@@ -650,9 +659,6 @@ fun PrayerTimesScreen(
                             useNightArtwork = coverNightArtwork,
                             isDarkTheme = homeIsDark,
                             isExpanded = isPagerRevealed,
-                            epochSeconds = coverEpochSeconds,
-                            latitude = latitude,
-                            longitude = longitude,
                             scrollOffsetPx = homePortraitScroll.value,
                             coverHeightPx = homeCoverHeightPx.intValue,
                             modifier = Modifier.matchParentSize(),
@@ -763,7 +769,7 @@ fun PrayerTimesScreen(
                                 )
                                     .coerceAtLeast(96.dp)
                                 val sectionGap = if (expandedInsightPage != null) 2.dp else 8.dp
-                                val collapseLocation = showAllPrayers || homeLocationNeedsCollapse(
+                                val collapseLocation = (showAllPrayers && windowLayout.prayerColumns < 3) || homeLocationNeedsCollapse(
                                     insightExpanded = expandedInsightPage != null,
                                     availableHeight = (maxHeight - phoneInsightHeight - sectionGap * 3 - 4.dp).value,
                                     prayerSectionMinimumHeight = minimumSchedule.value,
@@ -774,15 +780,21 @@ fun PrayerTimesScreen(
                                       sectionGap * 3 - 4.dp).coerceAtLeast(0.dp)
                                   // Captured for the scrolling column below: its content
                                   // lambda leaves the BoxWithConstraints receiver scope.
-                                  val phoneViewportWidth = if (usesArtworkHome) maxWidth - 48.dp else maxWidth
+                                  val phoneViewportWidth = maxWidth - windowLayout.gutter.dp * 2
+                                  val feedScheme = androidx.compose.material3.darkColorScheme(
+                                      primary = MaterialTheme.colorScheme.primaryContainer,
+                                      background = homeFeed.background,
+                                      surface = homeFeed.primarySurface,
+                                  )
+                                  MaterialTheme(colorScheme = feedScheme, typography = homeTypography(MaterialTheme.typography)) {
                                   Column(
                                       modifier = Modifier.fillMaxSize()
                                           .testTag("home-artwork-feed")
                                           .then(if (revealAtNavigation) Modifier.homeNavigationReveal(homeFeed.background, bottomNavigationClearance) else Modifier)
                                           .verticalScroll(homePortraitScroll)
                                           .padding(
-                                              start = if (usesArtworkHome) 24.dp else 0.dp,
-                                              end = if (usesArtworkHome) 24.dp else 0.dp,
+                                              start = windowLayout.gutter.dp,
+                                              end = windowLayout.gutter.dp,
                                               bottom = if (revealAtNavigation) bottomNavigationClearance + 12.dp else 0.dp,
                                           ),
                                       horizontalAlignment = Alignment.CenterHorizontally,
@@ -814,7 +826,8 @@ fun PrayerTimesScreen(
                                           },
                                       ) {
                                           Box(Modifier.align(Alignment.CenterHorizontally)
-                                              .requiredWidth(if (usesArtworkHome) phoneViewportWidth + 48.dp else phoneViewportWidth)) {
+                                              .widthIn(max = windowLayout.readerWidth.dp)
+                                              .fillMaxWidth()) {
                                               renderInsightPager(
                                                   phoneRestingInsight,
                                                   usesArtworkHome,
@@ -833,7 +846,7 @@ fun PrayerTimesScreen(
                                           visible = !isPagerRevealed,
                                           modifier = Modifier
                                               .align(Alignment.CenterHorizontally)
-                                              .requiredWidth(phoneViewportWidth + 48.dp)
+                                              .requiredWidth(phoneViewportWidth + windowLayout.gutter.dp * 2)
                                               .height(phoneCoverSlotHeight)
                                               .testTag("home-artwork-cover")
                                               .onSizeChanged {
@@ -859,7 +872,8 @@ fun PrayerTimesScreen(
                                       }
                                       if (!isPagerRevealed) {
                                           HomeReflectionPrompt(
-                                              modifier = Modifier.widthIn(max = 1100.dp),
+                                              modifier = Modifier.width(minOf(windowLayout.contentWidth, 720f).dp)
+                                                  .onSizeChanged { homeReflectionHeight = with(phoneDensity) { it.height.toDp() } },
                                               focusedPage = coverPage,
                                               scrollPosition = coverScrollPosition.floatValue,
                                               generatedInsights = homeReflectionEvidence,
@@ -870,6 +884,8 @@ fun PrayerTimesScreen(
                                                       bottomClearance = 96.dp, expanded = exploreExpanded,
                                                       onExpandedChange = { exploreExpanded = it }) { card, _ -> openHomeInsight(card.page) }
                                               },
+                                              readingSurahNumber = coverReadingSurah.number,
+                                              onSwipePage = { coverPage = it },
                                               onDarkCover = true,
                                               onClick = {
                                                   when (val target = HomePageReflections.cards[coverPage]?.target) {
@@ -881,7 +897,18 @@ fun PrayerTimesScreen(
                                                   }
                                               },
                                           )
-
+                                          HomeReadingRecommendations(
+                                              cards = HomePageReflections.readings[coverPage].orEmpty(),
+                                              preparing = HomePageReflections.loadingReadings[coverPage] == true,
+                                              modifier = Modifier.width(minOf(windowLayout.contentWidth, 720f).dp),
+                                          ) { card ->
+                                              when (val target = card.target) {
+                                                  is DeenlyKnowledgeTarget.Surah -> onOpenQuran(target.number)
+                                                  is DeenlyKnowledgeTarget.FortressDua -> onOpenFortressChapter(target.chapterId)
+                                                  is DeenlyKnowledgeTarget.BukhariHadith -> onOpenBukhariHadith(target.hadithId)
+                                                  is DeenlyKnowledgeTarget.ShamayelBook -> onOpenShamayelBook(target.bookId)
+                                              }
+                                          }
                                       }
                                     if (!isInsightImmersive) {
                                         val scheduleLayout = homePrayerScheduleLayout(
@@ -893,7 +920,7 @@ fun PrayerTimesScreen(
                                         )
                                         PrayerScheduleSection(
                                             onDarkFeed = usesArtworkHome,
-                                            modifier = Modifier.widthIn(max = 1100.dp).fillMaxWidth(),
+                                            modifier = Modifier.width(windowLayout.contentWidth.dp).testTag("home-prayer-schedule"),
                                             day = day,
                                             offsets = offsets,
                                             showAllPrayers = showAllPrayers,
@@ -910,6 +937,7 @@ fun PrayerTimesScreen(
                                             onTogglePrayerNotification = onTogglePrayerNotification,
                                             showExpandControl = true,
                                             compact = true,
+                                            columns = windowLayout.prayerColumns,
                                             cardMinHeight = scheduleLayout.rowHeight.dp,
                                             onMinimumCardHeightChange = { name, height ->
                                                 if (prayerContentHeights[name] != height) {
@@ -925,7 +953,7 @@ fun PrayerTimesScreen(
                                         // Keep location in normal flow directly below
                                         // the reduced schedule while resizing.
                                         AnimatedVisibility(
-                                            modifier = Modifier.widthIn(max = 1100.dp).onSizeChanged {
+                                            modifier = Modifier.width(windowLayout.contentWidth.dp).onSizeChanged {
                                                 phoneLocationHeight = with(phoneDensity) { it.height.toDp() }
                                             },
                                             visible = !collapseLocation,
@@ -943,6 +971,7 @@ fun PrayerTimesScreen(
                                             ) + fadeOut(animationSpec = tween(durationMillis = 180)),
                                         ) {
                                             LocationWeatherRow(
+                                                modifier = Modifier.testTag("home-location-weather"),
                                                 placeName = placeName,
                                                 temperatureCelsius = day.temperatureCelsius,
                                                 conditionLabel = day.conditionLabel,
@@ -954,6 +983,7 @@ fun PrayerTimesScreen(
                                         Spacer(Modifier.height(4.dp))
                                     }
                                 }
+                            }
                             }
                     }
 
@@ -971,6 +1001,7 @@ fun PrayerTimesScreen(
                             exit = fadeOut(tween(durationMillis = 220, easing = FastOutSlowInEasing)),
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
+                                .widthIn(max = windowLayout.headerWidth.dp + windowLayout.gutter.dp * 2)
                                 .fillMaxWidth()
                                 .graphicsLayer { alpha = headerVisibility }
                                 .windowInsetsPadding(
@@ -978,11 +1009,11 @@ fun PrayerTimesScreen(
                                 )
                                 // The banner consumes the top safe inset. Keep
                                 // a separate gap so the header clears its curve.
-                                .padding(start = 24.dp, end = 24.dp, top = 12.dp),
+                                .padding(start = windowLayout.gutter.dp, end = windowLayout.gutter.dp, top = 12.dp),
                         ) {
                             PrayerHomeHeader(
                                 lightHeaderInk = homeCoverHeaderUsesLightText(coverPage, coverNightArtwork),
-                                greeting = homeGreetingForHour(day.nowMinute / 60),
+                                greeting = homeAccountGreetingLabel(familyAccount(), contentStore.profile().displayName),
                                 supportingTexts = listOfNotNull(
                                     HomeHeaderDetail("${today.dayOfMonth} ${today.month.name.lowercase().replaceFirstChar { it.uppercase() }}, ${today.year}", HomeHeaderDetailKind.Calendar),
                                     homeHeaderLocation(placeName, homeCountryName, homeCountryCode)
@@ -1173,14 +1204,21 @@ private fun PrayerHomeHeader(
                     color = Color.Black.copy(alpha = if (lightHeaderInk) .18f else .03f),
                     offset = androidx.compose.ui.geometry.Offset(0f, .5f), blurRadius = 2f,
                 )
-                HomeFamilyRibbon(onOpenFamily ?: onShowProfile)
-                Column(Modifier.clickable(onClickLabel = "Open profile", onClick = onShowProfile)) {
-                    Text(greeting, style = HomeHeaderTypography.greeting.copy(shadow = headerShadow),
-                    color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    HomeRotatingHeaderText(supportingTexts, style = HomeHeaderTypography.detail.copy(shadow = headerShadow), color = ink.copy(alpha = .86f))
+                val signedIn = greeting != "Sign In"
+                Column(Modifier.clickable(onClickLabel = if (signedIn) "Open profile" else "Sign in", onClick = onShowProfile)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        val style = HomeHeaderTypography.greeting.copy(fontWeight = FontWeight.Normal,
+                            letterSpacing = .2.sp, shadow = headerShadow)
+                        Text("Salam,", style = style, color = ink, maxLines = 1)
+                        Text(greeting, modifier = Modifier.weight(1f, fill = false), style = style.copy(fontWeight = FontWeight.Bold),
+                            color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Icon(Icons.Rounded.ChevronRight, null, Modifier.size(18.dp), tint = ink)
+                    }
+                    HomeRotatingHeaderText(supportingTexts, style = HomeHeaderTypography.detail.copy(
+                        shadow = headerShadow, letterSpacing = .45.sp), color = ink.copy(alpha = .92f))
                 }
             }
-            AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings, guideHomeActions = true)
+            AppHeaderActions(onDarkArtwork = lightHeaderInk, onSearchClick = onOpenSearch, onSettingsClick = onOpenSettings, guideHomeActions = true, compact = true)
         }
         return
     }
@@ -2050,13 +2088,14 @@ private fun PrayerScheduleSection(
                 }
             }
         }
-        val prayerRows = day.dashboardSlots().chunked(columns.coerceIn(1, 2))
+        val prayerRows = day.dashboardSlots().chunked(columns.coerceIn(1, 3))
         // The first four prayers always stay visible; the rest sit behind the
         // Show All control, regardless of how many cards each row holds.
         val alwaysVisibleRows = collapsedRows.coerceIn(1, prayerRows.size)
         prayerRows.take(alwaysVisibleRows).forEach { pair ->
             PrayerCardRow(
                 slots = pair,
+                columns = columns,
                 offsets = offsets,
                 onAdjustPrayer = onAdjustPrayer,
                 isTuning = isTuning,
@@ -2084,6 +2123,7 @@ private fun PrayerScheduleSection(
                 prayerRows.drop(alwaysVisibleRows).forEach { pair ->
                     PrayerCardRow(
                         slots = pair,
+                        columns = columns,
                         offsets = offsets,
                         onAdjustPrayer = onAdjustPrayer,
                         onTogglePrayerAdhan = onTogglePrayerAdhan,
@@ -2100,7 +2140,7 @@ private fun PrayerScheduleSection(
                 }
             }
         }
-        if (showExpandControl) {
+        if (showExpandControl && prayerRows.size > alwaysVisibleRows) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2149,6 +2189,7 @@ private fun PrayerScheduleSection(
 @Composable
 private fun PrayerCardRow(
     slots: List<SharedPrayerSlot>,
+    columns: Int = 2,
     offsets: PrayerTimeOffsets,
     onAdjustPrayer: (prayer: String, delta: Int) -> Unit,
     isTuning: Boolean,
@@ -2187,10 +2228,10 @@ private fun PrayerCardRow(
                 compact = compact,
                 minHeight = cardMinHeight,
                 onMinimumHeightChange = { onMinimumCardHeightChange(slot.name, it) },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("home-prayer-${slot.name}"),
             )
         }
-        if (slots.size == 1) Spacer(Modifier.weight(1f))
+        repeat((columns - slots.size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
     }
 }
 
