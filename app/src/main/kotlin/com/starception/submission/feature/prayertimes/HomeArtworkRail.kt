@@ -90,8 +90,6 @@ import org.jetbrains.compose.resources.painterResource
 import kotlin.math.abs
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.gestures.Orientation
@@ -249,11 +247,9 @@ private fun HomeReadingRecommendation(
             target.dua.chapterTitle.ifBlank { "Dua" } to "Fortress of the Muslim · Dua ${target.dua.position}"
     }
     val translation by key(candidate.target, translationLanguage) {
-        produceState<String?>(null) {
+        produceState<HomeReadingText?>(null) {
             if (translationLanguage != "en") {
-                value = withContext(Dispatchers.IO) {
-                    readHomePassageTranslation(context, candidate.target, translationLanguage)
-                }
+                value = loadHomePassageTranslation(context, candidate.target, translationLanguage)
             }
         }
     }
@@ -261,11 +257,12 @@ private fun HomeReadingRecommendation(
         translationLanguage != "en" && candidate.modelGenerated &&
             it.isNotBlank() && !it.equals(title, ignoreCase = true)
     }
-    val excerpt = translation?.let(::homeEvidencePreview) ?: gist
+    val excerpt = translation?.text?.let(::homeEvidencePreview) ?: gist
         ?: candidate.nudge.supportingText?.let(::homeEvidencePreview)
     val citation = when {
         translationLanguage == "en" -> source
-        translation != null -> homeTranslationReference(candidate.target, source, translationLanguage)
+        translation != null -> homeTranslationReference(candidate.target, source, translationLanguage) +
+            if (translation?.machineTranslated == true) " · Machine translation · May contain errors" else ""
         !excerpt.isNullOrBlank() -> "$source · English"
         else -> source
     }
@@ -531,11 +528,9 @@ internal fun HomeReflectionPrompt(
                         homeReflectionMatchesReading(page, readingSurahNumber, it.target)
                     }
                     val localized by key(generatedCandidate?.target, translationLanguage) {
-                        produceState<String?>(null) {
+                        produceState<HomeReadingText?>(null) {
                             if (generatedCandidate != null && translationLanguage != "en") {
-                                value = withContext(Dispatchers.IO) {
-                                    readHomePassageTranslation(context, generatedCandidate.target, translationLanguage)
-                                }
+                                value = loadHomePassageTranslation(context, generatedCandidate.target, translationLanguage)
                             }
                         }
                     }
@@ -563,7 +558,7 @@ internal fun HomeReflectionPrompt(
                         )
                         generatedCandidate?.nudge?.supportingText?.takeIf(String::isNotBlank)?.let { sourceText ->
                             val fallbackToEnglish = translationLanguage != "en" && localized == null
-                            val preview = homeEvidencePreview(localized ?: sourceText)
+                            val preview = homeEvidencePreview(localized?.text ?: sourceText)
                             Text(
                                 preview, style = HomeTypography.body, color = ink.copy(alpha = .88f),
                                 maxLines = 3, overflow = TextOverflow.Ellipsis,
@@ -573,7 +568,11 @@ internal fun HomeReflectionPrompt(
                                     generatedCandidate.target, reference, if (fallbackToEnglish) "en" else translationLanguage,
                                 )
                                 Text(
-                                    if (fallbackToEnglish) "$citation · English" else citation,
+                                    when {
+                                        fallbackToEnglish -> "$citation · English"
+                                        localized?.machineTranslated == true -> "$citation · Machine translation · May contain errors"
+                                        else -> citation
+                                    },
                                     style = HomeTypography.caption, color = ink.copy(alpha = .76f),
                                 )
                             }

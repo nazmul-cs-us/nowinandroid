@@ -17,7 +17,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal data class HomeReadingText(val text: String, val notice: String)
+internal data class HomeReadingText(
+    val text: String,
+    val notice: String,
+    val machineTranslated: Boolean = false,
+)
 
 @Composable
 internal fun rememberReadingLanguage(): String {
@@ -104,6 +108,7 @@ internal suspend fun loadHomeHadithTranslation(
     language: String,
 ): HomeReadingText {
     val hadith = HadithRepository(context).getHadith(source.databaseFile, source.hadithNumber)
+        ?: return HomeReadingText(source.text, "Selected translation unavailable · Showing source text")
     val local = when (language) {
         "ar", "" -> hadith?.textArabic
         "bn" -> hadith?.bengaliText ?: hadith?.textPlain?.takeIf { it.any { char -> char in '\u0980'..'\u09FF' } }
@@ -116,10 +121,21 @@ internal suspend fun loadHomeHadithTranslation(
     if (language in listOf("", "ar", "transliteration")) {
         return HomeReadingText(source.text, "Selected translation unavailable · Showing source text")
     }
-    val original = hadith?.textArabic?.takeIf(String::isNotBlank) ?: source.text
-    val translated = TranslationService.getInstance(context).translate(original, language)
+    // Match the reader's Bukhari source and cache key, rather than translating
+    // a cached excerpt or a different (Arabic) rendering of the same record.
+    val english = hadith.englishText?.takeIf(String::isNotBlank)
+        ?: hadith.textPlain?.takeIf { text ->
+            text.isNotBlank() && text.any { it in 'a'..'z' || it in 'A'..'Z' } &&
+                text.none { it in '\u0980'..'\u09ff' }
+        }
+    val fromEnglish = source.databaseFile.contains("bukhari", ignoreCase = true) && english != null
+    val original = if (fromEnglish) english!! else hadith.textArabic?.takeIf(String::isNotBlank)
+        ?: english ?: return HomeReadingText(source.text, "Selected translation unavailable · Showing source text")
+    val service = TranslationService.getInstance(context)
+    val translated = if (fromEnglish) service.translateFromEnglish(original, language)
+        else service.translate(original, language)
     return if (translated.isNotBlank() && translated != original) {
-        HomeReadingText(translated, "Machine translation · May contain errors")
+        HomeReadingText(translated, "Machine translation · May contain errors", machineTranslated = true)
     } else {
         HomeReadingText(source.text, "Selected translation unavailable · Showing source text")
     }

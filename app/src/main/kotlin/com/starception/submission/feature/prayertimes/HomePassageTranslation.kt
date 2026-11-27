@@ -4,8 +4,12 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.database.sqlite.SQLiteDatabase
 import androidx.compose.runtime.*
+import com.starception.submission.core.model.deenly.PrayerHadithCandidate
 import com.starception.submission.core.qurandatabase.readLocalQuranPassage
 import java.io.File
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun rememberHomeTranslationLanguage(context: Context): String {
@@ -32,6 +36,30 @@ internal fun readHomePassageTranslation(context: Context, target: NowNudgeKnowle
         }
         is NowNudgeKnowledgeTarget.Hadith -> localHadithPassage(context, target, language)
     }?.trim()?.takeIf(String::isNotBlank)
+
+/** Use the reader's translation fallback when a hadith has no local target-language text. */
+internal suspend fun loadHomePassageTranslation(
+    context: Context,
+    target: NowNudgeKnowledgeTarget,
+    language: String,
+): HomeReadingText? {
+    val local = withContext(Dispatchers.IO) { readHomePassageTranslation(context, target, language) }
+    if (local != null) return HomeReadingText(local, "Local translation")
+    if (target !is NowNudgeKnowledgeTarget.Hadith || language in setOf("", "ar", "en", "transliteration") ||
+        !target.databaseFile.matches(Regex("[a-z0-9_]+\\.db"))
+    ) return null
+    return try {
+        // Empty fallback: a missing row or failed translation must not be
+        // presented as a successful translation of the candidate's English gist.
+        loadHomeHadithTranslation(context, PrayerHadithCandidate(
+            target.databaseFile, target.collectionName, target.hadithNumber, "",
+        ), language).takeIf { it.text.isNotBlank() }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
+}
 
 private fun localHadithPassage(context: Context, target: NowNudgeKnowledgeTarget.Hadith, language: String): String? {
     if (!target.databaseFile.matches(Regex("[a-z0-9_]+\\.db")) || language !in setOf("ar", "bn")) return null
