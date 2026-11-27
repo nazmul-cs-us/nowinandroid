@@ -15,6 +15,24 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class HomePageRecommendationStoreTest {
+    @Test fun sourceOnlyReadingsRestoreWithoutWaitingForAnotherLookup() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = context.getSharedPreferences("home_source_only_readings_test", Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+        val store = HomePageRecommendationStore(prefs)
+        val day = "2026-11-24"
+        val slot = homeRecommendationSlot(2, KnowledgeSourceKind.SURAH)
+        val reading = candidate(2, "Verified source").copy(modelGenerated = false)
+        store.save(day, slot, reading, "Isha")
+        store.saveAdditional(day, 2, listOf(reading), "Isha")
+
+        val restored = HomePageGenerationState()
+        store.restore(day, restored, "Isha")
+        assertFalse(restored.needsSource(slot))
+        assertFalse(restored.generated[slot]?.modelGenerated == true)
+        assertEquals(listOf(reading), restored.additionalRecommendations[2])
+    }
+
     @Test fun additionalReadingsRestoreForTheSameTileDayAndContext() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = context.getSharedPreferences("more_home_readings_test", Context.MODE_PRIVATE)

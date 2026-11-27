@@ -258,11 +258,15 @@ internal class HomePageGenerationState {
     val generated = mutableStateMapOf<Int, NowNudgeKnowledgeCandidate>()
     val additionalRecommendations = mutableStateMapOf<Int, List<NowNudgeKnowledgeCandidate>>()
     val attemptedAdditionalSources = mutableMapOf<Int, MutableSet<String>>()
+    val resolvedSlots = mutableStateMapOf<Int, Boolean>()
+    val attemptedHeadings = mutableMapOf<Int, MutableSet<String>>()
     val attempted = mutableStateMapOf<Int, Boolean>()
     val attempts = mutableStateMapOf<Int, Int>()
     val retryAfter = mutableStateMapOf<Int, Long>()
 
     fun needsGeneration(page: Int): Boolean = attempted[page] != true && (attempts[page] ?: 0) < 2
+
+    fun needsSource(slot: Int): Boolean = resolvedSlots[slot] != true && needsGeneration(slot)
 }
 
 internal object HomePageGenerationCache {

@@ -34,6 +34,42 @@ class NowNudgeKnowledgeProviderTest {
     )
 
     @Test
+    fun homeSourceIsReturnedBeforeTheModelAndEnrichmentPreservesItsDestination() = runBlocking {
+        var searches = 0
+        var modelCalls = 0
+        val provider = NowNudgeKnowledgeProvider(
+            sourceLoader = object : GroundedKnowledgeSourceLoader {
+                override suspend fun load(date: LocalDate, variation: Int): GroundedKnowledgeSource =
+                    error("Searching the requested corpus is sufficient")
+
+                override suspend fun search(query: String, limit: Int): List<GroundedKnowledgeSource> {
+                    searches++
+                    return listOf(source)
+                }
+            },
+            decisionGenerator = KnowledgeDecisionGenerator { _, envelope ->
+                modelCalls++
+                assertEquals(source.sourceText, envelope.sourceText)
+                assertEquals(source.reference, envelope.reference)
+                DeenlyKnowledgeDecision.Knowledge("The Day of Recompense")
+            },
+        )
+
+        val reading = checkNotNull(provider.load(
+            date, query = "Recompense", sourceKind = KnowledgeSourceKind.SURAH, generateHeading = false,
+        ))
+        assertEquals(0, modelCalls)
+        assertFalse(reading.modelGenerated)
+        val enriched = provider.addHeading(reading, "Home tile: today's reading")
+        assertEquals(1, searches)
+        assertEquals(1, modelCalls)
+        assertEquals(reading.target, enriched.target)
+        assertEquals(reading.nudge.supportingText, enriched.nudge.supportingText)
+        assertEquals("The Day of Recompense", enriched.nudge.label)
+        assertTrue(enriched.modelGenerated)
+    }
+
+    @Test
     fun homeRecommendationFiltersToTheRequestedKindBeforeInvokingTheModel() = runBlocking {
         val hadith = source.copy(
             id = "bukhari-1",

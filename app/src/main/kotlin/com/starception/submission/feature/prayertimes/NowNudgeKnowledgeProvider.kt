@@ -180,6 +180,7 @@ internal class NowNudgeKnowledgeProvider(
         requiredSurahNumber: Int? = null,
         sourceKind: KnowledgeSourceKind? = null,
         excludedSourceIds: Set<String> = emptySet(),
+        generateHeading: Boolean = true,
         onProgress: suspend (InsightSearchProgress) -> Unit = {},
     ): NowNudgeKnowledgeCandidate? {
         val sources = withContext(Dispatchers.IO) {
@@ -244,6 +245,9 @@ internal class NowNudgeKnowledgeProvider(
                 }
             ?: return null
         val source = rankedSource.source
+        if (task == DeenlyKnowledgeTask.KNOWLEDGE && !generateHeading) {
+            return buildCandidate(date, source, decision = null, rankingScore = rankedSource.score)
+        }
         val envelope = DeenlySourceEnvelope(
             collection = source.collection,
             reference = source.reference,
@@ -365,6 +369,27 @@ internal class NowNudgeKnowledgeProvider(
                 rankingScore = rankedSource.score,
             )
         }
+    }
+
+    /** Add presentation text to an already-ranked reading without retrieving its source again. */
+    suspend fun addHeading(candidate: NowNudgeKnowledgeCandidate, appSituation: String?): NowNudgeKnowledgeCandidate {
+        if (candidate.modelGenerated) return candidate
+        val text = candidate.nudge.supportingText?.takeIf(String::isNotBlank) ?: return candidate
+        val reference = candidate.nudge.sourceLabel ?: return candidate
+        val decision = decisionGenerator.generate(
+            DeenlyKnowledgeTask.KNOWLEDGE,
+            DeenlySourceEnvelope(
+                collection = candidate.collection,
+                reference = reference,
+                topic = candidate.topic,
+                appSituation = appSituation,
+                sourceText = text,
+                sourceTextSha256 = text.sha256(),
+            ),
+        ) as? DeenlyKnowledgeDecision.Knowledge ?: return candidate
+        val heading = decision.title.replace(Regex("\\s+"), " ").trim().take(MAX_TITLE_CHARS).trim()
+        if (heading.isEmpty()) return candidate
+        return candidate.copy(nudge = candidate.nudge.copy(label = heading), modelGenerated = true)
     }
 
     /**

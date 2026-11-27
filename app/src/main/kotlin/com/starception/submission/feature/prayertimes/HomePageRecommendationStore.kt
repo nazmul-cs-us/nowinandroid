@@ -21,8 +21,10 @@ internal class HomePageRecommendationStore(private val preferences: SharedPrefer
             }.getOrNull() ?: return@forEach
             if (state.generated[page] == null) state.generated[page] = stored.third
             // Yesterday's recommendation stays visible while today's turn runs.
-            if (stored.first == day && stored.second == contextKey && stored.third.modelGenerated)
-                state.attempted[page] = true
+            if (stored.first == day && stored.second == contextKey) {
+                state.resolvedSlots[page] = true
+                if (stored.third.modelGenerated) state.attempted[page] = true
+            }
         }
         for (page in 0..4) {
             if (state.additionalRecommendations[page] != null) continue
@@ -30,7 +32,7 @@ internal class HomePageRecommendationStore(private val preferences: SharedPrefer
                 .getOrNull() ?: continue
             if (fields.getOrNull(0) != day || fields.getOrNull(1) != contextKey) continue
             val readings = fields.drop(2).mapNotNull {
-                runCatching { PreparedInsightReadings.decodeAiCandidate(it) }.getOrNull()?.takeIf { it.modelGenerated }
+                runCatching { PreparedInsightReadings.decodeAiCandidate(it) }.getOrNull()
             }.distinctBy(NowNudgeKnowledgeCandidate::sourceId)
             if (readings.isNotEmpty()) state.additionalRecommendations[page] = readings
         }

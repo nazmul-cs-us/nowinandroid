@@ -3139,6 +3139,11 @@ fun PrayerTimesScreen(
                 val latestRecommendationViewportTop by rememberUpdatedState(homeViewportTopInWindowPx)
                 val latestRecommendationViewportBottom by rememberUpdatedState(homeViewportBottomInWindowPx)
 
+                fun homeRecommendationSituation(page: Int): String = listOfNotNull(
+                    latestExpandedAppSituation,
+                    "Home tile: ${homeFeedPage(page).eyebrow}. ${homeFeedPage(page).prompt}",
+                ).joinToString(" ")
+
                 suspend fun loadHomeRecommendation(
                     page: Int,
                     kind: KnowledgeSourceKind,
@@ -3149,14 +3154,12 @@ fun PrayerTimesScreen(
                     date = LocalDate.parse(nudgeDay),
                     variation = variation,
                     query = homeRecommendationQuery(page, kind),
-                    appSituation = listOfNotNull(
-                        latestExpandedAppSituation,
-                        "Home tile: ${homeFeedPage(page).eyebrow}. ${homeFeedPage(page).prompt}",
-                    ).joinToString(" "),
+                    appSituation = homeRecommendationSituation(page),
                     rankingContext = latestExpandedKnowledgeContext,
                     requiredSurahNumber = readingSurah,
                     sourceKind = kind,
                     excludedSourceIds = excludedSources,
+                    generateHeading = false,
                 )
 
                 LaunchedEffect(coverPage, homeScrollEngaged, homeModelAvailable, homePageGeneration) {
@@ -3172,12 +3175,13 @@ fun PrayerTimesScreen(
                         } == true) {
                         generatedHomePages.remove(readingSlot)
                         homePageGeneration.attempted.remove(readingSlot)
+                        homePageGeneration.resolvedSlots.remove(readingSlot)
                     }
-                    // Fast swipes cancel this delay. Generate each kind serially on the active tile.
+                    // Fast swipes cancel this delay. Find sources for each kind serially on the active tile.
                     delay(500)
                     while (true) {
                         val pending = recommendationKinds.filter { kind ->
-                            homePageGeneration.needsGeneration(homeRecommendationSlot(page, kind))
+                            homePageGeneration.needsSource(homeRecommendationSlot(page, kind))
                         }
                         if (pending.isEmpty()) break
                         val now = android.os.SystemClock.elapsedRealtime()
@@ -3197,7 +3201,7 @@ fun PrayerTimesScreen(
                                 )
                                 if (candidate != null) {
                                     generatedHomePages[slot] = candidate
-                                    homePageGeneration.attempted[slot] = candidate.modelGenerated
+                                    homePageGeneration.resolvedSlots[slot] = true
                                     homeRecommendationStore.save(nudgeDay, slot, candidate, suggestionContextKey)
                                 }
                             } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -3206,7 +3210,7 @@ fun PrayerTimesScreen(
                                 android.util.Log.w("HomeReflection", "Could not prepare ${kind.label} for page $page", error)
                             }
                             homePageGeneration.attempts[slot] = (homePageGeneration.attempts[slot] ?: 0) + 1
-                            if (homePageGeneration.attempted[slot] != true) {
+                            if (homePageGeneration.needsSource(slot)) {
                                 homePageGeneration.retryAfter[slot] = android.os.SystemClock.elapsedRealtime() + 30_000L
                             }
                         }
@@ -3229,7 +3233,9 @@ fun PrayerTimesScreen(
                                     recommendationBottom >= latestRecommendationViewportTop &&
                                     recommendationBottom <= latestRecommendationViewportBottom &&
                                     firstSlots.any { slot -> generatedHomePages[slot] != null } &&
-                                    firstSlots.none(homePageGeneration::needsGeneration)
+                                    firstSlots.none { slot ->
+                                        homePageGeneration.needsSource(slot) && (homePageGeneration.attempts[slot] ?: 0) == 0
+                                    }
                             }
                         }.first { it != null } ?: break
                         nextScroll = scroll + recommendationScrollStep
@@ -3240,11 +3246,9 @@ fun PrayerTimesScreen(
                                 val candidate = loadHomeRecommendation(page, kind, variation++, excludedSources = excluded)
                                     ?: continue
                                 attempted += candidate.sourceId
-                                if (candidate.modelGenerated) {
-                                    val updated = homePageGeneration.additionalRecommendations[page].orEmpty() + candidate
-                                    homePageGeneration.additionalRecommendations[page] = updated
-                                    homeRecommendationStore.saveAdditional(nudgeDay, page, updated, suggestionContextKey)
-                                }
+                                val updated = homePageGeneration.additionalRecommendations[page].orEmpty() + candidate
+                                homePageGeneration.additionalRecommendations[page] = updated
+                                homeRecommendationStore.saveAdditional(nudgeDay, page, updated, suggestionContextKey)
                             }
                         } catch (cancelled: kotlinx.coroutines.CancellationException) {
                             throw cancelled
@@ -3253,6 +3257,44 @@ fun PrayerTimesScreen(
                         } finally {
                             loadingMoreRecommendations = false
                         }
+                    }
+                }
+                LaunchedEffect(coverPage, homeScrollEngaged, homeModelAvailable, homePageGeneration, insightTileExpanded) {
+                    if (!homeModelAvailable || !homeScrollEngaged || insightTileExpanded) return@LaunchedEffect
+                    val page = coverPage.coerceIn(0, 4)
+                    val slots = homeRecommendationKinds(page).map { homeRecommendationSlot(page, it) }
+                    val attempted = homePageGeneration.attemptedHeadings.getOrPut(page) { mutableSetOf() }
+                    while (true) {
+                        val candidate = snapshotFlow {
+                            val primary = slots.mapNotNull { slot ->
+                                generatedHomePages[slot]?.takeIf { homePageGeneration.resolvedSlots[slot] == true }
+                            }
+                            (primary + homePageGeneration.additionalRecommendations[page].orEmpty()).firstOrNull {
+                                !it.modelGenerated && it.sourceId !in attempted
+                            }
+                        }.first { it != null } ?: break
+                        try {
+                            val enriched = nowNudgeKnowledgeProvider.addHeading(candidate, homeRecommendationSituation(page))
+                            if (enriched.modelGenerated) {
+                                val slot = slots.firstOrNull { generatedHomePages[it]?.sourceId == candidate.sourceId }
+                                if (slot != null) {
+                                    generatedHomePages[slot] = enriched
+                                    homePageGeneration.attempted[slot] = true
+                                    homeRecommendationStore.save(nudgeDay, slot, enriched, suggestionContextKey)
+                                } else {
+                                    val updated = homePageGeneration.additionalRecommendations[page].orEmpty().map {
+                                        if (it.sourceId == candidate.sourceId) enriched else it
+                                    }
+                                    homePageGeneration.additionalRecommendations[page] = updated
+                                    homeRecommendationStore.saveAdditional(nudgeDay, page, updated, suggestionContextKey)
+                                }
+                            }
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            android.util.Log.w("HomeReflection", "Could not prepare a heading for page $page", error)
+                        }
+                        attempted += candidate.sourceId
                     }
                 }
                 val prayerArtworkNight = prayerTimes?.let {
@@ -4199,7 +4241,7 @@ fun PrayerTimesScreen(
                                                 translationLanguage = homeTranslationLanguage,
                                                 preparing = loadingMoreRecommendations || (homeScrollEngaged && homeModelAvailable &&
                                                     homeRecommendationKinds(coverPage).any { kind ->
-                                                        homePageGeneration.needsGeneration(homeRecommendationSlot(coverPage, kind))
+                                                        homePageGeneration.needsSource(homeRecommendationSlot(coverPage, kind))
                                                     }),
                                                 modifier = Modifier.onGloballyPositioned {
                                                     recommendationBottom = it.positionInWindow().y + it.size.height
