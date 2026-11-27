@@ -3,6 +3,7 @@ package com.starception.submission.family
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.SystemClock
+import android.view.ViewGroup.LayoutParams
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.R as DesignSystemR
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
@@ -610,7 +611,7 @@ fun FamilyCallOverlay(client: FamilyClient) {
             mute = { client.mute() }, speaker = { client.speaker() }, camera = { client.toggleCamera(); client.previewCamera() }, flip = { client.switchCamera() }, faceBlur = { client.toggleFaceBlur() }),
             remoteReady = remote != null, localReady = local != null,
             remoteVideo = { VideoSurface(client.media, false, Modifier.fillMaxSize(), onGlassFrame = { remoteGlassFrame = it }) },
-            localVideo = { VideoSurface(client.media, true, Modifier.fillMaxSize(), fitPreview = true, onGlassFrame = { localGlassFrame = it }) },
+            localVideo = { VideoSurface(client.media, true, Modifier.fillMaxSize(), onGlassFrame = { localGlassFrame = it }) },
             localThumbnail = { VideoSurface(client.media, true, Modifier.fillMaxSize()) },
             glassFrame = if (call.stage == "ringing" && state.camera) localGlassFrame else remoteGlassFrame)
     }
@@ -746,23 +747,25 @@ private fun CallControl(icon: ImageVector, label: String, active: Boolean = fals
 
 @Composable
 private fun VideoSurface(media: AndroidFamilyMedia, local: Boolean, modifier: Modifier,
-    fitPreview: Boolean = false,
     onGlassFrame: ((androidx.compose.ui.graphics.ImageBitmap?) -> Unit)? = null) {
     val track by (if (local) media.localVideo else media.remoteVideo).collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val mirror = if (local) media.localPreviewMirrored.collectAsStateWithLifecycle().value else false
     val latestFrameConsumer by rememberUpdatedState(onGlassFrame)
     val renderer = remember { SurfaceViewRenderer(context).apply {
-        init(media.egl.eglBaseContext, null); setMirror(local); setZOrderMediaOverlay(local)
-        setScalingType(if (fitPreview) org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT
+        init(media.egl.eglBaseContext, null); setMirror(mirror); setZOrderMediaOverlay(local)
+        setScalingType(if (local) org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT
             else org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+        if (local) layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
         setEnableHardwareScaler(true)
     } }
     DisposableEffect(track, renderer) {
         runCatching { track?.addSink(renderer) }
         onDispose { runCatching { track?.removeSink(renderer) } }
     }
-    LaunchedEffect(renderer, track, onGlassFrame != null, lifecycle) {
+    LaunchedEffect(renderer, mirror) { renderer.setMirror(mirror) }
+    LaunchedEffect(renderer, track, onGlassFrame != null, lifecycle, mirror) {
         if (track == null || onGlassFrame == null) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
             try {
@@ -783,5 +786,12 @@ private fun VideoSurface(media: AndroidFamilyMedia, local: Boolean, modifier: Mo
         }
     }
     DisposableEffect(renderer) { onDispose { renderer.release() } }
-    AndroidView(factory = { renderer }, modifier = modifier)
+    if (local) {
+        // Fixed constraints on the SurfaceView override WebRTC's aspect-fit measurement.
+        Box(modifier, contentAlignment = Alignment.Center) {
+            AndroidView(factory = { renderer })
+        }
+    } else {
+        AndroidView(factory = { renderer }, modifier = modifier)
+    }
 }

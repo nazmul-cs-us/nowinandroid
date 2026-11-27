@@ -72,7 +72,10 @@ internal fun FamilyVideoCallLayout(
             .testTag("familyVideoMainCard")) {
             // SurfaceView video isn't recorded by Compose layers. A small in-memory
             // renderer frame supplies its actual pixels for the frosted backdrop.
-            if (glassFrame != null) Image(glassFrame, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (glassFrame != null) Image(
+                glassFrame, null, Modifier.fillMaxSize(),
+                contentScale = if (outgoing) ContentScale.Fit else ContentScale.Crop,
+            )
             if (outgoing) {
                 if (state.camera && localReady) localVideo()
             } else if (!incoming) remoteVideo()

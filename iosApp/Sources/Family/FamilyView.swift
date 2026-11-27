@@ -979,7 +979,7 @@ private struct FamilyCallView: View {
     private var selfPreview: some View {
         ZStack(alignment: .bottomLeading) {
             colors.field
-            if store.cameraEnabled { FamilyVideoRenderer(track: media.localVideo, mirror: true) }
+            if store.cameraEnabled { FamilyVideoRenderer(track: media.localVideo, mirror: media.localPreviewMirrored, fitPreview: true) }
             else { Image(systemName: "video.slash").foregroundStyle(colors.muted).frame(maxWidth: .infinity, maxHeight: .infinity) }
             Text("You").font(.system(size: 10)).foregroundStyle(.white).padding(6)
                 .background(.black.opacity(0.4), in: Capsule()).padding(8)
@@ -1010,7 +1010,7 @@ private struct FamilyCallView: View {
     }
     @ViewBuilder private func backdrop(_ call: FamilyCallInfo) -> some View {
         if preview {
-            FamilyVideoRenderer(track: media.localVideo, mirror: true).ignoresSafeArea()
+            FamilyVideoRenderer(track: media.localVideo, mirror: media.localPreviewMirrored, fitPreview: true).ignoresSafeArea()
             LinearGradient(colors: [.black.opacity(0.5), .clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
         } else if video {
             ZStack {
@@ -1115,11 +1115,12 @@ private struct FamilyCallControl: View {
 private struct FamilyVideoRenderer: UIViewRepresentable {
     let track: RTCVideoTrack?
     let mirror: Bool
+    var fitPreview = false
     final class Coordinator { var track: RTCVideoTrack? }
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeUIView(context: Context) -> RTCMTLVideoView {
         let view = RTCMTLVideoView(frame: .zero)
-        view.videoContentMode = .scaleAspectFill
+        view.videoContentMode = fitPreview ? .scaleAspectFit : .scaleAspectFill
         return view
     }
     func updateUIView(_ view: RTCMTLVideoView, context: Context) {

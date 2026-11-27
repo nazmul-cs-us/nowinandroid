@@ -8,6 +8,7 @@ import Shared
 @MainActor final class FamilyWebRTC: NSObject, ObservableObject {
     @Published private(set) var localVideo: RTCVideoTrack?
     @Published private(set) var remoteVideo: RTCVideoTrack?
+    @Published private(set) var localPreviewMirrored = true
     var onSignal: (([String: Any]) -> Void)?
     var onConnected: ((Bool) -> Void)?
     var onRoute: ((String) -> Void)?
@@ -176,12 +177,14 @@ import Shared
             abs(CMVideoFormatDescriptionGetDimensions($1.formatDescription).width - 640)
         }) else { throw MediaError.camera }
         let maximum = format.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 24
-        cameraDevice = device
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             capture.startCapture(with: device, format: format, fps: max(1, min(24, Int(maximum)))) { error in
                 if let error { continuation.resume(throwing: error) } else { continuation.resume() }
             }
         }
+        guard capturer === capture else { return }
+        cameraDevice = device
+        localPreviewMirrored = device.position == .front
         cameraStarted = true
     }
     func faceBlur(_ enabled: Bool) {

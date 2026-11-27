@@ -9,6 +9,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 import org.webrtc.*
@@ -32,6 +33,8 @@ class AndroidFamilyMedia(
     val egl: EglBase = EglBase.create()
     val localVideo = MutableStateFlow<VideoTrack?>(null)
     val remoteVideo = MutableStateFlow<VideoTrack?>(null)
+    private val frontCamera = MutableStateFlow(true)
+    val localPreviewMirrored = frontCamera.asStateFlow()
     private val audio = context.getSystemService(AudioManager::class.java)
     private val focus = FamilyAudioFocus(audio, scope, FamilyTelecom.audioFocus)
     private var previousMode = AudioManager.MODE_NORMAL
@@ -168,6 +171,7 @@ class AndroidFamilyMedia(
         val enumerator: CameraEnumerator = if (Camera2Enumerator.isSupported(context)) Camera2Enumerator(context) else Camera1Enumerator(false)
         val name = enumerator.deviceNames.firstOrNull { enumerator.isFrontFacing(it) } ?: enumerator.deviceNames.first()
         capturer = enumerator.createCapturer(name, null) ?: error("Camera unavailable")
+        frontCamera.value = enumerator.isFrontFacing(name)
         prepareCameraTrack()
         texture = SurfaceTextureHelper.create("FamilyCamera", egl.eglBaseContext)
         capturer!!.initialize(texture, context, privacyProcessor!!)
@@ -238,7 +242,18 @@ class AndroidFamilyMedia(
         faceBlurEnabled = enabled
         privacyProcessor?.setEnabled(enabled)
     }
-    fun switchCamera() { capturer?.switchCamera(null) }
+    fun switchCamera() {
+        val camera = capturer ?: return
+        camera.switchCamera(object : CameraVideoCapturer.CameraSwitchHandler {
+            override fun onCameraSwitchDone(isFrontCamera: Boolean) {
+                scope.launch {
+                    if (capturer === camera) frontCamera.value = isFrontCamera
+                }
+            }
+
+            override fun onCameraSwitchError(errorDescription: String?) = Unit
+        })
+    }
     @Suppress("DEPRECATION") fun speaker(enabled: Boolean) { audio.isSpeakerphoneOn = enabled }
     fun close(preservePreview: Boolean = false) {
         epoch++; remoteDescription = false; candidates.clear()
