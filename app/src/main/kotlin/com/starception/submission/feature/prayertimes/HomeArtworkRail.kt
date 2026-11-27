@@ -1,12 +1,16 @@
 package com.starception.submission.feature.prayertimes
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -68,6 +72,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -160,95 +165,134 @@ internal fun HomeReadingRecommendations(
     modifier: Modifier = Modifier,
     onOpen: (NowNudgeKnowledgeCandidate) -> Unit,
 ) {
-    val recommendations = KnowledgeSourceKind.entries.mapNotNull { kind ->
+    val recommendations = (homeRecommendationKinds(page).mapNotNull { kind ->
         candidates[homeRecommendationSlot(page, kind)]
             ?.takeIf { kind != KnowledgeSourceKind.SURAH || homeReflectionMatchesReading(page, readingSurahNumber, it.target) }
-    } + additionalRecommendations
-    if (recommendations.isEmpty() && !preparing) return
-    val context = LocalContext.current.applicationContext
+    } + additionalRecommendations).distinctBy(NowNudgeKnowledgeCandidate::sourceId)
+    val initialSources = remember(page) { recommendations.mapTo(mutableSetOf()) { it.sourceId } }
     val ink = MaterialTheme.colorScheme.onBackground
-    val sourceInk = ink.copy(alpha = .72f)
     val headlineFont = Font(Res.font.lora_regular)
     val headlineStyle = remember(headlineFont) {
         HomeTypography.reflection.copy(
             fontFamily = FontFamily(headlineFont),
-            fontSize = 16.sp,
-            lineHeight = 22.sp,
+            fontSize = 17.sp,
+            lineHeight = 24.sp,
             letterSpacing = 0.sp,
         )
     }
-    Column(modifier.fillMaxWidth().padding(top = 12.dp)) {
-        HorizontalDivider(color = ink.copy(alpha = .16f))
-        Text(
-            "Further reading",
-            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
-            style = HomeTypography.eyebrow,
-            color = sourceInk,
-        )
-        if (preparing && recommendations.isEmpty()) {
+    AnimatedVisibility(
+        visible = recommendations.isNotEmpty() || preparing,
+        modifier = modifier.fillMaxWidth(),
+        enter = fadeIn(tween(180)) + expandVertically(tween(260), expandFrom = Alignment.Top),
+        exit = fadeOut(tween(130)) + shrinkVertically(tween(200), shrinkTowards = Alignment.Top),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+            HorizontalDivider(color = ink.copy(alpha = .16f))
             Text(
-                "Preparing recommendations…",
-                modifier = Modifier.padding(vertical = 8.dp),
-                style = HomeTypography.caption,
-                color = sourceInk,
+                "Further reading",
+                modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
+                style = HomeTypography.eyebrow,
+                color = ink.copy(alpha = .72f),
             )
-        }
-        for (candidate in recommendations) {
-            val (title, source) = when (val target = candidate.target) {
-                is NowNudgeKnowledgeTarget.QuranAyah -> (
-                    QuranData.surahs.firstOrNull { it.number == target.surahNumber }
-                        ?.let { "Surah ${it.nameEnglish}" } ?: "Surah ${target.surahNumber}"
-                    ) to "Quran ${target.surahNumber}:${target.ayahNumber}"
-                is NowNudgeKnowledgeTarget.Hadith -> (
-                    candidate.topic.takeIf { it.isNotBlank() && it != target.collectionName }
-                        ?: "Hadith ${target.hadithNumber}"
-                    ) to (candidate.nudge.sourceLabel ?: target.collectionName)
-                is NowNudgeKnowledgeTarget.FortressDua ->
-                    target.dua.chapterTitle.ifBlank { "Dua" } to "Fortress of the Muslim · Dua ${target.dua.position}"
-            }
-            val translation by key(candidate.target, translationLanguage) {
-                produceState<String?>(null) {
-                    if (translationLanguage != "en") {
-                        value = withContext(Dispatchers.IO) {
-                            readHomePassageTranslation(context, candidate.target, translationLanguage)
+            recommendations.forEachIndexed { index, candidate ->
+                key(page, candidate.sourceId) {
+                    val visibility = remember {
+                        MutableTransitionState(candidate.sourceId in initialSources).apply { targetState = true }
+                    }
+                    AnimatedVisibility(
+                        visibleState = visibility,
+                        enter = fadeIn(tween(200, delayMillis = 30)) +
+                            expandVertically(tween(270, easing = FastOutSlowInEasing), expandFrom = Alignment.Top),
+                    ) {
+                        Column {
+                            if (index > 0) HorizontalDivider(color = ink.copy(alpha = .09f))
+                            HomeReadingRecommendation(candidate, translationLanguage, headlineStyle, ink, onOpen)
                         }
                     }
                 }
             }
-            val gist = candidate.nudge.label.takeIf {
-                translationLanguage != "en" && candidate.modelGenerated &&
-                    it.isNotBlank() && !it.equals(title, ignoreCase = true)
-            }
-            val excerpt = translation?.let(::homeEvidencePreview) ?: gist
-                ?: candidate.nudge.supportingText?.let(::homeEvidencePreview)
-            val citation = when {
-                translationLanguage == "en" -> source
-                translation != null -> homeTranslationReference(candidate.target, source, translationLanguage)
-                !excerpt.isNullOrBlank() -> "$source · English"
-                else -> source
-            }
-            Column(
-                modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(candidate) }
-                    .heightIn(min = 48.dp).padding(vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+            AnimatedVisibility(
+                visible = preparing,
+                enter = fadeIn(tween(150)),
+                exit = fadeOut(tween(120)) + shrinkVertically(tween(200), shrinkTowards = Alignment.Top),
             ) {
-                Text(title, style = headlineStyle, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (!excerpt.isNullOrBlank()) {
-                    Text(
-                        excerpt, style = HomeTypography.body, color = ink.copy(alpha = .84f),
-                        maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Text(citation, style = HomeTypography.caption, color = sourceInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (recommendations.isEmpty()) "Preparing recommendations…" else "Preparing more readings…",
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    style = HomeTypography.caption,
+                    color = ink.copy(alpha = .72f),
+                )
             }
         }
-        if (preparing && recommendations.isNotEmpty()) {
-            Text(
-                "Preparing more readings…",
-                modifier = Modifier.padding(vertical = 8.dp),
-                style = HomeTypography.caption,
-                color = sourceInk,
-            )
+    }
+}
+
+@Composable
+private fun HomeReadingRecommendation(
+    candidate: NowNudgeKnowledgeCandidate,
+    translationLanguage: String,
+    headlineStyle: TextStyle,
+    ink: Color,
+    onOpen: (NowNudgeKnowledgeCandidate) -> Unit,
+) {
+    val context = LocalContext.current.applicationContext
+    val (title, source) = when (val target = candidate.target) {
+        is NowNudgeKnowledgeTarget.QuranAyah -> (
+            QuranData.surahs.firstOrNull { it.number == target.surahNumber }
+                ?.let { "Surah ${it.nameEnglish}" } ?: "Surah ${target.surahNumber}"
+            ) to "Quran ${target.surahNumber}:${target.ayahNumber}"
+        is NowNudgeKnowledgeTarget.Hadith -> (
+            candidate.topic.takeIf { it.isNotBlank() && it != target.collectionName }
+                ?: "Hadith ${target.hadithNumber}"
+            ) to (candidate.nudge.sourceLabel ?: target.collectionName)
+        is NowNudgeKnowledgeTarget.FortressDua ->
+            target.dua.chapterTitle.ifBlank { "Dua" } to "Fortress of the Muslim · Dua ${target.dua.position}"
+    }
+    val translation by key(candidate.target, translationLanguage) {
+        produceState<String?>(null) {
+            if (translationLanguage != "en") {
+                value = withContext(Dispatchers.IO) {
+                    readHomePassageTranslation(context, candidate.target, translationLanguage)
+                }
+            }
+        }
+    }
+    val gist = candidate.nudge.label.takeIf {
+        translationLanguage != "en" && candidate.modelGenerated &&
+            it.isNotBlank() && !it.equals(title, ignoreCase = true)
+    }
+    val excerpt = translation?.let(::homeEvidencePreview) ?: gist
+        ?: candidate.nudge.supportingText?.let(::homeEvidencePreview)
+    val citation = when {
+        translationLanguage == "en" -> source
+        translation != null -> homeTranslationReference(candidate.target, source, translationLanguage)
+        !excerpt.isNullOrBlank() -> "$source · English"
+        else -> source
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(candidate) }
+            .heightIn(min = 48.dp).padding(vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            citation, style = HomeTypography.caption, color = ink.copy(alpha = .68f),
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+        )
+        Text(title, style = headlineStyle, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        AnimatedContent(
+            targetState = excerpt,
+            transitionSpec = {
+                (fadeIn(tween(170, delayMillis = 40)) togetherWith fadeOut(tween(100)))
+                    .using(SizeTransform { _, _ -> tween(240, easing = FastOutSlowInEasing) })
+            },
+            label = "readingExcerpt",
+        ) { body ->
+            if (!body.isNullOrBlank()) {
+                Text(
+                    body, style = HomeTypography.body.copy(fontSize = 14.sp, lineHeight = 21.sp),
+                    color = ink.copy(alpha = .88f), maxLines = 3, overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
